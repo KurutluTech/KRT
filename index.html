@@ -206,6 +206,10 @@ ead>
 
             <!-- 1. OPERATÖR BEYAN EKRANI -->
             <section id="tab-operatör" class="tab-content active space-y-6">
+                <!-- KMI-FIX (2026-09-25): Atanan iş emirleri artık Shop Floor'un ayrı ekranına
+                     gitmeden doğrudan Operatör Beyanı sekmesinde de görünür - tek beyan
+                     platformu, iki ayrı yer değil. Yeni atama olduğunda uyarı gösterilir. -->
+                <div id="operatorAssignedJobsPanel"></div>
                 <div id="operatorProfileCard" class="bg-slate-800 border border-blue-800/60 rounded-xl p-4 flex flex-wrap items-center gap-4">
                     <div id="operatorProfilePhoto" class="w-16 h-16 rounded-full bg-slate-900 border border-slate-700 flex items-center justify-center text-2xl">👤</div>
                     <div class="flex-1 min-w-[220px]"><div id="operatorProfileName" class="text-lg font-bold text-white">-</div><div id="operatorProfileContact" class="text-xs text-slate-400 mt-1">-</div><div class="mt-2"><div class="text-[10px] uppercase tracking-wide text-slate-500 font-bold mb-1">Onaylı Kabiliyetler / Eğitimler</div><div id="operatorProfileSkills" class="flex flex-wrap gap-1.5"><span class="text-[10px] text-slate-500">Tanımlı kabiliyet yok.</span></div><div class="text-[10px] uppercase tracking-wide text-slate-500 font-bold mt-2 mb-1">Görevler</div><div id="operatorProfileTasks" class="flex flex-wrap gap-1.5"><span class="text-[10px] text-slate-500">Tanımlı görev yok.</span></div></div><button onclick="editMyProfile()" class="mt-2 bg-slate-700 hover:bg-slate-600 text-white px-2 py-1 rounded text-[10px]"><i class="fa-solid fa-user-pen mr-1"></i>Bilgilerimi / Resmimi Düzenle</button></div>
@@ -528,10 +532,29 @@ ead>
       </div>
     </section>
 
-<section id="tab-siparis" class="tab-content space-y-6"><div class="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-8 gap-2 text-[10px] font-bold"><div class="bg-blue-950/50 border border-blue-800 rounded p-2">1 · SİPARİŞ</div><div class="bg-cyan-950/50 border border-cyan-800 rounded p-2">2 · REZERVASYON</div><div class="bg-amber-950/50 border border-amber-800 rounded p-2">3 · ÜRETİM</div><div class="bg-emerald-950/50 border border-emerald-800 rounded p-2">4 · KALİTE/DEPO</div><div class="bg-sky-950/50 border border-sky-800 rounded p-2">5 · SEVKİYAT</div><div class="bg-violet-950/50 border border-violet-800 rounded p-2">6 · FATURA</div><div class="bg-green-950/50 border border-green-800 rounded p-2">7 · TAHSİLAT</div><div class="bg-slate-800 border border-slate-600 rounded p-2">8 · AUDIT</div></div>
+<section id="tab-siparis" class="tab-content space-y-6"><div class="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-8 gap-2 text-[10px] font-bold">
+<button type="button" onclick="document.getElementById('v118OrdersSection')?.scrollIntoView({behavior:'smooth',block:'start'})" class="bg-blue-950/50 border border-blue-800 rounded p-2 text-left hover:border-blue-500">1 · SİPARİŞ</button>
+<button type="button" onclick="document.getElementById('v118OrdersSection')?.scrollIntoView({behavior:'smooth',block:'start'})" class="bg-cyan-950/50 border border-cyan-800 rounded p-2 text-left hover:border-cyan-500">2 · REZERVASYON</button>
+<button type="button" onclick="document.getElementById('v118ProductionSection')?.scrollIntoView({behavior:'smooth',block:'start'})" class="bg-amber-950/50 border border-amber-800 rounded p-2 text-left hover:border-amber-500">3 · ÜRETİM</button>
+<button type="button" onclick="switchTab('kalite')" class="bg-emerald-950/50 border border-emerald-800 rounded p-2 text-left hover:border-emerald-500">4 · KALİTE/DEPO</button>
+<button type="button" onclick="switchTab('sevkiyat')" class="bg-sky-950/50 border border-sky-800 rounded p-2 text-left hover:border-sky-500">5 · SEVKİYAT</button>
+<button type="button" onclick="document.getElementById('v118FinanceSection')?.scrollIntoView({behavior:'smooth',block:'start'})" class="bg-violet-950/50 border border-violet-800 rounded p-2 text-left hover:border-violet-500">6 · FATURA</button>
+<button type="button" onclick="document.getElementById('v118FinanceSection')?.scrollIntoView({behavior:'smooth',block:'start'})" class="bg-green-950/50 border border-green-800 rounded p-2 text-left hover:border-green-500">7 · TAHSİLAT</button>
+<button type="button" onclick="document.getElementById('v118AuditSection')?.scrollIntoView({behavior:'smooth',block:'start'})" class="bg-slate-800 border border-slate-600 rounded p-2 text-left hover:border-slate-400">8 · AUDIT</button>
+</div>
 <div class="bg-slate-800 border border-cyan-700/40 rounded-xl p-5 shadow-lg"><div class="flex flex-wrap justify-between gap-3"><div><h2 class="text-xl font-black text-white"><i class="fa-solid fa-diagram-project text-cyan-400 mr-2"></i>KURUTLU LIVE · Order & Flow Center</h2><p class="text-xs text-slate-400 mt-1">Performance Center · Paperless Machining · Every movement measured. Every decision informed.</p></div><div class="flex flex-wrap gap-2"><button onclick="kmiOpenScan()" class="bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2 rounded-lg text-xs font-black"><i class="fa-solid fa-qrcode mr-1"></i> SCAN</button><button onclick="kmiOpenLive()" class="bg-violet-600 hover:bg-violet-500 text-white px-4 py-2 rounded-lg text-xs font-black"><i class="fa-solid fa-tower-broadcast mr-1"></i> KURUTLU LIVE</button><button onclick="v118OpenOrder()" class="bg-cyan-600 hover:bg-cyan-500 text-white px-4 py-2 rounded-lg text-xs font-black"><i class="fa-solid fa-plus mr-1"></i> Yeni Müşteri Siparişi</button></div></div><div id="v118Kpis" class="grid grid-cols-2 md:grid-cols-5 gap-3 mt-4"></div></div>
-<div class="grid grid-cols-1 xl:grid-cols-3 gap-5"><div class="xl:col-span-2 bg-slate-800 border border-slate-700 rounded-xl p-5"><div class="flex justify-between mb-3"><h3 class="font-bold text-white">Müşteri Siparişleri</h3><select id="v118OrderFilter" onchange="v118Render()" class="bg-slate-900 border border-slate-700 rounded p-1 text-xs"><option value="">Tümü</option><option>OPEN</option><option>PARTIAL</option><option>READY</option><option>SHIPPED</option><option>INVOICED</option><option>PAID</option><option>CANCELLED</option></select></div><div class="overflow-x-auto"><table class="w-full text-xs"><thead class="bg-slate-900 text-slate-400"><tr><th class="p-2 text-left">Sipariş</th><th class="p-2 text-left">Müşteri</th><th class="p-2 text-left">Termin</th><th class="p-2 text-right">Tutar</th><th class="p-2 text-left">Durum</th><th class="p-2">İşlem</th></tr></thead><tbody id="v118Orders"></tbody></table></div></div><div class="bg-slate-800 border border-slate-700 rounded-xl p-5"><h3 class="font-bold text-white mb-3">Stok Özeti</h3><div id="v118Stock" class="space-y-2"></div></div></div>
-<div class="grid grid-cols-1 xl:grid-cols-2 gap-5"><div class="bg-slate-800 border border-slate-700 rounded-xl p-5"><h3 class="font-bold text-white mb-3">Fatura / Tahsilat</h3><div id="v118Finance" class="space-y-2"></div></div><div class="bg-slate-800 border border-slate-700 rounded-xl p-5"><h3 class="font-bold text-white mb-3">Audit Trail</h3><div id="v118Audit" class="space-y-2 max-h-80 overflow-auto"></div></div></div>
+<!-- KMI-FIX (2026-09-25): "3 · ÜRETİM" etiketi burada sadece dekoratif bir kutuydu; hiçbir
+     gerçek üretim/iş emri verisi göstermiyordu (bu ekranın "Müşteri Siparişleri" tablosu ayrı
+     bir veri kümesidir - sadece bu ekrandan "Yeni Müşteri Siparişi" ile açılan siparişleri
+     gösterir, shop floor'daki gerçek iş emirlerini DEĞİL). Şimdi gerçek jobOrders verisi
+     (Operatör Beyanı / Shop Floor / Kalite ile aynı kaynak) burada da gösteriliyor ve her
+     satırda kaynak planlama (makine/vardiya/operatör atama) butonu var. -->
+<div id="v118ProductionSection" class="bg-slate-800 border border-amber-700/40 rounded-xl p-5 shadow-lg">
+  <div class="flex flex-wrap justify-between items-center gap-3 mb-3"><div><h3 class="font-bold text-white"><i class="fa-solid fa-industry text-amber-400 mr-2"></i>Üretimde Olan İş Emirleri · Gerçek Zamanlı</h3><p class="text-[11px] text-slate-500 mt-1">Operatör Beyanı / Shop Floor / Kalite ile aynı iş emri verisi. Yukarıdaki "Müşteri Siparişleri" tablosundan ayrıdır.</p></div><button onclick="renderV118ProductionPanel()" class="bg-slate-700 hover:bg-slate-600 px-3 py-1.5 rounded text-[10px] text-white">Yenile</button></div>
+  <div class="overflow-x-auto"><table class="w-full text-xs"><thead class="bg-slate-900 text-slate-400"><tr><th class="p-2 text-left">İş Emri</th><th class="p-2 text-left">Müşteri / Ürün</th><th class="p-2 text-left">Makine · Vardiya</th><th class="p-2 text-left">Hedef / Tamamlanan</th><th class="p-2 text-left">Durum</th><th class="p-2 text-left">Aksiyon</th></tr></thead><tbody id="v118ProductionTable"></tbody></table></div>
+</div>
+<div id="v118OrdersSection" class="grid grid-cols-1 xl:grid-cols-3 gap-5"><div class="xl:col-span-2 bg-slate-800 border border-slate-700 rounded-xl p-5"><div class="flex justify-between mb-3"><h3 class="font-bold text-white">Müşteri Siparişleri</h3><select id="v118OrderFilter" onchange="v118Render()" class="bg-slate-900 border border-slate-700 rounded p-1 text-xs"><option value="">Tümü</option><option>OPEN</option><option>PARTIAL</option><option>READY</option><option>SHIPPED</option><option>INVOICED</option><option>PAID</option><option>CANCELLED</option></select></div><div class="overflow-x-auto"><table class="w-full text-xs"><thead class="bg-slate-900 text-slate-400"><tr><th class="p-2 text-left">Sipariş</th><th class="p-2 text-left">Müşteri</th><th class="p-2 text-left">Termin</th><th class="p-2 text-right">Tutar</th><th class="p-2 text-left">Durum</th><th class="p-2">İşlem</th></tr></thead><tbody id="v118Orders"></tbody></table></div></div><div class="bg-slate-800 border border-slate-700 rounded-xl p-5"><h3 class="font-bold text-white mb-3">Stok Özeti</h3><div id="v118Stock" class="space-y-2"></div></div></div>
+<div id="v118FinanceSection" class="grid grid-cols-1 xl:grid-cols-2 gap-5"><div class="bg-slate-800 border border-slate-700 rounded-xl p-5"><h3 class="font-bold text-white mb-3">Fatura / Tahsilat</h3><div id="v118Finance" class="space-y-2"></div></div><div id="v118AuditSection" class="bg-slate-800 border border-slate-700 rounded-xl p-5"><h3 class="font-bold text-white mb-3">Audit Trail</h3><div id="v118Audit" class="space-y-2 max-h-80 overflow-auto"></div></div></div>
 </section>
 
 <section id="tab-yonetici" class="tab-content space-y-6">
@@ -1469,6 +1492,30 @@ ead>
         function renderOeeMachineTable(){const body=document.getElementById('oeeMachineTableBody');if(!body)return;const month=document.getElementById('productionTargetMonth')?.value||getCurrentMonthKey();body.innerHTML=MACHINES_LIST.map(m=>{const name=`${m.code} - ${m.name}`,x=machineOeeMetrics(name,month),pct=v=>(v*100).toFixed(1)+'%';return `<tr class="border-t border-slate-800"><td class="p-2 font-semibold text-white">${name}</td><td class="text-center font-black ${x.oee>=.85?'text-emerald-400':x.oee>=.65?'text-amber-300':'text-rose-400'}">${x.rows?pct(x.oee):'-'}</td><td class="text-center">${x.rows?pct(x.availability):'-'}</td><td class="text-center">${x.rows?pct(x.performance):'-'}</td><td class="text-center">${x.rows?pct(x.quality):'-'}</td><td class="text-center">${x.dt.tool} dk</td><td class="text-center">${x.dt.setup} dk</td><td class="text-center">${x.dt.breakdown} dk</td><td class="text-center">${x.dt.material} dk</td><td class="text-center">${x.mtbf?x.mtbf.toFixed(1)+' sa':'-'}</td><td class="text-center">${x.mttr?x.mttr.toFixed(1)+' sa':'-'}</td></tr>`}).join('');}
         function renderMaintenanceCenter(){const cards=document.getElementById('machineHealthCards');if(!cards)return;cards.innerHTML=MACHINES_LIST.map(m=>{const name=`${m.code} - ${m.name}`,h=machineHealth(name),open=maintenanceRecords.filter(r=>r.machine===name&&!['Kapalı','Tamamlandı'].includes(r.status)).length,next=maintenanceRecords.filter(r=>r.machine===name&&r.plannedAt&&r.status!=='Kapalı').sort((a,b)=>String(a.plannedAt).localeCompare(String(b.plannedAt)))[0],o=machineOeeMetrics(name);return `<div class="bg-slate-950/60 border border-slate-700 rounded-xl p-3"><div class="flex justify-between"><b class="text-white text-xs">${name}</b><span class="font-black ${h>=90?'text-emerald-400':h>=70?'text-amber-400':'text-red-400'}">${h}/100</span></div><div class="h-2 bg-slate-800 rounded mt-2 overflow-hidden"><div class="h-full bg-emerald-500" style="width:${h}%"></div></div><div class="grid grid-cols-3 gap-1 mt-2 text-[9px]"><div class="bg-slate-900 rounded p-1">OEE <b class="text-cyan-300">${o.rows?(o.oee*100).toFixed(1)+'%':'-'}</b></div><div class="bg-slate-900 rounded p-1">MTBF <b>${o.mtbf?o.mtbf.toFixed(1)+'s':'-'}</b></div><div class="bg-slate-900 rounded p-1">MTTR <b>${o.mttr?o.mttr.toFixed(1)+'s':'-'}</b></div></div><div class="text-[10px] text-slate-500 mt-2">Açık kayıt: ${open} · Sonraki plan: ${next?.plannedAt||'-'}</div></div>`}).join('');const body=document.getElementById('maintenanceTableBody'),now=new Date();body.innerHTML=maintenanceRecords.map(r=>{const p=PERSONNEL_LIST.find(x=>Number(x.id)===Number(r.assignedTo));const h=maintenanceElapsedHours(r,r.closedAt||now.toISOString()),cls=maintenanceSlaClass(r);const sla=r.source!=='operator'?'Planlı':r.status==='Kapalı'?(h<=24?`≤24 saat ✓ ×1,10`:(h>=72?`≥72 saat · ekstra yok`:`${h.toFixed(1)} saat · ekstra yok`)):(h>=72?'72 saat aşıldı · ekstra yok':h<=24?`24 saat penceresi · ${h.toFixed(1)}s`:`${h.toFixed(1)} saat`);return `<tr class="border-t border-slate-800"><td class="p-2 font-mono">${r.id}</td><td class="p-2">${r.machine}</td><td class="p-2">${r.type}</td><td class="p-2 max-w-[300px]">${r.description}</td><td class="p-2">${r.plannedAt||new Date(r.openedAt).toLocaleString('tr-TR')}</td><td class="p-2">${p?.name||'-'}</td><td class="p-2 ${cls==='reward'||cls==='reward-window'?'text-emerald-400':cls==='expired'?'text-red-400':'text-amber-300'}">${sla}</td><td class="p-2">${r.status}</td><td class="p-2">${r.status!=='Kapalı'?`<button onclick="closeMaintenanceRecord('${r.id}')" class="bg-emerald-700 px-2 py-1 rounded text-white">Kapat</button>`:'-'}</td></tr>`}).join('')||'<tr><td colspan="9" class="p-4 text-center text-slate-500">Bakım kaydı yok.</td></tr>';renderOeeMachineTable();}
 
+        // KMI-FIX (2026-09-25): "Sipariş & Stok" ekranının "3 · ÜRETİM" kutusu boştu çünkü
+        // o ekranın kendi "Müşteri Siparişleri" verisi (V.orders) shop floor'daki gerçek iş
+        // emirlerinden (jobOrders) tamamen ayrı bir veri kümesidir. Bu fonksiyon gerçek açık/
+        // üretimdeki iş emirlerini burada da gösterir ve kaynak planlama (makine/vardiya/
+        // operatör atama) ile Shop Floor'a açma butonlarını ekler.
+        function renderV118ProductionPanel(){
+            const tbody=document.getElementById('v118ProductionTable'); if(!tbody) return;
+            const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+            const open=(jobOrders||[]).filter(j=>!j.deleted&&['Açık','Üretimde'].includes(String(j.status||'')));
+            tbody.innerHTML = open.map(j=>{
+                const people=(j.assignedTo||[]).map(id=>PERSONNEL_LIST.find(p=>Number(p.id)===Number(id))?.name).filter(Boolean).join(', ')||'Atanmamış';
+                const machineOk = j.machine && !/atanmad/i.test(j.machine);
+                const shiftOk = j.shift && !/atanmad/i.test(j.shift);
+                return `<tr class="border-t border-slate-800">
+                    <td class="p-2 font-mono text-blue-300">${esc(j.id)}</td>
+                    <td class="p-2">${esc(j.client||'-')}<div class="text-slate-500">${esc(j.item||'')}</div></td>
+                    <td class="p-2">${machineOk?`<span class="text-emerald-300">${esc(j.machine)}</span>`:'<span class="text-rose-400">Makine atanmadı</span>'}${shiftOk?` · ${esc(j.shift)}`:' · <span class="text-rose-400">Vardiya yok</span>'}<div class="text-[10px] text-slate-500 mt-0.5">${esc(people)}</div></td>
+                    <td class="p-2">${Number(j.completedQty||0)} / ${Number(j.targetQty||0)}</td>
+                    <td class="p-2"><span class="px-2 py-0.5 text-[10px] rounded ${j.status==='Üretimde'?'bg-emerald-900/60 text-emerald-300':'bg-amber-900/60 text-amber-300'}">${esc(j.status)}</span></td>
+                    <td class="p-2 whitespace-nowrap"><button onclick="editJobOrder('${esc(j.id)}')" class="bg-cyan-700 hover:bg-cyan-600 text-white px-2 py-1.5 rounded-lg text-[10px] font-bold mr-1"><i class="fa-solid fa-gears"></i> Kaynak Planla</button><button onclick="window.kmiOpenWork?.('${esc(j.id)}')" class="bg-emerald-700 hover:bg-emerald-600 text-white px-2 py-1.5 rounded-lg text-[10px] font-bold"><i class="fa-solid fa-play"></i> Shop Floor</button></td>
+                </tr>`;
+            }).join('') || `<tr><td colspan="6" class="p-4 text-center text-slate-500">Açık veya üretimdeki iş emri yok.</td></tr>`;
+        }
+
         function refreshAllViews() {
             renderJobOrders();
             renderDeclarations();
@@ -1493,6 +1540,8 @@ ead>
             renderOperatorMotivationPanel();
             renderOperatorProfile();
             renderQualityProductionDashboard();
+            try{window.renderOperatorAssignedJobs?.();}catch(e){}
+            try{renderV118ProductionPanel();}catch(e){}
         }
 
         // TAB SWITCHING
@@ -1543,6 +1592,8 @@ ead>
                 updateJobOrderDropdowns();
                 document.getElementById('kaliteUserBadge').innerText = `Aktif Kalite Personeli: ${currentUser.name}`;
             }
+            if(tabName==='operatör'){ try{window.renderOperatorAssignedJobs?.();}catch(e){} }
+            if(tabName==='siparis'){ try{renderV118ProductionPanel();}catch(e){} }
         }
 
         function initMachineDropdown() {
@@ -1844,12 +1895,29 @@ ead>
                 if(!method){ alert('Kalite onayı için ölçüm cihazı / yöntemi seçiniz.'); return; }
                 d.measurementMethods=[method];
                 d.qualityGood=Math.max(0,parseInt(document.getElementById('qGood-'+declId)?.value)||0); d.qualityScrap=Math.max(0,parseInt(document.getElementById('qScrap-'+declId)?.value)||0); d.qualityAllocated=Math.max(0,parseInt(document.getElementById('qAllocated-'+declId)?.value)||0); d.qualityQty=d.qualityGood+d.qualityScrap+d.qualityAllocated;
-                d.status = "Hazır - Muhasebe Onayı Bekliyor";
                 d.approver = currentUser.name;
                 d.qualityApprovalDate = new Date().toLocaleString('tr-TR');
                 d.updatedAt = new Date().toISOString();
-                d.readyStatus = "Hazır";
-                const jo = jobOrders.find(j=>j.id===d.jobOrder); if(jo){ jo.status='Muhasebe Onayı Bekliyor'; jo.updatedAt=new Date().toISOString(); saveStorage('jobOrders',jobOrders); }
+                const jo = jobOrders.find(j=>j.id===d.jobOrder);
+                // KMI-FIX (2026-09-25): Operasyonlar arası sevk beyanı (bkz. confirmMachineTransfer).
+                // Bu beyan Muhasebe/Sevkiyat akışına GİRMEZ - iş emri henüz bitmedi, sadece bir
+                // operasyondan diğerine geçiyor. Kalite onayı burada iş emrini gerçekten hedef
+                // makineye taşır ve Yönetim'in yeni operatör ataması kuyruğuna düşürür.
+                if(d.transferInfo && d.transferInfo.toMachine){
+                    d.status = "Ara Operasyon Onayı Tamamlandı";
+                    d.readyStatus = "Operasyonlar Arası";
+                    if(jo){
+                        const now=new Date().toISOString();
+                        jo.transferHistory=Array.isArray(jo.transferHistory)?jo.transferHistory:[];
+                        jo.transferHistory.push({fromMachine:d.transferInfo.fromMachine,toMachine:d.transferInfo.toMachine,requestedBy:d.transferInfo.requestedBy,requestedById:d.transferInfo.requestedById,requestedAt:d.transferInfo.requestedAt,note:d.transferInfo.note,completedQtyAtTransfer:Number(jo.completedQty||0),qualityApprovedBy:currentUser.name,qualityApprovedAt:now});
+                        jo.transferPending=true;jo.transferFromMachine=d.transferInfo.fromMachine;jo.machine=d.transferInfo.toMachine;jo.transferRequestedBy=d.transferInfo.requestedBy;jo.transferRequestedAt=d.transferInfo.requestedAt;jo.transferNote=d.transferInfo.note;jo.assignedTo=[];jo.status='Açık';jo.pendingTransferDeclId=null;jo.updatedAt=now;
+                        saveStorage('jobOrders',jobOrders);
+                    }
+                }else{
+                    d.status = "Hazır - Muhasebe Onayı Bekliyor";
+                    d.readyStatus = "Hazır";
+                    if(jo){ jo.status='Muhasebe Onayı Bekliyor'; jo.updatedAt=new Date().toISOString(); saveStorage('jobOrders',jobOrders); }
+                }
                 saveStorage('declarations', declarations);
                 refreshAllViews();
                 queueManagerReport('kalite onayı');
@@ -3060,11 +3128,13 @@ setTimeout(()=>{try{window.renderProductionTargetCenter()}catch(e){}try{window.r
     document.body.insertAdjacentHTML('beforeend', `
       <div id="machineTransferModal" class="hidden fixed inset-0 z-[90] bg-slate-950/80 items-center justify-center p-4">
         <div class="bg-slate-800 border border-amber-700/60 rounded-xl p-5 w-full max-w-lg shadow-2xl">
-          <div class="flex justify-between items-start gap-3 mb-4"><div><h3 class="text-lg font-black text-white"><i class="fa-solid fa-arrow-right-arrow-left text-amber-400 mr-2"></i>Bitmeyen Ürünü Başka Makineye Sevk</h3><p class="text-[11px] text-slate-400 mt-1">İş emri kapanmaz ve kaliteye gitmez. Yeni makinede operatör ataması için Yönetim'e düşer.</p></div><button type="button" onclick="closeMachineTransferModal()" class="text-slate-400 hover:text-white">✕</button></div>
+          <div class="flex justify-between items-start gap-3 mb-4"><div><h3 class="text-lg font-black text-white"><i class="fa-solid fa-arrow-right-arrow-left text-amber-400 mr-2"></i>Bitmeyen Ürünü Başka Makineye Sevk</h3><p class="text-[11px] text-slate-400 mt-1">İş emri kapanmaz. Bu operasyonda üretilenler önce <b class="text-emerald-300">Kaliteye</b> gider; Kalite onaylayınca iş emri hedef makineye sevk edilir ve Yönetim yeni operatör atar.</p></div><button type="button" onclick="closeMachineTransferModal()" class="text-slate-400 hover:text-white">✕</button></div>
           <div id="transferJobSummary" class="bg-slate-900 border border-slate-700 rounded-lg p-3 text-xs text-slate-300 mb-3"></div>
-          <label class="block text-xs text-slate-300 mb-1">Sevk Edilecek Makine</label><select id="transferTargetMachine" class="w-full bg-slate-950 border border-amber-700 rounded p-2 text-white text-xs"></select>
+          <label class="block text-xs text-slate-300 mb-1">Sevk Edilecek Makine (bu operasyon bitince gidecek)</label><select id="transferTargetMachine" class="w-full bg-slate-950 border border-amber-700 rounded p-2 text-white text-xs"></select>
+          <div class="grid grid-cols-3 gap-2 mt-3"><div><label class="block text-emerald-300 font-medium mb-1 text-xs">Sağlam</label><input type="number" id="transferGoodQty" min="0" value="0" class="w-full bg-slate-950 border border-emerald-700 rounded p-2 text-white text-xs"></div><div><label class="block text-red-300 font-medium mb-1 text-xs">Hurda</label><input type="number" id="transferScrapQty" min="0" value="0" class="w-full bg-slate-950 border border-red-700 rounded p-2 text-white text-xs"></div><div><label class="block text-amber-300 font-medium mb-1 text-xs">Tahsis</label><input type="number" id="transferAllocatedQty" min="0" value="0" class="w-full bg-slate-950 border border-amber-700 rounded p-2 text-white text-xs"></div></div>
+          <div class="text-[10px] text-slate-500 mt-1">Bu makinede şu ana kadar ürettiğiniz adetleri girin. Toplam sıfırdan büyük olmalı.</div>
           <label class="block text-xs text-slate-300 mt-3 mb-1">Operatör Notu</label><textarea id="transferOperatorNote" rows="2" class="w-full bg-slate-950 border border-slate-700 rounded p-2 text-white text-xs" placeholder="Kalan operasyon / bağlama / takım / dikkat edilmesi gerekenler..."></textarea>
-          <div class="grid grid-cols-2 gap-2 mt-4"><button type="button" onclick="closeMachineTransferModal()" class="bg-slate-700 text-white rounded p-2 text-xs">Vazgeç</button><button type="button" onclick="confirmMachineTransfer()" class="bg-amber-600 hover:bg-amber-500 text-white rounded p-2 text-xs font-black">Yönetim Atamasına Gönder</button></div>
+          <div class="grid grid-cols-2 gap-2 mt-4"><button type="button" onclick="closeMachineTransferModal()" class="bg-slate-700 text-white rounded p-2 text-xs">Vazgeç</button><button type="button" onclick="confirmMachineTransfer()" class="bg-amber-600 hover:bg-amber-500 text-white rounded p-2 text-xs font-black">Kaliteye Gönder</button></div>
         </div></div>
       <div id="transferAssignmentModal" class="hidden fixed inset-0 z-[91] bg-slate-950/80 items-center justify-center p-4">
         <div class="bg-slate-800 border border-cyan-700/60 rounded-xl p-5 w-full max-w-lg shadow-2xl">
@@ -3084,20 +3154,44 @@ setTimeout(()=>{try{window.renderProductionTargetCenter()}catch(e){}try{window.r
     document.getElementById('transferJobSummary').innerHTML=`<b class="text-blue-300">${esc(j.id)}</b> · ${esc(j.item)}<br>Mevcut makine: <b>${esc(currentMachine)}</b><br>Hedef: <b>${target}</b> · Tamamlanan: <b>${produced}</b> · Kalan: <b class="text-amber-300">${remaining}</b>`;
     document.getElementById('transferTargetMachine').innerHTML=opts.map(x=>`<option value="${esc(x)}">${esc(x)}</option>`).join('');
     document.getElementById('transferOperatorNote').value='';
+    document.getElementById('transferGoodQty').value='0';document.getElementById('transferScrapQty').value='0';document.getElementById('transferAllocatedQty').value='0';
     const m=document.getElementById('machineTransferModal');m.classList.remove('hidden');m.classList.add('flex');
   };
   window.closeMachineTransferModal=function(){const m=document.getElementById('machineTransferModal');if(m){m.classList.add('hidden');m.classList.remove('flex');}};
+  // KMI-FIX (2026-09-25): Operasyonlar arası kalite kontrolü. Eskiden bu sevk
+  // işlemi kaliteyi tamamen atlayıp doğrudan Yönetim'e (yeni operatör ataması)
+  // düşüyordu - fire/hatalı üretim bir sonraki makineye kontrolsüz taşınabiliyordu.
+  // Artık: sevk anında üretilen Sağlam/Hurda/Tahsis miktarı normal bir beyan gibi
+  // Kalite kuyruğuna gider; iş emri makinesi HENÜZ değişmez. Kalite onayladığında
+  // (bkz. approveKalite) iş emri gerçekten hedef makineye taşınır ve Yönetim'in
+  // yeni operatör ataması için "Operatör Ataması Bekliyor" listesine düşer.
   window.confirmMachineTransfer=function(){
     const id=document.getElementById('declJobOrder')?.value; const j=jobOrders.find(x=>x.id===id); if(!j)return;
     const to=document.getElementById('transferTargetMachine')?.value; if(!to||to===j.machine){alert('Farklı bir makine seçiniz.');return;}
+    const good=Math.max(0,parseInt(document.getElementById('transferGoodQty')?.value)||0);
+    const scrap=Math.max(0,parseInt(document.getElementById('transferScrapQty')?.value)||0);
+    const allocated=Math.max(0,parseInt(document.getElementById('transferAllocatedQty')?.value)||0);
+    if(good+scrap+allocated<=0){alert('Kaliteye göndermeden önce bu makinede ürettiğiniz Sağlam/Hurda/Tahsis adetlerini giriniz.');return;}
     const from=document.getElementById('declMachine')?.value||j.machine||''; const now=new Date().toISOString();
-    j.transferHistory=Array.isArray(j.transferHistory)?j.transferHistory:[];
-    j.transferHistory.push({fromMachine:from,toMachine:to,requestedBy:currentUser?.name||'-',requestedById:currentUser?.id||null,requestedAt:now,note:document.getElementById('transferOperatorNote')?.value.trim()||'',completedQtyAtTransfer:Number(j.completedQty||0)});
-    j.transferPending=true;j.transferFromMachine=from;j.machine=to;j.transferRequestedBy=currentUser?.name||'-';j.transferRequestedAt=now;j.transferNote=document.getElementById('transferOperatorNote')?.value.trim()||'';j.assignedTo=[];j.status='Açık';
+    const note=document.getElementById('transferOperatorNote')?.value.trim()||'';
+    const declId='BEY-XFER-'+Date.now().toString(36).toUpperCase();
+    const newDecl={
+      id:declId,date:new Date().toLocaleString('tr-TR',{dateStyle:'short',timeStyle:'short'}),
+      operator:currentUser?currentUser.name:'Operatör',workDate:new Date().toISOString().slice(0,10),
+      shift:document.getElementById('declShift')?.value||'1. Vardiya',machine:from,jobOrder:id,
+      qty:good+scrap+allocated,good,scrap,allocated,tools:'Değişen Takım Yok',
+      status:'Kalite Bekliyor',approver:'',shiftClosedAt:now,bonusFinalized:false,finalizedBonus:0,
+      source:'MACHINE_TRANSFER',
+      transferInfo:{fromMachine:from,toMachine:to,note,requestedBy:currentUser?.name||'-',requestedById:currentUser?.id||null,requestedAt:now}
+    };
+    declarations.unshift(newDecl);
+    j.completedQty=Number(j.completedQty||0)+good;
+    j.status='Kalite Bekliyor'; j.pendingTransferDeclId=declId;
+    saveStorage('declarations',declarations);
     saveStorage('jobOrders',jobOrders);
     if(activeJobDraftId===id){activeJobDraftId=null;}
     updateJobOrderDropdowns();refreshAllViews();closeMachineTransferModal();
-    alert(`${id} iş emri ${to} makinesine sevk edildi. İş emri kapanmadı; Yönetici Paneli'nde yeni operatör ataması bekliyor.`);
+    alert(`${id} iş emri için ${good} sağlam · ${scrap} hurda · ${allocated} tahsis Kalite onayına gönderildi. Kalite onaylayınca iş emri ${to} makinesine sevk edilecek.`);
   };
   let transferAssignJobId=null;
   window.openTransferAssignmentModal=function(id){
@@ -4951,7 +5045,12 @@ function persistJobs(){try{saveStorage('jobOrders',jobOrders)}catch(e){}}
 function personName(j){return (j.assignedTo||[]).map(id=>people().find(p=>Number(p.id)===Number(id))?.name).filter(Boolean).join(', ')||'Atanmamış'}
 function myJobs(){
  const p=currentPerson(),u=window.currentUser||{},admin=(()=>{try{return getEffectiveRole(u)==='ADMIN'}catch(e){return false}})();
- return jobs().filter(j=>!j.deleted&&!['Silindi','Kapalı','Tamamlandı','COMPLETED','CANCELLED'].includes(String(j.status||''))&&(admin||!p||(j.assignedTo||[]).map(Number).includes(Number(p.id))));
+ // KMI-FIX (2026-09-25): beyaz liste - sadece operatörün gerçekten çalışabileceği
+ // durumlar ('Açık','Üretimde') gösterilir. Eskiden kara liste kullanılıyordu ve
+ // Kalite/Muhasebe/Yönetim onayı bekleyen işler de "aktif işim" gibi görünüp
+ // operatörün aynı işi ikinci kez başlatmasına izin veriyordu (2 ayrı beyan
+ // platformu karışıklığının bir parçası).
+ return jobs().filter(j=>!j.deleted&&['Açık','Üretimde'].includes(String(j.status||''))&&(admin||!p||(j.assignedTo||[]).map(Number).includes(Number(p.id))));
 }
 function fmt(sec){sec=Math.max(0,Math.floor(sec));return [Math.floor(sec/3600),Math.floor(sec%3600/60),sec%60].map(x=>String(x).padStart(2,'0')).join(':')}
 function elapsed(s){if(!s?.startedAt)return 0;let ms=(s.finishedAt?new Date(s.finishedAt):new Date())-new Date(s.startedAt);(s.pauses||[]).forEach(p=>{ms-=((p.end?new Date(p.end):new Date())-new Date(p.start))});return Math.max(0,ms/1000)}
@@ -4991,6 +5090,10 @@ window.kmiStartWork=function(id){
  const machine=String(j.machine||'').trim(),shift=String(j.shift||'').trim();
  if(!machine||machine==='-'||/atanmad/i.test(machine)){toast('İşe başlamadan önce yönetici makine atamalı.','warn');return}
  if(!shift||shift==='-'||/atanmad/i.test(shift)){toast('İşe başlamadan önce vardiya atanmalı.','warn');return}
+ // KMI-FIX (2026-09-25): bir operatör aynı anda en fazla 3 iş emrini birlikte
+ // takip edebilir (fiziksel olarak 3'ten fazla makineyi aynı anda çalıştıramaz).
+ const runningCount=myJobs().filter(x=>String(x.id)!==String(id)).filter(x=>{const xs=sess(x.id);return xs?.startedAt&&!xs?.finishedAt}).length;
+ if(runningCount>=3){toast('Aynı anda en fazla 3 iş emri birlikte takip edilebilir. Önce birini bitirin/duraklatın.','warn');return}
  const baseline=N(j.completedQty);
  put(id,{startedAt:new Date().toISOString(),finishedAt:null,operator:currentPerson()?.name||window.currentUser?.name||'-',machine:j.machine,shift:j.shift,startCompletedQty:baseline,produced:0,scrap:0,pauses:[],tools:[]});
  j.status='Üretimde';j.startedAt=new Date().toISOString();persistJobs();ev('WORK_STARTED',j,{machine:j.machine,shift:j.shift,operator:currentPerson()?.name});kmiOpenWork(id)
@@ -5077,6 +5180,53 @@ window.kmiFinish=function(id){
 /* Entry point on operator screen without replacing legacy declaration workflow. */
 function addEntry(){if(document.getElementById('kmiShopFloorBtn'))return;const tab=document.getElementById('tab-operator')||document.getElementById('tab-operator-beyan');if(!tab)return;const b=document.createElement('button');b.id='kmiShopFloorBtn';b.onclick=kmiOpenShopFloor;b.className='mb-4 bg-emerald-600 hover:bg-emerald-500 px-5 py-3 rounded-xl font-black text-white shadow-xl';b.innerHTML='▶ SHOP FLOOR LIVE · İşlerim';tab.prepend(b)}
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',addEntry,{once:true});else addEntry();
+// KMI-FIX (2026-09-25): Operatör Beyanı panelinin aynı veriyi (myJobs/sess) kullanabilmesi için dışa açılıyor.
+window.kmiMyJobs=myJobs; window.kmiSess=sess; window.kmiElapsed=elapsed; window.kmiFmtTime=fmt;
+})();
+</script>
+
+<script id="kmi-v1193-operator-assigned-panel">
+(function(){
+'use strict';
+const E=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const N=v=>Number(v||0);
+const SEEN_KEY='kmi_operator_seen_jobs_v1193';
+function seenMap(){try{return JSON.parse(localStorage.getItem(SEEN_KEY)||'{}')||{}}catch(e){return {}}}
+function saveSeen(x){localStorage.setItem(SEEN_KEY,JSON.stringify(x))}
+function personKey(){const u=window.currentUser||{};return String(u.id||u.personnelId||u.name||'anon')}
+function toast(t,k){window.kmiToast?window.kmiToast(t,k):console.info(t)}
+window.renderOperatorAssignedJobs=function(){
+ const panel=document.getElementById('operatorAssignedJobsPanel'); if(!panel) return;
+ if(typeof window.kmiMyJobs!=='function'){panel.innerHTML='';return}
+ const arr=window.kmiMyJobs();
+ const pk=personKey(), seen=seenMap(), mySeen=Array.isArray(seen[pk])?seen[pk]:[];
+ const newOnes=arr.filter(j=>!mySeen.includes(String(j.id)));
+ if(newOnes.length){
+   newOnes.forEach(j=>toast(`Yeni iş emri atandı: ${j.id} · ${j.item||''}`,'success'));
+   seen[pk]=arr.map(j=>String(j.id)); saveSeen(seen);
+ }
+ const badge=document.getElementById('btn-operatör');
+ if(badge){ let dot=document.getElementById('operatorAssignedDot'); if(newOnes.length){ if(!dot){dot=document.createElement('span');dot.id='operatorAssignedDot';dot.className='ml-1 inline-block w-2 h-2 rounded-full bg-red-500 align-middle animate-pulse';badge.appendChild(dot);} } else if(dot){dot.remove();} }
+ if(!arr.length){panel.innerHTML='';return}
+ panel.innerHTML=`<div class="bg-slate-800 border border-cyan-700/50 rounded-xl p-4 shadow-lg">
+   <div class="flex items-center justify-between gap-3 mb-3"><h2 class="text-base font-black text-white"><i class="fa-solid fa-bolt text-cyan-400 mr-2"></i>Size Atanan İş Emirleri · Canlı Takip</h2><span class="text-[10px] text-slate-500">${arr.length} iş · en fazla 3'ü aynı anda çalıştırılabilir</span></div>
+   <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+   ${arr.map(j=>{
+     const s=window.kmiSess?window.kmiSess(j.id):null;
+     const running=s?.startedAt&&!s?.finishedAt;
+     const pct=Math.min(100,Math.round(N(j.completedQty)/Math.max(1,N(j.targetQty))*100));
+     return `<button onclick="window.kmiOpenWork?.('${E(j.id)}')" class="text-left bg-slate-900 border ${running?'border-emerald-500':'border-slate-700'} rounded-xl p-3 hover:border-cyan-600 transition">
+       <div class="flex justify-between items-start gap-2"><div class="text-[10px] text-cyan-300 font-black">${E(j.id)}</div>${running?'<span class="text-[9px] text-emerald-300 font-black">● ÇALIŞIYOR</span>':''}</div>
+       <div class="font-bold text-white text-sm mt-1">${E(j.item||j.productId||'Üretim')}</div>
+       <div class="text-[10px] text-slate-400 mt-0.5">${E(j.machine||'Makine atanmadı')} · ${E(j.shift||'Vardiya atanmadı')}</div>
+       <div class="h-1.5 bg-slate-800 rounded-full mt-2 overflow-hidden"><div class="h-full bg-cyan-500" style="width:${pct}%"></div></div>
+       <div class="text-[10px] text-slate-500 mt-1">${N(j.completedQty)} / ${N(j.targetQty)} adet</div>
+     </button>`;
+   }).join('')}
+   </div>
+ </div>`;
+};
+document.addEventListener('DOMContentLoaded',()=>setTimeout(()=>window.renderOperatorAssignedJobs?.(),300));
 })();
 </script>
 
@@ -5262,13 +5412,81 @@ window.kmiOpenTaskCreate=function(){
  <div class="grid md:grid-cols-2 gap-3 mt-5"><label class="md:col-span-2 text-sm">Görev<input id="ktTitle" class="w-full mt-1 bg-slate-950 border border-slate-700 rounded-xl p-3"></label>
  <label class="md:col-span-2 text-sm">Açıklama<textarea id="ktDesc" class="w-full mt-1 bg-slate-950 border border-slate-700 rounded-xl p-3"></textarea></label>
  <label class="text-sm">Sorumlu<select id="ktPerson" class="w-full mt-1 bg-slate-950 border border-slate-700 rounded-xl p-3">${opts}</select></label>
- <label class="text-sm">Öncelik<select id="ktPriority" class="w-full mt-1 bg-slate-950 border border-slate-700 rounded-xl p-3"><option>NORMAL</option><option>YÜKSEK</option><option>KRİTİK</option></select></label>
+ <label class="text-sm">Öncelik<select id="ktPriority" class="w-full mt-1 bg-slate-950 border border-slate-700 rounded-xl p-3"><option>NORMAL</option><option>YÜKSEK</option><option>ACİL</option><option>ÇOK ACİL</option><option>KRİTİK</option></select></label>
+ <!-- KMI-FIX (2026-09-25): Öncelik + En Geç Bitiş için tek dokunuşla hızlı seçim.
+      Elle tarih/saat seçmek yerine "Çok Acil / Acil / Gün İçinde / En Geç Yarın" butonu
+      hem önceliği hem bitiş zamanını otomatik doldurur. -->
+ <div class="md:col-span-2"><div class="text-[10px] text-slate-500 mb-1.5">Hızlı Öncelik & Son Tarih Seçimi</div><div class="flex flex-wrap gap-2">
+   <button type="button" onclick="kmiQuickDeadline('COK_ACIL')" class="bg-red-900/60 hover:bg-red-800 border border-red-700 text-red-200 px-3 py-2 rounded-xl text-xs font-black">🔥 Çok Acil · 2 saat içinde</button>
+   <button type="button" onclick="kmiQuickDeadline('ACIL')" class="bg-amber-900/60 hover:bg-amber-800 border border-amber-700 text-amber-200 px-3 py-2 rounded-xl text-xs font-black">⚡ Acil · 4 saat içinde</button>
+   <button type="button" onclick="kmiQuickDeadline('BUGUN')" class="bg-cyan-900/60 hover:bg-cyan-800 border border-cyan-700 text-cyan-200 px-3 py-2 rounded-xl text-xs font-black">📅 Gün İçinde · bugün 18:00</button>
+   <button type="button" onclick="kmiQuickDeadline('YARIN')" class="bg-slate-800 hover:bg-slate-700 border border-slate-600 text-slate-200 px-3 py-2 rounded-xl text-xs font-black">🕗 En Geç Yarın · yarın 18:00</button>
+ </div></div>
  <label class="text-sm">Planlanan Süre (dk)<input id="ktMinutes" type="number" min="0" class="w-full mt-1 bg-slate-950 border border-slate-700 rounded-xl p-3"></label>
  <label class="text-sm">En Geç Bitiş<input id="ktDue" type="datetime-local" class="w-full mt-1 bg-slate-950 border border-slate-700 rounded-xl p-3"></label>
- <label class="text-sm">Planlanan Başlangıç<input id="ktStart" type="datetime-local" class="w-full mt-1 bg-slate-950 border border-slate-700 rounded-xl p-3"></label>
+ <label class="text-sm">Planlanan Başlangıç<input id="ktStart" type="datetime-local" class="w-full mt-1 bg-slate-950 border border-slate-700 rounded-xl p-3"><button type="button" onclick="document.getElementById('ktStart').value=kmiNowLocalInput()" class="mt-1.5 bg-emerald-800/70 hover:bg-emerald-700 border border-emerald-600 text-emerald-100 px-3 py-1.5 rounded-lg text-[11px] font-black">▶ Hemen</button></label>
  <div class="space-y-2 pt-5"><label class="flex gap-2"><input id="ktEvidence" type="checkbox"> Belge / fotoğraf kanıtı zorunlu</label><label class="flex gap-2"><input id="ktApproval" type="checkbox"> Yönetici onayı gerekli</label></div></div>
  <button id="ktSave" class="w-full mt-5 bg-cyan-700 rounded-2xl p-4 font-black">Görevi Ata</button></div>`;document.body.appendChild(d);
+ if(!document.getElementById('ktStart').value) document.getElementById('ktStart').value=kmiNowLocalInput();
  d.querySelector('#ktSave').onclick=()=>{try{kmiTaskCreate({title:ktTitle.value,description:ktDesc.value,assigneeId:ktPerson.value,priority:ktPriority.value,plannedMinutes:ktMinutes.value,startAt:ktStart.value,dueAt:ktDue.value,approvalRequired:ktApproval.checked,evidenceRequired:ktEvidence.checked});d.remove();window.kmiToast?.('Görev atandı')}catch(e){window.kmiToast?.(e.message,'warn')}}
+};
+// KMI-FIX (2026-09-25): tarih/saat inputlarını yerel saatle dolduran yardımcılar.
+window.kmiNowLocalInput=function(d){d=d||new Date();const p=n=>String(n).padStart(2,'0');return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`};
+window.kmiQuickDeadline=function(kind){
+ const now=new Date();let due=new Date(now),priority='NORMAL';
+ if(kind==='COK_ACIL'){due=new Date(now.getTime()+2*3600*1000);priority='ÇOK ACİL';}
+ else if(kind==='ACIL'){due=new Date(now.getTime()+4*3600*1000);priority='ACİL';}
+ else if(kind==='BUGUN'){due=new Date(now);due.setHours(18,0,0,0);if(due<=now)due=new Date(now.getTime()+3*3600*1000);priority='YÜKSEK';}
+ else if(kind==='YARIN'){due=new Date(now);due.setDate(due.getDate()+1);due.setHours(18,0,0,0);priority='NORMAL';}
+ const dueEl=document.getElementById('ktDue'),prEl=document.getElementById('ktPriority'),startEl=document.getElementById('ktStart');
+ if(dueEl)dueEl.value=kmiNowLocalInput(due);
+ if(prEl)prEl.value=priority;
+ if(startEl&&!startEl.value)startEl.value=kmiNowLocalInput(now);
+ window.kmiToast?.(`${priority} · son tarih ${due.toLocaleString('tr-TR',{dateStyle:'short',timeStyle:'short'})} olarak ayarlandı`);
+};
+// KMI-FIX (2026-09-25): Task Command Center'daki emirler silinebilmeli veya
+// yeniden ayarlanabilmeli (kişi/öncelik/süre/tarih değiştirme) - eskiden bir
+// task atandıktan sonra hiçbir şekilde silinemiyor veya düzenlenemiyordu.
+window.kmiTaskDelete=function(id){
+ if(window.kmiCan && !kmiCan('management','act'))return window.kmiToast?.('Bu işlem için yetkiniz yok','warn');
+ const a=tasks(),idx=a.findIndex(t=>t.id===id);if(idx<0)return;
+ const t=a[idx];
+ if(!confirm(`"${t.title}" görevi silinsin mi? Bu işlem geri alınamaz.`))return;
+ a.splice(idx,1);putAll(a);event('TASK_DELETED',t,{title:t.title,assigneeId:t.assigneeId});
+ window.kmiToast?.('Task silindi');window.kmiRenderTaskFloor?.();window.kmiRenderMyTasks?.();try{window.renderYonTaskOverview?.();}catch(e){}
+};
+window.kmiOpenTaskEdit=function(id){
+ if(window.kmiCan && !kmiCan('management','act'))return window.kmiToast?.('Bu işlem için yetkiniz yok','warn');
+ const t=tasks().find(x=>x.id===id);if(!t)return;
+ document.getElementById('kmiTaskCreateModal')?.remove();const d=document.createElement('div');d.id='kmiTaskCreateModal';d.className='fixed inset-0 z-[290] bg-black/80 p-3 overflow-y-auto';
+ const opts=people().filter(p=>String(p.role||'').toUpperCase()!=='ADMIN'||true).map(p=>`<option value="${p.id}" ${Number(p.id)===Number(t.assigneeId)?'selected':''}>${E(p.name)} · ${E(p.job||p.role||'')}</option>`).join('');
+ const prOpts=['NORMAL','YÜKSEK','ACİL','ÇOK ACİL','KRİTİK'].map(x=>`<option ${t.priority===x?'selected':''}>${x}</option>`).join('');
+ d.innerHTML=`<div class="max-w-2xl mx-auto mt-8 bg-slate-900 border border-cyan-800 rounded-3xl p-5"><div class="flex justify-between"><div><div class="text-[10px] text-cyan-300 tracking-widest font-black">KMI · TASK COMMAND</div><h2 class="text-2xl font-black">Task'ı Yeniden Ayarla</h2><div class="text-[10px] text-slate-500 mt-1">${E(t.id)}</div></div><button onclick="this.closest('#kmiTaskCreateModal').remove()" class="bg-slate-800 px-4 rounded-xl">Kapat</button></div>
+ <div class="grid md:grid-cols-2 gap-3 mt-5"><label class="md:col-span-2 text-sm">Görev<input id="ktTitle" value="${E(t.title)}" class="w-full mt-1 bg-slate-950 border border-slate-700 rounded-xl p-3"></label>
+ <label class="md:col-span-2 text-sm">Açıklama<textarea id="ktDesc" class="w-full mt-1 bg-slate-950 border border-slate-700 rounded-xl p-3">${E(t.description||'')}</textarea></label>
+ <label class="text-sm">Sorumlu<select id="ktPerson" class="w-full mt-1 bg-slate-950 border border-slate-700 rounded-xl p-3">${opts}</select></label>
+ <label class="text-sm">Öncelik<select id="ktPriority" class="w-full mt-1 bg-slate-950 border border-slate-700 rounded-xl p-3">${prOpts}</select></label>
+ <div class="md:col-span-2"><div class="text-[10px] text-slate-500 mb-1.5">Hızlı Öncelik & Son Tarih Seçimi</div><div class="flex flex-wrap gap-2">
+   <button type="button" onclick="kmiQuickDeadline('COK_ACIL')" class="bg-red-900/60 hover:bg-red-800 border border-red-700 text-red-200 px-3 py-2 rounded-xl text-xs font-black">🔥 Çok Acil · 2 saat içinde</button>
+   <button type="button" onclick="kmiQuickDeadline('ACIL')" class="bg-amber-900/60 hover:bg-amber-800 border border-amber-700 text-amber-200 px-3 py-2 rounded-xl text-xs font-black">⚡ Acil · 4 saat içinde</button>
+   <button type="button" onclick="kmiQuickDeadline('BUGUN')" class="bg-cyan-900/60 hover:bg-cyan-800 border border-cyan-700 text-cyan-200 px-3 py-2 rounded-xl text-xs font-black">📅 Gün İçinde · bugün 18:00</button>
+   <button type="button" onclick="kmiQuickDeadline('YARIN')" class="bg-slate-800 hover:bg-slate-700 border border-slate-600 text-slate-200 px-3 py-2 rounded-xl text-xs font-black">🕗 En Geç Yarın · yarın 18:00</button>
+ </div></div>
+ <label class="text-sm">Planlanan Süre (dk)<input id="ktMinutes" type="number" min="0" value="${Number(t.plannedMinutes||0)}" class="w-full mt-1 bg-slate-950 border border-slate-700 rounded-xl p-3"></label>
+ <label class="text-sm">En Geç Bitiş<input id="ktDue" type="datetime-local" value="${E((t.dueAt||'').slice(0,16))}" class="w-full mt-1 bg-slate-950 border border-slate-700 rounded-xl p-3"></label>
+ <label class="text-sm">Planlanan Başlangıç<input id="ktStart" type="datetime-local" value="${E((t.startAt||'').slice(0,16))}" class="w-full mt-1 bg-slate-950 border border-slate-700 rounded-xl p-3"><button type="button" onclick="document.getElementById('ktStart').value=kmiNowLocalInput()" class="mt-1.5 bg-emerald-800/70 hover:bg-emerald-700 border border-emerald-600 text-emerald-100 px-3 py-1.5 rounded-lg text-[11px] font-black">▶ Hemen</button></label>
+ <div class="space-y-2 pt-5"><label class="flex gap-2"><input id="ktEvidence" type="checkbox" ${t.evidenceRequired?'checked':''}> Belge / fotoğraf kanıtı zorunlu</label><label class="flex gap-2"><input id="ktApproval" type="checkbox" ${t.approvalRequired?'checked':''}> Yönetici onayı gerekli</label></div></div>
+ <button id="ktSave" class="w-full mt-5 bg-cyan-700 rounded-2xl p-4 font-black">Değişiklikleri Kaydet</button></div>`;document.body.appendChild(d);
+ d.querySelector('#ktSave').onclick=()=>{try{kmiTaskUpdate(id,{title:ktTitle.value,description:ktDesc.value,assigneeId:ktPerson.value,priority:ktPriority.value,plannedMinutes:ktMinutes.value,startAt:ktStart.value,dueAt:ktDue.value,approvalRequired:ktApproval.checked,evidenceRequired:ktEvidence.checked});d.remove();window.kmiToast?.('Task güncellendi')}catch(e){window.kmiToast?.(e.message,'warn')}}
+};
+window.kmiTaskUpdate=function(id,data){
+ const a=tasks(),t=a.find(x=>x.id===id);if(!t)throw new Error('Task bulunamadı');
+ const title=String(data.title||'').trim(),assigneeId=Number(data.assigneeId),dueAt=data.dueAt||'';
+ if(!title||!assigneeId||!dueAt)throw new Error('Görev, sorumlu ve son bitiş zamanı zorunlu.');
+ Object.assign(t,{title,description:String(data.description||'').trim(),assigneeId,priority:data.priority||'NORMAL',plannedMinutes:Number(data.plannedMinutes||0),startAt:data.startAt||'',dueAt,approvalRequired:!!data.approvalRequired,evidenceRequired:!!data.evidenceRequired,updatedAt:now()});
+ putAll(a);event('TASK_RESCHEDULED',t,{title:t.title,assigneeId:t.assigneeId,dueAt:t.dueAt});
+ window.kmiRenderTaskFloor?.();window.kmiRenderMyTasks?.();try{window.renderYonTaskOverview?.();}catch(e){}
+ return t;
 };
 window.kmiOpenMyTasks=function(){document.getElementById('kmiMyTasks')?.remove();const d=document.createElement('div');d.id='kmiMyTasks';d.className='fixed inset-0 z-[200] bg-[#07101f] text-white overflow-y-auto';document.body.appendChild(d);kmiRenderMyTasks()};
 window.kmiRenderMyTasks=function(){
@@ -5443,7 +5661,7 @@ window.kmiOpenTaskFloor=function(){
 };
 window.kmiRenderTaskFloor=function(){
  const d=document.getElementById('kmiTaskFloor');if(!d)return;
- const p=cur(),all=load(),mgr=adminish(p),mine=all.filter(t=>Number(t.assigneeId)===Number(p.id));
+ const p=cur(),all=tasks(),mgr=adminish(p),mine=all.filter(t=>Number(t.assigneeId)===Number(p.id));
  const view=mgr?all:mine;
  const open=view.filter(t=>!['COMPLETED'].includes(t.status)).length;
  const late=view.filter(t=>t.status!=='COMPLETED'&&t.dueAt&&new Date()>new Date(t.dueAt)).length;
@@ -5460,7 +5678,7 @@ window.kmiRenderTaskFloor=function(){
   <div class="bg-amber-950/30 border border-amber-900 rounded-2xl p-4"><div class="text-xs text-amber-300">BEKLEMEDE</div><div class="text-3xl font-black">${waiting}</div></div>
   <div class="bg-violet-950/30 border border-violet-900 rounded-2xl p-4"><div class="text-xs text-violet-300">ONAY BEKLİYOR</div><div class="text-3xl font-black">${approval}</div></div>
  </div>
- ${mgr?`<div class="overflow-x-auto bg-slate-900 border border-slate-700 rounded-2xl"><table class="w-full text-sm"><thead class="bg-slate-950 text-slate-400"><tr><th class="p-3 text-left">TASK NO</th><th class="p-3 text-left">GÖREV</th><th class="p-3 text-left">ATANAN</th><th class="p-3 text-left">SÜRE / TERMİN</th><th class="p-3 text-left">DURUM</th><th class="p-3 text-left">KANIT / GERİ BİLDİRİM</th></tr></thead><tbody>${view.map(t=>{const st=state(t);return `<tr class="border-t border-slate-800"><td class="p-3 text-fuchsia-300 font-mono">${E(t.id)}</td><td class="p-3"><b>${E(t.title)}</b><div class="text-xs text-slate-500">${E(t.description||'')}</div></td><td class="p-3">${E(pname(t.assigneeId))}</td><td class="p-3">${Number(t.plannedMinutes||0)} dk<div class="text-xs text-slate-500">${t.dueAt?new Date(t.dueAt).toLocaleString('tr-TR'):'—'}</div></td><td class="p-3"><span class="inline-block border rounded-lg px-2 py-1 ${st[1]}">${st[0]}</span></td><td class="p-3">${(t.feedback||[]).length} kayıt${t.evidenceRequired?' · kanıt zorunlu':''}${t.waiting?`<div class="text-amber-300 text-xs">⏳ ${E(t.waiting.name||t.waiting.type)}</div>`:''}</td></tr>`}).join('')||`<tr><td colspan="6" class="p-10 text-center text-slate-500">Henüz task yok. “Yeni Task” ile atayın.</td></tr>`}</tbody></table></div>`
+ ${mgr?`<div class="overflow-x-auto bg-slate-900 border border-slate-700 rounded-2xl"><table class="w-full text-sm"><thead class="bg-slate-950 text-slate-400"><tr><th class="p-3 text-left">TASK NO</th><th class="p-3 text-left">GÖREV</th><th class="p-3 text-left">ATANAN</th><th class="p-3 text-left">SÜRE / TERMİN</th><th class="p-3 text-left">DURUM</th><th class="p-3 text-left">KANIT / GERİ BİLDİRİM</th><th class="p-3 text-left">AKSİYON</th></tr></thead><tbody>${view.map(t=>{const st=state(t);return `<tr class="border-t border-slate-800"><td class="p-3 text-fuchsia-300 font-mono">${E(t.id)}</td><td class="p-3"><b>${E(t.title)}</b><div class="text-xs text-slate-500">${E(t.description||'')}</div></td><td class="p-3">${E(pname(t.assigneeId))}</td><td class="p-3">${Number(t.plannedMinutes||0)} dk<div class="text-xs text-slate-500">${t.dueAt?new Date(t.dueAt).toLocaleString('tr-TR'):'—'}</div></td><td class="p-3"><span class="inline-block border rounded-lg px-2 py-1 ${st[1]}">${st[0]}</span></td><td class="p-3">${(t.feedback||[]).length} kayıt${t.evidenceRequired?' · kanıt zorunlu':''}${t.waiting?`<div class="text-amber-300 text-xs">⏳ ${E(t.waiting.name||t.waiting.type)}</div>`:''}</td><td class="p-3 whitespace-nowrap"><button onclick="kmiOpenTaskEdit('${E(t.id)}')" class="bg-slate-700 hover:bg-slate-600 text-white px-2 py-1.5 rounded-lg text-[10px] font-bold mr-1"><i class="fa-solid fa-pen"></i> Düzenle</button><button onclick="kmiTaskDelete('${E(t.id)}')" class="bg-red-900/70 hover:bg-red-700 text-red-200 px-2 py-1.5 rounded-lg text-[10px] font-bold"><i class="fa-solid fa-trash"></i> Sil</button></td></tr>`}).join('')||`<tr><td colspan="7" class="p-10 text-center text-slate-500">Henüz task yok. “Yeni Task” ile atayın.</td></tr>`}</tbody></table></div>`
  :`<div class="space-y-3">${view.map(t=>{const st=state(t);return `<div class="border rounded-2xl p-5 ${st[1]}"><div class="flex flex-wrap justify-between gap-3"><div><div class="text-xs font-black">${st[0]} · ${E(t.priority||'NORMAL')}</div><div class="text-2xl font-black mt-1">${E(t.title)}</div><div class="text-sm opacity-75 mt-1">${E(t.description||'')}</div></div><div class="text-right text-sm"><div>Plan ${Number(t.plannedMinutes||0)} dk</div><b>${t.dueAt?new Date(t.dueAt).toLocaleString('tr-TR'):'Termin yok'}</b></div></div>${t.waiting?`<div class="mt-3 bg-amber-950/40 rounded-xl p-3">⏳ Bekleniyor: <b>${E(t.waiting.name||t.waiting.type)}</b> · ${E(t.waiting.reason||'')}</div>`:''}<div class="flex flex-wrap gap-2 mt-4">${t.status==='OPEN'?`<button onclick="kmiTaskAction('${t.id}','START');kmiRenderTaskFloor()" class="bg-emerald-700 px-4 py-3 rounded-xl font-black">▶ BAŞLA</button>`:''}${t.status==='ACTIVE'?`<button onclick="kmiTaskWaitPrompt('${t.id}')" class="bg-amber-700 px-4 py-3 rounded-xl font-black">⏳ BEKLEME</button><button onclick="kmiTaskFeedbackPrompt('${t.id}')" class="bg-slate-700 px-4 py-3 rounded-xl font-black">＋ GERİ BİLDİRİM / KANIT</button><button onclick="kmiTaskAction('${t.id}','COMPLETE');setTimeout(kmiRenderTaskFloor,30)" class="bg-cyan-700 px-4 py-3 rounded-xl font-black">✓ TAMAMLA</button>`:''}${t.status==='WAITING'?`<button onclick="kmiTaskAction('${t.id}','RESUME');kmiRenderTaskFloor()" class="bg-emerald-700 px-4 py-3 rounded-xl font-black">▶ DEVAM</button><button onclick="kmiTaskFeedbackPrompt('${t.id}')" class="bg-slate-700 px-4 py-3 rounded-xl font-black">＋ GERİ BİLDİRİM / KANIT</button>`:''}</div><div class="mt-3 text-xs opacity-70">${(t.feedback||[]).length} geri bildirim / kanıt kaydı</div></div>`}).join('')||`<div class="text-center text-slate-500 p-16">Size atanmış task bulunmuyor.</div>`}</div>`}
  </div>`;
 };
