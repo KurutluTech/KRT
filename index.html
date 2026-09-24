@@ -534,6 +534,16 @@ ead>
 </section>
 
 <section id="tab-yonetici" class="tab-content space-y-6">
+                <!-- KMI-FIX (2026-09-25): iş emirleri gibi task'lar da yönetici panelinden
+                     ayrı bir ekrana girmeden görülsün - "kimde ne var" özet kartı. -->
+                <div class="bg-slate-800 border border-fuchsia-800/60 rounded-lg p-5 shadow-lg">
+                    <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
+                        <div><h2 class="text-lg font-semibold text-white"><i class="fa-solid fa-list-check text-fuchsia-400 mr-2"></i>Task Emirleri · Kimde Ne Var</h2><p class="text-xs text-slate-400">Tüm açık/aktif/bekleyen görevler, kişi bazında - iş emirleri listesiyle aynı mantıkta.</p></div>
+                        <div class="flex items-center gap-2"><span id="yonTaskOverviewStatus" class="text-[10px] text-slate-500"></span><button onclick="renderYonTaskOverview()" class="bg-slate-700 hover:bg-slate-600 px-3 py-1.5 rounded text-[10px] text-white">Yenile</button><button onclick="window.kmiOpenTaskFloor?.()" class="bg-fuchsia-700 hover:bg-fuchsia-600 px-3 py-1.5 rounded text-[10px] text-white font-bold">Task Floor'u Aç</button></div>
+                    </div>
+                    <div id="yonTaskOverviewBody" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-2"></div>
+                </div>
+
                 <!-- TOP ACTIONS & SYSTEM EXPORT -->
                 <div class="bg-slate-800 border border-slate-700 rounded-lg p-5 shadow-lg flex flex-wrap justify-between items-center gap-4">
                     <div>
@@ -2281,6 +2291,24 @@ ead>
                 body.innerHTML='<tr><td colspan="5" class="p-2 text-rose-400">Veri okunamadı: '+(err?.message||'bilinmeyen hata')+'</td></tr>';
             }
         }
+        function renderYonTaskOverview(){
+            const body=document.getElementById('yonTaskOverviewBody'), status=document.getElementById('yonTaskOverviewStatus');
+            if(!body) return;
+            let all=[]; try{ all=JSON.parse(localStorage.getItem('KMI_TASKS_V1192')||'[]'); }catch(e){ all=[]; }
+            const open=all.filter(t=>t.status!=='COMPLETED');
+            if(!open.length){ body.innerHTML='<div class="col-span-3 text-xs text-slate-500 py-4 text-center">Açık/aktif task yok.</div>'; if(status) status.textContent=`${all.length} toplam task`; return; }
+            const byPerson={};
+            open.forEach(t=>{ const pid=String(t.assigneeId); (byPerson[pid]=byPerson[pid]||[]).push(t); });
+            const stLabel={OPEN:'Açık',ACTIVE:'Çalışıyor',WAITING:'Beklemede',AWAITING_APPROVAL:'Onay Bekliyor'};
+            const stCls={OPEN:'text-slate-400',ACTIVE:'text-cyan-400',WAITING:'text-amber-400',AWAITING_APPROVAL:'text-violet-400'};
+            body.innerHTML=Object.entries(byPerson).map(([pid,list])=>{
+                const person=(PERSONNEL_LIST||[]).find(p=>String(p.id)===pid);
+                const name=person?.name||('Personel #'+pid);
+                const late=list.filter(t=>t.dueAt&&new Date()>new Date(t.dueAt)&&t.status!=='COMPLETED').length;
+                return `<div class="bg-slate-900 border border-slate-700 rounded-xl p-3"><div class="flex justify-between items-center mb-2"><b class="text-white text-xs">${escSkill(name)}</b><span class="text-[9px] ${late?'text-red-400 font-bold':'text-slate-500'}">${late?late+' gecikmiş':list.length+' görev'}</span></div>${list.map(t=>`<div class="text-[10px] border-t border-slate-800 pt-1.5 mt-1.5"><span class="${stCls[t.status]||'text-slate-400'} font-bold">${stLabel[t.status]||t.status}</span> · ${escSkill(t.title||'-')}${t.dueAt?` · <span class="${new Date()>new Date(t.dueAt)?'text-red-400':'text-slate-500'}">${new Date(t.dueAt).toLocaleDateString('tr-TR')}</span>`:''}</div>`).join('')}</div>`;
+            }).join('');
+            if(status) status.textContent=`${open.length} açık task · ${Object.keys(byPerson).length} kişi · ${new Date().toLocaleTimeString('tr-TR')}`;
+        }
         async function renderSahaLive(){
             const field=document.getElementById('sahaLiveField'), status=document.getElementById('sahaLiveStatus');
             const client=window.kurutluSupabase;
@@ -2992,7 +3020,7 @@ function render7(M){const el=document.getElementById('leadershipDailyQualityChar
 function renderKpis(M){const el=document.getElementById('leadershipKpis');if(!el)return;const g=M.monthly.reduce((s,x)=>s+x.good,0),sc=M.monthly.reduce((s,x)=>s+x.scrap,0),q=g+sc?g/(g+sc)*100:0,top=M.stats[0];el.innerHTML=[['Bu Ay Onaylı',g+' adet'],['Kalite Oranı','%'+q.toFixed(1)],['Aktif Performansçı',M.stats.filter(x=>x.g>0||x.pts>0).length],['Lider Puan',top?top.pts.toFixed(2)+' P':'0 P'],['Lider',top?.p?.name||'-'],['Kalite Kayıt',M.monthly.length]].map(x=>`<div class="z-kpi"><span class="text-[9px] text-slate-500 uppercase">${E(x[0])}</span><strong>${E(x[1])}</strong></div>`).join('');}
 function renderV59(){try{const M=model();const l=document.getElementById('leadershipMonthLabel');if(l)l.textContent=`${typeof formatMonthLabel==='function'?formatMonthLabel(M.m):M.m} · canlı performans`;renderKpis(M);renderPool(M);renderCards(M);renderRanking(M);renderRecords(M);renderDailyShiftMachine(M);render7(M);const h=document.getElementById('z58Health');if(h)h.textContent=`✓ ${M.rows.length} kalite onaylı kayıt · ${M.stats.length} personel · tek veri motoru`;}catch(err){console.error('V59 leadership fatal',err);const h=document.getElementById('z58Health');if(h){h.className='text-[10px] font-bold text-rose-600 mt-1';h.textContent='Zirvedekiler veri hatası: '+err.message;}}}
 window.renderZirveV54=renderV59;window.renderLeaderboard=renderV59;window.renderLeadershipPoolGauge=renderV59;window.renderLeadershipPerformanceChart=()=>{};
-const sw=window.switchTab;window.switchTab=function(tab){const r=sw.apply(this,arguments);if(tab==='liderlik'){setTimeout(renderV59,0);setTimeout(()=>{try{renderSahaLive();}catch(e){console.warn('[Saha Live]',e);}},0);}return r};
+const sw=window.switchTab;window.switchTab=function(tab){const r=sw.apply(this,arguments);if(tab==='liderlik'){setTimeout(renderV59,0);setTimeout(()=>{try{renderSahaLive();}catch(e){console.warn('[Saha Live]',e);}},0);}if(tab==='yonetici'){setTimeout(()=>{try{renderYonTaskOverview();window.kmiPullRemoteTasks?.().then(ch=>{if(ch)renderYonTaskOverview();});}catch(e){console.warn('[Task overview]',e);}},0);}return r};
 setTimeout(renderV59,250);
 })();
 </script>
@@ -4869,8 +4897,15 @@ window.kmiOpenWork=function(id){
 function renderRunning(j,s){
  const d=shell(),paused=(s.pauses||[]).some(x=>!x.end);
  d.innerHTML=`<div class="max-w-xl mx-auto p-4"><div class="flex justify-between"><button onclick="kmiOpenShopFloor()" class="text-slate-400">← İşlerim</button><div class="text-xs text-cyan-300 font-black">${E(j.id)}</div></div><div class="text-center mt-6"><div class="text-xs ${paused?'text-amber-300':'text-emerald-300'} font-black">${paused?'● DURUŞTA':'● ÇALIŞIYOR'}</div><div id="kmiWorkTimer" class="text-5xl md:text-6xl font-black tabular-nums mt-2">${fmt(elapsed(s))}</div><div class="text-slate-400 mt-2">${E(j.machine||'')} · ${E(j.item||'')}</div></div>
- <div class="bg-slate-900 rounded-2xl p-4 mt-5"><div class="flex justify-between"><div><div class="text-xs text-slate-500">ÜRETİLEN</div><div class="text-4xl font-black">${N(j.completedQty)}</div></div><div class="text-right"><div class="text-xs text-slate-500">HEDEF</div><div class="text-4xl font-black">${N(j.targetQty)}</div></div></div><div class="text-xs text-slate-500 mt-3">Hurda ${N(s.scrap)} · Takım olayı ${(s.tools||[]).length} · Duruş ${(s.pauses||[]).length}</div></div>
- <div class="grid grid-cols-2 gap-3 mt-4"><button onclick="kmiAddProduction('${E(j.id)}')" class="bg-cyan-700 rounded-2xl py-5 text-xl font-black">＋ ÜRETİM</button><button onclick="kmiScrap('${E(j.id)}')" class="bg-red-800 rounded-2xl py-5 text-xl font-black">HURDA</button><button onclick="kmiPause('${E(j.id)}')" class="${paused?'bg-emerald-700':'bg-amber-700'} rounded-2xl py-5 text-xl font-black">${paused?'▶ DEVAM':'Ⅱ DURUŞ'}</button><button onclick="kmiTool('${E(j.id)}')" class="bg-violet-700 rounded-2xl py-5 text-xl font-black">TAKIM</button></div>
+ <div class="bg-slate-900 rounded-2xl p-4 mt-5"><div class="flex justify-between"><div><div class="text-xs text-slate-500">ÜRETİLEN</div><div class="text-4xl font-black">${N(j.completedQty)}</div></div><div class="text-right"><div class="text-xs text-slate-500">HEDEF</div><div class="text-4xl font-black">${N(j.targetQty)}</div></div></div><div class="text-xs text-slate-500 mt-3">Takım olayı ${(s.tools||[]).length} · Duruş ${(s.pauses||[]).length}</div></div>
+ <!-- KMI-FIX (2026-09-25): Operatör Beyan formundaki Sağlam/Hurda/Tahsis alanlarıyla
+      aynı mantık - Shop Floor'da da +/- ile ayarlanabilir sayaç. -->
+ <div class="grid grid-cols-3 gap-2 mt-4">
+   <div class="bg-slate-900 border border-emerald-700 rounded-2xl p-3 text-center"><div class="text-[10px] text-emerald-300 font-black">SAĞLAM</div><div class="text-3xl font-black mt-1">${N(s.produced)}</div><div class="flex gap-1 mt-2"><button onclick="kmiAdjust('${E(j.id)}','good',-1)" class="flex-1 bg-slate-800 rounded-xl py-3 text-lg font-black">－</button><button onclick="kmiAdjust('${E(j.id)}','good',1)" class="flex-1 bg-emerald-700 rounded-xl py-3 text-lg font-black">＋</button></div></div>
+   <div class="bg-slate-900 border border-red-700 rounded-2xl p-3 text-center"><div class="text-[10px] text-red-300 font-black">HURDA</div><div class="text-3xl font-black mt-1">${N(s.scrap)}</div><div class="flex gap-1 mt-2"><button onclick="kmiAdjust('${E(j.id)}','scrap',-1)" class="flex-1 bg-slate-800 rounded-xl py-3 text-lg font-black">－</button><button onclick="kmiScrap('${E(j.id)}')" class="flex-1 bg-red-800 rounded-xl py-3 text-lg font-black">＋</button></div></div>
+   <div class="bg-slate-900 border border-amber-700 rounded-2xl p-3 text-center"><div class="text-[10px] text-amber-300 font-black">TAHSİS</div><div class="text-3xl font-black mt-1">${N(s.allocated)}</div><div class="flex gap-1 mt-2"><button onclick="kmiAdjust('${E(j.id)}','allocated',-1)" class="flex-1 bg-slate-800 rounded-xl py-3 text-lg font-black">－</button><button onclick="kmiAdjust('${E(j.id)}','allocated',1)" class="flex-1 bg-amber-700 rounded-xl py-3 text-lg font-black">＋</button></div></div>
+ </div>
+ <div class="grid grid-cols-2 gap-3 mt-3"><button onclick="kmiPause('${E(j.id)}')" class="${paused?'bg-emerald-700':'bg-amber-700'} rounded-2xl py-5 text-xl font-black">${paused?'▶ DEVAM':'Ⅱ DURUŞ'}</button><button onclick="kmiTool('${E(j.id)}')" class="bg-violet-700 rounded-2xl py-5 text-xl font-black">TAKIM</button></div>
  <button onclick="kmiFinish('${E(j.id)}')" class="w-full mt-5 border border-slate-600 bg-slate-900 rounded-2xl py-5 text-xl font-black">■ İŞİ BİTİR</button></div>`;
  clearInterval(window.__kmiTimer);window.__kmiTimer=setInterval(()=>{const x=document.getElementById('kmiWorkTimer');if(x)x.textContent=fmt(elapsed(sess(j.id)));else clearInterval(window.__kmiTimer)},1000);
 }
@@ -4887,6 +4922,24 @@ window.kmiAddProduction=function(id){
  const j=jobs().find(x=>String(x.id)===String(id));if(!j)return;const s=sess(id);if(!s)return;
  const qty=Math.min(1,Math.max(0,N(j.targetQty)-N(j.completedQty)));if(!qty){toast('Hedef adet tamamlandı','warn');return}
  j.completedQty=N(j.completedQty)+qty;put(id,{produced:Math.max(0,N(j.completedQty)-N(s.startCompletedQty))});persistJobs();ev('GOOD_PART',j,{qty,sessionGood:Math.max(0,N(j.completedQty)-N(s.startCompletedQty))});kmiOpenWork(id)
+};
+// KMI-FIX (2026-09-25): Operatör Beyan formundaki Sağlam/Hurda/Tahsis mantığını
+// Shop Floor'a da taşıyan +/- sayaç. 'good' oturum içi üretimi (ve iş emrinin
+// toplam completedQty'sini) ayarlar; oturum başlangıcından önceki üretime
+// dokunmaz. 'scrap'/'allocated' sadece bu oturuma ait sayaçlardır.
+window.kmiAdjust=function(id,field,delta){
+ const j=jobs().find(x=>String(x.id)===String(id));if(!j)return;const s=sess(id);if(!s)return;
+ if(field==='good'){
+   if(delta>0){ const room=Math.max(0,N(j.targetQty)-N(j.completedQty)); if(!room){toast('Hedef adet tamamlandı','warn');return} }
+   else{ if(N(s.produced)<=0){toast('Bu oturumda azaltılacak sağlam adet yok','warn');return} }
+   j.completedQty=Math.max(N(s.startCompletedQty),N(j.completedQty)+delta);
+   put(id,{produced:Math.max(0,N(j.completedQty)-N(s.startCompletedQty))});
+   persistJobs();ev(delta>0?'GOOD_PART':'GOOD_PART_ADJUST',j,{qty:delta,sessionGood:Math.max(0,N(j.completedQty)-N(s.startCompletedQty))});
+ }else{
+   const cur=N(s[field]);const next=Math.max(0,cur+delta);
+   put(id,{[field]:next});ev(field==='scrap'?'SCRAP_ADJUST':'ALLOCATED_ADJUST',j,{qty:delta,total:next});
+ }
+ kmiOpenWork(id);
 };
 function sheet(title,choices,cb){
  document.getElementById('kmiBottomSheet')?.remove();const d=document.createElement('div');d.id='kmiBottomSheet';d.className='fixed inset-0 z-[260] bg-black/60 flex items-end';d.innerHTML=`<div class="w-full max-w-xl mx-auto bg-slate-900 rounded-t-3xl p-4"><div class="text-lg font-black mb-3">${E(title)}</div><div class="grid grid-cols-2 gap-2">${choices.map((x,i)=>`<button data-i="${i}" class="bg-slate-800 rounded-2xl p-4 text-left font-bold">${E(x)}</button>`).join('')}</div><button onclick="this.closest('#kmiBottomSheet').remove()" class="w-full mt-3 p-3 text-slate-500">Vazgeç</button></div>`;document.body.appendChild(d);d.querySelectorAll('[data-i]').forEach(b=>b.onclick=()=>{const x=choices[N(b.dataset.i)];d.remove();cb(x)})
@@ -4921,15 +4974,15 @@ window.kmiAcceptToolCode=async function(id,type,code){
 window.kmiFinish=function(id){
  const j=jobs().find(x=>String(x.id)===String(id)),s=sess(id);if(!j||!s||s.finishedAt)return;
  const finishedAt=new Date().toISOString(),mins=Math.max(1,Math.round(elapsed(s)/60));
- const good=Math.max(0,N(j.completedQty)-N(s.startCompletedQty)),scrap=Math.max(0,N(s.scrap));
- if(good+scrap<=0){toast('Kaliteye göndermek için bu oturumda üretim veya hurda kaydı olmalı.','warn');return}
+ const good=Math.max(0,N(j.completedQty)-N(s.startCompletedQty)),scrap=Math.max(0,N(s.scrap)),allocated=Math.max(0,N(s.allocated));
+ if(good+scrap+allocated<=0){toast('Kaliteye göndermek için bu oturumda üretim, hurda veya tahsis kaydı olmalı.','warn');return}
  const declId='BEY-SF-'+Date.now().toString(36).toUpperCase();
  const toolRows=(s.tools||[]).map(x=>[x.type,x.toolCode||x.toolId||x.barcode,x.toolName].filter(Boolean).join(' / '));
  const pauses=s.pauses||[];
  const downtimeMinutes=Math.round(pauses.reduce((a,p)=>a+Math.max(0,((p.end?new Date(p.end):new Date())-new Date(p.start))/60000),0));
  const d={id:declId,date:new Date().toLocaleString('tr-TR',{dateStyle:'short',timeStyle:'short'}),workDate:new Date().toISOString().slice(0,10),
    operator:s.operator||currentPerson()?.name||window.currentUser?.name||'Operatör',shift:s.shift||j.shift||'',machine:s.machine||j.machine||'',jobOrder:j.id,
-   qty:good+scrap,good:good,scrap:scrap,allocated:0,tools:toolRows.length?toolRows.join(' | '):'Değişen Takım Yok',changedTools:s.tools||[],
+   qty:good+scrap+allocated,good:good,scrap:scrap,allocated:allocated,tools:toolRows.length?toolRows.join(' | '):'Değişen Takım Yok',changedTools:s.tools||[],
    machineCareScore:100,productionMinutes:mins,oeePlannedMinutes:mins,idealCycleSec:0,
    downtime:{tool:0,setup:0,breakdown:0,material:0,quality:0,other:downtimeMinutes},
    status:'Kalite Bekliyor',approver:'',shiftClosedAt:finishedAt,bonusFinalized:false,finalizedBonus:0,
@@ -5049,7 +5102,42 @@ function save(k,v){localStorage.setItem(k,JSON.stringify(v))}
 function people(){try{return Array.isArray(PERSONNEL_LIST)?PERSONNEL_LIST:[]}catch(e){return []}}
 function cur(){const u=window.currentUser||{};return people().find(p=>Number(p.id)===Number(u.id||u.personnelId||u.personId))||people().find(p=>String(p.name)===String(u.name))||u}
 function tasks(){return load(TASKKEY,[])}
-function putAll(a){save(TASKKEY,a)}
+let __kmiTaskSyncTimer=null, __kmiTaskPullInFlight=false, __kmiTaskPullDone=false;
+function kmiSyncRecentTasks(list){
+ const client=window.kurutluSupabase; if(!client||!Array.isArray(list))return;
+ const dayAgo=Date.now()-24*60*60*1000;
+ const rows=list.filter(t=>{const ts=new Date(t.completedAt||t.startedAt||t.createdAt||0).getTime();return ts>=dayAgo||!t._kmiSynced;}).map(t=>({
+  id:t.id, title:t.title||null, description:t.description||null, assignee_id:t.assigneeId!=null?String(t.assigneeId):null,
+  created_by:t.createdBy||null, priority:t.priority||null, planned_minutes:Number(t.plannedMinutes||0)||null,
+  start_at:t.startAt||null, due_at:t.dueAt||null, approval_required:!!t.approvalRequired, evidence_required:!!t.evidenceRequired,
+  status:t.status||'OPEN', started_at:t.startedAt||null, completed_at:t.completedAt||null, approved_at:t.approvedAt||null,
+  raw:t, updated_at:new Date().toISOString()
+ }));
+ if(!rows.length)return;
+ client.from('legacy_tasks').upsert(rows,{onConflict:'id'}).then(({error})=>{ if(error) console.warn('[legacy_tasks push]',error); else list.forEach(t=>t._kmiSynced=true); }).catch(e=>console.warn('[legacy_tasks push]',e));
+}
+async function kmiPullRemoteTasks(){
+ const client=window.kurutluSupabase; if(!client||__kmiTaskPullInFlight)return false;
+ __kmiTaskPullInFlight=true;
+ try{
+  const { data, error } = await client.from('legacy_tasks').select('id,raw,updated_at').order('updated_at',{ascending:false}).limit(300);
+  if(error) throw error;
+  const local=tasks(), localIds=new Set(local.map(t=>t.id));
+  let changed=false;
+  (data||[]).forEach(r=>{
+   if(!r.raw) return;
+   if(!localIds.has(r.id)){ local.unshift({...r.raw,_kmiSynced:true}); localIds.add(r.id); changed=true; }
+   else{
+    const li=local.findIndex(t=>t.id===r.id);
+    if(li>-1 && JSON.stringify(local[li])!==JSON.stringify({...r.raw,_kmiSynced:true})){ local[li]={...r.raw,_kmiSynced:true}; changed=true; }
+   }
+  });
+  if(changed) putAll(local);
+  return changed;
+ }catch(e){ console.warn('[legacy_tasks pull]',e); return false; }
+ finally{ __kmiTaskPullInFlight=false; }
+}
+function putAll(a){save(TASKKEY,a);clearTimeout(__kmiTaskSyncTimer);__kmiTaskSyncTimer=setTimeout(()=>{try{kmiSyncRecentTasks(a);}catch(e){}},1200);}
 function taskState(t){
  if(t.status==='COMPLETED'){
    const c=new Date(t.completedAt),due=new Date(t.dueAt);
@@ -5206,7 +5294,18 @@ window.kmiApplyRoleUX=function(){
  // enforce may restore legacy module buttons; hide the three full-module shortcuts again.
  hideFullBusinessModules(p);
 };
-function pulse(){clearTimeout(window.__kmiRoleUX);window.__kmiRoleUX=setTimeout(()=>window.kmiApplyRoleUX?.(),40)}
+// KMI-FIX (2026-09-25): task'lar sadece localStorage'daydı, yöneticinin
+// atadığı görev diğer cihaza hiç ulaşmıyordu ("task floor 0" hatası).
+// Kimlik doğrulandığında ve rol UX her yenilendiğinde arkaplanda uzaktaki
+// görevleri çekip (kmiPullRemoteTasks), değişiklik varsa rozet/listeyi
+// tekrar çiziyoruz - engelleyici (blocking) değil, tek seferlik tetik.
+let __kmiTaskPullCooldown=0;
+function kmiTaskBackgroundPull(){
+ const t=Date.now(); if(t-__kmiTaskPullCooldown<4000)return; __kmiTaskPullCooldown=t;
+ window.kmiPullRemoteTasks?.().then(changed=>{ if(changed){ window.kmiApplyRoleUX?.(); window.kmiRenderTaskFloor?.(); window.kmiRenderMyTasks?.(); try{window.renderYonTaskOverview?.();}catch(e){} } }).catch(()=>{});
+}
+window.addEventListener('kurutlu:supabase-identity',()=>setTimeout(kmiTaskBackgroundPull,600));
+function pulse(){clearTimeout(window.__kmiRoleUX);window.__kmiRoleUX=setTimeout(()=>{window.kmiApplyRoleUX?.();kmiTaskBackgroundPull();},40)}
 document.addEventListener('click',e=>{
  const x=e.target?.closest?.('button,a,[role="button"]'); if(!x)return;
  if(/Operatör|Beyan|Giriş|Çıkış|Kalite|Sevkiyat|Muhasebe|Yönetici|Bakım|showTab/i.test((x.textContent||'')+' '+(x.getAttribute('onclick')||''))) pulse();
