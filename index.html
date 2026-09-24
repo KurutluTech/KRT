@@ -3758,13 +3758,33 @@ window.addEventListener('kurutlu:supabase-identity',()=>{});
 // ===== KURUTLU V78 · SUPABASE PERSONNEL -> JOB ASSIGNMENT BRIDGE =====
 (function(){
 'use strict';
-const MAP_KEY='kurutluV78PersonnelNumericIds';
+// KMI-FIX (2026-09-25): eski MAP_KEY, her cihazda BAĞIMSIZ ve SIRALI (900000,
+// 900001, ...) numara dağıtıyordu - aynı gerçek kişi, yöneticinin tabletinde
+// 900003, operatörün telefonunda 900001 olabiliyordu. Sonuç: yönetici bir iş
+// emrini o kişiye atadığında (assignedTo:[900003]), operatörün kendi
+// cihazındaki currentUser.id (900001) hiç eşleşmiyor ve iş emri "size atanmış"
+// listesinde hiç görünmüyordu (yönetimde açık/atanmış gözükmeye devam ederken).
+// Çözüm: numarayı Supabase UUID'sinden DETERMİNİSTİK (hash ile) türetiyoruz,
+// böylece hangi cihazda hesaplanırsa hesaplansın aynı kişi için aynı numara
+// çıkar - merkezi senkron gerekmeden cihazlar arası tutarlı olur. Anahtar adı
+// değişti ki eski (tutarsız) cihaz-bazlı eşleşmeler sıfırlanıp yeniden,
+// deterministik biçimde hesaplansın.
+const MAP_KEY='kurutluV78PersonnelNumericIds_v2';
 function readMap(){try{return JSON.parse(localStorage.getItem(MAP_KEY)||'{}')||{};}catch(e){return {};}}
 function writeMap(m){localStorage.setItem(MAP_KEY,JSON.stringify(m));}
 function norm(v){return String(v||'').trim().toLocaleUpperCase('tr-TR');}
+function hashUuidToRange(uuid,lo,span){
+  // basit ama kararlı (deterministik) string hash - FNV-1a benzeri
+  let h=2166136261;
+  const s=String(uuid);
+  for(let i=0;i<s.length;i++){ h^=s.charCodeAt(i); h=Math.imul(h,16777619); }
+  h=Math.abs(h);
+  return lo+(h%span);
+}
 function numericIdFor(uuid,map,used){
-  if(map[uuid] && Number.isFinite(Number(map[uuid])) && !used.has(Number(map[uuid]))) return Number(map[uuid]);
-  let n=900000;
+  if(map[uuid] && Number.isFinite(Number(map[uuid]))) return Number(map[uuid]);
+  let n=hashUuidToRange(uuid,900000,99999);
+  // çok düşük ihtimalli çakışmaya karşı: dolu ise deterministik biçimde bir sonrakine kay
   while(used.has(n)) n++;
   map[uuid]=n; return n;
 }
