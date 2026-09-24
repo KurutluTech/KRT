@@ -840,13 +840,13 @@ ead>
                     <div class="text-right"><div id="leadershipMonthLabel" class="text-xs text-slate-500">-</div><div id="z58Health" class="text-[10px] font-bold text-emerald-600 mt-1">Veri motoru hazırlanıyor…</div></div>
                 </div>
 
-                <div class="z-card p-5"><div class="flex flex-wrap items-center justify-between gap-2 mb-3"><div><div class="text-[10px] font-black tracking-[.15em] text-emerald-600 uppercase">Canlı saha</div><h3 class="z-title text-lg"><i class="fa-solid fa-person-running text-emerald-500 mr-2"></i>Sahada Kim Var · Maç Günü Kadrosu</h3><div class="text-[10px] text-slate-500 mt-1">GEÇKO'dan anlık giriş yapmış, henüz çıkışı olmayan personel · vardiyaya göre 2 takım</div></div><div class="flex items-center gap-2"><span id="sahaLiveStatus" class="text-[10px] text-slate-500">Yükleniyor…</span><button onclick="renderSahaLive()" class="bg-slate-700 hover:bg-slate-600 px-2 py-1 rounded text-[10px] text-white">Yenile</button></div></div><div id="sahaLiveField" class="grid grid-cols-1 lg:grid-cols-2 gap-4"></div></div>
+                <div class="z-card p-5"><div class="flex flex-wrap items-center justify-between gap-2 mb-3"><div><div class="text-[10px] font-black tracking-[.15em] text-emerald-600 uppercase">Canlı Vardiya</div><h3 class="z-title text-lg"><i class="fa-solid fa-person-running text-emerald-500 mr-2"></i>Şu An Kim Vardiyada · Anlık Mesai Listesi</h3><div class="text-[10px] text-slate-500 mt-1">GEÇKO'dan anlık giriş yapmış, henüz çıkışı olmayan personel · vardiyaya göre 2 takım</div></div><div class="flex items-center gap-2"><span id="sahaLiveStatus" class="text-[10px] text-slate-500">Yükleniyor…</span><button onclick="renderSahaLive()" class="bg-slate-700 hover:bg-slate-600 px-2 py-1 rounded text-[10px] text-white">Yenile</button></div></div><div id="sahaLiveField" class="grid grid-cols-1 lg:grid-cols-2 gap-4"></div></div>
 
                 <div id="leadershipKpis" class="grid grid-cols-2 lg:grid-cols-6 gap-3"></div>
 
                 <div class="pool-gauge-card p-5"><div class="grid grid-cols-1 xl:grid-cols-[.8fr_1.2fr] gap-5 items-center"><div id="leadershipPoolGauge"></div><div><div class="grid grid-cols-2 lg:grid-cols-4 gap-3" id="z58PoolStats"></div><div class="mt-4"><div class="flex justify-between text-[10px] text-slate-500 mb-1"><span>Kesinleşme ilerlemesi</span><span id="z58PoolPct">%0</span></div><div class="h-3 bg-slate-200 rounded-full overflow-hidden"><div id="z58PoolProgress" class="h-full bg-emerald-500 rounded-full" style="width:0%"></div></div></div></div></div></div>
 
-                <div class="z-card p-5"><div class="flex flex-wrap items-end justify-between gap-2 mb-4"><div><div class="text-[10px] font-black tracking-[.15em] text-blue-600 uppercase">Aylık oyuncu kartları</div><h3 class="z-title text-lg"><i class="fa-solid fa-id-card text-blue-500 mr-2"></i>Operatör Performans Kartları</h3></div><span class="text-[10px] text-slate-500">Puan · sıra · üretim · kalite · iş · devamsızlık · kabiliyet · trend</span></div><div id="z58PlayerCards" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3"></div></div>
+                <div class="z-card p-5"><div class="flex flex-wrap items-end justify-between gap-2 mb-4"><div><div class="text-[10px] font-black tracking-[.15em] text-blue-600 uppercase">Aylık Performans Özeti</div><h3 class="z-title text-lg"><i class="fa-solid fa-id-card text-blue-500 mr-2"></i>Operatör Performans Kartları</h3></div><span class="text-[10px] text-slate-500">Puan · sıra · üretim · kalite · iş · devamsızlık · kabiliyet · trend</span></div><div id="z58PlayerCards" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3"></div></div>
 
                 <div class="z-card p-5"><div class="flex justify-between items-center mb-3"><div><div class="text-[10px] font-black tracking-[.15em] text-amber-700 uppercase">Power ranking</div><h3 class="z-title text-lg"><i class="fa-solid fa-ranking-star text-amber-500 mr-2"></i>Aylık Puantaj Sıralaması</h3><div class="text-[10px] text-slate-500 mt-1">En yüksek puandan en düşüğe; Puantaj & Prim ekranındaki aynı puan motoru.</div></div><span id="z58RankCount" class="text-[10px] text-slate-500"></span></div><div class="overflow-x-auto"><table class="z-table w-full text-xs"><thead><tr><th class="p-2 text-left">#</th><th class="p-2 text-left">Personel</th><th class="p-2 text-left">Birim</th><th class="p-2 text-right">Puan</th><th class="p-2 text-right">Onaylı Adet</th><th class="p-2 text-right">Kalite</th><th class="p-2 text-right">İş</th><th class="p-2 text-right">Devamsızlık</th><th class="p-2 text-left">Prim</th><th class="p-2 text-left">Trend</th></tr></thead><tbody id="leaderboardTableBody"></tbody></table></div></div>
 
@@ -1542,6 +1542,7 @@ ead>
             renderQualityProductionDashboard();
             try{window.renderOperatorAssignedJobs?.();}catch(e){}
             try{renderV118ProductionPanel();}catch(e){}
+            try{window.renderHandoffRequestsPanel?.();}catch(e){}
         }
 
         // TAB SWITCHING
@@ -1592,8 +1593,23 @@ ead>
                 updateJobOrderDropdowns();
                 document.getElementById('kaliteUserBadge').innerText = `Aktif Kalite Personeli: ${currentUser.name}`;
             }
-            if(tabName==='operatör'){ try{window.renderOperatorAssignedJobs?.();}catch(e){} }
+            if(tabName==='operatör'){
+                try{window.renderOperatorAssignedJobs?.();}catch(e){}
+                // KMI-FIX (2026-09-25): Operatör Beyanı sekmesine girince, üretim
+                // rolündeki kullanıcılar için Shop Floor Live doğrudan (ekstra tık
+                // gerekmeden) açılsın. Telefondan kullanan operatör için en az adımla
+                // "işe bağlanma" isteniyor - admin/yönetim rolündekiler için otomatik
+                // açılmaz (onlar formu/paneli görmek isteyebilir).
+                try{
+                    const role=(typeof getEffectiveRole==='function'&&window.currentUser)?getEffectiveRole(window.currentUser):'';
+                    const myJ=window.kmiMyJobs?window.kmiMyJobs():[];
+                    if((role==='OPERATOR'||role==='CAM')&&myJ.length>0&&!document.getElementById('kmiShopFloor')){
+                        setTimeout(()=>{try{window.kmiOpenShopFloor?.()}catch(e){}},150);
+                    }
+                }catch(e){}
+            }
             if(tabName==='siparis'){ try{renderV118ProductionPanel();}catch(e){} }
+            if(tabName==='yonetici'){ try{window.renderHandoffRequestsPanel?.();}catch(e){} }
         }
 
         function initMachineDropdown() {
@@ -2412,10 +2428,10 @@ ead>
                 const order=['TeamK1','TeamK2',''];
                 const cardsHtml = order.filter(k=>groups[k]).map(k=>{
                     const players=groups[k];
-                    return `<div class="bg-slate-950 border border-slate-700 rounded-2xl p-4"><div class="flex items-center justify-between mb-3"><b class="text-white text-sm"><i class="fa-solid ${teamIcon[k]} mr-2"></i>${teamLabel[k]}</b><span class="text-[10px] text-emerald-400 font-bold">${players.length} sahada</span></div><div class="grid grid-cols-2 sm:grid-cols-3 gap-2">${players.map(p=>`<div class="bg-slate-900 border border-slate-800 rounded-xl p-2 text-center"><div class="relative inline-block">${personPhotoHtml?personPhotoHtml(p.name,'w-10 h-10 rounded-full object-cover bg-slate-100 mx-auto'):`<div class="w-10 h-10 rounded-full bg-slate-700 mx-auto"></div>`}<span class="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full bg-emerald-400 border-2 border-slate-900"></span></div><div class="text-[10px] font-bold text-white mt-1 truncate">${escSkill(p.name)}</div><div class="text-[9px] text-slate-500 truncate">${escSkill(p.jobTitle)}</div><div class="text-[8px] text-emerald-400 mt-0.5">${p.checkInAt?new Date(p.checkInAt).toLocaleTimeString('tr-TR',{hour:'2-digit',minute:'2-digit'}):'-'} giriş</div></div>`).join('')}</div></div>`;
+                    return `<div class="bg-slate-950 border border-slate-700 rounded-2xl p-4"><div class="flex items-center justify-between mb-3"><b class="text-white text-sm"><i class="fa-solid ${teamIcon[k]} mr-2"></i>${teamLabel[k]}</b><span class="text-[10px] text-emerald-400 font-bold">${players.length} vardiyada</span></div><div class="grid grid-cols-2 sm:grid-cols-3 gap-2">${players.map(p=>`<div class="bg-slate-900 border border-slate-800 rounded-xl p-2 text-center"><div class="relative inline-block">${personPhotoHtml?personPhotoHtml(p.name,'w-10 h-10 rounded-full object-cover bg-slate-100 mx-auto'):`<div class="w-10 h-10 rounded-full bg-slate-700 mx-auto"></div>`}<span class="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full bg-emerald-400 border-2 border-slate-900"></span></div><div class="text-[10px] font-bold text-white mt-1 truncate">${escSkill(p.name)}</div><div class="text-[9px] text-slate-500 truncate">${escSkill(p.jobTitle)}</div><div class="text-[8px] text-emerald-400 mt-0.5">${p.checkInAt?new Date(p.checkInAt).toLocaleTimeString('tr-TR',{hour:'2-digit',minute:'2-digit'}):'-'} giriş</div></div>`).join('')}</div></div>`;
                 }).join('');
-                field.innerHTML = cardsHtml || '<div class="col-span-2 text-xs text-slate-500 py-6 text-center">Şu an sahada GEÇKO ile giriş yapmış personel yok.</div>';
-                if(status) status.textContent=`Canlı · ${onSite.length} kişi sahada · ${new Date().toLocaleTimeString('tr-TR')}`;
+                field.innerHTML = cardsHtml || '<div class="col-span-2 text-xs text-slate-500 py-6 text-center">Şu an GEÇKO ile giriş yapmış, vardiyada olan personel yok.</div>';
+                if(status) status.textContent=`Canlı · ${onSite.length} kişi vardiyada · ${new Date().toLocaleTimeString('tr-TR')}`;
             }catch(err){
                 console.error('[Saha Live]',err);
                 if(status) status.textContent='Okuma hatası';
@@ -3092,7 +3108,7 @@ function model(){const m=monthKey(),rows=prod(),monthly=rows.filter(x=>monthOf(x
 function pool(m){const store=approvedStore(),rec=store?.[m]?.people||{},approved=Object.values(rec).filter(x=>x?.approved),final=approved.reduce((s,x)=>s+N(x.bonus),0),budget=budgetFor(m),waiting=Math.max(0,budget-final),pct=budget?Math.min(100,final/budget*100):0;return{approved,final,budget,waiting,pct};}
 function renderPool(M){const P=pool(M.m),el=document.getElementById('leadershipPoolGauge');if(el)el.innerHTML=`<div class="flex items-center gap-5"><div class="relative w-40 h-24 overflow-hidden"><div class="absolute inset-x-0 top-0 h-40 rounded-full border-[18px] border-slate-200"></div><div class="absolute left-1/2 bottom-0 w-1 h-20 bg-slate-700 origin-bottom" style="transform:translateX(-50%) rotate(${(-90+P.pct*1.8).toFixed(1)}deg)"></div><div class="absolute inset-x-0 bottom-1 text-center text-2xl font-black text-blue-900">%${Math.round(P.pct)}</div></div><div><div class="text-[10px] uppercase text-slate-500">Kesinleşen prim</div><div class="text-3xl font-black text-emerald-700">${Math.round(P.final).toLocaleString('tr-TR')} TL</div><div class="text-[10px] text-slate-500 mt-1">${P.approved.length} kişi kesinleşti</div></div></div>`;
  const s=document.getElementById('z58PoolStats');if(s)s.innerHTML=[['Prim Havuzu',P.budget,'text-blue-800'],['Kesinleşen',P.final,'text-emerald-700'],['Kalan / Bekleyen',P.waiting,'text-amber-700'],['Kesinleşen Personel',P.approved.length,'text-blue-800']].map((x,i)=>`<div class="z-kpi"><span class="text-[9px] text-slate-500 uppercase">${x[0]}</span><strong class="${x[2]}">${i===3?x[1]+' kişi':Math.round(x[1]).toLocaleString('tr-TR')+' TL'}</strong></div>`).join('');const pr=document.getElementById('z58PoolProgress');if(pr)pr.style.width=P.pct+'%';const pc=document.getElementById('z58PoolPct');if(pc)pc.textContent='%'+Math.round(P.pct);const w=document.getElementById('leadershipWaitingPool');if(w)w.textContent=Math.round(P.waiting).toLocaleString('tr-TR')+' TL';}
-function renderCards(M){const el=document.getElementById('z58PlayerCards');if(!el)return;const max=Math.max(1,...M.stats.map(x=>x.pts));el.innerHTML=M.stats.map((r,i)=>{const trend=r.prevPts?((r.pts-r.prevPts)/r.prevPts*100):null,trendTxt=trend==null?'Yeni dönem':`${trend>=0?'▲':'▼'} ${Math.abs(trend).toFixed(0)}%`,approved=!!approvedStore()?.[M.m]?.people?.[r.p.id]?.approved,photo=r.p.photo?`<img src="${E(r.p.photo)}" class="z-avatar">`:`<div class="z-avatar flex items-center justify-center font-black text-blue-700">${E(String(r.p.name||'?').charAt(0))}</div>`;return `<div class="z-card p-4"><div class="flex justify-between gap-3"><div class="flex gap-3 items-center">${photo}<div><div class="text-[10px] font-black text-amber-600">#${i+1} POWER RANK</div><div class="font-black text-blue-950">${E(r.p.name)}</div><div class="text-[10px] text-slate-500">${E(r.p.dept||'-')} · ${E(r.shift)}</div></div></div><div class="text-right"><div class="text-2xl font-black text-blue-800">${r.pts.toFixed(2)}</div><div class="text-[9px] text-slate-500">PUAN</div></div></div><div class="grid grid-cols-4 gap-2 mt-4 text-center"><div><b class="text-blue-800">${r.g}</b><small class="block text-[8px] text-slate-500">ONAYLI</small></div><div><b class="text-emerald-700">%${r.q.toFixed(1)}</b><small class="block text-[8px] text-slate-500">KALİTE</small></div><div><b class="text-blue-800">${r.js}</b><small class="block text-[8px] text-slate-500">İŞ</small></div><div><b class="text-blue-800">${r.skills}</b><small class="block text-[8px] text-slate-500">KABİLİYET</small></div></div><div class="mt-3 z-bar"><span style="width:${Math.max(2,r.pts/max*100)}%"></span></div><div class="flex justify-between mt-3 text-[9px]"><span class="${N(r.x.absence)===0?'text-emerald-700':'text-slate-500'}">${N(r.x.absence)} gün devamsızlık</span><span class="${trend!=null&&trend<0?'text-rose-600':'text-blue-700'}">${trendTxt}</span><span class="${approved?'text-emerald-700':'text-amber-700'}">${approved?'✓ Prim kesin':'Prim canlı'}</span></div>${r.best?`<div class="mt-2 text-[9px] text-slate-500">En iyi kayıt: <b>${r.best.good} adet</b> · ${E(r.best.j?.item||r.best.d.jobOrder||'-')} · ${E(r.best.d.machine||r.best.j?.machine||'-')}</div>`:''}</div>`}).join('')||'<div class="col-span-3 p-8 text-center text-slate-500">Aktif performans personeli bulunamadı.</div>';}
+function renderCards(M){const el=document.getElementById('z58PlayerCards');if(!el)return;const max=Math.max(1,...M.stats.map(x=>x.pts));el.innerHTML=M.stats.map((r,i)=>{const trend=r.prevPts?((r.pts-r.prevPts)/r.prevPts*100):null,trendTxt=trend==null?'Yeni dönem':`${trend>=0?'▲':'▼'} ${Math.abs(trend).toFixed(0)}%`,approved=!!approvedStore()?.[M.m]?.people?.[r.p.id]?.approved,photo=r.p.photo?`<img src="${E(r.p.photo)}" class="z-avatar">`:`<div class="z-avatar flex items-center justify-center font-black text-blue-700">${E(String(r.p.name||'?').charAt(0))}</div>`;return `<div class="z-card p-4"><div class="flex justify-between gap-3"><div class="flex gap-3 items-center">${photo}<div><div class="text-[10px] font-black text-amber-600">#${i+1} PERFORMANS SIRASI</div><div class="font-black text-blue-950">${E(r.p.name)}</div><div class="text-[10px] text-slate-500">${E(r.p.dept||'-')} · ${E(r.shift)}</div></div></div><div class="text-right"><div class="text-2xl font-black text-blue-800">${r.pts.toFixed(2)}</div><div class="text-[9px] text-slate-500">PUAN</div></div></div><div class="grid grid-cols-4 gap-2 mt-4 text-center"><div><b class="text-blue-800">${r.g}</b><small class="block text-[8px] text-slate-500">ONAYLI</small></div><div><b class="text-emerald-700">%${r.q.toFixed(1)}</b><small class="block text-[8px] text-slate-500">KALİTE</small></div><div><b class="text-blue-800">${r.js}</b><small class="block text-[8px] text-slate-500">İŞ</small></div><div><b class="text-blue-800">${r.skills}</b><small class="block text-[8px] text-slate-500">KABİLİYET</small></div></div><div class="mt-3 z-bar"><span style="width:${Math.max(2,r.pts/max*100)}%"></span></div><div class="flex justify-between mt-3 text-[9px]"><span class="${N(r.x.absence)===0?'text-emerald-700':'text-slate-500'}">${N(r.x.absence)} gün devamsızlık</span><span class="${trend!=null&&trend<0?'text-rose-600':'text-blue-700'}">${trendTxt}</span><span class="${approved?'text-emerald-700':'text-amber-700'}">${approved?'✓ Prim kesin':'Prim canlı'}</span></div>${r.best?`<div class="mt-2 text-[9px] text-slate-500">En iyi kayıt: <b>${r.best.good} adet</b> · ${E(r.best.j?.item||r.best.d.jobOrder||'-')} · ${E(r.best.d.machine||r.best.j?.machine||'-')}</div>`:''}</div>`}).join('')||'<div class="col-span-3 p-8 text-center text-slate-500">Aktif performans personeli bulunamadı.</div>';}
 function renderRanking(M){const tb=document.getElementById('leaderboardTableBody');if(!tb)return;const store=approvedStore()?.[M.m]?.people||{};tb.innerHTML=M.stats.map((r,i)=>{const tr=r.prevPts?(r.pts-r.prevPts):null;return `<tr><td class="p-2 font-black text-amber-600">${i+1}</td><td class="p-2 font-bold text-blue-950">${E(r.p.name)}</td><td class="p-2">${E(r.p.dept||'-')}</td><td class="p-2 text-right font-black">${r.pts.toFixed(2)} P</td><td class="p-2 text-right">${r.g}</td><td class="p-2 text-right">%${r.q.toFixed(1)}</td><td class="p-2 text-right">${r.js}</td><td class="p-2 text-right">${N(r.x.absence)} gün</td><td class="p-2">${store?.[r.p.id]?.approved?'<b class="text-emerald-700">Kesinleşti</b>':'<span class="text-amber-700">Canlı</span>'}</td><td class="p-2">${tr==null?'<span class="text-slate-400">—</span>':`<span class="${tr>=0?'text-emerald-700':'text-rose-600'}">${tr>=0?'▲':'▼'} ${Math.abs(tr).toFixed(2)} P</span>`}</td></tr>`}).join('');const c=document.getElementById('z58RankCount');if(c)c.textContent=`${M.stats.length} personel · yüksekten düşüğe`;}
 function renderRecords(M){const ag=new Map();M.rows.forEach(x=>{const k=[x.d.operator,x.j?.item||x.d.product||x.d.jobOrder,x.d.machine||x.j?.machine||'-'].join('|'),o=ag.get(k)||{name:x.d.operator,item:x.j?.item||x.d.product||x.d.jobOrder||'-',machine:x.d.machine||x.j?.machine||'-',qty:0,jobs:0};o.qty+=x.good;o.jobs++;ag.set(k,o)});const rec=[...ag.values()].sort((a,b)=>b.qty-a.qty).slice(0,3),el=document.getElementById('productionRecordPodium');if(el)el.innerHTML=rec.map((r,i)=>`<div class="z-card z-podium ${i===0?'first':i===1?'second':'third'} p-4"><div class="z-rank ${i===0?'z-gold':i===1?'z-silver':'z-bronze'}">${i+1}.</div><div><b class="text-blue-950">${E(r.name)}</b><div class="text-xs text-slate-500">${E(r.item)}</div><div class="text-[10px] text-slate-500">${E(r.machine)} · ${r.jobs} kayıt</div></div><div class="text-2xl font-black text-blue-800">${r.qty} <span class="text-xs">adet</span></div></div>`).join('')||'<div class="col-span-3 text-sm text-slate-500 p-6 text-center">Kalite onaylı üretim kaydı bulunamadı.</div>';}
 function renderDailyShiftMachine(M){const byOp=new Map();M.daily.forEach(x=>{const o=byOp.get(x.d.operator)||{q:0,j:0};o.q+=x.good;o.j++;byOp.set(x.d.operator,o)});const dl=document.getElementById('dailyProductionLeaders');if(dl)dl.innerHTML=[...byOp].sort((a,b)=>b[1].q-a[1].q).slice(0,5).map(([n,o],i)=>`<div class="flex justify-between py-2 border-b border-slate-100"><span><b class="text-blue-900">${i+1}. ${E(n)}</b><small class="block text-slate-500">${o.j} kayıt</small></span><b class="text-emerald-700">${o.q} adet</b></div>`).join('')||'<div class="text-sm text-slate-500 py-6 text-center">Bugün kalite onaylı üretim yok.</div>';const dd=document.getElementById('dailyLeaderDate');if(dd)dd.textContent=M.today;
@@ -3645,6 +3661,12 @@ window.v69DeleteV68=function(bucket,index){if(!needAdmin69()||typeof M==='undefi
 function sec69(title,rows,kind,bucket){var out='<div class="bg-slate-950 border border-slate-800 rounded-xl overflow-hidden"><div class="px-3 py-2 bg-slate-900 font-black text-xs">'+title+' <span class="text-slate-500">('+rows.length+')</span></div><div class="max-h-64 overflow-auto">';rows.forEach(function(x,i){var onclick=kind==='D'?"v69DeleteDRecord('"+bucket+"','"+String(x.id).replace(/'/g,'')+"','"+title.replace(/'/g,'')+"')":kind==='L'?"v69DeleteLegacy('"+bucket+"',"+i+")":"v69DeleteV68('"+bucket+"',"+i+")";out+='<div class="flex items-center gap-2 px-3 py-2 border-t border-slate-900 text-xs"><div class="flex-1 min-w-0"><b class="text-white">'+lab69(x).replace(/[<>&]/g,'')+'</b><div class="text-[9px] text-slate-500 truncate">'+String(x.status||x.date||x.at||x.category||x.source||'').replace(/[<>&]/g,'')+'</div></div><button onclick="'+onclick+'" class="bg-red-950 text-red-300 px-2 py-1 rounded">Sil</button></div>'});if(!rows.length)out+='<div class="p-3 text-xs text-slate-600">Kayıt yok.</div>';return out+'</div></div>'}
 window.renderV69DataManagement=function(){var el=document.getElementById('v69DataManagement');if(!el)return;if(!isAdmin69()){el.innerHTML='<div class="p-4 rounded bg-red-950/30 text-red-300">Bu merkez yalnız Yönetim / ADMIN kullanıcılarına açıktır.</div>';return}var h='<div class="grid xl:grid-cols-3 md:grid-cols-2 gap-3">';if(window.D){[['Müşteriler','customers'],['Ürünler','products'],['Malzeme LOT','lots'],['İade / Rework','returns'],['Tedarikçiler','suppliers'],['Satınalma Kayıtları','purchases'],['Takım Ana Kartları','toolMasters'],['Fiziksel Takımlar','toolInstances'],['Takım Yaşam Döngüsü','toolLifeEvents']].forEach(function(z){if(Array.isArray(D[z[1]]))h+=sec69(z[0],D[z[1]],'D',z[1])})}['jobOrders','declarations','maintenanceRecords'].forEach(function(b){if(Array.isArray(window[b]))h+=sec69(b==='jobOrders'?'İş Emirleri':b==='declarations'?'Üretim Beyanları':'Bakım Kayıtları',window[b],'L',b)});if(typeof M!=='undefined'){[['Cost Analysis · Giderler','expenses'],['Cost Analysis · Gelirler','revenues'],['Cost Analysis · Varlık/Makine','assets'],['Cost Analysis · İş Gücü','labor']].forEach(function(z){if(Array.isArray(M[z[1]]))h+=sec69(z[0],M[z[1]],'M',z[1])})}h+='</div><div class="mt-4 text-[10px] text-amber-300">Üretim sürümünde silme işlemlerini audit loglu soft-delete yapısına çevireceğiz; kim, neyi, ne zaman sildi bilgisi korunacak.</div>';el.innerHTML=h};
 var old69=window.openAdminModule;if(typeof old69==='function')window.openAdminModule=function(name){var r=old69.apply(this,arguments);if(name==='datamanagement')setTimeout(renderV69DataManagement,0);return r};
+// KMI-FIX (2026-09-25): sec69 bu IIFE'ye özel (module-private) tanımlıydı; aşağıdaki
+// v70RenderDataManagement bloğu (global scope, farklı <script>) sec69'u çağırıyordu ama
+// göremiyordu -> "sec69 is not defined" hatasıyla "Veri Yönetimi" ekranı hep boş/kırık
+// açılıyordu. window.sec69 olarak dışa aktarınca diğer scriptteki bare "sec69(...)"
+// çağrıları da global nesne üzerinden otomatik çözülüyor.
+window.sec69=sec69;
 })();
 </script>
 <script>
@@ -5063,7 +5085,7 @@ function shell(){
 window.kmiOpenShopFloor=function(){
  const d=shell(),p=currentPerson(),arr=myJobs();
  d.innerHTML=`<div class="max-w-4xl mx-auto p-3 md:p-6"><div class="flex justify-between items-start sticky top-0 bg-[#07101f] z-10 py-3"><div><div class="text-[10px] tracking-[.22em] text-cyan-300 font-black">KMI · SHOP FLOOR LIVE</div><h1 class="text-3xl font-black">${E(p?.name||window.currentUser?.name||'Üretim')}</h1><div class="text-sm text-slate-400">${arr.length} aktif iş · Dokun, başla, üret.</div></div><button onclick="document.getElementById('kmiShopFloor').remove()" class="bg-slate-800 px-4 py-3 rounded-xl">Kapat</button></div>
- <div class="space-y-3 mt-3">${arr.map(j=>{const s=sess(j.id),pct=Math.min(100,Math.round(N(j.completedQty)/Math.max(1,N(j.targetQty))*100));return `<button onclick="kmiOpenWork('${E(j.id)}')" class="w-full text-left bg-slate-900 border ${s?.startedAt&&!s?.finishedAt?'border-emerald-500':'border-slate-700'} rounded-2xl p-4 active:scale-[.99] transition"><div class="flex justify-between gap-3"><div><div class="text-xs text-cyan-300 font-black">${E(j.id)}</div><div class="text-xl font-black mt-1">${E(j.item||j.productId||'Üretim')}</div><div class="text-sm text-slate-400 mt-1">${E(j.machine||'Makine atanmadı')} · ${E(j.shift||'Vardiya atanmadı')}</div></div><div class="text-right"><div class="text-2xl font-black">${N(j.completedQty)} / ${N(j.targetQty)}</div><div class="text-xs ${s?.startedAt&&!s?.finishedAt?'text-emerald-300':'text-slate-500'}">${s?.startedAt&&!s?.finishedAt?'● ÇALIŞIYOR':'Başlamaya hazır'}</div></div></div><div class="h-2 bg-slate-800 rounded-full mt-4 overflow-hidden"><div class="h-full bg-cyan-500" style="width:${pct}%"></div></div></button>`}).join('')||'<div class="bg-slate-900 rounded-2xl p-8 text-center text-slate-500">Size atanmış aktif iş bulunmuyor.</div>'}</div></div>`;
+ <div class="space-y-3 mt-3">${arr.map(j=>{const s=sess(j.id),pct=Math.min(100,Math.round(N(j.completedQty)/Math.max(1,N(j.targetQty))*100));return `<div class="w-full text-left bg-slate-900 border ${s?.startedAt&&!s?.finishedAt?'border-emerald-500':'border-slate-700'} rounded-2xl p-4 active:scale-[.99] transition"><div onclick="kmiOpenWork('${E(j.id)}')" class="cursor-pointer"><div class="flex justify-between gap-3"><div><div class="text-xs text-cyan-300 font-black">${E(j.id)}</div><div class="text-xl font-black mt-1">${E(j.item||j.productId||'Üretim')}</div><div class="text-sm text-slate-400 mt-1">${E(j.machine||'Makine atanmadı')} · ${E(j.shift||'Vardiya atanmadı')}</div></div><div class="text-right"><div class="text-2xl font-black">${N(j.completedQty)} / ${N(j.targetQty)}</div><div class="text-xs ${s?.startedAt&&!s?.finishedAt?'text-emerald-300':'text-slate-500'}">${s?.startedAt&&!s?.finishedAt?'● ÇALIŞIYOR':'Başlamaya hazır'}</div></div></div><div class="h-2 bg-slate-800 rounded-full mt-4 overflow-hidden"><div class="h-full bg-cyan-500" style="width:${pct}%"></div></div></div><button onclick="event.stopPropagation();window.kmiOpenHandoff?.('${E(j.id)}')" class="w-full mt-3 text-xs font-black text-amber-300 bg-amber-950/40 border border-amber-800/40 rounded-xl py-2">↪ Devret</button></div>`}).join('')||'<div class="bg-slate-900 rounded-2xl p-8 text-center text-slate-500">Size atanmış aktif iş bulunmuyor.</div>'}</div></div>`;
 };
 window.kmiOpenWork=function(id){
  const j=jobs().find(x=>String(x.id)===String(id));if(!j)return;const d=shell(),s=sess(id);
@@ -5082,7 +5104,8 @@ function renderRunning(j,s){
    <div class="bg-slate-900 border border-amber-700 rounded-2xl p-3 text-center"><div class="text-[10px] text-amber-300 font-black">TAHSİS</div><div class="text-3xl font-black mt-1">${N(s.allocated)}</div><div class="flex gap-1 mt-2"><button onclick="kmiAdjust('${E(j.id)}','allocated',-1)" class="flex-1 bg-slate-800 rounded-xl py-3 text-lg font-black">－</button><button onclick="kmiAdjust('${E(j.id)}','allocated',1)" class="flex-1 bg-amber-700 rounded-xl py-3 text-lg font-black">＋</button></div></div>
  </div>
  <div class="grid grid-cols-2 gap-3 mt-3"><button onclick="kmiPause('${E(j.id)}')" class="${paused?'bg-emerald-700':'bg-amber-700'} rounded-2xl py-5 text-xl font-black">${paused?'▶ DEVAM':'Ⅱ DURUŞ'}</button><button onclick="kmiTool('${E(j.id)}')" class="bg-violet-700 rounded-2xl py-5 text-xl font-black">TAKIM</button></div>
- <button onclick="kmiFinish('${E(j.id)}')" class="w-full mt-5 border border-slate-600 bg-slate-900 rounded-2xl py-5 text-xl font-black">■ İŞİ BİTİR</button></div>`;
+ <button onclick="kmiFinish('${E(j.id)}')" class="w-full mt-5 border border-slate-600 bg-slate-900 rounded-2xl py-5 text-xl font-black">■ İŞİ BİTİR</button>
+ <button onclick="window.kmiOpenHandoff?.('${E(j.id)}')" class="w-full mt-3 border border-amber-800/50 bg-amber-950/30 text-amber-300 rounded-2xl py-4 text-sm font-black">↪ RAHATSIZLANDIM / İŞİ DEVRET</button></div>`;
  clearInterval(window.__kmiTimer);window.__kmiTimer=setInterval(()=>{const x=document.getElementById('kmiWorkTimer');if(x)x.textContent=fmt(elapsed(sess(j.id)));else clearInterval(window.__kmiTimer)},1000);
 }
 window.kmiStartWork=function(id){
@@ -5215,18 +5238,122 @@ window.renderOperatorAssignedJobs=function(){
      const s=window.kmiSess?window.kmiSess(j.id):null;
      const running=s?.startedAt&&!s?.finishedAt;
      const pct=Math.min(100,Math.round(N(j.completedQty)/Math.max(1,N(j.targetQty))*100));
-     return `<button onclick="window.kmiOpenWork?.('${E(j.id)}')" class="text-left bg-slate-900 border ${running?'border-emerald-500':'border-slate-700'} rounded-xl p-3 hover:border-cyan-600 transition">
+     return `<div class="text-left bg-slate-900 border ${running?'border-emerald-500':'border-slate-700'} rounded-xl p-3 hover:border-cyan-600 transition">
+       <div onclick="window.kmiOpenWork?.('${E(j.id)}')" class="cursor-pointer">
        <div class="flex justify-between items-start gap-2"><div class="text-[10px] text-cyan-300 font-black">${E(j.id)}</div>${running?'<span class="text-[9px] text-emerald-300 font-black">● ÇALIŞIYOR</span>':''}</div>
        <div class="font-bold text-white text-sm mt-1">${E(j.item||j.productId||'Üretim')}</div>
        <div class="text-[10px] text-slate-400 mt-0.5">${E(j.machine||'Makine atanmadı')} · ${E(j.shift||'Vardiya atanmadı')}</div>
        <div class="h-1.5 bg-slate-800 rounded-full mt-2 overflow-hidden"><div class="h-full bg-cyan-500" style="width:${pct}%"></div></div>
        <div class="text-[10px] text-slate-500 mt-1">${N(j.completedQty)} / ${N(j.targetQty)} adet</div>
-     </button>`;
+       </div>
+       <button onclick="event.stopPropagation();window.kmiOpenHandoff?.('${E(j.id)}')" class="w-full mt-2 text-[10px] font-black text-amber-300 bg-amber-950/40 border border-amber-800/40 rounded-lg py-1.5">↪ Devret</button>
+     </div>`;
    }).join('')}
    </div>
  </div>`;
 };
 document.addEventListener('DOMContentLoaded',()=>setTimeout(()=>window.renderOperatorAssignedJobs?.(),300));
+})();
+</script>
+
+<script id="kmi-v1195-work-order-handoff">
+(function(){
+'use strict';
+// KMI-FIX (2026-09-25): Operatör vardiya ortasında rahatsızlanırsa/ayrılırsa
+// iş emrini (a) aynı vardiyede çalışan başka bir operatöre, (b) sonraki
+// vardiyaya, ya da (c) doğrudan yönetime devredebilsin. Yönetim, kendisine
+// veya boşa düşen (sonraki vardiya) iş emirlerini "Devir Talepleri"
+// panelinden görüp yeniden atayabilsin.
+const E=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+function toast(t,k){window.kmiToast?window.kmiToast(t,k):console.info(t)}
+function personnel(){try{return Array.isArray(PERSONNEL_LIST)?PERSONNEL_LIST:[]}catch(e){return []}}
+function me(){const u=window.currentUser||{};return personnel().find(p=>Number(p.id)===Number(u.id||u.personnelId))||personnel().find(p=>String(p.name||'')===String(u.name||''))||u;}
+function job(id){try{return (jobOrders||[]).find(x=>String(x.id)===String(id))}catch(e){return null}}
+function isProduction(p){const z=((p?.role||'')+' '+(p?.dept||'')+' '+(p?.department||'')).toUpperCase();return /OPERATOR|OPERATÖR|URETIM|ÜRETİM|CNC/.test(z);}
+function log(j,type,extra){
+ j.handoffHistory=Array.isArray(j.handoffHistory)?j.handoffHistory:[];
+ j.handoffHistory.push(Object.assign({type,at:new Date().toISOString(),byId:me()?.id||null,byName:me()?.name||window.currentUser?.name||'-'},extra||{}));
+}
+function sheet(title,rows,onClose){
+ document.getElementById('kmiHandoffSheet')?.remove();
+ const d=document.createElement('div');d.id='kmiHandoffSheet';d.className='fixed inset-0 z-[280] bg-black/70 flex items-end';
+ d.innerHTML=`<div class="w-full max-w-xl mx-auto bg-slate-900 rounded-t-3xl p-4 max-h-[80vh] overflow-y-auto"><div class="flex justify-between items-center mb-3"><div class="text-lg font-black text-white">${E(title)}</div><button id="kmiHandoffClose" class="bg-slate-800 text-white px-3 py-2 rounded-xl">✕</button></div><div class="space-y-2">${rows}</div></div>`;
+ document.body.appendChild(d);
+ d.querySelector('#kmiHandoffClose').onclick=()=>{d.remove();if(onClose)onClose()};
+ return d;
+}
+window.kmiOpenHandoff=function(id){
+ const j=job(id);if(!j)return;
+ sheet(`${j.id} · İş Emrini Devret`,`
+   <button onclick="window.kmiHandoffPeerPicker('${E(id)}')" class="w-full text-left bg-slate-800 hover:bg-slate-700 rounded-2xl p-4"><div class="font-black text-white">👥 Aynı vardiyadaki bir operatöre devret</div><div class="text-xs text-slate-400 mt-1">İşi hemen başka bir çalışan arkadaşınıza aktarın.</div></button>
+   <button onclick="window.kmiHandoffNextShift('${E(id)}')" class="w-full text-left bg-slate-800 hover:bg-slate-700 rounded-2xl p-4"><div class="font-black text-white">🕒 Sonraki vardiyaya devret</div><div class="text-xs text-slate-400 mt-1">İş emri boşa düşer, yönetim sonraki vardiyaya atar.</div></button>
+   <button onclick="window.kmiHandoffManagement('${E(id)}')" class="w-full text-left bg-slate-800 hover:bg-slate-700 rounded-2xl p-4"><div class="font-black text-white">🏢 Yönetime geri ver</div><div class="text-xs text-slate-400 mt-1">Rahatsızlandıysanız / ayrılmanız gerekiyorsa, iş emrini doğrudan yönetime bırakın.</div></button>
+ `);
+};
+window.kmiHandoffPeerPicker=function(id){
+ const j=job(id);if(!j)return;
+ const mine=me();
+ const peers=personnel().filter(p=>isProduction(p)&&Number(p.id)!==Number(mine?.id)&&p.active!==false);
+ const rows=peers.map(p=>`<button onclick="window.kmiHandoffConfirmPeer('${E(id)}',${Number(p.id)})" class="w-full text-left bg-slate-800 hover:bg-slate-700 rounded-xl p-3"><div class="font-bold text-white">${E(p.name)}</div><div class="text-[10px] text-slate-500">${E(p.dept||p.jobTitle||'')}</div></button>`).join('')||'<div class="text-slate-500 text-sm p-3">Uygun operatör bulunamadı.</div>';
+ sheet(`${j.id} · Kime devredilsin?`,rows);
+};
+window.kmiHandoffConfirmPeer=function(id,toId){
+ const j=job(id);if(!j)return;
+ const to=personnel().find(p=>Number(p.id)===Number(toId));if(!to)return;
+ if(!confirm(`${j.id} iş emri ${to.name} adlı çalışana devredilsin mi?`))return;
+ const fromName=me()?.name||window.currentUser?.name||'-';
+ j.assignedTo=[Number(toId)];
+ log(j,'PEER',{toId:Number(toId),toName:to.name,fromName});
+ j.updatedAt=new Date().toISOString();
+ saveStorage('jobOrders',jobOrders);
+ document.getElementById('kmiHandoffSheet')?.remove();
+ toast(`${j.id} → ${to.name} devredildi`,'success');
+ try{window.renderOperatorAssignedJobs?.();}catch(e){}
+ try{refreshAllViews();}catch(e){}
+};
+window.kmiHandoffNextShift=function(id){
+ const j=job(id);if(!j)return;
+ if(!confirm(`${j.id} iş emri sonraki vardiyaya devredilsin mi? İş emri boşa düşecek, yönetim sonraki vardiyadaki operatöre atayacak.`))return;
+ const fromName=me()?.name||window.currentUser?.name||'-';
+ const nextShift=String(j.shift||'').trim()==='1. Vardiya'?'2. Vardiya':(String(j.shift||'').trim()==='2. Vardiya'?'1. Vardiya':j.shift);
+ log(j,'NEXT_SHIFT',{fromName,fromShift:j.shift,toShift:nextShift});
+ j.assignedTo=[];
+ j.shift=nextShift;
+ j.pendingHandoff=true;
+ j.updatedAt=new Date().toISOString();
+ saveStorage('jobOrders',jobOrders);
+ document.getElementById('kmiHandoffSheet')?.remove();
+ toast(`${j.id} sonraki vardiyaya devredildi, yönetim ataması bekliyor`,'warn');
+ try{window.renderOperatorAssignedJobs?.();}catch(e){}
+ try{refreshAllViews();}catch(e){}
+};
+window.kmiHandoffManagement=function(id){
+ const j=job(id);if(!j)return;
+ if(!confirm(`${j.id} iş emri doğrudan yönetime bırakılsın mı?`))return;
+ const fromName=me()?.name||window.currentUser?.name||'-';
+ log(j,'MANAGEMENT',{fromName});
+ j.assignedTo=[];
+ j.pendingHandoff=true;
+ j.updatedAt=new Date().toISOString();
+ saveStorage('jobOrders',jobOrders);
+ document.getElementById('kmiHandoffSheet')?.remove();
+ toast(`${j.id} yönetime devredildi`,'warn');
+ try{window.renderOperatorAssignedJobs?.();}catch(e){}
+ try{refreshAllViews();}catch(e){}
+};
+// Yönetim paneli: bekleyen devir talepleri (boşa düşmüş, yeniden atanmayı bekleyen iş emirleri)
+window.renderHandoffRequestsPanel=function(){
+ const host=document.getElementById('tab-yonetici');if(!host)return;
+ let box=document.getElementById('kmiHandoffRequestsPanel');
+ const pending=(jobOrders||[]).filter(j=>j.pendingHandoff&&(!j.assignedTo||!j.assignedTo.length));
+ if(!box){
+   box=document.createElement('div');box.id='kmiHandoffRequestsPanel';box.className='bg-slate-900 border border-amber-700/50 rounded-2xl p-4 mb-4';
+   host.prepend(box);
+ }
+ if(!pending.length){box.remove();return}
+ box.innerHTML=`<h3 class="text-base font-black text-amber-300 mb-2"><i class="fa-solid fa-right-left mr-2"></i>İş Emri Devir Talepleri (${pending.length})</h3><div class="space-y-2">${pending.map(j=>{const h=(j.handoffHistory||[])[j.handoffHistory.length-1]||{};return `<div class="flex flex-wrap items-center justify-between gap-2 bg-slate-950 border border-slate-800 rounded-xl p-3"><div><div class="text-cyan-300 font-mono text-xs">${E(j.id)}</div><div class="text-white font-bold text-sm">${E(j.item||j.productId||'-')}</div><div class="text-[10px] text-slate-500">${E(h.fromName||'-')} devretti · ${h.type==='NEXT_SHIFT'?'Sonraki vardiya':(h.type==='MANAGEMENT'?'Yönetime':'Devir')} · ${j.shift?E(j.shift):''}</div></div><button onclick="editJobOrder('${E(j.id)}')" class="bg-amber-700 hover:bg-amber-600 text-white px-3 py-2 rounded-xl text-xs font-black">Yeniden Ata</button></div>`}).join('')}</div>`;
+};
+document.addEventListener('DOMContentLoaded',()=>setTimeout(()=>{try{window.renderHandoffRequestsPanel?.()}catch(e){}},400));
 })();
 </script>
 
@@ -5661,7 +5788,7 @@ window.kmiOpenTaskFloor=function(){
 };
 window.kmiRenderTaskFloor=function(){
  const d=document.getElementById('kmiTaskFloor');if(!d)return;
- const p=cur(),all=tasks(),mgr=adminish(p),mine=all.filter(t=>Number(t.assigneeId)===Number(p.id));
+ const p=cur(),all=load(),mgr=adminish(p),mine=all.filter(t=>Number(t.assigneeId)===Number(p.id));
  const view=mgr?all:mine;
  const open=view.filter(t=>!['COMPLETED'].includes(t.status)).length;
  const late=view.filter(t=>t.status!=='COMPLETED'&&t.dueAt&&new Date()>new Date(t.dueAt)).length;
