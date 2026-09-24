@@ -2305,7 +2305,7 @@ ead>
                 const person=(PERSONNEL_LIST||[]).find(p=>String(p.id)===pid);
                 const name=person?.name||('Personel #'+pid);
                 const late=list.filter(t=>t.dueAt&&new Date()>new Date(t.dueAt)&&t.status!=='COMPLETED').length;
-                return `<div class="bg-slate-900 border border-slate-700 rounded-xl p-3"><div class="flex justify-between items-center mb-2"><b class="text-white text-xs">${escSkill(name)}</b><span class="text-[9px] ${late?'text-red-400 font-bold':'text-slate-500'}">${late?late+' gecikmiş':list.length+' görev'}</span></div>${list.map(t=>`<div class="text-[10px] border-t border-slate-800 pt-1.5 mt-1.5"><span class="${stCls[t.status]||'text-slate-400'} font-bold">${stLabel[t.status]||t.status}</span> · ${escSkill(t.title||'-')}${t.dueAt?` · <span class="${new Date()>new Date(t.dueAt)?'text-red-400':'text-slate-500'}">${new Date(t.dueAt).toLocaleDateString('tr-TR')}</span>`:''}</div>`).join('')}</div>`;
+                return `<div class="bg-slate-900 border border-slate-700 rounded-xl p-3"><div class="flex justify-between items-center mb-2"><b class="text-white text-xs">${escSkill(name)}</b><span class="text-[9px] ${late?'text-red-400 font-bold':'text-slate-500'}">${late?late+' gecikmiş':list.length+' görev'}</span></div>${list.map(t=>{const isLate=t.dueAt&&new Date()>new Date(t.dueAt);return `<div class="text-[10px] border-t border-slate-800 pt-1.5 mt-1.5"><span class="${isLate?'text-red-400':(stCls[t.status]||'text-slate-400')} font-bold">${isLate?'GECİKMİŞ':(stLabel[t.status]||t.status)}</span> · ${escSkill(t.title||'-')}${t.dueAt?` · <span class="${isLate?'text-red-400':'text-slate-500'}">${new Date(t.dueAt).toLocaleDateString('tr-TR')}</span>`:''}</div>`}).join('')}</div>`;
             }).join('');
             if(status) status.textContent=`${open.length} açık task · ${Object.keys(byPerson).length} kişi · ${new Date().toLocaleTimeString('tr-TR')}`;
         }
@@ -3982,10 +3982,12 @@ async function load(force=false){
   ];
   const rr=await Promise.all(qs);rr.forEach(r=>{if(r.error)throw r.error});
   [S.workOrders,S.operations,S.assignments,S.quality,S.accounting,S.management,S.shipments]=rr.map(r=>r.data||[]);S.last=Date.now();S.error=null;
+  const prevById=new Map((Array.isArray(jobOrders)?jobOrders:[]).map(j=>[String(j.id),j]));
   const mapped=S.workOrders.map(r=>{
     const ops=S.operations.filter(o=>String(o.work_order_id)===String(r.id));const opids=new Set(ops.map(o=>String(o.id)));const aa=S.assignments.filter(a=>opids.has(String(a.work_order_operation_id))&&!a.unassigned_at);
     const ids=aa.map(a=>{const p=(window.PERSONNEL_LIST||[]).find(x=>String(x.dbId||x.uuid||'')===String(a.operator_personnel_id));return p?.id}).filter(x=>x!=null);
-    return {id:r.work_order_no||r.id,dbId:r.id,client:'',item:r.product_id?('Ürün · '+String(r.product_id).slice(0,8)):'-',department:'Üretim',machine:'',targetType:String(r.work_order_type||'PRODUCTION').toUpperCase().includes('TIME')?'timed':'production',targetQty:Number(r.target_quantity||0),durationMinutes:0,completedQty:0,price:0,dueAt:r.due_at||null,status:statusTr(r.status),assignedTo:ids,createdAt:r.created_at,updatedAt:r.updated_at,_supabase:true};
+    const woId=r.work_order_no||r.id, prev=prevById.get(String(woId));
+    return {id:woId,dbId:r.id,client:prev?.client||'',item:prev?.item||(r.product_id?('Ürün · '+String(r.product_id).slice(0,8)):'-'),department:prev?.department||'Üretim',machine:prev?.machine||'',shift:prev?.shift||'',targetType:String(r.work_order_type||'PRODUCTION').toUpperCase().includes('TIME')?'timed':'production',targetQty:Number(r.target_quantity||0),durationMinutes:0,completedQty:Number(prev?.completedQty||0),price:0,dueAt:r.due_at||null,status:statusTr(r.status),assignedTo:ids,createdAt:r.created_at,updatedAt:r.updated_at,_supabase:true};
   });
   const legacy=(Array.isArray(jobOrders)?jobOrders:[]).filter(j=>!j._supabase&&!mapped.some(m=>String(m.id)===String(j.id))); jobOrders=window.jobOrders=[...mapped,...legacy]; try{saveStorage('jobOrders',jobOrders)}catch(e){}
   try{if(typeof renderAdminJobOrders==='function')renderAdminJobOrders()}catch(e){console.error('[KMI WO admin render]',e)};renderAll();console.info('[V98] DB workflow', {workOrders:S.workOrders.length,quality:S.quality.length,accounting:S.accounting.length,management:S.management.length,shipments:S.shipments.length});return true;
@@ -4836,16 +4838,73 @@ window.kmiPrintOrderQR=function(id){
 };
 
 /* PUBLIC SHOW LIVE: no raw audit/event IDs. Aggregate only meaningful operational signals. */
+// KMI-FIX (2026-09-25): "Kurutlu Live" ekranı tekrar tasarlandı - futbol/spor
+// dili yok, iş diline uygun. Bugün/hafta/ay üretim kırılımı, makine durum
+// panosu (çalışan / boşta / arızalı), kritik akış (termin riski + açık
+// arızalar) eklendi. Her KPI kutusu tıklanınca büyüyüp altındaki detayı
+// gösteriyor (kmiLiveExpand) - istenen "parametreyi büyütme" ihtiyacının
+// ilk sürümü.
+function kmiLiveWeekMonth(ds){
+ const now=new Date(), day=now.getDay()||7, monday=new Date(now); monday.setDate(now.getDate()-day+1); monday.setHours(0,0,0,0);
+ const monthStart=new Date(now.getFullYear(),now.getMonth(),1);
+ let week=0, month=0;
+ ds.forEach(d=>{ const dt=new Date(String(d.date||d.workDate||'').slice(0,10)); if(isNaN(dt))return; const qty=Math.max(0,N(d.qty));
+   if(dt>=monday) week+=qty; if(dt>=monthStart) month+=qty; });
+ return {week,month};
+}
+function kmiMachineBoard(){
+ const js=(()=>{try{return jobOrders}catch(e){return []}})();
+ const active=js.filter(j=>!j.deleted&&!['Silindi','Kapalı','Tamamlandı','COMPLETED','CANCELLED'].includes(String(j.status||'')));
+ const runningNames=new Set(active.map(j=>j.machine).filter(Boolean));
+ const mr=(()=>{try{return maintenanceRecords}catch(e){return []}})();
+ return (typeof MACHINES_LIST!=='undefined'?MACHINES_LIST:[]).map(m=>{
+   const name=`${m.code} - ${m.name}`;
+   const down=mr.some(r=>r.machine===name&&r.status!=='Kapalı'&&r.priority==='CRITICAL')||mr.some(r=>r.machine===name&&r.status!=='Kapalı'&&r.stopsProduction);
+   const issue=mr.some(r=>r.machine===name&&r.status!=='Kapalı');
+   const running=runningNames.has(name);
+   return {name,code:m.code,status:down?'DOWN':running?'RUNNING':issue?'ISSUE':'IDLE'};
+ });
+}
+window.kmiLiveExpand=function(title,bodyHtml){
+ document.getElementById('kmiLiveExpandModal')?.remove();
+ const m=document.createElement('div');m.id='kmiLiveExpandModal';m.className='fixed inset-0 z-[170] bg-black/85 p-4 flex items-center justify-center';
+ m.innerHTML=`<div class="w-full max-w-3xl bg-slate-900 border border-cyan-700 rounded-3xl p-6 max-h-[85vh] overflow-y-auto"><div class="flex justify-between items-center mb-4"><h2 class="text-2xl font-black text-white">${E(title)}</h2><button onclick="this.closest('#kmiLiveExpandModal').remove()" class="bg-slate-800 px-4 py-2 rounded-xl">Kapat</button></div>${bodyHtml}</div>`;
+ document.body.appendChild(m);
+};
 window.kmiOpenLive=function(){
  document.getElementById('kmiLiveModal')?.remove();const st=window.V118_STATE||{},orders=st.orders||[],js=(()=>{try{return jobOrders}catch(e){return []}})(),ds=(()=>{try{return declarations}catch(e){return []}})();
- const active=js.filter(j=>!j.deleted&&!['Silindi','Kapalı','Tamamlandı','COMPLETED','CANCELLED'].includes(String(j.status||''))),assigned=active.filter(j=>(j.assignedTo||[]).length),machinesActive=new Set(active.map(j=>j.machine).filter(Boolean)).size;
- const today=new Date().toISOString().slice(0,10),todayRows=ds.filter(d=>String(d.date||'').slice(0,10)===today),todayQty=todayRows.reduce((a,d)=>a+Math.max(0,N(d.qty)),0),scrap=todayRows.reduce((a,d)=>a+Math.max(0,N(d.scrapQty||d.rejectQty)),0);
- const dueRisk=orders.filter(o=>{if(['PAID','CANCELLED','SHIPPED'].includes(o.status))return false;const x=new Date(o.dueDate),dd=(x-Date.now())/86400000;return dd<=3}).length;
- const d=document.createElement('div');d.id='kmiLiveModal';d.className='fixed inset-0 z-[160] bg-[#07101f] p-4 md:p-6 overflow-y-auto';
- d.innerHTML=`<div class="max-w-7xl mx-auto"><div class="flex justify-between"><div><div class="text-cyan-300 text-sm tracking-[.25em] font-black">KURUTLU MANUFACTURING INTELLIGENCE</div><h1 class="text-5xl md:text-7xl font-black mt-2">KURUTLU LIVE</h1><div class="text-slate-400">Factory Performance · Live Operations</div></div><button onclick="this.closest('#kmiLiveModal').remove()" class="bg-slate-800 px-4 h-12 rounded-xl">Kapat</button></div>
- <div class="grid grid-cols-2 lg:grid-cols-5 gap-3 mt-8">${[['BUGÜN ÜRETİM',todayQty+' ad'],['AKTİF İŞ',active.length],['ATANMIŞ',assigned.length],['AKTİF MAKİNE',machinesActive],['TERMİN RİSKİ',dueRisk]].map(x=>`<div class="bg-slate-900 border border-slate-700 rounded-2xl p-5"><div class="text-xs text-slate-500">${x[0]}</div><div class="text-3xl md:text-4xl font-black text-cyan-300 mt-2">${x[1]}</div></div>`).join('')}</div>
- <div class="grid lg:grid-cols-2 gap-4 mt-4"><div class="bg-slate-900 border border-slate-700 rounded-2xl p-5"><h2 class="text-xl font-black">CANLI ÜRETİM</h2><div class="mt-4 space-y-2">${active.slice(0,8).map(j=>`<div class="bg-slate-950 rounded-xl p-3 flex justify-between"><div><b>${E(j.item||j.id)}</b><div class="text-xs text-slate-500">${E(j.machine||'Planlama')} · ${E(j.shift||'')}</div></div><div class="text-right"><b>${N(j.completedQty)} / ${N(j.targetQty)}</b><div class="text-xs text-cyan-300">${E(j.status||'Açık')}</div></div></div>`).join('')||'<div class="text-slate-500">Aktif üretim yok.</div>'}</div></div>
- <div class="bg-slate-900 border border-slate-700 rounded-2xl p-5"><h2 class="text-xl font-black">FABRİKA NABZI</h2><div class="grid grid-cols-2 gap-3 mt-4"><div class="bg-slate-950 rounded-xl p-4"><div class="text-xs text-slate-500">Bugün kayıt</div><b class="text-3xl">${todayRows.length}</b></div><div class="bg-slate-950 rounded-xl p-4"><div class="text-xs text-slate-500">Hurda</div><b class="text-3xl">${scrap}</b></div><div class="bg-slate-950 rounded-xl p-4 col-span-2"><div class="text-xs text-slate-500">KMI FLOW</div><div class="text-lg font-black mt-2">Sipariş → Planlama → Makine → İnsan → Üretim → Kalite → Sevkiyat</div></div></div><p class="text-xs text-slate-500 mt-4">Bu görünüm ziyaretçi/show ekranıdır. Ham audit, kullanıcı kimliği ve teknik event akışı gösterilmez.</p></div></div></div>`;
+ const active=js.filter(j=>!j.deleted&&!['Silindi','Kapalı','Tamamlandı','COMPLETED','CANCELLED'].includes(String(j.status||''))),assigned=active.filter(j=>(j.assignedTo||[]).length);
+ const board=kmiMachineBoard(),running=board.filter(m=>m.status==='RUNNING'),down=board.filter(m=>m.status==='DOWN'),idle=board.filter(m=>m.status==='IDLE'||m.status==='ISSUE');
+ const today=new Date().toISOString().slice(0,10),todayRows=ds.filter(d=>String(d.date||d.workDate||'').slice(0,10)===today),todayQty=todayRows.reduce((a,d)=>a+Math.max(0,N(d.qty)),0),scrap=todayRows.reduce((a,d)=>a+Math.max(0,N(d.scrapQty||d.rejectQty)),0);
+ const {week,month}=kmiLiveWeekMonth(ds);
+ const riskOrders=orders.filter(o=>{if(['PAID','CANCELLED','SHIPPED'].includes(o.status))return false;const x=new Date(o.dueDate),dd=(x-Date.now())/86400000;return dd<=3});
+ const openIssues=(()=>{try{return maintenanceRecords.filter(r=>r.status!=='Kapalı')}catch(e){return []}})();
+ const d=document.createElement('div');d.id='kmiLiveModal';d.className='fixed inset-0 z-[160] bg-gradient-to-b from-[#050b16] to-[#0a1628] p-4 md:p-6 overflow-y-auto';
+ const tile=(label,val,detailTitle,detailHtml,accent='text-cyan-300')=>`<button onclick='kmiLiveExpand(${JSON.stringify(detailTitle)},${JSON.stringify(detailHtml)})' class="text-left bg-slate-900/80 border border-slate-700 hover:border-cyan-600 rounded-2xl p-5 transition"><div class="flex justify-between items-start"><div class="text-xs text-slate-500 tracking-wide">${E(label)}</div><i class="fa-solid fa-expand text-slate-600 text-[10px]"></i></div><div class="text-3xl md:text-4xl font-black ${accent} mt-2">${val}</div></button>`;
+ const machineChip=m=>`<div class="rounded-xl p-2.5 text-center border ${m.status==='RUNNING'?'bg-emerald-950/50 border-emerald-700 text-emerald-300':m.status==='DOWN'?'bg-red-950/50 border-red-700 text-red-300':'bg-slate-950 border-slate-700 text-slate-500'}"><div class="text-[10px] font-black">${E(m.code)}</div><div class="text-[8px] mt-0.5">${m.status==='RUNNING'?'ÇALIŞIYOR':m.status==='DOWN'?'ARIZALI':m.status==='ISSUE'?'AÇIK KAYIT':'BOŞTA'}</div></div>`;
+ d.innerHTML=`<div class="max-w-7xl mx-auto"><div class="flex flex-wrap justify-between gap-3"><div><div class="text-cyan-300 text-sm tracking-[.25em] font-black">KURUTLU MANUFACTURING INTELLIGENCE</div><h1 class="text-4xl md:text-6xl font-black mt-2 bg-gradient-to-r from-white to-cyan-300 bg-clip-text text-transparent">KURUTLU LIVE</h1><div class="text-slate-400">Fabrika Performansı · Canlı Operasyon</div></div><button onclick="this.closest('#kmiLiveModal').remove()" class="bg-slate-800 px-4 h-12 rounded-xl self-start">Kapat</button></div>
+
+ <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 mt-8">
+   ${tile('BUGÜN ÜRETİM',todayQty+' ad','Bugünün Üretim Kayıtları',`<div class="space-y-2">${todayRows.map(r=>`<div class="bg-slate-950 rounded-lg p-3 flex justify-between text-sm"><span>${E(r.operator||'-')} · ${E(r.machine||'-')}</span><b class="text-emerald-300">${N(r.qty)} ad</b></div>`).join('')||'<div class="text-slate-500">Bugün kayıt yok.</div>'}</div>`)}
+   ${tile('BU HAFTA',week+' ad','Bu Hafta Üretim',`<div class="text-slate-300">Pazartesiden bugüne toplam kalite onaylı üretim: <b class="text-2xl text-cyan-300">${week} adet</b></div>`)}
+   ${tile('BU AY',month+' ad','Bu Ay Üretim',`<div class="text-slate-300">Ay başından bugüne toplam kalite onaylı üretim: <b class="text-2xl text-cyan-300">${month} adet</b></div>`)}
+   ${tile('HURDA (BUGÜN)',scrap+' ad',"Bugünün Hurda Kayıtları",`<div class="space-y-2">${todayRows.filter(r=>N(r.scrapQty||r.rejectQty)>0).map(r=>`<div class="bg-slate-950 rounded-lg p-3 flex justify-between text-sm"><span>${E(r.operator||'-')} · ${E(r.machine||'-')}</span><b class="text-red-300">${N(r.scrapQty||r.rejectQty)} ad</b></div>`).join('')||'<div class="text-slate-500">Bugün hurda kaydı yok.</div>'}</div>`,'text-red-300')}
+ </div>
+ <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 mt-3">
+   ${tile('AKTİF İŞ EMRİ',active.length,'Aktif İş Emirleri',`<div class="space-y-2">${active.slice(0,20).map(j=>`<div class="bg-slate-950 rounded-lg p-3 flex justify-between text-sm"><span>${E(j.item||j.id)} · ${E(j.machine||'Planlama')}</span><b>${N(j.completedQty)}/${N(j.targetQty)}</b></div>`).join('')||'-'}</div>`)}
+   ${tile('ATANMIŞ',assigned.length,'Atanmış İş Emirleri',`<div class="text-slate-300">Operatöre atanmış aktif iş emri sayısı: <b class="text-2xl">${assigned.length}</b> / ${active.length}</div>`)}
+   ${tile('ÇALIŞAN MAKİNE',running.length+'/'+board.length,'Makine Durumu',`<div class="grid grid-cols-4 md:grid-cols-6 gap-2">${board.map(machineChip).join('')}</div>`,'text-emerald-300')}
+   ${tile('TERMİN RİSKİ',riskOrders.length,'Termini 3 Gün veya Daha Yakın Siparişler',`<div class="space-y-2">${riskOrders.map(o=>`<div class="bg-slate-950 rounded-lg p-3 flex justify-between text-sm"><span>${E(o.customerPO||o.id)}</span><b class="text-amber-300">${E(o.dueDate||'-')}</b></div>`).join('')||'<div class="text-slate-500">Yakın termin riski yok.</div>'}</div>`,riskOrders.length?'text-amber-300':'text-cyan-300')}
+ </div>
+
+ <div class="grid lg:grid-cols-3 gap-4 mt-4">
+  <div class="lg:col-span-2 bg-slate-900/80 border border-slate-700 rounded-2xl p-5"><h2 class="text-lg font-black text-white">MAKİNE DURUM PANOSU</h2><div class="text-xs text-slate-500 mt-1">${running.length} çalışıyor · ${down.length} arızalı · ${idle.length} boşta</div><div class="grid grid-cols-4 md:grid-cols-6 xl:grid-cols-8 gap-2 mt-4">${board.map(machineChip).join('')}</div></div>
+  <div class="bg-slate-900/80 border border-red-800/60 rounded-2xl p-5"><h2 class="text-lg font-black text-white">KRİTİK AKIŞ</h2><div class="mt-3 space-y-2 text-sm">${down.length?down.map(m=>`<div class="bg-red-950/40 border border-red-800 rounded-lg p-2"><b class="text-red-300">${E(m.name)}</b> · arızalı</div>`).join(''):''}${openIssues.filter(r=>r.status!=='Kapalı').slice(0,6).map(r=>`<div class="bg-slate-950 rounded-lg p-2 flex justify-between"><span>${E(r.machine)}</span><span class="text-amber-300 text-xs">${E(r.status)}</span></div>`).join('')||(down.length?'':'<div class="text-slate-500">Açık kritik kayıt yok.</div>')}</div></div>
+ </div>
+
+ <div class="bg-slate-900/80 border border-slate-700 rounded-2xl p-5 mt-4"><h2 class="text-lg font-black text-white">CANLI ÜRETİM AKIŞI</h2><div class="grid md:grid-cols-2 gap-2 mt-4">${active.slice(0,10).map(j=>`<div class="bg-slate-950 rounded-xl p-3 flex justify-between"><div><b>${E(j.item||j.id)}</b><div class="text-xs text-slate-500">${E(j.machine||'Planlama')} · ${E(j.shift||'')}</div></div><div class="text-right"><b>${N(j.completedQty)} / ${N(j.targetQty)}</b><div class="text-xs text-cyan-300">${E(j.status||'Açık')}</div></div></div>`).join('')||'<div class="text-slate-500">Aktif üretim yok.</div>'}</div>
+ <div class="text-xs text-slate-500 mt-4 border-t border-slate-800 pt-3">Akış: Sipariş → Planlama → Makine → İnsan → Üretim → Kalite → Sevkiyat · Bu görünüm show ekranıdır, kullanıcı kimliği ve ham audit gösterilmez. Bir kutuya tıklayarak detayını büyütebilirsiniz.</div></div>
+ </div>`;
  document.body.appendChild(d);
 };
 })();
@@ -5342,9 +5401,16 @@ const load=()=>{try{return JSON.parse(localStorage.getItem(KEY)||'[]')}catch(e){
 const people=()=>{try{return Array.isArray(PERSONNEL_LIST)?PERSONNEL_LIST:[]}catch(e){return []}};
 const cur=()=>{const u=window.currentUser||{};return people().find(p=>Number(p.id)===Number(u.id||u.personnelId||u.personId))||people().find(p=>String(p.name)===String(u.name))||u};
 const adminish=p=>/ADMIN|YÖNET|YONET|MUHASEBE|ACCOUNT/.test(((p?.role||'')+' '+(p?.job||'')+' '+(p?.department||'')).toUpperCase());
+// KMI-FIX (2026-09-25): renk kodu netleştirildi - gecikenler kırmızı,
+// zamanından önce tamamlananlar yeşil, tam zamanında tamamlananlar mavi.
 function state(t){
  const due=t.dueAt?new Date(t.dueAt):null, now=new Date();
- if(t.status==='COMPLETED')return ['TAMAMLANDI','bg-emerald-950/60 border-emerald-700 text-emerald-300'];
+ if(t.status==='COMPLETED'){
+   const c=t.completedAt?new Date(t.completedAt):now;
+   if(due&&c<due)return ['ERKEN TAMAMLANDI','bg-emerald-950/60 border-emerald-700 text-emerald-300'];
+   if(due&&c>due)return ['GEÇ TAMAMLANDI','bg-red-950/60 border-red-700 text-red-300'];
+   return ['ZAMANINDA TAMAMLANDI','bg-blue-950/60 border-blue-700 text-blue-300'];
+ }
  if(t.status==='AWAITING_APPROVAL')return ['ONAY BEKLİYOR','bg-violet-950/60 border-violet-700 text-violet-300'];
  if(t.status==='WAITING')return ['BEKLEMEDE','bg-amber-950/60 border-amber-700 text-amber-300'];
  if(due&&now>due)return ['GECİKMİŞ','bg-red-950/60 border-red-700 text-red-300'];
