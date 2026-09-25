@@ -614,7 +614,7 @@ ead>
     </button>
   </div>
 </div>
-<div class="bg-slate-800 border border-cyan-700/40 rounded-xl p-5 shadow-lg"><div class="flex flex-wrap justify-between gap-3"><div><h2 class="text-xl font-black text-white"><i class="fa-solid fa-diagram-project text-cyan-400 mr-2"></i>KURUTLU LIVE · Order & Flow Center</h2><p class="text-xs text-slate-400 mt-1">Performance Center · Paperless Machining · Every movement measured. Every decision informed.</p></div><div class="flex flex-wrap gap-2"><button onclick="kmiOpenScan()" class="bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2 rounded-lg text-xs font-black"><i class="fa-solid fa-qrcode mr-1"></i> SCAN</button><button onclick="kmiOpenLive()" class="bg-violet-600 hover:bg-violet-500 text-white px-4 py-2 rounded-lg text-xs font-black"><i class="fa-solid fa-tower-broadcast mr-1"></i> KURUTLU LIVE</button><button onclick="v118OpenOrder()" class="bg-cyan-600 hover:bg-cyan-500 text-white px-4 py-2 rounded-lg text-xs font-black"><i class="fa-solid fa-plus mr-1"></i> Yeni Müşteri Siparişi</button></div></div><div id="v118Kpis" class="grid grid-cols-2 md:grid-cols-5 gap-3 mt-4"></div></div>
+<div class="bg-slate-800 border border-cyan-700/40 rounded-xl p-5 shadow-lg"><div class="flex flex-wrap justify-between gap-3"><div><h2 class="text-xl font-black text-white"><i class="fa-solid fa-diagram-project text-cyan-400 mr-2"></i>KURUTLU LIVE · Order & Flow Center</h2><p class="text-xs text-slate-400 mt-1">Performance Center · Paperless Machining · Every movement measured. Every decision informed.</p></div><div class="flex flex-wrap gap-2"><button onclick="kmiOpenScan()" class="bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2 rounded-lg text-xs font-black"><i class="fa-solid fa-qrcode mr-1"></i> SCAN</button><button onclick="kmiOpenLive()" class="bg-violet-600 hover:bg-violet-500 text-white px-4 py-2 rounded-lg text-xs font-black"><i class="fa-solid fa-tower-broadcast mr-1"></i> KURUTLU LIVE</button><button onclick="v118OpenOrder()" class="bg-cyan-600 hover:bg-cyan-500 text-white px-4 py-2 rounded-lg text-xs font-black"><i class="fa-solid fa-plus mr-1"></i> Yeni Müşteri Siparişi</button></div></div><div id="v118Kpis" class="grid grid-cols-2 md:grid-cols-5 gap-3 mt-4"></div><div id="kmiV121Dashboard" class="mt-4"></div></div>
 <!-- KMI-FIX (2026-09-25): "3 · ÜRETİM" etiketi burada sadece dekoratif bir kutuydu; hiçbir
      gerçek üretim/iş emri verisi göstermiyordu (bu ekranın "Müşteri Siparişleri" tablosu ayrı
      bir veri kümesidir - sadece bu ekrandan "Yeni Müşteri Siparişi" ile açılan siparişleri
@@ -3516,6 +3516,76 @@ window.kmiSubmitServiceCall=function(machine){
  kmiReopenMachineFile(machine);
  alert('Dış servis çağrısı yönetime iletildi.');
 };
+// KMI-FIX (2026-09-26): "+ Yeni Makine" prompt() zincirleri yerine kart tarzı modal.
+window.kmiOpenMachineAddModal=function(departments,onSave){
+ document.getElementById('kmiMachineAddModal')?.remove();
+ window.__kmiMachineAddSave=onSave;
+ const depts=Array.isArray(departments)&&departments.length?departments:['Üretim','Kalite','Bakım','Sevkiyat','Diğer'];
+ const d=document.createElement('div');d.id='kmiMachineAddModal';d.className='fixed inset-0 z-[110] bg-slate-950/85 flex items-center justify-center p-4';
+ d.innerHTML=`<div class="bg-slate-900 border border-cyan-700 rounded-2xl w-full max-w-lg p-5 shadow-2xl"><div class="flex justify-between items-center mb-3"><h3 class="text-base font-black text-white"><i class="fa-solid fa-industry text-cyan-400 mr-2"></i>Yeni Makine Ekle</h3><button onclick="kmiCloseDynModal('kmiMachineAddModal')" class="text-slate-400 hover:text-white text-xl">&times;</button></div>
+ <div class="space-y-3 text-xs">
+ <div class="grid grid-cols-2 gap-2"><label class="block text-slate-400">Makine Kodu / Numarası (zorunlu)<input id="kmiAddCode" placeholder="Örn. 115" class="w-full mt-1 bg-slate-950 border border-slate-700 rounded p-2 text-white"></label><label class="block text-slate-400">Marka / Model (zorunlu)<input id="kmiAddModel" placeholder="Örn. HAAS VF-2" class="w-full mt-1 bg-slate-950 border border-slate-700 rounded p-2 text-white"></label></div>
+ <label class="block text-slate-400">Departman<select id="kmiAddDept" class="w-full mt-1 bg-slate-950 border border-slate-700 rounded p-2 text-white">${depts.map(x=>`<option value="${x}">${x}</option>`).join('')}</select></label>
+ <div class="grid grid-cols-2 gap-2"><label class="block text-slate-400">Marka<input id="kmiAddBrand" class="w-full mt-1 bg-slate-950 border border-slate-700 rounded p-2 text-white"></label><label class="block text-slate-400">Seri No<input id="kmiAddSerial" class="w-full mt-1 bg-slate-950 border border-slate-700 rounded p-2 text-white"></label></div>
+ <div class="grid grid-cols-2 gap-2"><label class="block text-slate-400">Üretim Yılı<input id="kmiAddYear" class="w-full mt-1 bg-slate-950 border border-slate-700 rounded p-2 text-white"></label><label class="block text-slate-400">Lokasyon<input id="kmiAddLocation" value="Üretim" class="w-full mt-1 bg-slate-950 border border-slate-700 rounded p-2 text-white"></label></div>
+ <label class="block text-slate-400">Teknik Özellikler / Notlar<textarea id="kmiAddSpecs" rows="3" class="w-full mt-1 bg-slate-950 border border-slate-700 rounded p-2 text-white"></textarea></label>
+ </div>
+ <div class="flex justify-end gap-2 mt-4"><button onclick="kmiCloseDynModal('kmiMachineAddModal')" class="bg-slate-700 px-3 py-2 rounded text-xs">Vazgeç</button><button onclick="kmiSubmitMachineAdd()" class="bg-cyan-700 hover:bg-cyan-600 px-4 py-2 rounded text-xs font-bold text-white">Makineyi Ekle</button></div>
+ </div>`;
+ document.body.appendChild(d);
+ setTimeout(()=>document.getElementById('kmiAddCode')?.focus(),50);
+};
+window.kmiSubmitMachineAdd=function(){
+ const code=document.getElementById('kmiAddCode')?.value.trim()||'';
+ const model=document.getElementById('kmiAddModel')?.value.trim()||'';
+ if(!code)return alert('Makine kodu / numarası zorunludur.');
+ if(!model)return alert('Marka / model zorunludur.');
+ const data={
+  code,model,
+  department:document.getElementById('kmiAddDept')?.value||'',
+  brand:document.getElementById('kmiAddBrand')?.value.trim()||'',
+  serial:document.getElementById('kmiAddSerial')?.value.trim()||'',
+  year:document.getElementById('kmiAddYear')?.value.trim()||'',
+  location:document.getElementById('kmiAddLocation')?.value.trim()||'Üretim',
+  specs:document.getElementById('kmiAddSpecs')?.value.trim()||'',
+ };
+ kmiCloseDynModal('kmiMachineAddModal');
+ try{ if(typeof window.__kmiMachineAddSave==='function') window.__kmiMachineAddSave(data); }catch(e){}
+ window.__kmiMachineAddSave=null;
+};
+window.kmiOpenMachineEditModal=function(data,onSave){
+ document.getElementById('kmiMachineEditModal')?.remove();
+ window.__kmiMachineEditSave=onSave;
+ const esc=(x)=>String(x==null?'':x).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+ const d=document.createElement('div');d.id='kmiMachineEditModal';d.className='fixed inset-0 z-[110] bg-slate-950/85 flex items-center justify-center p-4';
+ d.innerHTML=`<div class="bg-slate-900 border border-slate-600 rounded-2xl w-full max-w-lg p-5 shadow-2xl"><div class="flex justify-between items-center mb-3"><h3 class="text-base font-black text-white"><i class="fa-solid fa-id-card text-slate-300 mr-2"></i>Makine Künyesini Düzenle</h3><button onclick="kmiCloseDynModal('kmiMachineEditModal')" class="text-slate-400 hover:text-white text-xl">&times;</button></div>
+ <div class="space-y-3 text-xs">
+ <label class="block text-slate-400">Makine Adı<input id="kmiEditName" value="${esc(data.name)}" class="w-full mt-1 bg-slate-950 border border-slate-700 rounded p-2 text-white"></label>
+ <div class="grid grid-cols-2 gap-2"><label class="block text-slate-400">Marka<input id="kmiEditBrand" value="${esc(data.brand)}" class="w-full mt-1 bg-slate-950 border border-slate-700 rounded p-2 text-white"></label><label class="block text-slate-400">Model<input id="kmiEditModel" value="${esc(data.model)}" class="w-full mt-1 bg-slate-950 border border-slate-700 rounded p-2 text-white"></label></div>
+ <div class="grid grid-cols-2 gap-2"><label class="block text-slate-400">Seri No<input id="kmiEditSerial" value="${esc(data.serial)}" class="w-full mt-1 bg-slate-950 border border-slate-700 rounded p-2 text-white"></label><label class="block text-slate-400">Üretim Yılı<input id="kmiEditYear" value="${esc(data.year)}" class="w-full mt-1 bg-slate-950 border border-slate-700 rounded p-2 text-white"></label></div>
+ <label class="block text-slate-400">Lokasyon<input id="kmiEditLocation" value="${esc(data.location)}" class="w-full mt-1 bg-slate-950 border border-slate-700 rounded p-2 text-white"></label>
+ <label class="block text-slate-400">Teknik Özellikler / Notlar<textarea id="kmiEditSpecs" rows="4" class="w-full mt-1 bg-slate-950 border border-slate-700 rounded p-2 text-white">${esc(data.specs)}</textarea></label>
+ </div>
+ <div class="flex justify-end gap-2 mt-4"><button onclick="kmiCloseDynModal('kmiMachineEditModal')" class="bg-slate-700 px-3 py-2 rounded text-xs">Vazgeç</button><button onclick="kmiSubmitMachineEdit()" class="bg-cyan-700 hover:bg-cyan-600 px-4 py-2 rounded text-xs font-bold text-white">Kaydet</button></div>
+ </div>`;
+ document.body.appendChild(d);
+};
+window.kmiSubmitMachineEdit=function(){
+ const name=document.getElementById('kmiEditName')?.value.trim()||'';
+ if(!name)return alert('Makine adı zorunludur.');
+ const upd={
+  name,
+  brand:document.getElementById('kmiEditBrand')?.value.trim()||'',
+  model:document.getElementById('kmiEditModel')?.value.trim()||'',
+  serial:document.getElementById('kmiEditSerial')?.value.trim()||'',
+  year:document.getElementById('kmiEditYear')?.value.trim()||'',
+  location:document.getElementById('kmiEditLocation')?.value.trim()||'',
+  specs:document.getElementById('kmiEditSpecs')?.value.trim()||'',
+ };
+ kmiCloseDynModal('kmiMachineEditModal');
+ try{ if(typeof window.__kmiMachineEditSave==='function') window.__kmiMachineEditSave(upd); }catch(e){}
+ window.__kmiMachineEditSave=null;
+};
 function renderServiceCallPanel(){
  const box=document.getElementById('machineServiceCallPanel');if(!box)return;
  const rows=(machineServiceCalls||[]).slice(0,25);
@@ -4069,10 +4139,30 @@ window.v35SaveAssign=function(oid){
  journal.unshift({id:'J'+Date.now(),machineId:o.machineId,type:'ATAMA',text:p?`Bakım emri ${p.name} adlı personele atandı.`:'Bakım emri ortak kuyruğa geri alındı.',by:currentUser.name,at:nowISO()});
  persist();window.v62CloseModal();renderAll();
 };
-function addMachine(){const code=prompt('Makine kodu / numarası:','');if(!code?.trim())return;const model=prompt('Makine marka / model:','');if(!model?.trim())return;const m={id:'M'+Date.now(),code:code.trim(),name:code.trim()+' - '+model.trim(),brand:'',model:model.trim(),serial:'',year:'',location:'Üretim',specs:'',status:'UP',downSince:null,totalDownMinutes:0,health:100,createdAt:nowISO(),active:true};m.department=guessDepartment(m);machines.push(m);persist();renderAll();openFile(m.id)}
+function addMachine(){
+ if(typeof window.kmiOpenMachineAddModal==='function'){
+  window.kmiOpenMachineAddModal(DEPARTMENTS,(data)=>{
+   const code=data.code.trim(),model=data.model.trim();
+   const m={id:'M'+Date.now(),code,name:code+' - '+model,brand:data.brand||'',model,serial:data.serial||'',year:data.year||'',location:data.location||'Üretim',specs:data.specs||'',status:'UP',downSince:null,totalDownMinutes:0,health:100,createdAt:nowISO(),active:true};
+   m.department=data.department||guessDepartment(m);
+   machines.push(m);persist();renderAll();openFile(m.id);
+  });
+  return;
+ }
+ const code=prompt('Makine kodu / numarası:','');if(!code?.trim())return;const model=prompt('Makine marka / model:','');if(!model?.trim())return;const m={id:'M'+Date.now(),code:code.trim(),name:code.trim()+' - '+model.trim(),brand:'',model:model.trim(),serial:'',year:'',location:'Üretim',specs:'',status:'UP',downSince:null,totalDownMinutes:0,health:100,createdAt:nowISO(),active:true};m.department=guessDepartment(m);machines.push(m);persist();renderAll();openFile(m.id)
+}
 function setDepartment(id,dept){if(!canAdmin())return alert('Departman ataması yalnız Yönetim tarafından yapılabilir.');const m=machine(id);if(!m)return;if(!DEPARTMENTS.includes(dept))return;m.department=dept;persist();renderAll()}
 window.v35SetMachineDepartment=setDepartment;
-function editMachine(id){const m=machine(id);const name=prompt('Makine adı:',m.name);if(!name?.trim())return;m.name=name.trim();m.brand=prompt('Marka:',m.brand||'')??m.brand;m.model=prompt('Model:',m.model||'')??m.model;m.serial=prompt('Seri No:',m.serial||'')??m.serial;m.year=prompt('Üretim yılı:',m.year||'')??m.year;m.location=prompt('Lokasyon:',m.location||'Üretim')??m.location;m.specs=prompt('Teknik özellikler / notlar:',m.specs||'')??m.specs;persist();renderAll();openFile(id)}
+function editMachine(id){
+ const m=machine(id);if(!m)return;
+ if(typeof window.kmiOpenMachineEditModal==='function'){
+  window.kmiOpenMachineEditModal({id:m.id,name:m.name,brand:m.brand,model:m.model,serial:m.serial,year:m.year,location:m.location,specs:m.specs},(upd)=>{
+   Object.assign(m,upd);persist();renderAll();openFile(id);
+  });
+  return;
+ }
+ const name=prompt('Makine adı:',m.name);if(!name?.trim())return;m.name=name.trim();m.brand=prompt('Marka:',m.brand||'')??m.brand;m.model=prompt('Model:',m.model||'')??m.model;m.serial=prompt('Seri No:',m.serial||'')??m.serial;m.year=prompt('Üretim yılı:',m.year||'')??m.year;m.location=prompt('Lokasyon:',m.location||'Üretim')??m.location;m.specs=prompt('Teknik özellikler / notlar:',m.specs||'')??m.specs;persist();renderAll();openFile(id)
+}
 // Operatör beyanından bakım emri oluşturmayı V35 tek veri modeline bağla.
 window.createMaintenanceFromOperator=function(machineName,description,severity,reportedBy,alarmCode,stopsProduction){return createExternalFault(machineName,alarmCode||description,description,severity,reportedBy,!!stopsProduction,'operator');};
 function normalizeMachineName(x){if(x&&typeof x==='object')return String(x.code||'')+(x.name?' - '+x.name:'');return String(x||'');}
@@ -4870,7 +4960,11 @@ window.v72CalcPO=function(){const q=Number(document.getElementById('poQty')?.val
 window.v72SavePO=function(){const p=D.purchases.find(x=>x.id===activeV62?.id);if(!p)return;const val=x=>document.getElementById(x)?.value??'';const qs=[0,1,2].map(n=>({supplier:val('qSup'+n),quoteNo:val('qNo'+n).trim(),date:val('qDate'+n),unitPrice:Number(val('qPrice'+n)||0),currency:val('qCur'+n),leadTimeDays:Number(val('qLead'+n)||0),paymentTerm:val('qPay'+n).trim(),incoterm:val('qInc'+n).trim(),validUntil:val('qValid'+n),file:p.quotes?.[n]?.file||null}));const ex=document.getElementById('poQuoteException')?.checked,reason=val('poExceptionReason').trim();const complete=qs.filter(q=>q.supplier&&q.unitPrice>0).length;if(complete<3&&!ex)return alert('3 fiyat teklifi tamamlanmadı. İstisna gerekiyorsa “3 teklif istisnası” seçip gerekçe yazın.');if(ex&&!reason)return alert('3 teklif istisnası için gerekçe zorunludur.');Object.assign(p,{purchaseItemId:val('poPurchaseItem'),supplier:val('poSupplier'),productId:val('poProduct'),item:val('poItem').trim(),qty:Number(val('poQty')||0),unit:val('poUnit').trim(),unitPrice:Number(val('poPrice')||0),currency:val('poCur'),fxRate:val('poCur')==='TRY'?1:Number(val('poFx')||0),purchasedBy:val('poBy').trim(),orderDate:val('poDate'),eta:val('poEta'),status:val('poStatus').trim(),quotes:qs,threeQuoteException:ex,exceptionReason:reason,selectedQuote:Number(val('poSelectedQuote')),selectionReason:val('poSelectionReason').trim()});let pending=4;const done=()=>{if(--pending===0){save();v62CloseModal();v61Show('supply')}};[0,1,2].forEach(n=>v72FileRead(document.getElementById('qFile'+n),f=>{if(f)p.quotes[n].file=f;done()}));v72FileRead(document.getElementById('poProforma'),f=>{if(f)p.proforma=f;done()})};
 window.v72OpenRequest=function(id){const r=D.purchaseRequests.find(x=>x.id===id);if(!r)return;const admin=['ADMIN','YÖNETİM','YONETIM','MANAGEMENT'].includes(String(currentUser?.role||'').toUpperCase())||String(currentUser?.dept||'').toLowerCase().includes('satın');v62Modal('Satınalma Talebi · '+esc(r.id),`<div class="grid md:grid-cols-2 gap-3 text-sm"><div><span class="text-slate-500">Talep eden</span><br><b>${esc(r.requestedBy||'-')}</b></div><div>${v72StatusBadge(r.status)}</div><div><span class="text-slate-500">Malzeme</span><br><b>${esc(r.materialName)}</b></div><div><span class="text-slate-500">Miktar</span><br><b>${Number(r.qty||0)} ${esc(r.unit||'')}</b></div><div class="md:col-span-2"><span class="text-slate-500">Ne için lazım?</span><br>${esc(r.purpose||'-')}</div><div class="md:col-span-2"><span class="text-slate-500">Açıklama</span><br>${esc(r.notes||'-')}</div></div>${admin?`<div class="mt-5 border-t border-slate-700 pt-4"><label>Satınalma Yanıtı<textarea id="reqResponse" class="mt-1 w-full bg-slate-950 border border-slate-700 rounded p-2">${esc(r.response||'')}</textarea></label><div class="flex flex-wrap gap-2 mt-3"><button onclick="v72Decision('${r.id}','REVIEW')" class="bg-blue-700 px-3 py-2 rounded">İnceleniyor</button><button onclick="v72Decision('${r.id}','APPROVED')" class="bg-emerald-700 px-3 py-2 rounded">Olumlu / Onayla</button><button onclick="v72Decision('${r.id}','REJECTED')" class="bg-red-800 px-3 py-2 rounded">Olumsuz / Reddet</button><button onclick="v72ConvertRequest('${r.id}')" class="bg-cyan-700 px-3 py-2 rounded">Satınalmaya Dönüştür</button></div></div>`:''}`)};
 window.v72Decision=function(id,status){const r=D.purchaseRequests.find(x=>x.id===id);if(!r)return;r.status=status;r.response=document.getElementById('reqResponse')?.value.trim()||'';r.reviewedBy=currentUser?.name||'-';r.reviewedAt=new Date().toISOString();save();v62CloseModal();v61Show('supply')};
-window.v72ConvertRequest=function(id){const r=D.purchaseRequests.find(x=>x.id===id);if(!r)return;const po={id:'PO-'+new Date().getFullYear()+'-'+String(Date.now()).slice(-6),supplier:'',purchaseItemId:r.purchaseItemId||'',productId:'',item:r.materialName,qty:Number(r.qty||0),unit:r.unit||'adet',unitPrice:0,currency:'TRY',fxRate:1,purchasedBy:currentUser?.name||'',orderDate:new Date().toISOString().slice(0,10),eta:'',status:'Taslak · Talep '+r.id,quotes:[],proforma:null,requestId:r.id};D.purchases.unshift(po);r.status='CONVERTED';r.convertedPoId=po.id;r.response=document.getElementById('reqResponse')?.value.trim()||r.response||'Satınalma kaydına dönüştürüldü.';r.reviewedBy=currentUser?.name||'-';r.reviewedAt=new Date().toISOString();save();v62CloseModal();v62OpenPO(po.id)};
+window.v72ConvertRequest=function(id){const r=D.purchaseRequests.find(x=>x.id===id);if(!r)return;const po={id:'PO-'+new Date().getFullYear()+'-'+String(Date.now()).slice(-6),supplier:'',purchaseItemId:r.purchaseItemId||'',productId:'',item:r.materialName,qty:Number(r.qty||0),unit:r.unit||'adet',unitPrice:0,currency:'TRY',fxRate:1,purchasedBy:currentUser?.name||'',orderDate:new Date().toISOString().slice(0,10),eta:'',status:'Taslak · Talep '+r.id,quotes:[],proforma:null,requestId:r.id,
+  // KMI-FIX (2026-09-26): bu alanlar eksikti; talepten dönüştürülen PO, künye düzenlenmeden
+  // doğrudan yönetim onayı/giriş kalite adımına girerse approvalHistory.push() ReferenceError
+  // fırlatıyordu (satınalma bildirim akışını test ederken bulundu).
+  workflowStatus:'DRAFT',receivedQty:0,qcResult:'',approvalHistory:[]};D.purchases.unshift(po);r.status='CONVERTED';r.convertedPoId=po.id;r.response=document.getElementById('reqResponse')?.value.trim()||r.response||'Satınalma kaydına dönüştürüldü.';r.reviewedBy=currentUser?.name||'-';r.reviewedAt=new Date().toISOString();save();v62CloseModal();v62OpenPO(po.id)};
 window.v72NewRequest=function(){v62Modal('Basit Satınalma Talebi',`<div class="space-y-3 text-sm"><label>Lazım Olan Malzeme / Ürün *<input id="reqMat" class="mt-1 w-full bg-slate-950 border border-slate-700 rounded p-2" placeholder="Örn. Ø10 karbür freze, eldiven, sensör..."></label><div class="grid grid-cols-2 gap-3"><label>Miktar<input id="reqQty" type="number" min="0" step="0.001" value="1" class="mt-1 w-full bg-slate-950 border border-slate-700 rounded p-2"></label><label>Birim<input id="reqUnit" value="adet" class="mt-1 w-full bg-slate-950 border border-slate-700 rounded p-2"></label></div><label>Ne İçin Lazım? *<textarea id="reqPurpose" class="mt-1 w-full bg-slate-950 border border-slate-700 rounded p-2" placeholder="Makine / iş emri / bakım / üretim ihtiyacı..."></textarea></label><label>Öncelik<select id="reqPriority" class="mt-1 w-full bg-slate-950 border border-slate-700 rounded p-2"><option>Normal</option><option>Yüksek</option><option>Acil</option></select></label><label>Ek Açıklama<textarea id="reqNotes" class="mt-1 w-full bg-slate-950 border border-slate-700 rounded p-2"></textarea></label><button onclick="v72SubmitRequest()" class="w-full bg-amber-600 hover:bg-amber-500 text-slate-950 font-black py-3 rounded">Talep Et</button></div>`)};
 window.v72SubmitRequest=function(){const mat=document.getElementById('reqMat')?.value.trim(),purpose=document.getElementById('reqPurpose')?.value.trim();if(!mat||!purpose)return alert('Malzeme adı ve ne için lazım olduğu zorunludur.');D.purchaseRequests.unshift({id:'REQ-'+String(Date.now()).slice(-8),materialName:mat,qty:Number(document.getElementById('reqQty')?.value||1),unit:document.getElementById('reqUnit')?.value.trim()||'adet',purpose,priority:document.getElementById('reqPriority')?.value||'Normal',notes:document.getElementById('reqNotes')?.value.trim()||'',requestedBy:currentUser?.name||'-',requestedUserId:currentUser?.id||'',createdAt:new Date().toISOString(),status:'NEW',response:''});save();v62CloseModal();alert('Satınalma talebiniz satınalma talepleri kuyruğuna gönderildi.')};
 const supply71=supply;supply=function(){const base=supply71();return base.replace('Satınalma Geçmişi / Açık PO','Satınalma Geçmişi / Açık PO').replace('<div class="mt-8 border-t border-slate-700 pt-6">',`<div class="mt-8 border-t border-slate-700 pt-6"><div class="grid lg:grid-cols-2 gap-5 mb-8"><div><div class="flex justify-between items-center mb-3"><h4 class="font-black text-amber-300">Satınalma Talepleri</h4><span class="text-[10px] text-slate-500">Operatör / personel talepleri</span></div>${v72RequestRows()}</div><div class="bg-slate-950 border border-slate-700 rounded-xl p-4"><h4 class="font-black text-cyan-300">Satınalma Kontrol Standardı</h4><div class="text-xs text-slate-400 mt-2 space-y-2"><div>✓ Miktar × birim fiyat ve TL ödeme karşılığı</div><div>✓ 3 tedarikçi teklifi veya gerekçeli istisna</div><div>✓ Proforma / teklif dokümanı</div><div>✓ Seçilen teklif + seçim gerekçesi</div><div>✓ Ürün kartında kronolojik hareket dosyası</div></div></div></div>`)};
@@ -4898,6 +4992,40 @@ window.v73MarkPaid=function(id){if(!v73IsAccounting())return alert('Bu işlem ya
 window.v73Arrival=function(id){if(!v73IsQuality())return alert('Mal kabul / giriş kalite işlemi Kalite yetkilisindedir.');const p=D.purchases.find(x=>x.id===id);if(!p)return;p.workflowStatus='INCOMING_QC';p.status='Geldi · Giriş Kalite Bekliyor';p.arrivedAt=new Date().toISOString();p.arrivedBy=currentUser.name;p.approvalHistory.push({step:'ARRIVED',by:currentUser.name,at:p.arrivedAt});save();v73RenderQueues()};
 window.v73IncomingQC=function(id){if(!v73IsQuality())return alert('Bu işlem yalnız Kalite yetkilisindedir.');const p=D.purchases.find(x=>x.id===id);if(!p)return;v62Modal('Giriş Kalite · '+esc(p.id),`<div class="space-y-3 text-sm"><div class="bg-slate-950 p-3 rounded"><b>${esc(p.item)}</b><br>${Number(p.qty||0)} ${esc(p.unit||'')} · Depo: <b>${esc(p.warehouseLocation||'-')}</b></div><label>Fiilen Gelen / Kabul Edilecek Miktar<input id="v73RecvQty" type="number" step="0.001" value="${Number(p.qty||0)}" class="mt-1 w-full bg-slate-950 border border-slate-700 rounded p-2"></label><label>Kalite / Mal Kabul Notu<textarea id="v73QcNote" class="mt-1 w-full bg-slate-950 border border-slate-700 rounded p-2"></textarea></label><div class="grid grid-cols-2 gap-2"><button onclick="v73QCDecision('${p.id}',false)" class="bg-red-800 py-3 rounded font-bold">RED / KARANTİNA</button><button onclick="v73QCDecision('${p.id}',true)" class="bg-emerald-700 py-3 rounded font-bold">KABUL · STOĞA AL</button></div></div>`)};
 window.v73QCDecision=function(id,ok){const p=D.purchases.find(x=>x.id===id);if(!p)return;const qty=Number(document.getElementById('v73RecvQty')?.value||0),note=document.getElementById('v73QcNote')?.value.trim()||'';if(ok&&qty<=0)return alert('Kabul miktarı 0’dan büyük olmalıdır.');p.receivedQty=qty;p.qcNote=note;p.qcBy=currentUser.name;p.qcAt=new Date().toISOString();if(!ok){p.workflowStatus='QC_REJECTED';p.status='Giriş Kalite Red · Karantina';p.qcResult='RED';p.approvalHistory.push({step:'QC_REJECTED',by:currentUser.name,at:p.qcAt,note});save();v62CloseModal();v73RenderQueues();return}p.workflowStatus='STOCKED';p.status='Giriş Kalite Kabul · Stoğa Alındı';p.qcResult='KABUL';if(p.purchaseItemId){const item=D.purchaseItems.find(x=>x.id===p.purchaseItemId);if(item)item.stockQty=Number(item.stockQty||0)+qty}D.inventoryMovements.unshift({id:'STK-'+String(Date.now()).slice(-9),type:'PURCHASE_RECEIPT',poId:p.id,purchaseItemId:p.purchaseItemId||'',item:p.item,qty,unit:p.unit,warehouseLocation:p.warehouseLocation,by:currentUser.name,at:p.qcAt,note});p.approvalHistory.push({step:'QC_ACCEPTED_STOCKED',by:currentUser.name,at:p.qcAt,qty,warehouse:p.warehouseLocation});save();v62CloseModal();v73RenderQueues();};
+// KMI-FIX (2026-09-26): Ender'in isteği - satınalma talebi olumlu (kabul edildi) olarak
+// işaretlenince talebi açan operatöre uyarı düşsün; malzeme fiilen temin edilip (giriş kalite
+// kabul · stoğa alındı) stoğa girince de ayrıca bilgi verilsin. Task Floor / "Kimde Ne Var"
+// üzerinden zaten herkesin gördüğü görev bildirim mekanizması kullanıldı.
+(function(){
+ const oldDecision=window.v72Decision;
+ window.v72Decision=function(id,status){
+  const before=(D.purchaseRequests||[]).find(x=>x.id===id);
+  const wasApproved=before&&before.status==='APPROVED';
+  oldDecision(id,status);
+  try{
+   const r=(D.purchaseRequests||[]).find(x=>x.id===id);
+   if(r&&status==='APPROVED'&&!wasApproved&&r.requestedUserId&&typeof window.kmiTaskCreate==='function'){
+    const due=new Date(Date.now()+24*3600000).toISOString().slice(0,16);
+    window.kmiTaskCreate({title:`Satınalma Talebiniz Kabul Edildi: ${r.materialName}`,description:`Talebiniz (${r.id}) kabul edildi.\nMalzeme: ${r.materialName} · ${r.qty} ${r.unit||'adet'}\nYanıt: ${r.response||'-'}\nSatınalma tarafından temin süreci başladı; hazır olduğunda ayrıca bilgilendirileceksiniz.`,assigneeId:r.requestedUserId,priority:'NORMAL',plannedMinutes:0,dueAt:due,evidenceRequired:false});
+   }
+  }catch(e){console.error('KMI satınalma onay bildirimi',e);}
+ };
+ const oldQC=window.v73QCDecision;
+ window.v73QCDecision=function(id,ok){
+  oldQC(id,ok);
+  try{
+   if(!ok)return;
+   const p=(D.purchases||[]).find(x=>x.id===id);
+   if(!p||p.workflowStatus!=='STOCKED'||!p.requestId)return;
+   const r=(D.purchaseRequests||[]).find(x=>x.id===p.requestId);
+   if(!r||!r.requestedUserId||typeof window.kmiTaskCreate!=='function')return;
+   if(r.suppliedNotified)return;
+   const due=new Date(Date.now()+24*3600000).toISOString().slice(0,16);
+   window.kmiTaskCreate({title:`Talep Ettiğiniz Malzeme Temin Edildi: ${r.materialName}`,description:`Talebiniz (${r.id}) için malzeme geldi ve stoğa alındı.\nMalzeme: ${p.item||r.materialName} · Kabul edilen miktar: ${Number(p.receivedQty||0)} ${p.unit||r.unit||'adet'}\nDepo: ${p.warehouseLocation||'-'}`,assigneeId:r.requestedUserId,priority:'NORMAL',plannedMinutes:0,dueAt:due,evidenceRequired:false});
+   r.suppliedNotified=true;save();
+  }catch(e){console.error('KMI satınalma temin bildirimi',e);}
+ };
+})();
 function v73EnsureQueue(id,title,desc){let el=document.getElementById(id);if(el)return el;const tab=id.includes('Management')?document.getElementById('tab-yonetici'):id.includes('Accounting')?document.getElementById('tab-muhasebe'):document.getElementById('tab-kalite');if(!tab)return null;el=document.createElement('div');el.id=id;el.className='bg-slate-800 border border-cyan-800/50 rounded-xl p-5 shadow-lg mb-6';el.innerHTML=`<h2 class="text-lg font-black text-white">${title}</h2><p class="text-xs text-slate-400 mt-1 mb-4">${desc}</p><div data-v73-list class="grid md:grid-cols-2 xl:grid-cols-3 gap-3"></div>`;tab.prepend(el);return el}
 window.v73RenderQueues=function(){const m=v73EnsureQueue('v73ManagementPOQueue','Satınalma PO · Yönetim Onayı','Satınalma tarafından kaydedilen PO burada onaylanır; onaylanan kayıt Muhasebeye gider.'),a=v73EnsureQueue('v73AccountingPOQueue','Satınalma Ödeme Kuyruğu','Yönetim onaylı PO ödemesi burada “Ödendi” olarak kapatılır.'),q=v73EnsureQueue('v73QualityPOQueue','Beklenen Mal Kabul & Giriş Kalite','Ödemesi yapılan PO, beklenen teslim tarihi ve depo adresiyle burada izlenir. Geldiğinde giriş kalite yapılır.');if(m)m.querySelector('[data-v73-list]').innerHTML=D.purchases.filter(p=>p.workflowStatus==='PENDING_MANAGEMENT').map(p=>v73QueueCard(p,'management')).join('')||'<div class="text-xs text-slate-500">Yönetim onayı bekleyen PO yok.</div>';if(a)a.querySelector('[data-v73-list]').innerHTML=D.purchases.filter(p=>p.workflowStatus==='PENDING_ACCOUNTING').map(p=>v73QueueCard(p,'accounting')).join('')||'<div class="text-xs text-slate-500">Ödeme bekleyen PO yok.</div>';if(q)q.querySelector('[data-v73-list]').innerHTML=D.purchases.filter(p=>['PAID','INCOMING_QC','QC_REJECTED'].includes(p.workflowStatus)).sort((x,y)=>String(x.eta||'').localeCompare(String(y.eta||''))).map(p=>v73QueueCard(p,'quality')).join('')||'<div class="text-xs text-slate-500">Beklenen giriş kalite kaydı yok.</div>'};
 const v73OldSwitch=window.switchTab||switchTab;window.switchTab=function(tab){const r=v73OldSwitch(tab);setTimeout(v73RenderQueues,20);return r};
@@ -6356,6 +6484,169 @@ window.kmiOpenLive=function(){
   root.querySelectorAll('*').forEach(el=>{if(el.children.length===0&&/PRODUCTION_NEED|RESERVATION|FINISHED_GOODS|SHIPMENT|INVOICE|PAYMENT/.test(el.textContent||'')){let t=el.textContent;['PRODUCTION_NEED','RESERVATION','FINISHED_GOODS','SHIPMENT','INVOICE','PAYMENT'].forEach(k=>t=t.replaceAll(k,humanEvent(k)));el.textContent=t}})
  });
 };
+})();
+</script>
+
+<!-- KMI-FIX (2026-09-26): Ender'in isteği - "Müşteri Sipariş · Stok · Finans" ekranını rakip
+     job-shop ERP'lerin (ProShop, JobBOSS2, Global Shop Solutions, Fulcrum) en güçlü yanlarına göre
+     genişlet: sipariş bazlı risk/bloke tespiti (termin + üretim kapsamı + bekleyen hammadde PO'su),
+     WIP değeri, zamanında teslim oranı, ortalama sipariş süresi ve yaşlandırma (aging) tablolu
+     tahsilat riski tek bir "Sipariş Komuta Merkezi" panelinde. Mevcut v118 çekirdeğine dokunmadan,
+     v1187/v1188 katmanlarıyla aynı desende ek bir katman olarak eklendi. -->
+<script id="kmi-v121-command-center">
+(function(){
+'use strict';
+const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const num=v=>Number(v||0);
+const money=(n,c)=>{c=c||'TRY';return Number(n||0).toLocaleString('tr-TR',{minimumFractionDigits:2,maximumFractionDigits:2})+' '+c};
+let _raw=null,_cache=null;
+function state(){
+ try{const raw=localStorage.getItem('kurutlu_v118_core')||'{}';if(raw!==_raw){_raw=raw;_cache=JSON.parse(raw)||{};}return _cache||{};}
+ catch(e){return {};}
+}
+function customerName(id){
+ try{const c=(window.KMI_MASTER_DATA?.customers||[]).find(x=>String(x.id)===String(id));return c?(c.shortName||c.name||c.legalName||id):id;}catch(e){return id;}
+}
+function metricsOf(o){
+ try{return typeof window.v118OrderMetrics==='function'?window.v118OrderMetrics(o):{};}catch(e){return {};}
+}
+function dueDays(o){
+ if(!o.dueDate)return null;
+ const d=Math.ceil((new Date(o.dueDate)-new Date())/86400000);
+ return Number.isFinite(d)?d:null;
+}
+const OPEN_PO_STATES=['PENDING_MANAGEMENT','PENDING_ACCOUNTING','PAID','INCOMING_QC','ORDERED','DRAFT'];
+// Hammadde/ürün bazlı tedarik riski: siparişin üretim ihtiyacı olan bir kaleminde, aynı ürüne
+// bağlı henüz stoğa girmemiş (workflowStatus hâlâ açık) bir satınalma kaydı varsa uyar.
+function supplyReasons(o,m){
+ const D=window.D||window.KMI_MASTER_DATA||{};
+ const purchases=Array.isArray(D.purchases)?D.purchases:[];
+ if(!purchases.length||!(m.productionNeed>0))return [];
+ const reasons=[];
+ (o.lines||[]).forEach(l=>{
+  const need=num(l.qty)-Math.max(num(l.reserved),num(l.produced));
+  if(need<=0)return;
+  const openPO=purchases.find(p=>String(p.productId||'')===String(l.productId)&&OPEN_PO_STATES.includes(String(p.workflowStatus||'')));
+  if(openPO)reasons.push(`Hammadde/tedarik bekleniyor: PO ${esc(openPO.id)}${openPO.eta?' · ETA '+esc(openPO.eta):''} (${esc(openPO.item||openPO.productId||'')})`);
+ });
+ return reasons;
+}
+window.kmiV121Risk=function(o){
+ if(['CANCELLED','PAID'].includes(o.status))return {level:'DONE',reasons:[],days:dueDays(o)};
+ const m=metricsOf(o),days=dueDays(o),reasons=[];
+ let level='ON_TRACK';
+ if(days!==null&&days<0){level='BLOCKED';reasons.push(`Termin geçti · ${Math.abs(days)} gün gecikme`);}
+ const sup=supplyReasons(o,m);
+ if(sup.length){reasons.push(...sup);if(level!=='BLOCKED')level='AT_RISK';}
+ if(num(m.productionNeed)>0){
+  if(days!==null&&days<=3){if(level!=='BLOCKED')level='AT_RISK';reasons.push(`Termine ${days} gün kaldı, ${m.productionNeed} adet üretimi henüz planlanmadı`);}
+  else if(days!==null&&days<=7&&level==='ON_TRACK'){level='WATCH';reasons.push(`Termine ${days} gün kaldı, ${m.productionNeed} adet planlanacak`);}
+  else if(days===null&&level==='ON_TRACK'){level='WATCH';reasons.push('Termin tarihi girilmemiş, üretim ihtiyacı açık');}
+ }
+ if(level==='ON_TRACK'&&days!==null&&days<=2)level='WATCH';
+ return {level,reasons,days};
+};
+function computeDashboard(){
+ const st=state(),orders=st.orders||[],invoices=st.invoices||[],payments=st.payments||[],movements=st.movements||[];
+ const openOrders=orders.filter(o=>!['PAID','CANCELLED'].includes(o.status));
+ let wip=0;
+ openOrders.forEach(o=>(o.lines||[]).forEach(l=>{wip+=Math.max(0,num(l.qty)-num(l.shipped))*num(l.unitPrice);}));
+ const risks=openOrders.map(o=>({o,risk:window.kmiV121Risk(o)}));
+ const blocked=risks.filter(x=>x.risk.level==='BLOCKED');
+ const atRisk=risks.filter(x=>x.risk.level==='AT_RISK');
+ const watch=risks.filter(x=>x.risk.level==='WATCH');
+ const ranked=[...blocked,...atRisk,...watch].sort((a,b)=>(a.risk.days??999)-(b.risk.days??999));
+ const today=Date.now();
+ const buckets={cur:0,b30:0,b60:0,b90:0,b90p:0};
+ let overdueTotal=0,overdueCount=0;
+ const arRows=[];
+ invoices.forEach(inv=>{
+  const paid=payments.filter(p=>p.invoiceId===inv.id).reduce((a,p)=>a+num(p.amount),0);
+  const outstanding=num(inv.amount)-paid;
+  if(outstanding<=0.01)return;
+  const ord=orders.find(x=>x.id===inv.orderId);
+  const payDays=num(ord?.paymentDays||0);
+  const dueTs=new Date(inv.createdAt).getTime()+payDays*86400000;
+  const overdueDays=Math.floor((today-dueTs)/86400000);
+  let bucket='cur';
+  if(overdueDays>90)bucket='b90p';else if(overdueDays>60)bucket='b90';else if(overdueDays>30)bucket='b60';else if(overdueDays>0)bucket='b30';
+  buckets[bucket]+=outstanding;
+  if(overdueDays>0){overdueTotal+=outstanding;overdueCount++;}
+  arRows.push({inv,outstanding,overdueDays,customer:customerName(ord?.customerId),currency:inv.currency});
+ });
+ arRows.sort((a,b)=>b.overdueDays-a.overdueDays);
+ const cutoff=today-90*86400000;
+ let onTime=0,total=0,cycleSum=0,cycleCount=0;
+ orders.filter(o=>['SHIPPED','INVOICED','PAID'].includes(o.status)).forEach(o=>{
+  const shipMoves=movements.filter(mv=>mv.ref===o.id&&mv.type==='SHIP');
+  if(!shipMoves.length)return;
+  const lastShip=shipMoves.reduce((a,mv)=>Math.max(a,new Date(mv.at).getTime()),0);
+  if(lastShip<cutoff)return;
+  total++;
+  if(o.dueDate&&lastShip<=new Date(o.dueDate).getTime()+86399999)onTime++;
+  if(o.orderDate){cycleSum+=(lastShip-new Date(o.orderDate).getTime())/86400000;cycleCount++;}
+ });
+ const onTimePct=total?Math.round(onTime/total*100):null;
+ const avgCycle=cycleCount?Math.round(cycleSum/cycleCount):null;
+ return {openOrders,wip,blocked,atRisk,watch,ranked,buckets,overdueTotal,overdueCount,arRows,onTimePct,avgCycle,total,onTime};
+}
+function kpiCard(t,v,s,cls){return `<div class="bg-slate-900 border border-slate-700 rounded-lg p-3"><div class="text-[9px] uppercase text-slate-500">${t}</div><div class="text-lg font-black ${cls||'text-cyan-300'}">${v}</div>${s?`<div class="text-[9px] text-slate-500 mt-0.5">${s}</div>`:''}</div>`;
+}
+function riskChip(level){
+ const map={BLOCKED:['⛔ BLOKE','bg-red-900/70 text-red-200 border-red-500'],AT_RISK:['⚠ RİSK','bg-orange-900/70 text-orange-200 border-orange-500'],WATCH:['⏱ İZLE','bg-amber-900/70 text-amber-200 border-amber-500']};
+ const [label,cls]=map[level]||['','bg-slate-800 text-slate-300 border-slate-600'];
+ return {label,cls};
+}
+window.kmiV121Render=function(){
+ const box=document.getElementById('kmiV121Dashboard');
+ if(!box)return;
+ const d=computeDashboard();
+ const riskCount=d.blocked.length+d.atRisk.length+d.watch.length;
+ const kpis=[
+  kpiCard('WIP Değeri',money(d.wip),'sevk edilmeyi bekleyen sipariş değeri'),
+  kpiCard('Riskli / Bloke Sipariş',riskCount,`${d.blocked.length} bloke · ${d.atRisk.length} risk · ${d.watch.length} izle`,riskCount?'text-orange-300':'text-emerald-300'),
+  kpiCard('Vadesi Geçen Alacak',money(d.overdueTotal),d.overdueCount+' fatura',d.overdueTotal>0?'text-red-300':'text-emerald-300'),
+  kpiCard('Zamanında Teslim (90g)',d.onTimePct===null?'—':'%'+d.onTimePct,d.total+' sevkiyat',d.onTimePct===null?'text-slate-400':d.onTimePct>=90?'text-emerald-300':d.onTimePct>=70?'text-amber-300':'text-red-300'),
+  kpiCard('Ort. Sipariş Süresi',d.avgCycle===null?'—':d.avgCycle+' gün','sipariş → sevkiyat'),
+ ];
+ const riskList=d.ranked.slice(0,8).map(({o,risk})=>{const c=riskChip(risk.level);return `<div class="bg-slate-950 border border-slate-800 rounded-lg p-3"><div class="flex justify-between items-start gap-2"><div><b class="text-white text-xs">${esc(o.customerPO||o.id)}</b><div class="text-[10px] text-slate-500">${esc(customerName(o.customerId))} · Termin ${esc(o.dueDate||'-')}${risk.days!==null?' · '+(risk.days<0?Math.abs(risk.days)+' gün gecikti':risk.days+' gün kaldı'):''}</div></div><span class="shrink-0 text-[9px] font-black border rounded px-2 py-1 ${c.cls}">${c.label}</span></div><ul class="text-[10px] text-slate-400 mt-2 list-disc list-inside space-y-0.5">${risk.reasons.map(r=>`<li>${r}</li>`).join('')||'<li>-</li>'}</ul><button onclick="v118OrderCommand('${esc(o.id)}')" class="mt-2 text-[10px] bg-slate-800 hover:bg-cyan-800 px-2 py-1 rounded">Command'ı Aç</button></div>`;
+ }).join('')||'<div class="text-[10px] text-slate-500 p-3">Riskli veya bloke sipariş yok.</div>';
+ const bucketRow=(t,v,cls)=>`<div class="flex justify-between text-[10px] py-1 border-b border-slate-800"><span class="text-slate-500">${t}</span><b class="${cls}">${money(v)}</b></div>`;
+ const arList=d.arRows.slice(0,8).map(r=>`<div class="bg-slate-950 border border-slate-800 rounded-lg p-2 flex justify-between items-center gap-2"><div><b class="text-white text-[11px]">${esc(r.customer)}</b><div class="text-[9px] text-slate-500">${esc(r.inv.id)} · ${r.overdueDays>0?r.overdueDays+' gün gecikmiş':'vadesinde'}</div></div><div class="text-right"><b class="text-[11px] ${r.overdueDays>60?'text-red-300':r.overdueDays>30?'text-orange-300':r.overdueDays>0?'text-amber-300':'text-emerald-300'}">${money(r.outstanding,r.currency)}</b><button onclick="v118Pay('${esc(r.inv.id)}')" class="block ml-auto mt-1 text-[9px] bg-emerald-800 hover:bg-emerald-700 px-2 py-0.5 rounded">Tahsilat</button></div></div>`).join('')||'<div class="text-[10px] text-slate-500 p-2">Açık alacak yok.</div>';
+ box.innerHTML=`<div class="border-t border-slate-700 pt-4 mt-1"><div class="flex items-center gap-2 mb-2"><i class="fa-solid fa-radar text-cyan-400"></i><b class="text-sm text-white">Sipariş Komuta Merkezi</b><span class="text-[9px] text-slate-500">WIP · risk/bloke tespiti · zamanında teslim · alacak yaşlandırması</span></div>
+ <div class="grid grid-cols-2 md:grid-cols-5 gap-2">${kpis.join('')}</div>
+ <div class="grid grid-cols-1 xl:grid-cols-2 gap-3 mt-3">
+  <div class="bg-slate-900/60 border border-slate-700 rounded-xl p-3"><b class="text-xs text-white">Riskli / Bloke Siparişler</b><div class="space-y-2 mt-2">${riskList}</div></div>
+  <div class="bg-slate-900/60 border border-slate-700 rounded-xl p-3"><b class="text-xs text-white">Alacak Yaşlandırma (Aging)</b><div class="mt-2">${bucketRow('Vadesinde',d.buckets.cur,'text-emerald-300')}${bucketRow('1-30 gün',d.buckets.b30,'text-amber-300')}${bucketRow('31-60 gün',d.buckets.b60,'text-orange-300')}${bucketRow('61-90 gün',d.buckets.b90,'text-red-300')}${bucketRow('90+ gün',d.buckets.b90p,'text-red-400')}</div><div class="mt-2 space-y-1.5">${arList}</div></div>
+ </div></div>`;
+};
+function paintRiskChips(){
+ const st=state(),orders=st.orders||[];
+ document.querySelectorAll('#v118Orders tr').forEach(tr=>{
+  const idCell=tr.querySelector('td .text-slate-500');
+  const id=idCell?.textContent?.trim();
+  if(!id)return;
+  const o=orders.find(x=>x.id===id);
+  if(!o)return;
+  const flowCell=tr.children[4];
+  if(!flowCell||flowCell.querySelector('.kmi-risk-chip'))return;
+  const r=window.kmiV121Risk(o);
+  if(r.level==='DONE'||r.level==='ON_TRACK')return;
+  const c=riskChip(r.level);
+  const chip=document.createElement('div');
+  chip.className='kmi-risk-chip mt-2 inline-block text-[9px] border rounded px-2 py-0.5 '+c.cls;
+  chip.title=r.reasons.join('\n')||'-';
+  chip.textContent=c.label+(r.reasons.length?' · '+r.reasons.length+' neden (üzerine gel)':'');
+  flowCell.appendChild(chip);
+ });
+}
+const oldRender=window.v118Render;
+window.v118Render=function(){
+ oldRender&&oldRender();
+ try{window.kmiV121Render();}catch(e){console.error('KMI v121 dashboard',e);}
+ try{paintRiskChips();}catch(e){console.error('KMI v121 risk chips',e);}
+};
+setTimeout(()=>{try{window.v118Render&&window.v118Render();}catch(e){}},2000);
 })();
 </script>
 
