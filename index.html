@@ -2490,6 +2490,11 @@ ead>
                     .is('check_out_at', null)
                     .order('check_in_at',{ascending:true});
                 if(error) throw error;
+                // KMI-FIX (2026-09-25): "Şu An Kim Vardiyada" burada GEÇKO'dan giriş yapmış HERKESİ
+                // (mutfak personeli, kalite yöneticisi, ofis vb. dahil) gösteriyordu. Ender bunun
+                // sadece üretim alanındaki (Üretim departmanı / CNC operatörleri) personeli
+                // göstermesini istedi - ofis/destek personeli GEÇKO'dan giriş yapsa bile burada
+                // listelenmesin.
                 const onSite=(data||[]).map(r=>{
                     const local=(window.PERSONNEL_LIST||[]).find(p=>sameId(p.dbId,r.personnel_id)||sameId(p.uuid,r.personnel_id));
                     const name=local?.name || (r.personnel?`${r.personnel.first_name||''} ${r.personnel.last_name||''}`.trim():'Bilinmeyen');
@@ -2500,7 +2505,7 @@ ead>
                         jobTitle: local?.jobTitle || local?.role || '-',
                         photo: local?.photo || ''
                     };
-                });
+                }).filter(p=>String(p.dept||'').trim().toLocaleLowerCase('tr-TR')==='üretim');
                 const teamLabel={TeamK1:'1. Vardiya · Takım K1', TeamK2:'2. Vardiya · Takım K2', '':'Vardiya Atanmamış'};
                 const teamIcon={TeamK1:'fa-shield-halved text-blue-400', TeamK2:'fa-shield-halved text-rose-400', '':'fa-question text-slate-500'};
                 const groups={};
@@ -2755,7 +2760,22 @@ refreshAllViews=function(){_refreshAllViews();renderDeletedJobOrders();renderPer
 
 // ===== V28 WORKFLOW CONSISTENCY / MAINTENANCE FILE / OPERATOR STATUS =====
 function workflowRank(status){const a=['Açık','Aktif','Kalite Bekliyor','Hazır - Muhasebe Onayı Bekliyor','Muhasebe Onayı Bekliyor','Yönetim Onayı Bekliyor','Sevk Onayı Bekliyor','Sevk Edildi'];return a.indexOf(status);}
-function syncJobOrderWorkflowStatuses(){jobOrders.forEach(j=>{if(j.deleted||j.status==='Silindi')return;const ds=declarations.filter(d=>d.jobOrder===j.id);if(!ds.length)return;const d=ds.slice().sort((a,b)=>workflowRank(b.status)-workflowRank(a.status)||new Date(b.updatedAt||0)-new Date(a.updatedAt||0))[0];const map={'Kalite Bekliyor':'Kalite Onayı Bekliyor','Hazır - Muhasebe Onayı Bekliyor':'Muhasebe Onayı Bekliyor','Muhasebe Onayı Bekliyor':'Muhasebe Onayı Bekliyor','Yönetim Onayı Bekliyor':'Yönetim Onayı Bekliyor','Sevk Onayı Bekliyor':'Sevke Hazır','Sevk Edildi':'Sevk Edildi / Kapandı','Tamamlandı (Yönetim Onaylı)':'Tamamlandı (Yönetim Onaylı)'};if(map[d.status])j.status=map[d.status];if(d.accountingApprover)j.accountingApprover=d.accountingApprover;if(d.managementApprover)j.managementApprover=d.managementApprover;if(d.shippedAt)j.shippedAt=d.shippedAt;});saveStorage('jobOrders',jobOrders);}
+function syncJobOrderWorkflowStatuses(){jobOrders.forEach(j=>{if(j.deleted||j.status==='Silindi')return;const ds=declarations.filter(d=>d.jobOrder===j.id);if(!ds.length)return;const d=ds.slice().sort((a,b)=>workflowRank(b.status)-workflowRank(a.status)||new Date(b.updatedAt||0)-new Date(a.updatedAt||0))[0];const map={'Kalite Bekliyor':'Kalite Onayı Bekliyor','Hazır - Muhasebe Onayı Bekliyor':'Muhasebe Onayı Bekliyor','Muhasebe Onayı Bekliyor':'Muhasebe Onayı Bekliyor','Yönetim Onayı Bekliyor':'Yönetim Onayı Bekliyor','Sevk Onayı Bekliyor':'Sevke Hazır','Sevk Edildi':'Sevk Edildi / Kapandı','Tamamlandı (Yönetim Onaylı)':'Tamamlandı (Yönetim Onaylı)'};
+ if(map[d.status]){
+   let next=map[d.status];
+   // KMI-FIX (2026-09-25): "adet üretim hedefli" (production) iş emirlerinde TEK bir vardiya
+   // beyanı (parça sayısı hedefin altında olsa bile) onay zincirinden geçince tüm iş emri
+   // "Tamamlandı" diye kapanıyordu (ör. hedef 100, üretilen 3 iken emir kapandı). Hedef adede
+   // ulaşılmadan iş emrini kapatılmış/sevk edilmiş sayma - hâlâ açık/üretimde kalsın, kalan
+   // adet için yeni beyan girilebilsin. Süreli (timed) iş emirlerinde bu kural uygulanmaz.
+   const isProdTarget=j.targetType==='production'&&(Number(j.targetQty)||0)>0;
+   const closingStates=['Tamamlandı (Yönetim Onaylı)','Sevk Edildi / Kapandı','Sevke Hazır'];
+   if(isProdTarget&&closingStates.includes(next)&&(Number(j.completedQty)||0)<(Number(j.targetQty)||0)){
+     next='Üretimde';
+   }
+   j.status=next;
+ }
+ if(d.accountingApprover)j.accountingApprover=d.accountingApprover;if(d.managementApprover)j.managementApprover=d.managementApprover;if(d.shippedAt)j.shippedAt=d.shippedAt;});saveStorage('jobOrders',jobOrders);}
 function operatorWorkflowLabel(j){const ds=declarations.filter(d=>d.jobOrder===j.id&&d.operator===currentUser?.name).sort((a,b)=>new Date(b.updatedAt||0)-new Date(a.updatedAt||0));const d=ds[0];if(!d)return j.status;const map={'Kalite Bekliyor':'Kalite Onayı Bekliyor','Hazır - Muhasebe Onayı Bekliyor':'Muhasebe Onayı Bekliyor','Yönetim Onayı Bekliyor':'Yönetim Onayı Bekliyor','Sevk Onayı Bekliyor':'Sevke Hazır / Sevkiyat Bekliyor','Sevk Edildi':'Sevk Edildi · İş Emri Kapandı'};return map[d.status]||d.status||j.status;}
 function renderClosedOperatorJobs(){const tb=document.getElementById('closedOperatorJobOrders');if(!tb||!currentUser)return;const mine=jobOrders.filter(j=>!j.deleted&&(j.assignedTo||[]).map(Number).includes(Number(currentUser.id))&&j.status!=='Açık');mine.sort((a,b)=>new Date(b.updatedAt||b.dueAt||0)-new Date(a.updatedAt||a.dueAt||0));tb.innerHTML=mine.map(j=>{const d=declarations.filter(x=>x.jobOrder===j.id&&x.operator===currentUser.name).sort((a,b)=>new Date(b.updatedAt||0)-new Date(a.updatedAt||0))[0];return `<tr class="border-t border-slate-800"><td class="p-2 font-mono text-blue-300">${j.id}</td><td class="p-2">${escSkill(j.item||'-')}</td><td class="p-2">${escSkill(j.machine||'-')}</td><td class="p-2">${j.dueAt?new Date(j.dueAt).toLocaleString('tr-TR',{hour12:false}):'-'}</td><td class="p-2 font-bold text-emerald-300">${operatorWorkflowLabel(j)}</td><td class="p-2">${d?`<button onclick="showDeclarationBonusDetail('${d.id}')" class="bg-cyan-700 px-2 py-1 rounded text-white">Detay</button>`:'-'}</td></tr>`}).join('')||'<tr><td colspan="6" class="p-3 text-center text-slate-500">Kapanan iş emri yok.</td></tr>';}
 const __renderJobOrdersV28=renderJobOrders;
@@ -4485,10 +4505,13 @@ window.kmiRenderJobOrderDocs=async function(id){
     const {data,error}=await c.from('job_order_attachments').select('*').eq('job_order_id',String(id)).order('uploaded_at',{ascending:false});
     if(error)throw error;
     if(!data||!data.length){box.innerHTML='<span class="text-slate-500">Henüz bağlı belge yok.</span>';return;}
+    // KMI-FIX (2026-09-25): Yanlış yüklenen belgeyi silme imkanı yoktu. Silme yetkisi
+    // veritabanı tarafında zaten sadece yönetime (is_management()) açık; buton herkese
+    // görünür ama yetkisiz kullanıcıda Supabase RLS reddedip anlaşılır hata gösterir.
     const rows=await Promise.all(data.map(async d=>{
       let url='#';
       try{const {data:sd}=await c.storage.from('job-order-docs').createSignedUrl(d.file_path,3600);url=sd?.signedUrl||'#';}catch(e){}
-      return `<div class="flex items-center justify-between bg-slate-950 border border-slate-800 rounded-lg px-3 py-2"><div><span class="text-amber-300 font-bold">${esc(JOD_CATS[d.category]||d.category)}</span> · <a href="${url}" target="_blank" class="text-cyan-300 underline">${esc(d.file_name)}</a><div class="text-[9px] text-slate-500">${new Date(d.uploaded_at).toLocaleString('tr-TR')}</div></div></div>`;
+      return `<div class="flex items-center justify-between bg-slate-950 border border-slate-800 rounded-lg px-3 py-2"><div><span class="text-amber-300 font-bold">${esc(JOD_CATS[d.category]||d.category)}</span> · <a href="${url}" target="_blank" class="text-cyan-300 underline">${esc(d.file_name)}</a><div class="text-[9px] text-slate-500">${new Date(d.uploaded_at).toLocaleString('tr-TR')}</div></div><button onclick="kmiDeleteJobOrderDoc('${esc(id)}','${esc(d.id)}','${esc(d.file_path)}')" class="text-rose-400 hover:text-rose-300 px-2" title="Sil"><i class="fa-solid fa-trash"></i></button></div>`;
     }));
     box.innerHTML=rows.join('');
   }catch(e){box.innerHTML='<span class="text-red-300">Belgeler yüklenemedi: '+esc(e.message||String(e))+'</span>';}
@@ -4512,6 +4535,17 @@ window.kmiUploadJobOrderDoc=async function(id){
     if(fileInput)fileInput.value='';
     kmiRenderJobOrderDocs(id);
   }catch(e){if(msg)msg.innerHTML='<span class="text-red-300">Yükleme başarısız: '+esc(e.message||String(e))+'</span>';}
+};
+window.kmiDeleteJobOrderDoc=async function(jobId,attId,filePath){
+  if(!confirm('Bu belgeyi silmek istediğinize emin misiniz?'))return;
+  const c=jodClient();if(!c)return alert('Supabase bağlantısı hazır değil.');
+  try{
+    const del=await c.from('job_order_attachments').delete().eq('id',attId);
+    if(del.error)throw del.error;
+    try{await c.storage.from('job-order-docs').remove([filePath]);}catch(e){}
+    try{KMI.event('DOC_REMOVED','JOB_ORDER',jobId,{label:filePath,source:'JOB_ORDER_FILE'});}catch(e){}
+    kmiRenderJobOrderDocs(jobId);
+  }catch(e){alert('Silinemedi: '+(e?.message||String(e))+' (Bu işlem sadece yönetim rolüne açık olabilir.)');}
 };
 window.kmiJobOrderScanApprove=function(id){
   const who=window.currentUser?.name||window.currentUser?.email||'Bilinmeyen';
@@ -5334,13 +5368,19 @@ function ev(type,j,data={}){
 function persistJobs(){try{saveStorage('jobOrders',jobOrders)}catch(e){}}
 function personName(j){return (j.assignedTo||[]).map(id=>people().find(p=>Number(p.id)===Number(id))?.name).filter(Boolean).join(', ')||'Atanmamış'}
 function myJobs(){
- const p=currentPerson(),u=window.currentUser||{},admin=(()=>{try{return getEffectiveRole(u)==='ADMIN'}catch(e){return false}})();
+ const p=currentPerson();
  // KMI-FIX (2026-09-25): beyaz liste - sadece operatörün gerçekten çalışabileceği
  // durumlar ('Açık','Üretimde') gösterilir. Eskiden kara liste kullanılıyordu ve
  // Kalite/Muhasebe/Yönetim onayı bekleyen işler de "aktif işim" gibi görünüp
  // operatörün aynı işi ikinci kez başlatmasına izin veriyordu (2 ayrı beyan
  // platformu karışıklığının bir parçası).
- return jobs().filter(j=>!j.deleted&&['Açık','Üretimde'].includes(String(j.status||''))&&(admin||!p||(j.assignedTo||[]).map(Number).includes(Number(p.id))));
+ // KMI-FIX (2026-09-25): "admin her işi kendi işiymiş gibi görür" istisnası kaldırıldı -
+ // yönetici girişiyle bakınca, kimseye atanmamış/başkasına atanmış iş emirleri "Size Atanan
+ // İş Emirleri" panelinde yöneticiye atanmış gibi görünüyordu (kafa karıştırıcı, yanlış).
+ // Yönetici zaten "Üretimde Olan İş Emirleri" ve admin iş emri tablosunda HERKESİN işini
+ // görebiliyor - bu fonksiyon sadece "gerçekten bana atanmış" işleri döndürsün.
+ if(!p) return [];
+ return jobs().filter(j=>!j.deleted&&['Açık','Üretimde'].includes(String(j.status||''))&&(j.assignedTo||[]).map(Number).includes(Number(p.id)));
 }
 function fmt(sec){sec=Math.max(0,Math.floor(sec));return [Math.floor(sec/3600),Math.floor(sec%3600/60),sec%60].map(x=>String(x).padStart(2,'0')).join(':')}
 function elapsed(s){if(!s?.startedAt)return 0;let ms=(s.finishedAt?new Date(s.finishedAt):new Date())-new Date(s.startedAt);(s.pauses||[]).forEach(p=>{ms-=((p.end?new Date(p.end):new Date())-new Date(p.start))});return Math.max(0,ms/1000)}
@@ -5425,11 +5465,17 @@ window.kmiToolScan=function(id,type){
  document.getElementById('kmiToolScanModal')?.remove();const d=document.createElement('div');d.id='kmiToolScanModal';d.className='fixed inset-0 z-[310] bg-black/90 p-4 flex items-center justify-center';
  d.innerHTML=`<div class="w-full max-w-lg bg-slate-900 border border-violet-700 rounded-3xl p-4"><div class="flex justify-between"><div><div class="text-[10px] tracking-widest text-violet-300 font-black">KMI · TOOL SCAN</div><h3 class="text-xl font-black">${E(type)}</h3></div><button onclick="kmiCloseToolScan()" class="bg-slate-800 px-3 rounded-xl">✕</button></div><div id="kmiToolReader" class="mt-4 bg-black rounded-2xl min-h-[260px] overflow-hidden"></div><div id="kmiToolScanStatus" class="text-xs text-slate-400 mt-3">Kamera açılıyor…</div><div class="flex gap-2 mt-3"><input id="kmiToolCode" class="flex-1 bg-slate-950 border border-slate-700 rounded-xl p-3" placeholder="Barkod / takım kodu"><button onclick="kmiAcceptToolCode('${E(id)}','${E(type)}',document.getElementById('kmiToolCode').value)" class="bg-violet-700 px-4 rounded-xl font-black">OK</button></div></div>`;document.body.appendChild(d);
  window.__kmiToolScanner=null;
- (async()=>{try{
-   if(typeof Html5Qrcode==='undefined')throw new Error('Kamera barkod modülü yüklenemedi');
-   const q=new Html5Qrcode('kmiToolReader');window.__kmiToolScanner=q;
-   await q.start({facingMode:'environment'},{fps:10,qrbox:{width:260,height:140}},code=>window.kmiAcceptToolCode(id,type,code));
- }catch(e){const st=document.getElementById('kmiToolScanStatus');if(st)st.textContent='Kamera açılamadı. Barkodu elle girebilir veya harici okuyucu kullanabilirsiniz. '+e.message}
+ (async()=>{
+   const st=document.getElementById('kmiToolScanStatus');
+   // KMI-FIX (2026-09-25): Aynı getUserMedia sorunu burada da vardı - https olmayan/izinsiz
+   // bağlantıda hata mesajı "undefined" diye anlamsız görünüyordu. Önceden kontrol edip
+   // anlaşılır Türkçe mesaj gösteriyoruz.
+   if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia){if(st)st.textContent='Bu bağlantıda kamera kullanılamıyor (https gerekir, veya tarayıcı izin vermiyor). Barkodu elle girebilir veya harici okuyucu kullanabilirsiniz.';return;}
+   try{
+     if(typeof Html5Qrcode==='undefined')throw new Error('Kamera barkod modülü yüklenemedi');
+     const q=new Html5Qrcode('kmiToolReader');window.__kmiToolScanner=q;
+     await q.start({facingMode:'environment'},{fps:10,qrbox:{width:260,height:140}},code=>window.kmiAcceptToolCode(id,type,code));
+   }catch(e){if(st)st.textContent='Kamera açılamadı. Barkodu elle girebilir veya harici okuyucu kullanabilirsiniz. '+(e?.message||'')}
  })()
 };
 window.kmiCloseToolScan=async function(){const q=window.__kmiToolScanner;window.__kmiToolScanner=null;if(q){try{await q.stop()}catch(e){}try{q.clear()}catch(e){}}document.getElementById('kmiToolScanModal')?.remove()};
@@ -5462,10 +5508,16 @@ window.kmiFinish=function(id){
  declarations.unshift(d);saveStorage('declarations',declarations);
  put(id,{finishedAt,elapsedSeconds:Math.round(elapsed(s)),declarationId:declId});
  j.finishedAt=finishedAt;j.productionMinutes=N(j.productionMinutes)+mins;
- j.status=N(j.completedQty)>=N(j.targetQty)?'Kalite Bekliyor':'Açık';
+ const targetReached=j.targetType==='production'?N(j.completedQty)>=N(j.targetQty):true;
+ j.status=targetReached?'Kalite Bekliyor':'Üretimde';
  persistJobs();ev('WORK_FINISHED',j,{declarationId:declId,good,scrap,productionMinutes:mins,qualityStatus:'Kalite Bekliyor'});
  try{refreshAllViews()}catch(e){}
- toast(`${good} sağlam${scrap?` · ${scrap} hurda`:''} kalite kontrol kuyruğuna gönderildi`);
+ // KMI-FIX (2026-09-25): Hedef adede ulaşılmadan beyan gönderildiğinde bunu açıkça söylüyoruz -
+ // eskiden sessizce gönderiliyordu, operatör/yönetici kalan adedin ne kadar olduğunu bilmiyordu
+ // ve onay zincirinden geçince iş emri (hatalı biçimde) tam kapanmış gibi görünüyordu.
+ const remaining=j.targetType==='production'?Math.max(0,N(j.targetQty)-N(j.completedQty)):0;
+ const doneMsg=`${good} sağlam${scrap?` · ${scrap} hurda`:''} kalite kontrol kuyruğuna gönderildi`;
+ toast(remaining>0?`${doneMsg}. Bu iş emrinde HEDEFE ULAŞILMADI, kalan: ${remaining} adet. İş emri açık kalacak.`:doneMsg, remaining>0?'warn':undefined);
  setTimeout(kmiOpenShopFloor,250)
 };
 /* Entry point on operator screen without replacing legacy declaration workflow. */
