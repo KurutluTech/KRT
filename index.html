@@ -932,6 +932,22 @@ ead>
                 else console.info(`[KMI Supabase sync] ${rows.length} beyan senkronlandı.`);
             });
         }
+        // KMI-FIX (2026-09-25): jobOrders da declarations ile aynı sorunu yaşıyordu - sadece
+        // localStorage'da tutulduğu için bir tarayıcıda oluşturulan/atanan iş emri başka bir
+        // cihaz/tarayıcıdaki operatörde hiç görünmüyordu (Test Operatör örneği). Aynı merkezi
+        // debounce deseniyle job_orders_sync aynasına da yazıyoruz - best-effort, gecikmeli.
+        let __kmiJobSyncTimer=null;
+        function kmiSyncJobOrdersToCloud(list){
+            const client=window.kurutluSupabase; if(!client||!Array.isArray(list)||!list.length) return;
+            const rows=list.filter(j=>j&&j.id).map(j=>({
+                id:String(j.id), status:j.status||null, department:j.department||null, machine:j.machine||null,
+                assigned_to:Array.isArray(j.assignedTo)?j.assignedTo:[], raw:j, updated_at:new Date().toISOString()
+            }));
+            if(!rows.length) return;
+            client.from('job_orders_sync').upsert(rows,{onConflict:'id'}).then(({error})=>{
+                if(error) console.warn('[KMI Supabase sync] job_orders_sync upsert hatası:',error.message);
+            });
+        }
         function saveStorage(key, value) {
             try {
                 localStorage.setItem(key, JSON.stringify(value));
@@ -942,7 +958,37 @@ ead>
                 clearTimeout(__kmiDeclSyncTimer);
                 __kmiDeclSyncTimer=setTimeout(()=>{ try{ kmiSyncRecentDeclarations(value); }catch(e){ console.warn('[KMI Supabase sync]',e); } }, 1500);
             }
+            if(key==='jobOrders' && Array.isArray(value)){
+                clearTimeout(__kmiJobSyncTimer);
+                __kmiJobSyncTimer=setTimeout(()=>{ try{ kmiSyncJobOrdersToCloud(value); }catch(e){ console.warn('[KMI Supabase sync]',e); } }, 1200);
+            }
         }
+        // KMI-FIX (2026-09-25): Karşı yön - başka bir cihazda oluşturulan/güncellenen iş
+        // emirlerini bu tarayıcının local jobOrders dizisine çekiyor (id'ye göre eksik olanları
+        // ekler, var olanları en son değişen taraf kazanacak şekilde günceller). Login sonrası,
+        // Operatör/Yönetici sekmelerine girildiğinde ve arka planda periyodik çağrılır.
+        let __kmiJobPullBusy=false;
+        window.kmiPullJobOrdersFromCloud=async function(){
+            const client=window.kurutluSupabase; if(!client||__kmiJobPullBusy) return false;
+            __kmiJobPullBusy=true;
+            try{
+                const {data,error}=await client.from('job_orders_sync').select('id,raw,updated_at').order('updated_at',{ascending:false}).limit(500);
+                if(error||!Array.isArray(data)) return false;
+                if(!Array.isArray(window.jobOrders)) window.jobOrders=jobOrders=[];
+                let changed=false;
+                data.forEach(row=>{
+                    const remote=row.raw; if(!remote||!remote.id) return;
+                    const idx=jobOrders.findIndex(j=>String(j.id)===String(remote.id));
+                    if(idx===-1){ jobOrders.push(remote); changed=true; return; }
+                    const local=jobOrders[idx];
+                    const lt=Date.parse(local.updatedAt||local.openedAt||0)||0, rt=Date.parse(row.updated_at||remote.updatedAt||remote.openedAt||0)||0;
+                    if(rt>lt+2000){ jobOrders[idx]=remote; changed=true; }
+                });
+                if(changed){ window.jobOrders=jobOrders; try{localStorage.setItem('jobOrders',JSON.stringify(jobOrders));}catch(e){} try{refreshAllViews();}catch(e){} try{window.renderOperatorAssignedJobs?.();}catch(e){} }
+                return changed;
+            }catch(e){ console.warn('[KMI Supabase pull] job_orders_sync',e); return false; }
+            finally{ __kmiJobPullBusy=false; }
+        };
 
         // YÖNETİCİ ONAYLI KABİLİYET / EĞİTİM KATALOĞU
         const DEFAULT_SKILLS = ["CAD","CAM","3 eksen operatörü","4 eksen operatörü","5 eksen operatörü","CMM Operatörü","parça bağlama ve sökme","tesviye","mastar kontrol","ofset verebilme","takım ölçme","takım yedekleme","Fotoğraflı Kalite Ölçümü","Kumpasla ölçüm","Bakım","tüm tezgahları kullanabilme","torna operatörü","robot operatörü"];
@@ -1319,6 +1365,11 @@ ead>
                     try{ initToolRows(); }catch(e){ console.warn('[V85 deferred initToolRows]',e); }
                     try{ const gb=document.getElementById('globalBonusBudgetInput'); if(gb) gb.value=globalBonusBudget; }catch(e){}
                     try{ populateLoginUserDropdown(); }catch(e){}
+                    // KMI-FIX (2026-09-25): Giriş yapar yapmaz, başka cihazlarda oluşturulmuş/
+                    // güncellenmiş iş emirlerini bu tarayıcıya çekiyoruz (bkz. kmiPullJobOrdersFromCloud),
+                    // sonra bekleyen QR taramasını işliyoruz - böylece scan tam güncel veriyle çalışır.
+                    (async()=>{ try{ await window.kmiPullJobOrdersFromCloud?.(); }catch(e){ console.warn('[V85 job pull]',e); } try{ window.kmiRunPendingScan?.(); }catch(e){ console.warn('[V85 pending scan]',e); } })();
+                    if(!window.__kmiJobPullInterval){ window.__kmiJobPullInterval=setInterval(()=>{ try{ window.kmiPullJobOrdersFromCloud?.(); }catch(e){} }, 45000); }
                 },0);
             } catch(err) {
                 console.error('[V84 login]',err);
@@ -1617,6 +1668,9 @@ ead>
                 document.getElementById('declOperator').value = currentUser.name;
                 updateJobOrderDropdowns();
                 document.getElementById('kaliteUserBadge').innerText = `Aktif Kalite Personeli: ${currentUser.name}`;
+            }
+            if(tabName==='operatör'||tabName==='yonetici'){
+                try{ window.kmiPullJobOrdersFromCloud?.(); }catch(e){}
             }
             if(tabName==='operatör'){
                 try{window.renderOperatorAssignedJobs?.();}catch(e){}
@@ -4346,8 +4400,26 @@ KMI.event=function(type,entityType,entityId,data={}){const e={id:'EV-'+Date.now(
 function label(e){const d=e.data||{};return `${e.type} · ${d.label||e.entityId||''}`};
 window.kmiRenderStream=function(){const b=document.getElementById('kmiEventStrip');if(!b)return;const es=KMI.events.slice(0,6);b.innerHTML=es.length?es.slice(0,3).map(e=>`<div class=\"bg-slate-900 border border-slate-700 rounded-lg p-2\"><div class=\"text-cyan-300 font-bold\">${esc(label(e))}</div><div class=\"text-slate-500\">${new Date(e.at).toLocaleTimeString('tr-TR',{hour:'2-digit',minute:'2-digit'})} · ${esc(e.user)} · ${esc(e.source)}</div></div>`).join(''):'<div class=\"text-slate-500\">Henüz canlı event yok. İlk scan/hareket burada görünecek.</div>'};
 window.kmiOpenScan=function(){document.getElementById('kmiScanModal')?.remove();const m=document.createElement('div');m.id='kmiScanModal';m.className='fixed inset-0 z-[150] bg-slate-950/90 p-4 overflow-y-auto';m.innerHTML=`<div class=\"max-w-lg mx-auto mt-8 bg-slate-800 border border-emerald-700 rounded-2xl p-5\"><div class=\"flex justify-between\"><div><h3 class=\"text-xl font-black text-white\">KMI SCAN</h3><p class=\"text-xs text-slate-400\">QR / barkod fiziksel hareketi dijital event'e bağlar.</p></div><button onclick=\"this.closest('#kmiScanModal').remove()\" class=\"text-slate-400\">✕</button></div><div id=\"kmiCameraBox\" class=\"mt-4 aspect-video bg-slate-950 border border-slate-700 rounded-xl flex items-center justify-center overflow-hidden\"><div class=\"text-xs text-slate-500\">Kamera başlatılmadı</div></div><button onclick=\"kmiStartCamera()\" class=\"mt-3 w-full bg-emerald-600 p-3 rounded-lg font-black\"><i class=\"fa-solid fa-camera mr-2\"></i>Kamerayı Aç & QR/Barkod Oku</button><div class=\"my-3 text-center text-[10px] text-slate-500\">veya kodu elle gir / okutucu kullan</div><div class=\"flex gap-2\"><input id=\"kmiScanInput\" autofocus class=\"flex-1 bg-slate-950 border border-slate-700 rounded p-3\" placeholder=\"SO-... / WO-... / BOX-... / MACHINE-...\"><button onclick=\"kmiProcessScan(document.getElementById('kmiScanInput').value)\" class=\"bg-cyan-700 px-4 rounded font-bold\">OK</button></div><div id=\"kmiScanResult\" class=\"mt-3 text-xs\"></div></div>`;document.body.appendChild(m);m.querySelector('#kmiScanInput')?.addEventListener('keydown',e=>{if(e.key==='Enter')kmiProcessScan(e.target.value)});};
-let stream=null,scanTimer=null; window.kmiStartCamera=async function(){const box=document.getElementById('kmiCameraBox');try{stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:'environment'}},audio:false});box.innerHTML='<video id=\"kmiVideo\" autoplay playsinline class=\"w-full h-full object-cover\"></video>';document.getElementById('kmiVideo').srcObject=stream;if('BarcodeDetector' in window){const det=new BarcodeDetector({formats:['qr_code','code_128','ean_13','ean_8','data_matrix']});scanTimer=setInterval(async()=>{try{const v=document.getElementById('kmiVideo');if(!v)return;const a=await det.detect(v);if(a[0]?.rawValue){clearInterval(scanTimer);stream?.getTracks().forEach(t=>t.stop());kmiProcessScan(a[0].rawValue)}}catch(e){}},500)}else document.getElementById('kmiScanResult').innerHTML='<span class=\"text-amber-300\">Bu tarayıcı yerleşik barkod algılamayı desteklemiyor. Kamera açık; kodu aşağıya yazabilir veya harici okutucu kullanabilirsiniz.</span>'}catch(e){box.innerHTML='<div class=\"p-4 text-red-300 text-xs\">Kamera açılamadı: '+esc(e.message)+'</div>'}};
-window.kmiProcessScan=function(raw){const code=String(raw||'').trim();if(!code)return;
+let stream=null,scanTimer=null; window.kmiStartCamera=async function(){const box=document.getElementById('kmiCameraBox');
+ // KMI-FIX (2026-09-25): navigator.mediaDevices güvensiz bağlamda (http, sertifika hazır değilken vb.)
+ // tamamen undefined olabiliyor; doğrudan .getUserMedia çağrısı "Cannot read properties of undefined"
+ // diye ham hata fırlatıyordu. Önce açıkça kontrol edip anlaşılır bir mesaj gösteriyoruz.
+ if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia){box.innerHTML='<div class="p-4 text-amber-300 text-xs">Bu bağlantıda kamera kullanılamıyor (https gerekir, veya tarayıcı izin vermiyor). Kodu aşağıya yazabilir ya da harici barkod okuyucu ile okutabilirsiniz.</div>';return;}
+ try{stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:'environment'}},audio:false});box.innerHTML='<video id=\"kmiVideo\" autoplay playsinline class=\"w-full h-full object-cover\"></video>';document.getElementById('kmiVideo').srcObject=stream;if('BarcodeDetector' in window){const det=new BarcodeDetector({formats:['qr_code','code_128','ean_13','ean_8','data_matrix']});scanTimer=setInterval(async()=>{try{const v=document.getElementById('kmiVideo');if(!v)return;const a=await det.detect(v);if(a[0]?.rawValue){clearInterval(scanTimer);stream?.getTracks().forEach(t=>t.stop());kmiProcessScan(a[0].rawValue)}}catch(e){}},500)}else document.getElementById('kmiScanResult').innerHTML='<span class=\"text-amber-300\">Bu tarayıcı yerleşik barkod algılamayı desteklemiyor. Kamera açık; kodu aşağıya yazabilir veya harici okutucu kullanabilirsiniz.</span>'}catch(e){box.innerHTML='<div class=\"p-4 text-red-300 text-xs\">Kamera açılamadı: '+esc(e.message)+'</div>'}};
+// KMI-FIX (2026-09-25): Sayfa "?scan=KOD" ile açıldığında (yazdırılan QR'ı telefon kamerasıyla
+// okutunca) giriş ekranı önce gelir. Kodu burada URL'den yakalayıp saklıyoruz; login başarılı
+// olur olmaz kmiRunPendingScan() bu kodu işleyip ilgili iş emri dosyasını otomatik açar.
+window.__kmiPendingScan=(function(){try{const p=new URLSearchParams(location.search).get('scan');if(p){history.replaceState(null,'',location.pathname);return p;}}catch(e){}return null})();
+window.kmiRunPendingScan=function(){
+ const code=window.__kmiPendingScan; if(!code) return;
+ window.__kmiPendingScan=null;
+ setTimeout(()=>{try{window.kmiProcessScan(code);}catch(e){console.warn('[kmiRunPendingScan]',e);}},400);
+};
+window.kmiProcessScan=function(raw){let code=String(raw||'').trim();if(!code)return;
+ // KMI-FIX (2026-09-25): Telefonun kendi kamera uygulaması ile okutulan QR artık düz metin
+ // değil, tam bir link (https://.../?scan=KOD). Biri bu linki KMI SCAN kutusuna yapıştırırsa
+ // veya link biçiminde bir kod okutulursa, buradan gerçek KOD'u ayıklıyoruz.
+ try{const u=new URL(code);const p=u.searchParams.get('scan');if(p)code=p.trim();}catch(e){}
  // KMI-FIX (2026-09-25): SCAN artık iş emirlerini (jobOrders) de tanıyor, sadece satış siparişlerini değil.
  const jo=(Array.isArray(window.jobOrders)?window.jobOrders:[]).find(x=>String(x.id)===code);
  if(jo){KMI.event('SCAN','JOB_ORDER',jo.id,{label:code,source:'PHONE_CAMERA/SCANNER'});const r=document.getElementById('kmiScanResult');if(r)r.innerHTML='<span class=\"text-emerald-300 font-bold\">İş emri bulundu: '+esc(jo.id)+'</span>';setTimeout(()=>{document.getElementById('kmiScanModal')?.remove();kmiOpenJobOrderFile(jo.id)},250);return;}
@@ -4362,7 +4434,14 @@ window.kmiPrintOrderQR=function(id){const w=window.open('','_blank','width=520,h
 // raporu/foto gibi belgeler ve onaylar hiç karışmadan bağlanıyor.
 const JOD_CATS={kalite_sertifikasi:'Kalite Sertifikası',hammadde_sertifikasi:'Hammadde Sertifikası',olcum_raporu:'Ölçüm Raporu',resim:'Fotoğraf',diger:'Diğer'};
 function jodClient(){return window.kurutluSupabase||window.KURUTLU_SUPABASE?.client||null}
-window.kmiPrintJobOrderQR=function(id){const w=window.open('','_blank','width=520,height=620');w.document.write(`<html><body style="font-family:Arial;text-align:center;padding:30px"><img src="${window.KMI_K_LOGO_DATAURI||''}" style="height:44px;width:auto;margin-bottom:8px"><h2>KURUTLU MANUFACTURING INTELLIGENCE</h2><div>İş Emri Dijital Dosyası</div><div id="q" style="display:inline-block;margin:30px"></div><h3>${esc(id)}</h3><p>Bu kodu okutarak iş emrinin tüm dosya ve onaylarına ulaşın.</p><script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"><\/script><script>new QRCode(document.getElementById('q'),{text:${JSON.stringify(id)},width:260,height:260});setTimeout(()=>window.print(),500)<\/script></body></html>`);w.document.close()};
+window.kmiPrintJobOrderQR=function(id){
+ // KMI-FIX (2026-09-25): QR artık düz "TEST-WO-0001" metni değil, gerçek bir link
+ // (https://flow.kurutlu.com/?scan=TEST-WO-0001) taşıyor. Böylece herhangi bir telefonun
+ // kendi kamera uygulaması bu kodu okuttuğunda doğrudan uygulamayı açar; giriş yapıldıktan
+ // sonra o iş emrinin dijital dosyası otomatik açılır. Eskiden düz metin olduğu için sıradan
+ // bir telefon kamerasıyla okutulduğunda hiçbir şey olmuyordu.
+ const deepLink=location.origin+location.pathname+'?scan='+encodeURIComponent(id);
+ const w=window.open('','_blank','width=520,height=620');w.document.write(`<html><body style="font-family:Arial;text-align:center;padding:30px"><img src="${window.KMI_K_LOGO_DATAURI||''}" style="height:44px;width:auto;margin-bottom:8px"><h2>KURUTLU MANUFACTURING INTELLIGENCE</h2><div>İş Emri Dijital Dosyası</div><div id="q" style="display:inline-block;margin:30px"></div><h3>${esc(id)}</h3><p>Telefon kamerası ile okutun: dijital dosya otomatik açılır.</p><script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"><\/script><script>new QRCode(document.getElementById('q'),{text:${JSON.stringify(deepLink)},width:260,height:260});setTimeout(()=>window.print(),500)<\/script></body></html>`);w.document.close()};
 window.kmiOpenJobOrderFile=async function(id){
   document.getElementById('kmiJobOrderFile')?.remove();
   const j=(Array.isArray(window.jobOrders)?window.jobOrders:[]).find(x=>String(x.id)===String(id));
