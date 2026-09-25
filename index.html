@@ -1643,6 +1643,19 @@ ead>
             const st=document.getElementById('shiftAssignmentStatus');if(st)st.textContent=team?`✓ ${p.name} ${team} takımına atandı.`:`✓ ${p.name} vardiya atamasından çıkarıldı.`;
         }
         function removeEmployeeFromShift(id){const p=PERSONNEL_LIST.find(x=>Number(x.id)===Number(id));if(!p)return;p.shiftTeam='';saveStorage('PERSONNEL_LIST',PERSONNEL_LIST);renderShiftTeamManager();renderOperatorProfile();}
+        // KMI-FIX (2026-09-25): Ender'in isteği - Personel Dosyası kartından da vardiya ataması yapılabilsin,
+        // özellikle "Vardiyalar" paneli yalnız OPERATOR/BAKIM/CAM rolündekileri listelediği için üretimde
+        // çalışmayan personele (Aşçı, Ofis, Kalite, Muhasebe vb.) hiç vardiya atanamıyordu. Burada rol/
+        // departman kısıtı yok - herhangi bir personele doğrudan vardiya atanabiliyor.
+        function kmiAssignShiftDirect(id,team){
+            if(!currentUser||getEffectiveRole(currentUser)!=='ADMIN'){alert('Vardiya atamasını yalnız yönetici yapabilir.');return;}
+            const p=PERSONNEL_LIST.find(x=>Number(x.id)===Number(id));if(!p)return;
+            p.shiftTeam=team; saveStorage('PERSONNEL_LIST',PERSONNEL_LIST);
+            try{renderShiftTeamManager();}catch(e){}
+            try{renderOperatorProfile();}catch(e){}
+            openPersonnelFile(id);
+        }
+        window.kmiAssignShiftDirect=kmiAssignShiftDirect;
         function clearAllShiftAssignments(){if(!currentUser||getEffectiveRole(currentUser)!=='ADMIN')return;if(!confirm('TeamK1 ve TeamK2 vardiya atamalarının tamamı temizlensin mi?'))return;PERSONNEL_LIST.forEach(p=>p.shiftTeam='');saveStorage('PERSONNEL_LIST',PERSONNEL_LIST);renderShiftTeamManager();}
 
         function monthKeyNow(){return new Date().toISOString().slice(0,7);}
@@ -2832,6 +2845,72 @@ renderAdminJobOrders=function(){const deleted=jobOrders.filter(j=>j.deleted||j.s
 function renderPersonnelFileCards(){const el=document.getElementById('personnelFileCards');if(!el)return;el.innerHTML=PERSONNEL_LIST.map(p=>{const skills=(p.skills||[]).map(id=>SKILL_CATALOG.find(s=>Number(s.id)===Number(id))?.name).filter(Boolean),tasks=(p.tasks||[]).map(id=>TASK_CATALOG.find(t=>Number(t.id)===Number(id))?.name).filter(Boolean);return `<div class="bg-slate-950/70 border border-slate-700 rounded-2xl p-4 hover:border-cyan-600 transition"><div onclick="openPersonnelFile(${p.id})" class="cursor-pointer"><div class="flex gap-3">${personPhotoHtml(p.name,'w-14 h-14 rounded-xl object-cover text-lg')}<div><div class="font-black text-white">${escSkill(p.name)}</div><div class="text-[10px] text-cyan-300">${escSkill(p.dept||'-')} · ${escSkill(p.jobTitle||'-')}</div><div class="text-[9px] ${p.active!==false?'text-emerald-400':'text-red-400'}">${p.active!==false?'AKTİF':'PASİF'} · ${p.shiftTeam||'Vardiya yok'}</div></div></div><div class="grid grid-cols-2 gap-2 text-[9px] mt-3"><div class="bg-slate-900 p-2 rounded">Telefon<br><b>${escSkill(p.phone||'-')}</b></div><div class="bg-slate-900 p-2 rounded">E-posta<br><b>${escSkill(p.email||'-')}</b></div><div class="bg-slate-900 p-2 rounded">Rol<br><b>${p.role||'-'}</b></div><div class="bg-slate-900 p-2 rounded">Kişisel katsayı<br><b>${Number(p.puantajMultiplier||1).toFixed(2)}×</b></div></div><div class="mt-2 text-[9px] text-slate-400"><b>Kabiliyetler:</b> ${skills.join(', ')||'-'}</div><div class="mt-1 text-[9px] text-slate-400"><b>Görevler:</b> ${tasks.join(', ')||'-'}</div></div><div class="flex gap-1.5 mt-3"><button onclick="openPersonnelFile(${p.id})" class="flex-1 bg-indigo-700 hover:bg-indigo-600 text-white rounded p-2 text-[10px] font-bold">Dosyayı Aç</button><button onclick="event.stopPropagation();toggleEmployeeActive(${p.id})" class="${p.active!==false?'bg-amber-800 hover:bg-amber-700':'bg-emerald-800 hover:bg-emerald-700'} text-white rounded p-2 text-[10px] font-bold px-2.5">${p.active!==false?'Pasife Al':'Aktifleştir'}</button><button onclick="event.stopPropagation();deleteEmployee(${p.id})" class="bg-red-900 hover:bg-red-700 text-white rounded p-2 text-[10px] font-bold px-2.5">Sil</button></div></div>`}).join('');}
 // Bakım & Makine'deki "dijital dosya" mantığının aynısı: tıklayınca tüm bilgiler tek modalde.
 function closePersonnelFile(){const m=document.getElementById('personnelFileModal');if(m){m.classList.add('hidden');m.classList.remove('flex');}}
+// KMI-FIX (2026-09-25): Ender'in isteği - Personel Dosyası'nda sadece devamsızlık değil, tüm performans
+// verisi (geç kalma, görev emri zamanında kapama %, bakım emri zamanında kapama %, üretim toplamları ve
+// varsa üretim rekoru rozetleri) tek yerde görünsün. Mevcut puantaj/prim hesabına dokunmaz, salt okunur
+// ayrı bir özet katmanıdır.
+function personTaskPerformance(p){
+    let all=[]; try{ all=JSON.parse(localStorage.getItem('KMI_TASKS_V1192')||'[]'); }catch(e){ all=[]; }
+    const mine=all.filter(t=>Number(t.assigneeId)===Number(p.id));
+    const completed=mine.filter(t=>t.status==='COMPLETED');
+    const onTime=completed.filter(t=>!t.dueAt||!t.completedAt||new Date(t.completedAt)<=new Date(t.dueAt)).length;
+    const overdueOpen=mine.filter(t=>t.status!=='COMPLETED'&&t.dueAt&&new Date()>new Date(t.dueAt)).length;
+    return {total:mine.length,completed:completed.length,onTime,late:completed.length-onTime,overdueOpen,onTimePct:completed.length?Math.round(onTime/completed.length*100):null};
+}
+function personMaintenancePerformance(p){
+    const mine=(typeof maintenanceRecords!=='undefined'?maintenanceRecords:[]).filter(r=>Number(r.assignedTo)===Number(p.id));
+    const closed=mine.filter(r=>r.status==='Kapalı');
+    const within24=closed.filter(r=>Number(r.responseHours)>0?Number(r.responseHours)<=24:!!r.closedWithin24h).length;
+    const openOverdue=mine.filter(r=>r.status!=='Kapalı'&&r.dueAt&&new Date()>new Date(r.dueAt)).length;
+    return {total:mine.length,closed:closed.length,within24,openOverdue,onTimePct:closed.length?Math.round(within24/closed.length*100):null};
+}
+function personProductionPerformance(p){
+    const rows=(typeof declarations!=='undefined'?declarations:[]).filter(d=>d.operator===p.name && (typeof isQualityPassedDeclaration!=='function' || isQualityPassedDeclaration(d)));
+    const qtyOf=d=>Math.max(0,Number(d.qualityGood??d.qty)||0);
+    const totalAll=rows.reduce((s,d)=>s+qtyOf(d),0);
+    const monthKey=(typeof getCurrentMonthKey==='function')?getCurrentMonthKey():'';
+    const totalMonth=rows.filter(d=>(typeof getRecordMonthKey==='function'?getRecordMonthKey(d.workDate||d.date):'')===monthKey).reduce((s,d)=>s+qtyOf(d),0);
+    const byDay={},byMonth={}; rows.forEach(d=>{
+        const dk=(typeof dateKeyOf==='function')?dateKeyOf(d):''; if(dk) byDay[dk]=(byDay[dk]||0)+qtyOf(d);
+        const mk=(typeof getRecordMonthKey==='function')?getRecordMonthKey(d.workDate||d.date):''; if(mk) byMonth[mk]=(byMonth[mk]||0)+qtyOf(d);
+    });
+    const bestDay=Object.values(byDay).reduce((a,b)=>Math.max(a,b),0);
+    const bestMonth=Object.values(byMonth).reduce((a,b)=>Math.max(a,b),0);
+    const scrapAll=rows.reduce((s,d)=>s+Math.max(0,Number(d.scrap)||0),0);
+    return {totalAll,totalMonth,bestDay,bestMonth,goodRate:(totalAll+scrapAll)?totalAll/(totalAll+scrapAll):0};
+}
+function companyProductionRecords(){
+    let bestDayQty=0,bestDayPerson=null,bestMonthQty=0,bestMonthPerson=null;
+    PERSONNEL_LIST.filter(x=>x.active!==false).forEach(x=>{
+        const perf=personProductionPerformance(x);
+        if(perf.bestDay>bestDayQty){bestDayQty=perf.bestDay;bestDayPerson=x.id;}
+        if(perf.bestMonth>bestMonthQty){bestMonthQty=perf.bestMonth;bestMonthPerson=x.id;}
+    });
+    return {bestDayQty,bestDayPerson,bestMonthQty,bestMonthPerson};
+}
+function personnelPerformanceHtml(p){
+    const absTotal=(typeof getAbsenceDays==='function'?getAbsenceDays(p):0);
+    const absMonth=(typeof getMonthlyAbsenceDays==='function'?getMonthlyAbsenceDays(p):absTotal);
+    const tp=personTaskPerformance(p), mp=personMaintenancePerformance(p), pp=personProductionPerformance(p), rec=companyProductionRecords();
+    const badges=[];
+    if(absMonth===0) badges.push('<span class="text-[10px] bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 px-2 py-1 rounded-full"><i class="fa-solid fa-shield-check mr-1"></i>Bu Ay Sıfır Devamsızlık</span>');
+    if(tp.completed>=3 && tp.onTimePct===100) badges.push('<span class="text-[10px] bg-cyan-500/10 border border-cyan-500/30 text-cyan-300 px-2 py-1 rounded-full"><i class="fa-solid fa-bullseye mr-1"></i>Görevlerde %100 Zamanında</span>');
+    if(mp.closed>=3 && mp.onTimePct!==null && mp.onTimePct>=90) badges.push('<span class="text-[10px] bg-blue-500/10 border border-blue-500/30 text-blue-300 px-2 py-1 rounded-full"><i class="fa-solid fa-wrench mr-1"></i>Hızlı Bakım Müdahalesi</span>');
+    if(rec.bestDayPerson===p.id && rec.bestDayQty>0) badges.push(`<span class="text-[10px] bg-amber-500/10 border border-amber-500/30 text-amber-300 px-2 py-1 rounded-full"><i class="fa-solid fa-trophy mr-1"></i>Günlük Üretim Rekoru · ${rec.bestDayQty} adet</span>`);
+    if(rec.bestMonthPerson===p.id && rec.bestMonthQty>0) badges.push(`<span class="text-[10px] bg-amber-500/10 border border-amber-500/30 text-amber-300 px-2 py-1 rounded-full"><i class="fa-solid fa-crown mr-1"></i>Aylık Üretim Rekoru · ${rec.bestMonthQty} adet</span>`);
+    return `
+  <div class="mt-4 border-t border-slate-800 pt-4">
+   <div class="text-[10px] text-slate-500 uppercase font-bold mb-2"><i class="fa-solid fa-chart-line text-cyan-400 mr-1"></i>Performans Özeti</div>
+   <div class="grid grid-cols-2 md:grid-cols-4 gap-2 text-xs">
+    <div class="bg-slate-950 border border-slate-800 rounded-xl p-3"><div class="text-[9px] text-slate-500 uppercase">Devamsızlık (bu ay / toplam)</div><b class="${absMonth>0?'text-rose-400':'text-emerald-400'}">${absMonth} / ${absTotal} gün</b></div>
+    <div class="bg-slate-950 border border-slate-800 rounded-xl p-3"><div class="text-[9px] text-slate-500 uppercase">Görev Emri Zamanında Kapama</div><b class="text-white">${tp.onTimePct===null?'Veri yok':'%'+tp.onTimePct}</b><div class="text-[9px] text-slate-500 mt-0.5">${tp.completed}/${tp.total} tamamlandı${tp.overdueOpen?` · ${tp.overdueOpen} gecikmiş açık`:''}</div></div>
+    <div class="bg-slate-950 border border-slate-800 rounded-xl p-3"><div class="text-[9px] text-slate-500 uppercase">Bakım Emri Zamanında Kapama</div><b class="text-white">${mp.onTimePct===null?'Veri yok':'%'+mp.onTimePct}</b><div class="text-[9px] text-slate-500 mt-0.5">${mp.closed}/${mp.total} kapatıldı${mp.openOverdue?` · ${mp.openOverdue} gecikmiş açık`:''}</div></div>
+    <div class="bg-slate-950 border border-slate-800 rounded-xl p-3"><div class="text-[9px] text-slate-500 uppercase">Üretim (bu ay / toplam)</div><b class="text-white">${pp.totalMonth} / ${pp.totalAll} adet</b><div class="text-[9px] text-slate-500 mt-0.5">Kalite oranı %${Math.round(pp.goodRate*100)} · En iyi gün ${pp.bestDay} adet</div></div>
+   </div>
+   <div id="personnelGeckoPerfBox_${p.id}" class="mt-2 text-[10px] text-slate-500"><i class="fa-solid fa-spinner fa-spin mr-1"></i>GEÇKO devam/geç kalma verisi yükleniyor…</div>
+   ${badges.length?`<div class="flex flex-wrap gap-1.5 mt-3">${badges.join('')}</div>`:''}
+  </div>`;
+}
 function openPersonnelFile(id){
  const p=PERSONNEL_LIST.find(x=>Number(x.id)===Number(id)); if(!p)return;
  let modal=document.getElementById('personnelFileModal');
@@ -2857,12 +2936,23 @@ function openPersonnelFile(id){
   </div>
   <div class="mt-4"><div class="text-[10px] text-slate-500 uppercase font-bold mb-1.5">Onaylı Kabiliyetler</div><div class="flex flex-wrap gap-1.5">${skills.length?skills.map(s=>`<span class="text-[10px] bg-amber-500/10 border border-amber-500/30 text-amber-300 px-2 py-1 rounded-full">${escSkill(s)}</span>`).join(''):'<span class="text-[10px] text-slate-500">Tanımlı kabiliyet yok.</span>'}</div></div>
   <div class="mt-3"><div class="text-[10px] text-slate-500 uppercase font-bold mb-1.5">Görevler</div><div class="flex flex-wrap gap-1.5">${tasks.length?tasks.map(t=>`<span class="text-[10px] bg-cyan-500/10 border border-cyan-500/30 text-cyan-300 px-2 py-1 rounded-full">${escSkill(t)}</span>`).join(''):'<span class="text-[10px] text-slate-500">Tanımlı görev yok.</span>'}</div></div>
+  <!-- KMI-FIX (2026-09-25): Ender'in isteği - vardiya ataması personel dosyasından da yapılabilsin,
+       özellikle üretimde çalışmayan personel için (Vardiyalar paneli yalnız OPERATOR/BAKIM/CAM
+       rolündekileri listeliyordu, örn. Aşçı/Ofis/Kalite/Muhasebe hiç seçilemiyordu). Burada rol/
+       departman kısıtı yok - herhangi bir personele doğrudan vardiya atanabiliyor. -->
+  <div class="mt-4"><div class="text-[10px] text-slate-500 uppercase font-bold mb-1.5">Vardiya Ataması</div><div class="flex flex-wrap gap-2">
+   <button onclick="kmiAssignShiftDirect(${p.id},'TeamK1')" class="${p.shiftTeam==='TeamK1'?'bg-blue-600':'bg-slate-800 hover:bg-slate-700'} text-white px-3 py-2 rounded-xl text-xs font-black border border-blue-700/40">1. Vardiya · TeamK1</button>
+   <button onclick="kmiAssignShiftDirect(${p.id},'TeamK2')" class="${p.shiftTeam==='TeamK2'?'bg-emerald-600':'bg-slate-800 hover:bg-slate-700'} text-white px-3 py-2 rounded-xl text-xs font-black border border-emerald-700/40">2. Vardiya · TeamK2</button>
+   ${p.shiftTeam?`<button onclick="kmiAssignShiftDirect(${p.id},'')" class="bg-slate-800 hover:bg-slate-700 text-slate-300 px-3 py-2 rounded-xl text-xs font-black">Vardiya Atamasını Kaldır</button>`:''}
+  </div></div>
+  ${personnelPerformanceHtml(p)}
   <div class="flex flex-wrap gap-2 mt-5 pt-4 border-t border-slate-800">
    <button onclick="closePersonnelFile();openEmployeeForm(${p.id});document.getElementById('employeeFormWrap')?.scrollIntoView({behavior:'smooth'})" class="bg-slate-700 hover:bg-slate-600 text-white px-4 py-2.5 rounded-xl text-xs font-black"><i class="fa-solid fa-pen mr-1"></i>Düzenle</button>
    <button onclick="toggleEmployeeActive(${p.id});openPersonnelFile(${p.id})" class="${p.active!==false?'bg-amber-700 hover:bg-amber-600':'bg-emerald-700 hover:bg-emerald-600'} text-white px-4 py-2.5 rounded-xl text-xs font-black">${p.active!==false?'Pasife Al':'Aktifleştir'}</button>
    <button onclick="if(deleteEmployee(${p.id})!==false)closePersonnelFile()" class="bg-red-800 hover:bg-red-700 text-white px-4 py-2.5 rounded-xl text-xs font-black ml-auto"><i class="fa-solid fa-trash mr-1"></i>Sil</button>
   </div>`;
  modal.classList.remove('hidden'); modal.classList.add('flex');
+ try{ window.kmiFillPersonnelGeckoPerf?.(p.id); }catch(e){}
 }
 function openMachineFile(machine){const rows=maintenanceRecords.filter(r=>r.machine===machine).sort((a,b)=>new Date(b.openedAt||b.plannedAt||0)-new Date(a.openedAt||a.plannedAt||0)),parts=machineSpareParts.filter(x=>x.machine===machine);const w=window.open('','_blank','width=1050,height=800');w.document.write(`<html><head><title>${machine} Makine Dosyası</title><style>body{font-family:Arial;background:#f5f6f7;color:#172033;padding:28px}table{width:100%;border-collapse:collapse}td,th{padding:8px;border-bottom:1px solid #ddd;text-align:left}.card{background:white;border:1px solid #ddd;border-radius:12px;padding:18px;margin:12px 0}</style></head><body><h1>${machine}</h1><div class="card"><h3>Bakım / Arıza Geçmişi</h3><table><tr><th>Tarih</th><th>Tür</th><th>Arıza / İşlem</th><th>Yapan</th><th>Durum</th></tr>${rows.map(r=>`<tr><td>${new Date(r.openedAt||r.plannedAt).toLocaleString('tr-TR')}</td><td>${r.type}</td><td>${r.description}${r.actionTaken?'<br><b>Yapılan:</b> '+r.actionTaken:''}</td><td>${r.closedBy||PERSONNEL_LIST.find(p=>Number(p.id)===Number(r.assignedTo))?.name||'-'}</td><td>${r.status}</td></tr>`).join('')}</table></div><div class="card"><h3>Yedek Parça / Değişen Parça Kayıtları</h3><table><tr><th>Tarih</th><th>Parça</th><th>Adet</th><th>Yapan</th><th>Not</th></tr>${parts.map(x=>`<tr><td>${new Date(x.at).toLocaleString('tr-TR')}</td><td>${x.part}</td><td>${x.qty}</td><td>${x.by}</td><td>${x.note||''}</td></tr>`).join('')}</table><button onclick="window.opener.addMachineSparePart('${machine.replace(/'/g,"\\'")}');window.close()">Yedek Parça Kaydı Ekle</button></div></body></html>`);w.document.close();}
 function addMachineSparePart(machine){const part=prompt('Değişen / kullanılan yedek parça:');if(!part)return;const qty=Math.max(1,Number(prompt('Adet:','1'))||1),note=prompt('İşlem / parça notu:','')||'';machineSpareParts.unshift({id:'SP-'+Date.now(),machine,part,qty,note,by:currentUser?.name||'Yönetim',at:new Date().toISOString()});saveStorage('machineSpareParts',machineSpareParts);renderMaintenanceCenter();}
@@ -6421,6 +6511,24 @@ window.renderMyGeckoMonthlySummary=async function(){
  }
 };
 document.addEventListener('DOMContentLoaded',()=>setTimeout(()=>{try{window.renderMyGeckoMonthlySummary?.()}catch(e){}},600));
+// KMI-FIX (2026-09-25): Personel Dosyası kartındaki "Performans Özeti" bölümünün GEÇKO (devamsızlık/geç
+// kalma) satırını doldurur. openPersonnelFile ayrı bir (IIFE olmayan) script bloğunda olduğu için bu
+// fonksiyon window üzerinden çağrılabilir hale getirildi.
+window.kmiFillPersonnelGeckoPerf=async function(personId){
+ const box=document.getElementById('personnelGeckoPerfBox_'+personId); if(!box) return;
+ const monthKey=(typeof getCurrentMonthKey==='function')?getCurrentMonthKey():new Date().toISOString().slice(0,7);
+ try{
+   const records=await fetchMonth(monthKey);
+   const rows=summarize(records,monthKey);
+   const row=rows.find(r=>Number(r.person.id)===Number(personId));
+   const liveBox=document.getElementById('personnelGeckoPerfBox_'+personId); if(!liveBox) return;
+   if(!row){ liveBox.innerHTML='<i class="fa-solid fa-clock mr-1"></i>Bu ay için GEÇKO turnike kaydı yok.'; return; }
+   liveBox.innerHTML=`<i class="fa-solid fa-clock mr-1"></i>GEÇKO ${(typeof formatMonthLabel==='function'?formatMonthLabel(monthKey):monthKey)}: <b class="text-white">${row.daysPresent}</b> gün çalıştı · <b class="${row.absence>0?'text-rose-400':'text-emerald-400'}">${row.absence}</b> gün devamsız · <b class="${row.lateCount>0?'text-amber-300':'text-emerald-400'}">${row.lateCount}</b> kez geç kaldı (${row.lateMinutes} dk) · üretim alanında ${fmtDur(row.minutes)}`;
+ }catch(err){
+   console.error('[Personel Dosyası GEÇKO]',err);
+   const liveBox=document.getElementById('personnelGeckoPerfBox_'+personId); if(liveBox) liveBox.innerHTML='<span class="text-rose-400">GEÇKO verisi okunamadı.</span>';
+ }
+};
 })();
 </script>
 
