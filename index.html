@@ -633,6 +633,16 @@ ead>
                     <div id="yonTaskOverviewBody" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-2"></div>
                 </div>
 
+                <!-- KMI-FIX (2026-09-26): Ender'in isteği - yöneticiler dahil herkesin task performans
+                     yüzdesi (haftalık/aylık/genel ortalama + artış-azalış ok işareti) tek tabloda. -->
+                <div class="bg-slate-800 border border-cyan-800/60 rounded-lg p-5 shadow-lg">
+                    <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
+                        <div><h2 class="text-lg font-semibold text-white"><i class="fa-solid fa-gauge-high text-cyan-400 mr-2"></i>Personel Görev Performansı</h2><p class="text-xs text-slate-400">Haftalık, aylık ve genel ortalama zamanında-tamamlama yüzdesi; yanındaki ok bir önceki döneme göre artış/azalışı gösterir. Yöneticiler dahil tüm aktif personel.</p></div>
+                        <button onclick="renderPersonnelTaskPerformanceBoard()" class="bg-slate-700 hover:bg-slate-600 px-3 py-1.5 rounded text-[10px] text-white">Yenile</button>
+                    </div>
+                    <div class="overflow-x-auto"><table class="w-full text-left text-xs text-slate-300"><thead class="bg-slate-900 text-slate-400 uppercase text-[10px]"><tr><th class="p-1.5">Personel</th><th class="p-1.5">Görev / Departman</th><th class="p-1.5 text-center">Haftalık</th><th class="p-1.5 text-center">Aylık</th><th class="p-1.5 text-center">Genel Ortalama</th></tr></thead><tbody id="personnelTaskPerfBoardBody" class="divide-y divide-slate-800"></tbody></table></div>
+                </div>
+
                 <!-- KMI-FIX (2026-09-25): Ender'in isteği - editlenebilir organizasyon şeması ve
                      buna göre kimin kime iş emri/bakım emri/task açabileceğinin hiyerarşisi. -->
                 <div class="bg-slate-800 border border-indigo-800/60 rounded-lg p-5 shadow-lg flex flex-wrap justify-between items-center gap-3">
@@ -1994,8 +2004,17 @@ ead>
             `).join('');
         }
 
+        // KMI-FIX (2026-09-26): Ender'in isteği - üretim/kalite iş emri açma yetkisi yalnız ADMIN
+        // rolüyle sınırlıydı; Üretim Müdürü de (jobTitle alanında "Üretim Müdürü" geçen personel)
+        // Hakan Kurutlu ve Ender Kurutlu (zaten ADMIN) gibi iş emri açabilsin istendi.
+        function canOpenJobOrder(user){
+            if(!user) return false;
+            if(getEffectiveRole(user)==='ADMIN') return true;
+            const t=String(user.jobTitle||user.role||'').toLocaleUpperCase('tr-TR');
+            return t.includes('ÜRETİM MÜDÜR') || t.includes('URETIM MUDUR');
+        }
         function openNewJobOrderModal(){
-            if(!currentUser || getEffectiveRole(currentUser)!=='ADMIN'){alert('Yönetici yetkisi gerekir.');return;}
+            if(!currentUser || !canOpenJobOrder(currentUser)){alert('İş emri açma yetkisi yalnız Üretim Müdürü ve Yönetime aittir.');return;}
             const m=document.getElementById('jobOrderModal'); if(!m)return;
             document.getElementById('joId').value=window.v107NextJobOrderNo ? window.v107NextJobOrderNo() : `IE-${new Date().getFullYear()}-${String(jobOrders.length+1).padStart(3,'0')}`;
             document.getElementById('joClient').value=''; document.getElementById('joItem').value=''; document.getElementById('joTargetQty').value=''; document.getElementById('joDuration').value=''; document.getElementById('joPrice').value='0';
@@ -2008,7 +2027,7 @@ ead>
         function toggleJobOrderTargetFields(){const timed=document.getElementById('joTargetType').value==='timed';document.getElementById('joTargetWrap').classList.toggle('hidden',timed);document.getElementById('joDurationWrap').classList.toggle('hidden',!timed);}
         function refreshJobOrderPeopleOptions(){const wrap=document.getElementById('joPeople'); if(!wrap)return; const dept=document.getElementById('joDept').value.toUpperCase(); const people=PERSONNEL_LIST.filter(p=>p.active!==false && String(p.dept||'').toUpperCase()===dept); wrap.innerHTML=people.map(p=>`<label class="flex items-center gap-2 bg-slate-800 border border-slate-700 rounded p-2"><input type="checkbox" name="joPerson" value="${p.id}"><span><b class="text-white">${p.name}</b><small class="block text-slate-500">${p.jobTitle||p.role||''}</small></span></label>`).join('')||'<div class="text-slate-500">Bu departmanda aktif personel yok.</div>'; }
         function saveJobOrderFromModal(e){
-            e.preventDefault(); if(!currentUser||getEffectiveRole(currentUser)!=='ADMIN'){alert('Yönetici yetkisi gerekir.');return;}
+            e.preventDefault(); if(!currentUser||!canOpenJobOrder(currentUser)){alert('İş emri açma yetkisi yalnız Üretim Müdürü ve Yönetime aittir.');return;}
             const id=document.getElementById('joId').value.trim(), dept=document.getElementById('joDept').value, machine=document.getElementById('joMachine').value, targetType=document.getElementById('joTargetType').value;
             const assignedTo=Array.from(document.querySelectorAll('input[name="joPerson"]:checked')).map(x=>Number(x.value));
             const dueAt=document.getElementById('joDueAt').value; const targetQty=Number(document.getElementById('joTargetQty').value||0); const durationMinutes=Number(document.getElementById('joDuration').value||0);
@@ -2613,6 +2632,21 @@ ead>
             }).join('');
             if(status) status.textContent=`${open.length} açık task · ${Object.keys(byPerson).length} kişi · ${new Date().toLocaleTimeString('tr-TR')}`;
         }
+        // KMI-FIX (2026-09-26): Ender'in isteği - yöneticiler dahil HERKESİN task performansı
+        // (haftalık/aylık/genel yüzde + artış-azalış ok işareti) yönetici panelinde tek tabloda
+        // görünsün. personTaskPerformanceFull ile aynı hesaplamayı kullanır (Personel Dosyası'ndakiyle
+        // tutarlı), yalnız burada tüm aktif personel tek tabloda listelenir.
+        function renderPersonnelTaskPerformanceBoard(){
+            const body=document.getElementById('personnelTaskPerfBoardBody'); if(!body) return;
+            const list=(PERSONNEL_LIST||[]).filter(p=>p.active!==false).sort((a,b)=>(a.name||'').localeCompare(b.name||'','tr'));
+            body.innerHTML=list.map(p=>{
+                const f=personTaskPerformanceFull(p);
+                return `<tr class="border-t border-slate-800"><td class="p-1.5 text-white font-semibold">${escSkill(p.name)}</td><td class="p-1.5 text-slate-400">${escSkill(p.jobTitle||p.dept||'-')}</td>
+                 <td class="p-1.5 text-center">${kmiPctHtml(f.week.pct)}${kmiTrendArrowHtml(f.weekTrend)}</td>
+                 <td class="p-1.5 text-center">${kmiPctHtml(f.month.pct)}${kmiTrendArrowHtml(f.monthTrend)}</td>
+                 <td class="p-1.5 text-center">${kmiPctHtml(f.overall.pct)}</td></tr>`;
+            }).join('')||'<tr><td colspan="5" class="p-3 text-center text-slate-500">Aktif personel yok.</td></tr>';
+        }
         async function renderSahaLive(){
             const field=document.getElementById('sahaLiveField'), status=document.getElementById('sahaLiveStatus');
             const client=window.kurutluSupabase;
@@ -2857,6 +2891,40 @@ function personTaskPerformance(p){
     const overdueOpen=mine.filter(t=>t.status!=='COMPLETED'&&t.dueAt&&new Date()>new Date(t.dueAt)).length;
     return {total:mine.length,completed:completed.length,onTime,late:completed.length-onTime,overdueOpen,onTimePct:completed.length?Math.round(onTime/completed.length*100):null};
 }
+// KMI-FIX (2026-09-26): Ender'in isteği - herkesin (yöneticiler dahil) task performansı hem uzun
+// dönem ortalaması hem aylık hem haftalık yüzde olarak, artış/azalışı gösteren ok işaretiyle birlikte
+// görünsün; bu veri hem Personel Dosyası'nda hem yönetici görünümünde (Task Command Center) olsun.
+function kmiTasksRaw(){ try{ return JSON.parse(localStorage.getItem('KMI_TASKS_V1192')||'[]'); }catch(e){ return []; } }
+function taskPerfPercent(personId,fromDate,toDate){
+    const all=kmiTasksRaw();
+    const mine=all.filter(t=>Number(t.assigneeId)===Number(personId));
+    const refDate=t=>new Date(t.completedAt||t.dueAt||t.createdAt||0);
+    const inWin=mine.filter(t=>{ const d=refDate(t); return (!fromDate||d>=fromDate)&&(!toDate||d<=toDate); });
+    const completed=inWin.filter(t=>t.status==='COMPLETED');
+    const onTime=completed.filter(t=>!t.dueAt||!t.completedAt||new Date(t.completedAt)<=new Date(t.dueAt)).length;
+    const overdueOpen=inWin.filter(t=>t.status!=='COMPLETED'&&t.dueAt&&new Date()>new Date(t.dueAt)).length;
+    const denom=completed.length+overdueOpen;
+    return {count:inWin.length,completedCount:completed.length,onTime,overdueOpen,pct:denom?Math.round(onTime/denom*100):null};
+}
+function personTaskPerformanceFull(p){
+    const now=new Date();
+    const startWeek=new Date(now.getTime()-7*86400000), prevWeekStart=new Date(now.getTime()-14*86400000);
+    const startMonth=new Date(now.getFullYear(),now.getMonth(),1);
+    const prevMonthStart=new Date(startMonth.getFullYear(),startMonth.getMonth()-1,1), prevMonthEnd=new Date(startMonth.getTime()-1);
+    const overall=taskPerfPercent(p.id,null,now);
+    const week=taskPerfPercent(p.id,startWeek,now);
+    const prevWeek=taskPerfPercent(p.id,prevWeekStart,startWeek);
+    const month=taskPerfPercent(p.id,startMonth,now);
+    const prevMonth=taskPerfPercent(p.id,prevMonthStart,prevMonthEnd);
+    const trend=(cur,prev)=>(cur.pct===null||prev.pct===null)?null:(cur.pct-prev.pct);
+    return {overall,week,month,weekTrend:trend(week,prevWeek),monthTrend:trend(month,prevMonth)};
+}
+function kmiPctHtml(pct){ return pct===null?'<span class="text-slate-500">Veri yok</span>':`<b class="text-white">%${pct}</b>`; }
+function kmiTrendArrowHtml(delta){
+    if(delta===null) return '';
+    if(delta===0) return '<span class="text-slate-500 text-[10px] ml-1">—</span>';
+    return delta>0?`<span class="text-emerald-400 text-[10px] ml-1"><i class="fa-solid fa-arrow-up"></i> ${delta}</span>`:`<span class="text-rose-400 text-[10px] ml-1"><i class="fa-solid fa-arrow-down"></i> ${Math.abs(delta)}</span>`;
+}
 function personMaintenancePerformance(p){
     const mine=(typeof maintenanceRecords!=='undefined'?maintenanceRecords:[]).filter(r=>Number(r.assignedTo)===Number(p.id));
     const closed=mine.filter(r=>r.status==='Kapalı');
@@ -2891,10 +2959,10 @@ function companyProductionRecords(){
 function personnelPerformanceHtml(p){
     const absTotal=(typeof getAbsenceDays==='function'?getAbsenceDays(p):0);
     const absMonth=(typeof getMonthlyAbsenceDays==='function'?getMonthlyAbsenceDays(p):absTotal);
-    const tp=personTaskPerformance(p), mp=personMaintenancePerformance(p), pp=personProductionPerformance(p), rec=companyProductionRecords();
+    const tpf=personTaskPerformanceFull(p), mp=personMaintenancePerformance(p), pp=personProductionPerformance(p), rec=companyProductionRecords();
     const badges=[];
     if(absMonth===0) badges.push('<span class="text-[10px] bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 px-2 py-1 rounded-full"><i class="fa-solid fa-shield-check mr-1"></i>Bu Ay Sıfır Devamsızlık</span>');
-    if(tp.completed>=3 && tp.onTimePct===100) badges.push('<span class="text-[10px] bg-cyan-500/10 border border-cyan-500/30 text-cyan-300 px-2 py-1 rounded-full"><i class="fa-solid fa-bullseye mr-1"></i>Görevlerde %100 Zamanında</span>');
+    if(tpf.overall.completedCount>=3 && tpf.overall.pct===100) badges.push('<span class="text-[10px] bg-cyan-500/10 border border-cyan-500/30 text-cyan-300 px-2 py-1 rounded-full"><i class="fa-solid fa-bullseye mr-1"></i>Görevlerde %100 Zamanında</span>');
     if(mp.closed>=3 && mp.onTimePct!==null && mp.onTimePct>=90) badges.push('<span class="text-[10px] bg-blue-500/10 border border-blue-500/30 text-blue-300 px-2 py-1 rounded-full"><i class="fa-solid fa-wrench mr-1"></i>Hızlı Bakım Müdahalesi</span>');
     if(rec.bestDayPerson===p.id && rec.bestDayQty>0) badges.push(`<span class="text-[10px] bg-amber-500/10 border border-amber-500/30 text-amber-300 px-2 py-1 rounded-full"><i class="fa-solid fa-trophy mr-1"></i>Günlük Üretim Rekoru · ${rec.bestDayQty} adet</span>`);
     if(rec.bestMonthPerson===p.id && rec.bestMonthQty>0) badges.push(`<span class="text-[10px] bg-amber-500/10 border border-amber-500/30 text-amber-300 px-2 py-1 rounded-full"><i class="fa-solid fa-crown mr-1"></i>Aylık Üretim Rekoru · ${rec.bestMonthQty} adet</span>`);
@@ -2903,7 +2971,7 @@ function personnelPerformanceHtml(p){
    <div class="text-[10px] text-slate-500 uppercase font-bold mb-2"><i class="fa-solid fa-chart-line text-cyan-400 mr-1"></i>Performans Özeti</div>
    <div class="grid grid-cols-2 md:grid-cols-4 gap-2 text-xs">
     <div class="bg-slate-950 border border-slate-800 rounded-xl p-3"><div class="text-[9px] text-slate-500 uppercase">Devamsızlık (bu ay / toplam)</div><b class="${absMonth>0?'text-rose-400':'text-emerald-400'}">${absMonth} / ${absTotal} gün</b></div>
-    <div class="bg-slate-950 border border-slate-800 rounded-xl p-3"><div class="text-[9px] text-slate-500 uppercase">Görev Emri Zamanında Kapama</div><b class="text-white">${tp.onTimePct===null?'Veri yok':'%'+tp.onTimePct}</b><div class="text-[9px] text-slate-500 mt-0.5">${tp.completed}/${tp.total} tamamlandı${tp.overdueOpen?` · ${tp.overdueOpen} gecikmiş açık`:''}</div></div>
+    <div class="bg-slate-950 border border-slate-800 rounded-xl p-3"><div class="text-[9px] text-slate-500 uppercase mb-1">Görev Emri Performansı</div><div class="grid grid-cols-3 gap-1 text-center"><div><div class="text-[8px] text-slate-500">Haftalık</div>${kmiPctHtml(tpf.week.pct)}${kmiTrendArrowHtml(tpf.weekTrend)}</div><div><div class="text-[8px] text-slate-500">Aylık</div>${kmiPctHtml(tpf.month.pct)}${kmiTrendArrowHtml(tpf.monthTrend)}</div><div><div class="text-[8px] text-slate-500">Genel</div>${kmiPctHtml(tpf.overall.pct)}</div></div></div>
     <div class="bg-slate-950 border border-slate-800 rounded-xl p-3"><div class="text-[9px] text-slate-500 uppercase">Bakım Emri Zamanında Kapama</div><b class="text-white">${mp.onTimePct===null?'Veri yok':'%'+mp.onTimePct}</b><div class="text-[9px] text-slate-500 mt-0.5">${mp.closed}/${mp.total} kapatıldı${mp.openOverdue?` · ${mp.openOverdue} gecikmiş açık`:''}</div></div>
     <div class="bg-slate-950 border border-slate-800 rounded-xl p-3"><div class="text-[9px] text-slate-500 uppercase">Üretim (bu ay / toplam)</div><b class="text-white">${pp.totalMonth} / ${pp.totalAll} adet</b><div class="text-[9px] text-slate-500 mt-0.5">Kalite oranı %${Math.round(pp.goodRate*100)} · En iyi gün ${pp.bestDay} adet</div></div>
    </div>
@@ -2971,7 +3039,7 @@ function renderExecutiveDashboard(){const el=document.getElementById('executiveD
 function renderShippingToday(){const r=document.getElementById('shippingReadyToday'),s=document.getElementById('shippingSentToday');if(!r||!s)return;const today=new Date().toLocaleDateString('tr-TR'),ready=declarations.filter(d=>d.shipmentReady&&d.status!=='Sevk Edildi'),sent=declarations.filter(d=>d.status==='Sevk Edildi'&&String(d.shippedAt||d.shipmentDate||d.updatedAt||'').includes(new Date().toISOString().slice(0,10)));r.innerHTML=ready.map(d=>`<div>${d.jobOrder} · ${d.operator} · <b>${d.qualityGood??d.qty}</b> adet</div>`).join('')||'<div class="text-slate-500">Bugün sevke hazır kayıt yok.</div>';s.innerHTML=sent.map(d=>`<div>${d.jobOrder} · <b>${d.qualityGood??d.qty}</b> adet · ${d.vehiclePlate||'-'}</div>`).join('')||'<div class="text-slate-500">Bugün sevk edilen kayıt yok.</div>';}
 function enhanceQualityMeasurementUI(){ /* V53: ölçüm seçimi renderKaliteTable içinde tek kaynaktan oluşturulur. */ }
 const _refreshAllViews=refreshAllViews;
-refreshAllViews=function(){_refreshAllViews();renderDeletedJobOrders();renderPersonnelFileCards();populatePuantajAuditPeople();renderManagementApprovedHistory();renderLiveMachineAssignments();renderExecutiveDashboard();renderShippingToday();enhanceQualityMeasurementUI();};
+refreshAllViews=function(){_refreshAllViews();renderDeletedJobOrders();renderPersonnelFileCards();populatePuantajAuditPeople();renderManagementApprovedHistory();renderLiveMachineAssignments();renderExecutiveDashboard();renderShippingToday();enhanceQualityMeasurementUI();try{renderPersonnelTaskPerformanceBoard();}catch(e){}};
 
 // ===== V28 WORKFLOW CONSISTENCY / MAINTENANCE FILE / OPERATOR STATUS =====
 function workflowRank(status){const a=['Açık','Aktif','Tesviye Bekliyor','Vibrasyon Bekliyor','Kalite Bekliyor','Hazır - Muhasebe Onayı Bekliyor','Muhasebe Onayı Bekliyor','Yönetim Onayı Bekliyor','Sevk Onayı Bekliyor','Sevk Edildi'];return a.indexOf(status);}
@@ -3571,7 +3639,7 @@ function render7(M){const el=document.getElementById('leadershipDailyQualityChar
 function renderKpis(M){const el=document.getElementById('leadershipKpis');if(!el)return;const g=M.monthly.reduce((s,x)=>s+x.good,0),sc=M.monthly.reduce((s,x)=>s+x.scrap,0),q=g+sc?g/(g+sc)*100:0,top=M.stats[0];el.innerHTML=[['Bu Ay Onaylı',g+' adet'],['Kalite Oranı','%'+q.toFixed(1)],['Aktif Performansçı',M.stats.filter(x=>x.g>0||x.pts>0).length],['Lider Puan',top?top.pts.toFixed(2)+' P':'0 P'],['Lider',top?.p?.name||'-'],['Kalite Kayıt',M.monthly.length]].map(x=>`<div class="z-kpi"><span class="text-[9px] text-slate-500 uppercase">${E(x[0])}</span><strong>${E(x[1])}</strong></div>`).join('');}
 function renderV59(){try{const M=model();const l=document.getElementById('leadershipMonthLabel');if(l)l.textContent=`${typeof formatMonthLabel==='function'?formatMonthLabel(M.m):M.m} · canlı performans`;renderKpis(M);renderPool(M);renderCards(M);renderRanking(M);renderRecords(M);renderDailyShiftMachine(M);render7(M);const h=document.getElementById('z58Health');if(h)h.textContent=`✓ ${M.rows.length} kalite onaylı kayıt · ${M.stats.length} personel · tek veri motoru`;}catch(err){console.error('V59 leadership fatal',err);const h=document.getElementById('z58Health');if(h){h.className='text-[10px] font-bold text-rose-600 mt-1';h.textContent='Zirvedekiler veri hatası: '+err.message;}}}
 window.renderZirveV54=renderV59;window.renderLeaderboard=renderV59;window.renderLeadershipPoolGauge=renderV59;window.renderLeadershipPerformanceChart=()=>{};
-const sw=window.switchTab;window.switchTab=function(tab){const r=sw.apply(this,arguments);if(tab==='liderlik'){setTimeout(renderV59,0);setTimeout(()=>{try{renderSahaLive();}catch(e){console.warn('[Saha Live]',e);}},0);}if(tab==='yonetici'){setTimeout(()=>{try{renderYonTaskOverview();window.kmiPullRemoteTasks?.().then(ch=>{if(ch)renderYonTaskOverview();});}catch(e){console.warn('[Task overview]',e);}},0);}return r};
+const sw=window.switchTab;window.switchTab=function(tab){const r=sw.apply(this,arguments);if(tab==='liderlik'){setTimeout(renderV59,0);setTimeout(()=>{try{renderSahaLive();}catch(e){console.warn('[Saha Live]',e);}},0);}if(tab==='yonetici'){setTimeout(()=>{try{renderYonTaskOverview();renderPersonnelTaskPerformanceBoard();window.kmiPullRemoteTasks?.().then(ch=>{if(ch){renderYonTaskOverview();renderPersonnelTaskPerformanceBoard();}});}catch(e){console.warn('[Task overview]',e);}},0);}return r};
 setTimeout(renderV59,250);
 })();
 </script>
@@ -7544,13 +7612,23 @@ window.kmiOrgSubordinates=function(personId){
  }
  return result;
 };
+// KMI-FIX (2026-09-26): Ender'in isteği - Genel Müdür'e (Hakan Kurutlu) org şemasında DOĞRUDAN
+// bağlı olanlar Task Command Center'da herkese görev atayabilsin (hiyerarşi kısıtı olmadan).
+// Muhasebe de idari görevi gereği (evrak talebi, online yükleme isteği vb.) herkese task açabilsin.
+function findGenelMudur(){
+ return people().find(p=>{const n=String(p.name||'').toLocaleUpperCase('tr-TR');return n.includes('HAKAN')&&n.includes('KURUTLU');})||null;
+}
 // Aktör (actorId), hedef (targetId) için iş emri/bakım emri/task açabilir mi?
 // ADMIN her zaman açabilir. Kendi kendine her zaman açabilir. Hiyerarşide altındaysa açabilir.
+// Muhasebe ve Genel Müdür'e doğrudan bağlı olanlar herkese açabilir (yukarıda açıklandı).
 // Org şeması hiç kurulmamışsa (harita boşsa) eski davranış korunur - kısıtlama YOK (geriye dönük
 // uyumluluk, Ender şemayı doldurana kadar mevcut akışları bozmaz).
 window.kmiOrgCanAssign=function(actor,targetId){
  if(!actor)return true;
  if(isAdmin(actor))return true;
+ try{ if(getEffectiveRole(actor)==='MUHASEBE') return true; }catch(e){}
+ const gm=findGenelMudur();
+ if(gm && String(window.kmiOrgManagerOf(actor.id))===String(gm.id)) return true;
  const m=load(); if(!Object.keys(m).length)return true;
  if(String(actor.id)===String(targetId))return true;
  return window.kmiOrgSubordinates(actor.id).has(String(targetId));
