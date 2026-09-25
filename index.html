@@ -112,9 +112,16 @@
         .machine-modal-card{background:#111827;border:1px solid #334155;border-radius:16px;padding:14px}.machine-timeline{border-left:2px solid #334155;padding-left:14px}.machine-timeline-item{position:relative;padding:0 0 16px 8px}.machine-timeline-item:before{content:"";position:absolute;width:9px;height:9px;border-radius:50%;background:#38bdf8;left:-19px;top:4px}
         .perf-excluded{opacity:.58;background:rgba(127,29,29,.16)}
 </style>
-  <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <!-- KMI-FIX (2026-09-25): Bu 4 dış kütüphane <head> içinde src ile (defer'sız) yüklendiği için
+       tarayıcı, zayıf/yavaş atölye internetinde bunları indirene kadar SAYFANIN GERİ KALANINI
+       (giriş ekranı dahil) hiç render etmiyordu - "giriş ekranı açılması 1 dakika sürüyor" şikayetinin
+       kök nedeni buydu. defer eklendi: HTML ayrıştırma bloklanmaz, kütüphaneler paralel indirilir ve
+       DOMContentLoaded'dan hemen önce (sıralarına göre) çalıştırılır - v75 Supabase init() zaten
+       DOMContentLoaded'a bağlı olduğu için hiçbir işlevsellik bozulmaz. -->
+  <script defer src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 </h
 
 ead>
@@ -326,6 +333,16 @@ ead>
                                     <i class="fa-solid fa-paper-plane mr-1"></i> Aktif İş Emrini Kapat ve Kaliteye Gönder
                                 </button>
                             </div>
+                            <!-- KMI-FIX (2026-09-25): Başka makineye sevk ile aynı mantıkta, işlemin bitip Tesviye ya da
+                                 Vibrasyon operasyonuna gönderilmesi seçeneği - Shop Floor Live'daki İşi Bitir ile aynı motor. -->
+                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                <button type="button" onclick="handleDeclarationSubmit(event,'tesviye')" class="w-full bg-violet-700 hover:bg-violet-600 text-white font-semibold py-2 rounded text-xs transition duration-150">
+                                    <i class="fa-solid fa-hammer mr-1"></i> Üretim Bitti · Tesviyeye Gönder
+                                </button>
+                                <button type="button" onclick="handleDeclarationSubmit(event,'vibrasyon')" class="w-full bg-indigo-700 hover:bg-indigo-600 text-white font-semibold py-2 rounded text-xs transition duration-150">
+                                    <i class="fa-solid fa-wave-square mr-1"></i> Üretim Bitti · Vibrasyona Gönder
+                                </button>
+                            </div>
                         </form>
                     </div>
 
@@ -407,6 +424,10 @@ ead>
 
             <!-- 2. KALİTE ONAY EKRANI -->
             <section id="tab-kalite" class="tab-content space-y-6">
+                <!-- KMI-FIX (2026-09-25): Tesviye ve Vibrasyon operasyon kuyrukları - sadece o
+                     kabiliyete (Kabiliyet: Tesviye / Vibrasyon) sahip personele ve yöneticiye görünür.
+                     Onaylanınca kayıt otomatik olarak Kalite Onay listesine düşer. -->
+                <div id="kmiPostOpQueues"></div>
                 <div class="bg-slate-800 border border-slate-700 rounded-lg p-5 shadow-lg">
                     <div class="flex justify-between items-center mb-4 border-b border-slate-700 pb-3">
                         <div>
@@ -994,6 +1015,22 @@ ead>
         const DEFAULT_SKILLS = ["CAD","CAM","3 eksen operatörü","4 eksen operatörü","5 eksen operatörü","CMM Operatörü","parça bağlama ve sökme","tesviye","mastar kontrol","ofset verebilme","takım ölçme","takım yedekleme","Fotoğraflı Kalite Ölçümü","Kumpasla ölçüm","Bakım","tüm tezgahları kullanabilme","torna operatörü","robot operatörü"];
         let SKILL_CATALOG = loadStorage('SKILL_CATALOG', DEFAULT_SKILLS.map((name,i)=>({id:i+1,name})));
         if(!Array.isArray(SKILL_CATALOG) || !SKILL_CATALOG.length) SKILL_CATALOG=DEFAULT_SKILLS.map((name,i)=>({id:i+1,name}));
+        // KMI-FIX (2026-09-25): Tesviye ve Vibrasyon, iş emri operasyon yönlendirmesinde ("Tesviyeye
+        // Gönder" / "Vibrasyona Gönder") KİMİN onaylayabileceğini belirlemek için mevcut Kabiliyet
+        // (skill) sistemi üzerinden kişiye atanır - yeni bir yetki sistemi kurmak yerine var olanı
+        // kullanıyoruz. Fatma Çetin tesviyeden sorumlu olarak etiketlendi (Ender'in talebi).
+        (function kmiEnsureOpSkills(){
+            let changed=false;
+            const nextId=()=>SKILL_CATALOG.reduce((m,x)=>Math.max(m,Number(x.id)||0),0)+1;
+            ['Tesviye','Vibrasyon'].forEach(name=>{
+                if(!SKILL_CATALOG.some(x=>String(x.name).toLocaleLowerCase('tr-TR')===name.toLocaleLowerCase('tr-TR'))){
+                    SKILL_CATALOG.push({id:nextId(),name}); changed=true;
+                }
+            });
+            if(changed) saveStorage('SKILL_CATALOG',SKILL_CATALOG);
+            window.KMI_TESVIYE_SKILL_ID=SKILL_CATALOG.find(x=>String(x.name).toLocaleLowerCase('tr-TR')==='tesviye')?.id;
+            window.KMI_VIBRASYON_SKILL_ID=SKILL_CATALOG.find(x=>String(x.name).toLocaleLowerCase('tr-TR')==='vibrasyon')?.id;
+        })();
         function escSkill(v){return String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
         function renderEmployeeSkillsChecklist(selected=[]){const el=document.getElementById('employeeSkillsChecklist');if(!el)return;const set=new Set((selected||[]).map(Number));el.innerHTML=SKILL_CATALOG.map(sk=>`<label class="flex items-center gap-2 bg-slate-900 border border-slate-700 rounded p-2 text-[10px] text-slate-200"><input type="checkbox" class="employee-skill-check accent-amber-500" value="${sk.id}" ${set.has(Number(sk.id))?'checked':''}> <span>${escSkill(sk.name)}</span></label>`).join('')||'<span class="text-slate-500 text-[10px]">Önce kabiliyet kataloğuna kayıt ekleyin.</span>';}
         function renderSkillCatalogAdmin(){const el=document.getElementById('skillCatalogAdmin');if(!el)return;el.innerHTML=SKILL_CATALOG.map(sk=>`<div class="flex items-center gap-2 bg-slate-900/70 border border-slate-700 rounded-lg p-2"><span class="flex-1 text-xs text-slate-200">${escSkill(sk.name)}</span><button onclick="editSkillDefinition(${sk.id})" class="bg-slate-700 hover:bg-slate-600 px-2 py-1 rounded text-[10px]">Düzenle</button><button onclick="deleteSkillDefinition(${sk.id})" class="bg-red-800 hover:bg-red-700 px-2 py-1 rounded text-[10px]">Sil</button></div>`).join('');}
@@ -1097,6 +1134,15 @@ ead>
             }
             return p;
         });
+        // KMI-FIX (2026-09-25): Fatma Çetin, Tesviye kabiliyetiyle etiketlendi - Tesviye onay
+        // kuyruğu bu kabiliyete sahip personele görünür (bkz. kmiEnsureOpSkills yukarıda).
+        if(window.KMI_TESVIYE_SKILL_ID){
+            const fatma=PERSONNEL_LIST.find(p=>String(p.name||'').trim().toLocaleLowerCase('tr-TR')==='fatma çetin');
+            if(fatma){
+                fatma.skills=Array.isArray(fatma.skills)?fatma.skills:[];
+                if(!fatma.skills.map(Number).includes(Number(window.KMI_TESVIYE_SKILL_ID))) fatma.skills.push(window.KMI_TESVIYE_SKILL_ID);
+            }
+        }
         saveStorage('PERSONNEL_LIST', PERSONNEL_LIST);
 
         const MACHINES_LIST = [
@@ -1111,7 +1157,10 @@ ead>
             { code: "112", name: "HAAS SL 30" },
             { code: "113", name: "DMU 60 P" },
             { code: "CMM", name: "Hexagon 5 eksen CMM" },
-            { code: "OPT", name: "In size ISD-V Manuel Video Optik" }
+            { code: "OPT", name: "In size ISD-V Manuel Video Optik" },
+            // KMI-FIX (2026-09-25): Vibrasyon (titreşimli yüzey/çapak temizleme) makinesi - Ender'in
+            // talebiyle eklendi, Kalite altında bir operasyon makinesi olarak işaretlendi.
+            { code: "VIBROMAK", name: "Vibromak Vibrasyon Makinesi", category: "Kalite" }
         ];
 
         let defaultJobOrders = [];
@@ -1672,6 +1721,9 @@ ead>
             if(tabName==='operatör'||tabName==='yonetici'){
                 try{ window.kmiPullJobOrdersFromCloud?.(); }catch(e){}
             }
+            if(tabName==='kalite'){
+                try{ window.kmiRenderPostOpQueues?.(); }catch(e){}
+            }
             if(tabName==='operatör'){
                 try{window.renderOperatorAssignedJobs?.();}catch(e){}
                 try{window.renderMyGeckoMonthlySummary?.();}catch(e){}
@@ -1750,8 +1802,15 @@ ead>
         }
 
         // SUBMIT DECLARATION
-        function handleDeclarationSubmit(e) {
+        function handleDeclarationSubmit(e,postOp) {
             e.preventDefault();
+            postOp=postOp||'kalite';
+            let vibrationTargetMinutes=0;
+            if(postOp==='vibrasyon'){
+                const mins=prompt('Vibrasyon süresi (dakika):','15');
+                if(mins===null)return; // vazgeçti
+                vibrationTargetMinutes=Math.max(0,Math.round(Number(mins)||0));
+            }
             const machine = document.getElementById('declMachine').value;
             const jobOrder = document.getElementById('declJobOrder').value;
             const good=parseInt(document.getElementById('declGood').value)||0;
@@ -1794,7 +1853,11 @@ ead>
                 machineHandoverOut: machineHandoverOut,
                 machineHandoverIn: machineHandoverIn,
                 handoverFromOperator: handoverFromOperator,
-                status: "Kalite Bekliyor",
+                // KMI-FIX (2026-09-25): postOp - beyan doğrudan Kaliteye değil, önce Tesviye ya da
+                // Vibrasyon operasyonuna gönderilebilir (ikincil işlem tamamlanınca otomatik Kaliteye düşer).
+                status: {tesviye:'Tesviye Bekliyor',vibrasyon:'Vibrasyon Bekliyor',kalite:'Kalite Bekliyor'}[postOp]||'Kalite Bekliyor',
+                postOp: postOp,
+                vibrationTargetMinutes: postOp==='vibrasyon'?vibrationTargetMinutes:undefined,
                 approver: "",
                 shiftClosedAt: new Date().toISOString(),
                 bonusFinalized: false,
@@ -1814,7 +1877,9 @@ ead>
             if(activeJobDraftId){delete jobDrafts[draftKey(activeJobDraftId)];saveStorage('operatorJobDrafts',jobDrafts);activeJobDraftId=null;}
 
             refreshAllViews();
-            alert("Operatör beyanı başarıyla kaydedildi!");
+            const postOpMsg={tesviye:'Operatör beyanı kaydedildi ve Tesviye kuyruğuna gönderildi.',vibrasyon:'Operatör beyanı kaydedildi ve Vibrasyon kuyruğuna gönderildi.',kalite:'Operatör beyanı başarıyla kaydedildi!'}[postOp]||'Operatör beyanı başarıyla kaydedildi!';
+            alert(postOpMsg);
+            try{window.kmiRenderPostOpQueues?.();}catch(e){}
             document.getElementById('declarationForm').reset();
             document.getElementById('declOperator').value = currentUser.name;
         }
@@ -2759,8 +2824,8 @@ const _refreshAllViews=refreshAllViews;
 refreshAllViews=function(){_refreshAllViews();renderDeletedJobOrders();renderPersonnelFileCards();populatePuantajAuditPeople();renderManagementApprovedHistory();renderLiveMachineAssignments();renderExecutiveDashboard();renderShippingToday();enhanceQualityMeasurementUI();};
 
 // ===== V28 WORKFLOW CONSISTENCY / MAINTENANCE FILE / OPERATOR STATUS =====
-function workflowRank(status){const a=['Açık','Aktif','Kalite Bekliyor','Hazır - Muhasebe Onayı Bekliyor','Muhasebe Onayı Bekliyor','Yönetim Onayı Bekliyor','Sevk Onayı Bekliyor','Sevk Edildi'];return a.indexOf(status);}
-function syncJobOrderWorkflowStatuses(){jobOrders.forEach(j=>{if(j.deleted||j.status==='Silindi')return;const ds=declarations.filter(d=>d.jobOrder===j.id);if(!ds.length)return;const d=ds.slice().sort((a,b)=>workflowRank(b.status)-workflowRank(a.status)||new Date(b.updatedAt||0)-new Date(a.updatedAt||0))[0];const map={'Kalite Bekliyor':'Kalite Onayı Bekliyor','Hazır - Muhasebe Onayı Bekliyor':'Muhasebe Onayı Bekliyor','Muhasebe Onayı Bekliyor':'Muhasebe Onayı Bekliyor','Yönetim Onayı Bekliyor':'Yönetim Onayı Bekliyor','Sevk Onayı Bekliyor':'Sevke Hazır','Sevk Edildi':'Sevk Edildi / Kapandı','Tamamlandı (Yönetim Onaylı)':'Tamamlandı (Yönetim Onaylı)'};
+function workflowRank(status){const a=['Açık','Aktif','Tesviye Bekliyor','Vibrasyon Bekliyor','Kalite Bekliyor','Hazır - Muhasebe Onayı Bekliyor','Muhasebe Onayı Bekliyor','Yönetim Onayı Bekliyor','Sevk Onayı Bekliyor','Sevk Edildi'];return a.indexOf(status);}
+function syncJobOrderWorkflowStatuses(){jobOrders.forEach(j=>{if(j.deleted||j.status==='Silindi')return;const ds=declarations.filter(d=>d.jobOrder===j.id);if(!ds.length)return;const d=ds.slice().sort((a,b)=>workflowRank(b.status)-workflowRank(a.status)||new Date(b.updatedAt||0)-new Date(a.updatedAt||0))[0];const map={'Tesviye Bekliyor':'Tesviye Bekliyor','Vibrasyon Bekliyor':'Vibrasyon Bekliyor','Kalite Bekliyor':'Kalite Onayı Bekliyor','Hazır - Muhasebe Onayı Bekliyor':'Muhasebe Onayı Bekliyor','Muhasebe Onayı Bekliyor':'Muhasebe Onayı Bekliyor','Yönetim Onayı Bekliyor':'Yönetim Onayı Bekliyor','Sevk Onayı Bekliyor':'Sevke Hazır','Sevk Edildi':'Sevk Edildi / Kapandı','Tamamlandı (Yönetim Onaylı)':'Tamamlandı (Yönetim Onaylı)'};
  if(map[d.status]){
    let next=map[d.status];
    // KMI-FIX (2026-09-25): "adet üretim hedefli" (production) iş emirlerinde TEK bir vardiya
@@ -3180,6 +3245,41 @@ function seedMachines(){
 }
 let machines=seedMachines(), orders=load(K_O,[]), journal=load(K_J,[]), selected=null;
 function persist(){save(K_M,machines);save(K_O,orders);save(K_J,journal)}
+// KMI-FIX (2026-09-25): Ender'in verdiği gerçek makine bilgileriyle 103/107/109 künyeleri
+// (marka/model/yıl/teknik özellikler) dolduruldu - sadece bir kere, boş alanlar üzerine yazılır,
+// Ender'in kendi elle girdiği veriler korunur. Web'den bulunan speclerin referans olduğu, kesin
+// değerlerin makine plakasından/kullanım kılavuzundan teyit edilmesi gerektiği notu eklendi.
+(function kmiPatchMachineSpecsV1(){
+ try{
+  if(loadStorage('KMI_MACHINE_SPECS_V1_DONE',false)) return;
+  const patch={
+   '103':{brand:'DMG MORI',model:'NHX 5000',year:'2012',serial:'',
+    specs:'Çift paletli (twin-pallet) yatay işleme merkezi - master üretim makinesi (bu ürün ailesi için). '
+     +'Fikstür/parça bağlama diğer palet işlenirken yapılır, bu yüzden bağlama-sökme süresi çevrim süresini ETKİLEMEZ. '
+     +'Referans specler (kesin değerler makine plakasından teyit edilmeli): X 730mm · Y 730mm · Z 880mm eksen hareketi, '
+     +'iş parçası maks. Ø800mm x 1000mm / 500kg, spindle 20.000 rpm\'e kadar (yeni nesil speedMASTER opsiyonu; 2012 model daha düşük olabilir), '
+     +'ilerleme hızı 70.000 mm/dk\'ya kadar. Kaynak: DMG MORI NHX 5000 ürün sayfası (dmgmori.com).'},
+   '107':{brand:'HAAS',model:'VF-2SS',year:'2018',serial:'',
+    specs:'Tek paletli, Super Speed vertical machining center. Fikstür bağlama-sökme (~3 dk) doğrudan çevrim süresine eklenir. '
+     +'Kapasite desteği/yükseltme makinesi olarak kullanılıyor. Referans specler (kesin değerler makine plakasından teyit edilmeli): '
+     +'X 762mm · Y 406mm · Z 508mm eksen hareketi, tabla 914x356mm, spindle maks. 12.000 rpm (30hp/22.4kW), '
+     +'hızlı ilerleme 35,6 m/dk, takım değiştirici 30+1 (yan takımlı, takım-takım 1.8sn). Kaynak: machinetoolindex.com (Haas VF-2SS).'},
+   '109':{specs:'107 (HAAS VF-2SS) için yedek/destek makine olarak kullanılıyor - aynı aile/konfigürasyon varsayılıyor, teyit edilmeli.'}
+  };
+  machines.forEach(m=>{
+   const p=patch[String(m.code)]; if(!p) return;
+   // Not: model/marka alanları seedMachines() tarafından zaten dolduruluyordu (isim tekrarı),
+   // bu yüzden "boşsa doldur" değil, Ender'in verdiği doğru bilgiyle DÜZELTİYORUZ - ama specs
+   // alanı boşsa dolduruyoruz (Ender kendi notunu yazmışsa üzerine yazmıyoruz).
+   if(p.brand) m.brand=p.brand;
+   if(p.model) m.model=p.model;
+   if(p.year) m.year=p.year;
+   if(p.specs&&!m.specs) m.specs=p.specs;
+  });
+  persist();
+  saveStorage('KMI_MACHINE_SPECS_V1_DONE',true);
+ }catch(e){console.warn('[KMI machine specs patch]',e);}
+})();
 function machine(id){return machines.find(x=>x.id===id)}
 function openOrders(id){return orders.filter(o=>o.machineId===id&&!['CLOSED','CANCELLED'].includes(o.status))}
 function closedOrders(id){return orders.filter(o=>o.machineId===id&&o.status==='CLOSED').sort((a,b)=>new Date(b.closedAt)-new Date(a.closedAt))}
@@ -3426,8 +3526,94 @@ const seed={
 function load(){try{const x=JSON.parse(localStorage.getItem(K)||'null');return x&&x.customers?x:structuredClone(seed)}catch(e){return JSON.parse(JSON.stringify(seed))}}
 let D=load();window.KMI_MASTER_DATA=D;window.D=D; // KMI-FIX: pek çok ayrı <script> bloğu 'D' değişkenini global sanıyordu; let ile tanımlandığı için sadece bu blokta görünüyordu, diğer bloklarda 'D is not defined' hatası veriyordu.
 D.customers=(D.customers||[]).map(x=>({...x,customerCode:x.customerCode||x.id,legalName:x.legalName||x.name||'',shortName:x.shortName||'',taxOffice:x.taxOffice||'',taxNo:x.taxNo||'',country:x.country||'Türkiye',city:x.city||'',address:x.address||'',contactName:x.contactName||'',contactRole:x.contactRole||'',phone:x.phone||'',email:x.email||'',website:x.website||'',currency:x.currency||'TRY',paymentTerm:x.paymentTerm||'',incoterm:x.incoterm||'',deliveryAddress:x.deliveryAddress||'',qualityContact:x.qualityContact||'',qualityRequirements:x.qualityRequirements||'',customerSupplierCode:x.customerSupplierCode||'',notes:x.notes||'',documents:Array.isArray(x.documents)?x.documents:[],fields:Array.isArray(x.fields)?x.fields:[]}));
-D.products=(D.products||[]).map(x=>({...x,revision:x.revision||'A',status:x.status||'Aktif',drawingNo:x.drawingNo||'',drawingRev:x.drawingRev||'',customerPartNo:x.customerPartNo||'',materialStandard:x.materialStandard||'',rawForm:x.rawForm||'',rawDimensions:x.rawDimensions||'',finishedWeight:Number(x.finishedWeight||0),annualForecast:Number(x.annualForecast||0),minStock:Number(x.minStock||0),standardCycleSec:Number(x.standardCycleSec||0),criticalCharacteristics:x.criticalCharacteristics||'',traceabilityLevel:x.traceabilityLevel||'LOT',notes:x.notes||'',unit:x.unit||'adet',description:x.description||'',qualityPlan:x.qualityPlan||'',packaging:x.packaging||'',documents:Array.isArray(x.documents)?x.documents:[],fields:Array.isArray(x.fields)?x.fields:[]}));
+D.products=(D.products||[]).map(x=>({...x,revision:x.revision||'A',status:x.status||'Aktif',drawingNo:x.drawingNo||'',drawingRev:x.drawingRev||'',customerPartNo:x.customerPartNo||'',materialStandard:x.materialStandard||'',rawForm:x.rawForm||'',rawDimensions:x.rawDimensions||'',finishedWeight:Number(x.finishedWeight||0),annualForecast:Number(x.annualForecast||0),minStock:Number(x.minStock||0),standardCycleSec:Number(x.standardCycleSec||0),criticalCharacteristics:x.criticalCharacteristics||'',traceabilityLevel:x.traceabilityLevel||'LOT',notes:x.notes||'',unit:x.unit||'adet',description:x.description||'',qualityPlan:x.qualityPlan||'',packaging:x.packaging||'',documents:Array.isArray(x.documents)?x.documents:[],fields:Array.isArray(x.fields)?x.fields:[],
+ // KMI-FIX (2026-09-25): Ender'in istediği genişletilmiş ürün parametreleri - ham madde tedarik şekli,
+ // bağlama/sökme süresi, CAM programından tahmini çevrim süresi, hangi makinelerde üretilebileceği,
+ // takım listesi (Excel'den içe aktarılabilir) ve gerçek dosya eki kategorileri (küçük ikon rozetleri için).
+ rawSupplyMode:x.rawSupplyMode||'',rawSupplyNote:x.rawSupplyNote||'',setupTeardownMin:Number(x.setupTeardownMin||0),
+ camCycleEstimateSec:Number(x.camCycleEstimateSec||0),allowedMachines:Array.isArray(x.allowedMachines)?x.allowedMachines:[],
+ toolList:Array.isArray(x.toolList)?x.toolList:[],docCategories:Array.isArray(x.docCategories)?x.docCategories:[],
+ // KMI-FIX (2026-09-25): Bazı makineler (çift paletli) bağlama/sökme süresini çevrim süresine
+ // yansıtmıyor, bazıları (tek paletli) yansıtıyor - tek bir genel süre yeterli değil, makine bazlı not
+ // ve çevrim başına çıkan adet (batch) gerekiyor (örn. çift paletli makinede 1 çevrimde 3 adet).
+ machineNotes:(x.machineNotes&&typeof x.machineNotes==='object')?x.machineNotes:{},
+ partsPerCyclePerMachine:(x.partsPerCyclePerMachine&&typeof x.partsPerCyclePerMachine==='object')?x.partsPerCyclePerMachine:{}}));
 D.suppliers=(D.suppliers||[]).map(x=>({...x,fields:Array.isArray(x.fields)?x.fields:[]}));
+// KMI-FIX (2026-09-25): Ender'in yüklediği teknik resim (Y135MAM0E3 rev.9), STEP katı model,
+// NC programı (1453.nc) ve takım listesi Excel'inden (107-M3500 ÇATAL TAKIM LİSTESİ) M3500 ürün
+// kartı otomatik oluşturuluyor - sadece bir kere, ürün zaten yoksa.
+(function kmiSeedM3500(){
+ try{
+  if(D.products.some(p=>String(p.code||'').toLocaleUpperCase('tr-TR')==='M3500')) return;
+  let stogger=D.customers.find(c=>String(c.name||'').toLocaleUpperCase('tr-TR').includes('STOGGER'));
+  if(!stogger){
+   stogger={id:'MUS-STOGGER',name:'Stogger',legalName:'Stogger Işık San. ve Tic. A.Ş.',shortName:'Stogger',active:true,customerCode:'STOGGER',country:'Türkiye',city:'',address:'',contactName:'',contactRole:'',phone:'',email:'',website:'',currency:'TRY',paymentTerm:'',incoterm:'',deliveryAddress:'',qualityContact:'',qualityRequirements:'',customerSupplierCode:'',notes:'Teknik resim başlığından otomatik oluşturuldu - bilgiler teyit edilmeli.',documents:[],fields:[]};
+   D.customers.push(stogger);
+  }
+  D.products.push({
+   id:'URN-M3500',code:'M3500',name:'Mekanizma Çatal Kolu',revision:'A',status:'Aktif',
+   customer:stogger.id,customerPartNo:'',
+   drawingNo:'Y135MAM0E3',drawingRev:'9',
+   material:'SAE 4140',materialStandard:'240-270 HB Islah Edilmiş (Local Endüksiyon 42-45 HRc belirtilen bölgelerde)',
+   rawForm:'Profil (H100MCP06)',rawDimensions:'~330 x 40 x 30 mm (TASLAK - tedarikçi profil kataloğundan teyit edilmeli)',
+   rawSupplyMode:'',rawSupplyNote:'Teyit edilmeli: ham maddeyi müşteri mi sağlıyor yoksa Kurutlu mu satın alıyor/ebatlıyor?',
+   finishedWeight:0,materialFullGram:0,finishedGram:0,
+   unit:'adet',annualForecast:0,minStock:0,conversionKg:0,conversionQty:0,rawKgPerBlank:0,
+   setupTeardownMin:0,camCycleEstimateSec:520,standardCycleSec:0,
+   traceabilityLevel:'LOT',
+   route:'Kesim → CNC (4. Eksen) → Lokal Endüksiyon (Dış Proses) → Kalite → Sevkiyat',
+   description:'Teknik resim, STEP (katı model), NC programı (1453.nc) ve takım listesinden (107-M3500 ÇATAL TAKIM LİSTESİ) otomatik oluşturuldu. Uygulandığı ürün/model: M3500-M3000. Çizen: A. Küçükavcı, Onaylayan: B. Sudaş.',
+   qualityPlan:'',
+   criticalCharacteristics:'Konumsal toleranslar (0.10/0.05), düzlemsellik 0.10, yüzey pürüzlülüğü 1.6/3.2, Ø29.1±.1 ve Ø20 toleranslı delikler, Lokal Endüksiyon 42-45 HRc bölgeleri (bkz. teknik resim not 9).',
+   packaging:'',notes:'CAM çevrim süresi NC dosyasından (1453.nc) otomatik/yaklaşık hesaplanmıştır - takım değişimi/dwell dahil değildir, gerçek üretimde doğrulanmalı. Ham madde ölçüsü ve tedarik şekli taslaktır, teyit gerekir.',
+   active:true,fields:[],allowedMachines:[],
+   toolList:[
+    {toolNo:'T1',name:'Ø14,5-KARBUR-MATKAP-L-70-HB-35-Z2-SAFT-16-KAPLAMALI',code:'TM010',clampLength:'STANDART',partsPerTool:0},
+    {toolNo:'T12',name:'Ø12-DUZ-KARBUR-FREZE-HB-9-Z4-SAFT-12-KAPLAMALI-ALIN KESME (İÇ BOŞALTMA)',code:'TM009',clampLength:'25',partsPerTool:0},
+    {toolNo:'T4',name:'Ø10-DUZ-KARBUR-FREZE-Z4-SAFT-12-KAPLAMALI-BİLEME PAHLI ALTERNATİF (9,5/10,5)',code:'TM463 (TM174-TM084-TM375)',clampLength:'25',partsPerTool:0},
+    {toolNo:'T23',name:'Ø14-KARBUR-KURE-FREZE-L-80-HB-26-Z4-SAFT-14-KAPLAMALI',code:'TM011',clampLength:'25',partsPerTool:0},
+    {toolNo:'T5',name:'Ø6-DUZ-KARBUR-FREZE-L-55-HB-13-Z4-SAFT-6-KAPLAMALI',code:'TM003',clampLength:'25',partsPerTool:0},
+    {toolNo:'T11',name:'Ø9,5-DUZ-KARBUR-FREZE-L-60-HB-15-DB-20-SAFT-10-KAPLAMALI-PAHSIZ',code:'TM375',clampLength:'25',partsPerTool:0},
+    {toolNo:'T2',name:'Ø6XR0,5-KARBUR-FREZE-L-50-HB-15-DB-15-SAFT-6-KAPLAMALI',code:'TM354',clampLength:'25',partsPerTool:0},
+    {toolNo:'T14',name:'Ø6XR0,2-DUZ-KARBUR-FREZE-L-57-HB-14-Z4-SAFT-6-KAPLAMALI',code:'TM778',clampLength:'25',partsPerTool:0},
+    {toolNo:'T16',name:'Ø3-DUZ-KARBUR-FREZE-L-55-HB-12-Z4-SAFT-6-KAPLAMALI',code:'TM006',clampLength:'25',partsPerTool:0},
+    {toolNo:'T3',name:'Ø20xR18-KARBUR-KURE-FREZE-SAFT-22-KAPLAMALI',code:'TM796(TM749-TM266)',clampLength:'25',partsPerTool:0},
+    {toolNo:'T10',name:'SPMX 110408-PG LF6018 PUNTA TAKMA UC',code:'TM791',clampLength:'STANDART',partsPerTool:0}
+   ],
+   docCategories:[]
+  });
+  save();
+ }catch(e){console.warn('[KMI M3500 seed]',e);}
+})();
+// KMI-FIX (2026-09-25): Ender'in verdiği kesin bilgilerle (ham madde 3000mm hazır çekme profil
+// müşteriden geliyor, blank 317gr → bitmiş 131gr, 103/107/109 makine notları ve çevrim başına
+// adet) M3500 kartı güncellendi. Sadece bir kere - Ender'in kendi elle yaptığı değişiklikler
+// üzerine yazılmasın diye versiyon bayrağıyla korunuyor.
+(function kmiPatchM3500V2(){
+ try{
+  if(loadStorage('KMI_M3500_PATCH_V2_DONE',false)) return;
+  const p=D.products.find(x=>String(x.code||'').toLocaleUpperCase('tr-TR')==='M3500');
+  if(p){
+   p.rawForm='Çekme Profil (H100MCP06)';
+   p.rawDimensions='~330 x 40 x 30 mm (kesilmiş blank ölçüsü - Ender onayladı)';
+   p.rawSupplyMode='Müşteri Sağlıyor - Tam Boy Çubuk/Profil';
+   p.rawSupplyNote='3000 mm boy hazır çekme profil olarak müşteriden geliyor, Kurutlu bu boydan kesip işliyor.';
+   p.materialFullGram=317; p.finishedGram=131;
+   p.finishedWeight=0.131; p.chipGramPerPart=317-131;
+   p.setupTeardownMin=3;
+   p.allowedMachines=Array.from(new Set([...(p.allowedMachines||[]),'103','107','109']));
+   p.machineNotes=Object.assign({},p.machineNotes,{
+    '103':'Master makine. Çift paletli (twin-pallet) - fikstür diğer palet işlenirken bağlanır, bağlama/sökme çevrim süresini ETKİLEMEZ. 1. operasyon 3 adet + 2. operasyon 3 adet aynı anda bağlanır, 1 çevrimde 3 adet çıkar.',
+    '107':'Kapasite desteği/yükseltme makinesi. Tek paletli - bağlama/sökme (~3 dk) çevrim süresine doğrudan eklenir.',
+    '109':'107 için yedek makine.'
+   });
+   p.partsPerCyclePerMachine=Object.assign({},p.partsPerCyclePerMachine,{'103':3,'107':1,'109':1});
+   p.notes=(p.notes||'')+' [Ender teyidi 2026-09-25: ham madde/ağırlık/makine bilgileri onaylandı.]';
+   save();
+  }
+  saveStorage('KMI_M3500_PATCH_V2_DONE',true);
+ }catch(e){console.warn('[KMI M3500 patch v2]',e);}
+})();
 D.purchases=(D.purchases||[]).map(x=>({...x,unitPrice:Number(x.unitPrice||0),currency:x.currency||'TRY',purchasedBy:x.purchasedBy||'',orderDate:x.orderDate||'',productId:x.productId||''}));
 D.purchaseItems=Array.isArray(D.purchaseItems)?D.purchaseItems:[];
 D.purchaseItems=D.purchaseItems.map(x=>({...x,fields:Array.isArray(x.fields)?x.fields:[],documents:Array.isArray(x.documents)?x.documents:[],alternatives:Array.isArray(x.alternatives)?x.alternatives:[],equivalents:Array.isArray(x.equivalents)?x.equivalents:[],usageRules:Array.isArray(x.usageRules)?x.usageRules:[],supplierIds:Array.isArray(x.supplierIds)?x.supplierIds:[]}));
@@ -3487,6 +3673,19 @@ function kmiSyncRecentPurchases(){
 function save(){localStorage.setItem(K,JSON.stringify(D));window.KMI_MASTER_DATA=D;renderKpis();clearTimeout(__kmiPurchSyncTimer);__kmiPurchSyncTimer=setTimeout(kmiSyncRecentPurchases,1500);}window.save=save; // KMI-FIX: bu fonksiyon bir IIFE içinde tanımlıydı, dışa sızmıyordu; v67 Cost Center modülü bunu global sanıp çağırınca ReferenceError ile çöküyordu.
 function money(v,c='TRY'){return Number(v||0).toLocaleString('tr-TR',{minimumFractionDigits:2,maximumFractionDigits:2})+' '+c}
 function fieldRows(fields){return (fields||[]).map((f,i)=>`<div class="grid grid-cols-[1fr_1fr_auto] gap-2 mb-2"><input value="${esc(f.label)}" onchange="v62FieldChange(${i},'label',this.value)" class="bg-slate-900 border border-slate-700 rounded p-2"><input value="${esc(f.value)}" onchange="v62FieldChange(${i},'value',this.value)" class="bg-slate-900 border border-slate-700 rounded p-2"><button onclick="v62FieldDelete(${i})" class="bg-red-950 text-red-300 px-3 rounded">Sil</button></div>`).join('')}
+const DOC73_CATS={teknik_resim:{label:'Teknik Resim',icon:'fa-solid fa-ruler-combined',cls:'bg-amber-500/10 border-amber-500/30 text-amber-300'},katı_model:{label:'Katı Model / STEP',icon:'fa-solid fa-cube',cls:'bg-cyan-500/10 border-cyan-500/30 text-cyan-300'},cam_program:{label:'CAM / NC Programı',icon:'fa-solid fa-microchip',cls:'bg-violet-500/10 border-violet-500/30 text-violet-300'},takim_listesi:{label:'Takım Listesi',icon:'fa-solid fa-screwdriver-wrench',cls:'bg-emerald-500/10 border-emerald-500/30 text-emerald-300'},kalite_plani:{label:'Kalite Kontrol Planı',icon:'fa-solid fa-clipboard-check',cls:'bg-rose-500/10 border-rose-500/30 text-rose-300'},diger:{label:'Diğer',icon:'fa-solid fa-file',cls:'bg-slate-500/10 border-slate-500/30 text-slate-300'}};
+// KMI-FIX (2026-09-25): Ürün listesinde teknik resim/katı model/takım listesi gibi ekli dosyaların
+// küçük ikon rozeti olarak görünmesi istendi - gerçek dosya listesi Supabase'de olduğu için (ağ
+// isteği gerektirir), listede hızlı gösterim için ürüne kaydedilen hafif 'docCategories' önbelleği
+// ve takım listesi uzunluğu kullanılıyor; ürün kartı her açıldığında/dosya eklendiğinde tazelenir.
+function docBadges73(p){
+ const cats=Array.isArray(p.docCategories)?p.docCategories:[];
+ const chips=cats.map(c=>DOC73_CATS[c]?`<span title="${esc(DOC73_CATS[c].label)}" class="inline-flex items-center justify-center w-6 h-6 rounded-full border ${DOC73_CATS[c].cls}"><i class="${DOC73_CATS[c].icon} text-[10px]"></i></span>`:'').join('');
+ const toolChip=(p.toolList||[]).length?`<span title="${(p.toolList||[]).length} takım tanımlı" class="inline-flex items-center gap-1 px-2 h-6 rounded-full border bg-blue-500/10 border-blue-500/30 text-blue-300 text-[10px] font-bold"><i class="fa-solid fa-toolbox"></i>${(p.toolList||[]).length}</span>`:'';
+ if(!chips&&!toolChip)return '';
+ return `<div class="flex flex-wrap gap-1.5 mt-2">${chips}${toolChip}</div>`;
+}
+window.DOC73_CATS=DOC73_CATS;window.docBadges73=docBadges73;
 function docRows(docs){return (docs||[]).map((d,i)=>`<div class="grid md:grid-cols-[1fr_2fr_auto] gap-2 mb-2"><input value="${esc(d.name||'')}" onchange="v63DocChange(${i},'name',this.value)" placeholder="Doküman adı" class="bg-slate-950 border border-slate-700 rounded p-2"><input value="${esc(d.url||'')}" onchange="v63DocChange(${i},'url',this.value)" placeholder="Dosya / SharePoint / Drive / portal URL" class="bg-slate-950 border border-slate-700 rounded p-2"><button onclick="v63DocDelete(${i})" class="bg-red-950 text-red-300 px-3 rounded">Sil</button></div>`).join('')||'<div class="text-xs text-slate-500">Henüz doküman bağlantısı yok.</div>'}
 function cardUrl(type,id){const base=location.href.split('?')[0].split('#')[0];return `${base}?v63card=${encodeURIComponent(type)}&id=${encodeURIComponent(id)}`}
 function identityPanel(type,obj,barcodeValue){const url=cardUrl(type,obj.id);return `<div class="mt-5 grid md:grid-cols-[1fr_1fr] gap-4"><div class="bg-white rounded-xl p-4 text-slate-950"><div class="text-[10px] font-black uppercase text-slate-500 mb-2">Barkod · ${esc(barcodeValue)}</div><svg id="v63Barcode"></svg><div class="text-[10px] text-slate-500 mt-2">El terminali / USB / Bluetooth okuyucu ile okutulabilir.</div></div><div class="bg-white rounded-xl p-4 text-slate-950 flex gap-4 items-center"><div id="v63Qr"></div><div><div class="text-[10px] font-black uppercase text-slate-500">QR Kimlik Kartı</div><div class="text-xs mt-1">QR okutulduğunda bu kartın adresini açar.</div><button onclick="navigator.clipboard?.writeText('${esc(url)}')" class="mt-2 bg-slate-900 text-white px-3 py-1 rounded text-xs">Kart adresini kopyala</button></div></div></div>`}
@@ -3501,7 +3700,7 @@ function renderKpis(){const accepted=D.lots.filter(x=>x.qc==='KABUL'),kg=accepte
 function shell(title,desc,buttons,body){return `<section class="bg-slate-900 border border-slate-700 rounded-2xl overflow-hidden"><div class="p-5 border-b border-slate-700 flex flex-wrap justify-between gap-3"><div><h3 class="text-xl font-black">${title}</h3><p class="text-xs text-slate-400 mt-1">${desc}</p></div><div>${buttons||''}</div></div><div class="p-5">${body}</div></section>`}
 function products(){
  const customers=D.customers.map(c=>`<button onclick="v62OpenCustomer('${c.id}')" class="text-left bg-slate-950 hover:bg-slate-800 border border-slate-700 rounded-2xl p-4 transition"><div class="flex justify-between gap-2"><div class="font-black text-white">${esc(c.name)}</div><span class="text-[10px] ${c.active===false?'text-red-300':'text-emerald-300'}">${c.active===false?'PASİF':'AKTİF'}</span></div><div class="text-xs text-slate-500 mt-1">${D.products.filter(p=>p.customer===c.id).length} ürün · ${esc(c.id)}</div><div class="text-[10px] text-cyan-300 mt-3">Kartı aç / düzenle →</div></button>`).join('');
- const prods=D.products.map(p=>`<button onclick="v62OpenProduct('${p.id}')" class="text-left bg-slate-950 hover:bg-slate-800 border border-slate-700 rounded-2xl p-4 transition"><div class="flex justify-between"><span class="font-mono text-cyan-300 font-black">${esc(p.code)}</span><span class="text-[10px] text-slate-500">REV ${esc(p.revision||'-')}</span></div><div class="font-black text-white mt-2">${esc(p.name)}</div><div class="text-xs text-slate-400 mt-1">${esc(name('customers',p.customer))}</div><div class="text-xs text-slate-500 mt-2">${esc(p.material||'Malzeme tanımsız')}</div><div class="text-[10px] text-cyan-300 mt-3">Ürün kimlik kartını aç →</div></button>`).join('');
+ const prods=D.products.map(p=>`<button onclick="v62OpenProduct('${p.id}')" class="text-left bg-slate-950 hover:bg-slate-800 border border-slate-700 rounded-2xl p-4 transition"><div class="flex justify-between"><span class="font-mono text-cyan-300 font-black">${esc(p.code)}</span><span class="text-[10px] text-slate-500">REV ${esc(p.revision||'-')}</span></div><div class="font-black text-white mt-2">${esc(p.name)}</div><div class="text-xs text-slate-400 mt-1">${esc(name('customers',p.customer))}</div><div class="text-xs text-slate-500 mt-2">${esc(p.material||'Malzeme tanımsız')}</div>${docBadges73(p)}<div class="text-[10px] text-cyan-300 mt-3">Ürün kimlik kartını aç →</div></button>`).join('');
  return shell('Ürün Kimlik Kartları & Müşteri Kartları','Kartlar açılır, düzenlenir, silinir. Zorunlu başlangıç alanlarına ek olarak ihtiyaç oldukça sınırsız özel alan ekleyebilirsiniz.',`<button onclick="v61AddCustomer()" class="bg-slate-700 px-3 py-2 rounded mr-2">+ Müşteri Kartı</button><button onclick="v61AddProduct()" class="bg-blue-600 px-3 py-2 rounded">+ Ürün Kimlik Kartı</button>`,`<h4 class="font-black mb-3 text-amber-300">Müşteriler</h4><div class="grid md:grid-cols-3 gap-3 mb-7">${customers||'<div class="text-slate-500">Müşteri yok.</div>'}</div><h4 class="font-black mb-3 text-cyan-300">Ürünler</h4><div class="grid md:grid-cols-3 xl:grid-cols-4 gap-3">${prods||'<div class="text-slate-500">Ürün yok.</div>'}</div>`)
 }
 function material(){const rows=D.lots.map(l=>`<tr class="border-b border-slate-800"><td class="p-3 font-mono text-amber-300">${esc(l.id)}</td><td>${esc(l.material)}</td><td>${esc(l.source)}</td><td>${Number(l.kgIn).toLocaleString('tr-TR')} kg</td><td>${Number(l.kgAvailable).toLocaleString('tr-TR')} kg</td><td>${Number(l.blankAvailable).toLocaleString('tr-TR')}</td><td><span class="px-2 py-1 rounded text-[10px] ${l.qc==='KABUL'?'bg-emerald-900 text-emerald-300':'bg-amber-900 text-amber-300'}">${esc(l.qc)}</span></td><td><button onclick="v61ProcessLot('${l.id}')" class="bg-slate-700 px-2 py-1 rounded text-xs">Giriş Kalite / Kesim</button> <button onclick="v69DeleteDRecord('lots','${l.id}','LOT')" class="bg-red-950 text-red-300 px-2 py-1 rounded text-xs ml-1">Sil</button></td></tr>`).join('');return shell('Malzeme · LOT · Giriş Kalite · Kesim','Müşteri malı ve Kurutlu satınalması aynı LOT izlenebilirliğiyle yönetilir. kg ve blank/adet stokları ayrı tutulur.',`<button onclick="v61AddLot()" class="bg-blue-600 px-3 py-2 rounded">+ Ham Madde Girişi</button>`,`<div class="bg-slate-950 border border-slate-700 rounded-xl p-4 mb-4 text-xs text-slate-300"><b class="text-amber-300">Kural:</b> Ham madde girişi üretim değildir. Kesilmiş blank da CNC üretim KPI'ına eklenmez. LOT → blank → iş emri → sağlam/hurda zinciri ayrı izlenir.</div><div class="overflow-x-auto"><table class="w-full text-sm"><thead class="text-left text-slate-500"><tr><th class="p-3">LOT</th><th>Malzeme</th><th>Kaynak</th><th>Gelen</th><th>Kalan kg</th><th>Kalan blank</th><th>Giriş Kalite</th><th>İşlem</th></tr></thead><tbody>${rows}</tbody></table></div>`)}
@@ -3591,7 +3790,7 @@ window.openV61Master=function(section='products'){document.getElementById('v61Ma
 window.closeV61Master=function(){document.getElementById('v61MasterOverlay').classList.add('hidden');document.body.style.overflow=''};
 window.v61Show=function(k){document.querySelectorAll('.v61tab').forEach(b=>{b.classList.remove('bg-blue-700');b.classList.add('bg-slate-800')});const map={products,material,rework,supply,cost:costAnalysis66,flow};document.getElementById('v61Workspace').innerHTML=(map[k]||products)();const idx={products:0,material:1,rework:2,supply:3,cost:4,flow:5}[k]??0;const b=document.querySelectorAll('.v61tab')[idx];b.classList.remove('bg-slate-800');b.classList.add('bg-blue-700')};
 window.v61AddCustomer=function(){const n=prompt('Müşteri / firma adı');if(!n)return;const c={id:'M-'+Date.now(),name:n.trim(),active:true,fields:[]};D.customers.push(c);save();v62OpenCustomer(c.id)};
-window.v61AddProduct=function(){const code=prompt('Ürün kodu');if(!code)return;const p={id:'URN-'+Date.now(),code:code.trim(),name:code.trim(),revision:'A',drawingNo:'',customerPartNo:'',customer:D.customers[0]?.id||'',material:'',rawKgPerBlank:0,unit:'adet',route:'Kesim → CNC → Kalite → Sevkiyat',description:'',qualityPlan:'',packaging:'',active:true,fields:[]};D.products.push(p);save();v62OpenProduct(p.id)};
+window.v61AddProduct=function(){const code=prompt('Ürün kodu');if(!code)return;const p={id:'URN-'+Date.now(),code:code.trim(),name:code.trim(),revision:'A',drawingNo:'',customerPartNo:'',customer:D.customers[0]?.id||'',material:'',rawKgPerBlank:0,unit:'adet',route:'Kesim → CNC → Kalite → Sevkiyat',description:'',qualityPlan:'',packaging:'',active:true,fields:[],rawSupplyMode:'',rawSupplyNote:'',setupTeardownMin:0,camCycleEstimateSec:0,allowedMachines:[],toolList:[],docCategories:[]};D.products.push(p);save();v62OpenProduct(p.id)};
 window.v61AddLot=function(){const mat=prompt('Malzeme','Alüminyum 6082');if(!mat)return;const kg=Number(prompt('Gelen kg','1000')||0);const source=confirm('Kurutlu satınalması mı?\nTamam=Kurutlu / İptal=Müşteri Malı')?'Kurutlu Satınalma':'Müşteri Malı';D.lots.unshift({id:'LOT-'+Date.now(),material:mat,source,supplier:'',kgIn:kg,kgAvailable:kg,blankQty:0,blankAvailable:0,qc:'GİRİŞ KALİTE BEKLİYOR',certificate:'Kontrol Bekliyor',date:new Date().toISOString().slice(0,10)});save();v61Show('material')};
 window.v61ProcessLot=function(id){const l=D.lots.find(x=>x.id===id);if(!l)return;if(l.qc!=='KABUL'){if(!confirm('Giriş kaliteyi KABUL olarak işaretle?'))return;l.qc='KABUL';l.certificate='Kontrol edildi';}const blanks=Number(prompt('Kesim sonrası gerçek blank adedi',String(l.blankQty||0))||0);if(blanks>0){l.blankQty=blanks;l.blankAvailable=blanks;}save();v61Show('material')};
 window.v61AddReturn=function(){const qty=Number(prompt('İade gelen adet','1')||0);if(!qty)return;const reason=prompt('İade nedeni','Kalite uygunsuzluğu')||'';D.returns.unshift({id:'RMA-'+Date.now(),customer:D.customers[0]?.id||'',product:D.products[0]?.id||'',qty,reason,decision:'İNCELEME',status:'Kalite İnceleme Bekliyor',originalWO:'-'});save();v61Show('rework')};
@@ -3601,9 +3800,9 @@ window.v61AddPO=function(){if(!D.suppliers.length)return alert('Önce tedarikçi
 
 window.v62OpenCustomer=function(id){const c=D.customers.find(x=>x.id===id);if(!c)return;activeV62={type:'customers',id};v62Modal('Müşteri Kimlik Kartı · '+esc(c.name),`<div class="grid md:grid-cols-3 gap-3"><label>Müşteri Kodu *<input id="cCode" value="${esc(c.customerCode)}" class="mt-1 w-full bg-slate-950 border border-slate-700 rounded p-2"></label><label>Ticari Ünvan *<input id="v62cName" value="${esc(c.legalName||c.name)}" class="mt-1 w-full bg-slate-950 border border-slate-700 rounded p-2"></label><label>Kısa Ad<input id="cShort" value="${esc(c.shortName)}" class="mt-1 w-full bg-slate-950 border border-slate-700 rounded p-2"></label><label>Vergi Dairesi<input id="cTaxOffice" value="${esc(c.taxOffice)}" class="mt-1 w-full bg-slate-950 border border-slate-700 rounded p-2"></label><label>Vergi / VAT No<input id="cTaxNo" value="${esc(c.taxNo)}" class="mt-1 w-full bg-slate-950 border border-slate-700 rounded p-2"></label><label>Durum<select id="v62cActive" class="mt-1 w-full bg-slate-950 border border-slate-700 rounded p-2"><option value="1" ${c.active!==false?'selected':''}>Aktif</option><option value="0" ${c.active===false?'selected':''}>Pasif</option></select></label><label>Ülke<input id="cCountry" value="${esc(c.country)}" class="mt-1 w-full bg-slate-950 border border-slate-700 rounded p-2"></label><label>Şehir<input id="cCity" value="${esc(c.city)}" class="mt-1 w-full bg-slate-950 border border-slate-700 rounded p-2"></label><label>Telefon<input id="cPhone" value="${esc(c.phone)}" class="mt-1 w-full bg-slate-950 border border-slate-700 rounded p-2"></label><label>E-posta<input id="cEmail" type="email" value="${esc(c.email)}" class="mt-1 w-full bg-slate-950 border border-slate-700 rounded p-2"></label><label>Web<input id="cWeb" value="${esc(c.website)}" class="mt-1 w-full bg-slate-950 border border-slate-700 rounded p-2"></label><label>Para Birimi<select id="cCur" class="mt-1 w-full bg-slate-950 border border-slate-700 rounded p-2">${['TRY','EUR','USD','GBP'].map(x=>`<option ${c.currency===x?'selected':''}>${x}</option>`).join('')}</select></label><label>Yetkili Kişi<input id="cContact" value="${esc(c.contactName)}" class="mt-1 w-full bg-slate-950 border border-slate-700 rounded p-2"></label><label>Yetkili Görevi<input id="cRole" value="${esc(c.contactRole)}" class="mt-1 w-full bg-slate-950 border border-slate-700 rounded p-2"></label><label>KURUTLU Müşteri/Tedarikçi Kodu<input id="cSupplierCode" value="${esc(c.customerSupplierCode)}" class="mt-1 w-full bg-slate-950 border border-slate-700 rounded p-2"></label><label>Ödeme Vadesi<input id="cPayment" value="${esc(c.paymentTerm)}" placeholder="Örn. 60 gün" class="mt-1 w-full bg-slate-950 border border-slate-700 rounded p-2"></label><label>Incoterm<input id="cIncoterm" value="${esc(c.incoterm)}" placeholder="EXW / FCA / DDP..." class="mt-1 w-full bg-slate-950 border border-slate-700 rounded p-2"></label><label>Kalite Yetkilisi<input id="cQualityContact" value="${esc(c.qualityContact)}" class="mt-1 w-full bg-slate-950 border border-slate-700 rounded p-2"></label><label class="md:col-span-3">Fatura Adresi<textarea id="cAddress" class="mt-1 w-full bg-slate-950 border border-slate-700 rounded p-2">${esc(c.address)}</textarea></label><label class="md:col-span-3">Teslimat Adresi<textarea id="cDelivery" class="mt-1 w-full bg-slate-950 border border-slate-700 rounded p-2">${esc(c.deliveryAddress)}</textarea></label><label class="md:col-span-3">Müşteriye Özel Kalite / Dokümantasyon Şartları<textarea id="cQuality" class="mt-1 w-full bg-slate-950 border border-slate-700 rounded p-2">${esc(c.qualityRequirements)}</textarea></label><label class="md:col-span-3">Notlar<textarea id="cNotes" class="mt-1 w-full bg-slate-950 border border-slate-700 rounded p-2">${esc(c.notes)}</textarea></label></div>${identityPanel('customer',c,c.customerCode||c.id)}<div class="mt-5 border-t border-slate-700 pt-4"><div class="flex justify-between mb-2"><b>Doküman Kasası</b><button onclick="v63DocAdd()" class="bg-cyan-800 px-3 py-1 rounded text-xs">+ Doküman / Dosya Bağlantısı</button></div><div id="v63Docs">${docRows(c.documents)}</div><div class="text-[10px] text-slate-500 mt-2">Prototipte bağlantı saklanır. PostgreSQL/Storage aşamasında PDF, sözleşme, kalite şartnamesi vb. dosyalar doğrudan portala yüklenecek ve QR ile açılacaktır.</div></div>${activityPanel64('customer',c.id)}<div class="mt-5"><div class="flex justify-between mb-2"><b>KURUTLU'ya Özel Ek Alanlar</b><button onclick="v62FieldAdd()" class="bg-blue-700 px-3 py-1 rounded text-xs">+ Hücre / Alan Ekle</button></div><div id="v62Fields">${fieldRows(c.fields)}</div></div><div class="mt-6 flex justify-between"><button onclick="v62DeleteCurrent()" class="bg-red-950 text-red-300 px-4 py-2 rounded">Müşteriyi Sil</button><button onclick="v62SaveCustomer()" class="bg-emerald-700 px-5 py-2 rounded font-bold">Müşteri Kartını Kaydet</button></div>`);renderIdentityCodes('customer',c,c.customerCode||c.id)};
 window.v62SaveCustomer=function(){const c=D.customers.find(x=>x.id===activeV62?.id);if(!c)return;const legal=document.getElementById('v62cName').value.trim();Object.assign(c,{customerCode:document.getElementById('cCode').value.trim()||c.id,name:legal,legalName:legal,shortName:document.getElementById('cShort').value.trim(),taxOffice:document.getElementById('cTaxOffice').value.trim(),taxNo:document.getElementById('cTaxNo').value.trim(),active:document.getElementById('v62cActive').value==='1',country:document.getElementById('cCountry').value.trim(),city:document.getElementById('cCity').value.trim(),phone:document.getElementById('cPhone').value.trim(),email:document.getElementById('cEmail').value.trim(),website:document.getElementById('cWeb').value.trim(),currency:document.getElementById('cCur').value,contactName:document.getElementById('cContact').value.trim(),contactRole:document.getElementById('cRole').value.trim(),customerSupplierCode:document.getElementById('cSupplierCode').value.trim(),paymentTerm:document.getElementById('cPayment').value.trim(),incoterm:document.getElementById('cIncoterm').value.trim(),qualityContact:document.getElementById('cQualityContact').value.trim(),address:document.getElementById('cAddress').value.trim(),deliveryAddress:document.getElementById('cDelivery').value.trim(),qualityRequirements:document.getElementById('cQuality').value.trim(),notes:document.getElementById('cNotes').value.trim()});save();v62CloseModal();v61Show('products')};
-window.v62OpenProduct=function(id){const p=D.products.find(x=>x.id===id);if(!p)return;activeV62={type:'products',id};const opts=D.customers.map(c=>`<option value="${c.id}" ${p.customer===c.id?'selected':''}>${esc(c.name)}</option>`).join('');v62Modal('Ürün Kimlik Kartı · '+esc(p.code),`<div class="grid md:grid-cols-3 gap-3"><label>Ürün Kodu *<input id="pCode" value="${esc(p.code)}" class="mt-1 w-full bg-slate-950 border border-slate-700 rounded p-2"></label><label>Ürün Adı *<input id="pName" value="${esc(p.name)}" class="mt-1 w-full bg-slate-950 border border-slate-700 rounded p-2"></label><label>Durum<select id="pStatus" class="mt-1 w-full bg-slate-950 border border-slate-700 rounded p-2">${['Aktif','Pasif','Numune','Devreye Alma','Revizyon Bekliyor'].map(x=>`<option ${p.status===x?'selected':''}>${x}</option>`).join('')}</select></label><label>Revizyon<input id="pRev" value="${esc(p.revision)}" class="mt-1 w-full bg-slate-950 border border-slate-700 rounded p-2"></label><label>Müşteri<select id="pCustomer" class="mt-1 w-full bg-slate-950 border border-slate-700 rounded p-2"><option value="">-</option>${opts}</select></label><label>Müşteri Parça No<input id="pCustNo" value="${esc(p.customerPartNo)}" class="mt-1 w-full bg-slate-950 border border-slate-700 rounded p-2"></label><label>Teknik Resim No<input id="pDrawing" value="${esc(p.drawingNo)}" class="mt-1 w-full bg-slate-950 border border-slate-700 rounded p-2"></label><label>Teknik Resim Revizyonu<input id="pDrawingRev" value="${esc(p.drawingRev)}" class="mt-1 w-full bg-slate-950 border border-slate-700 rounded p-2"></label><label>Malzeme / Alaşım<input id="pMaterial" value="${esc(p.material)}" class="mt-1 w-full bg-slate-950 border border-slate-700 rounded p-2"></label><label>Malzeme Standardı<input id="pMatStd" value="${esc(p.materialStandard)}" placeholder="EN / ASTM / AMS..." class="mt-1 w-full bg-slate-950 border border-slate-700 rounded p-2"></label><label>Ham Madde Formu<input id="pRawForm" value="${esc(p.rawForm)}" placeholder="Çubuk / plaka / dövme..." class="mt-1 w-full bg-slate-950 border border-slate-700 rounded p-2"></label><label>Ham Madde / Blank Ölçüsü<input id="pRawDim" value="${esc(p.rawDimensions)}" placeholder="Ø60 x 85 mm" class="mt-1 w-full bg-slate-950 border border-slate-700 rounded p-2"></label><label>Bitmiş Parça kg<input id="pFinishedKg" type="number" step="0.001" value="${Number(p.finishedWeight||0)}" class="mt-1 w-full bg-slate-950 border border-slate-700 rounded p-2"></label><label>Malzeme Dolu Ağırlık · gr<input id="pFullGram" type="number" step="0.1" value="${Number(p.materialFullGram||((p.rawKgPerBlank||0)*1000)||0)}" oninput="v70CalcChip()" class="mt-1 w-full bg-slate-950 border border-slate-700 rounded p-2"></label><label>İşleme Sonrası Net Ağırlık · gr<input id="pNetGram" type="number" step="0.1" value="${Number(p.finishedGram||((p.finishedWeight||0)*1000)||0)}" oninput="v70CalcChip()" class="mt-1 w-full bg-slate-950 border border-slate-700 rounded p-2"></label><label>Teorik Talaş · gr/adet<div id="pChipGram" class="mt-1 w-full bg-slate-950 border border-slate-700 rounded p-2 text-amber-300 font-black">-</div></label><label>Birim<input id="pUnit" value="${esc(p.unit||'adet')}" class="mt-1 w-full bg-slate-950 border border-slate-700 rounded p-2"></label><label>Yıllık Tahmin / Forecast<input id="pForecast" type="number" value="${Number(p.annualForecast||0)}" class="mt-1 w-full bg-slate-950 border border-slate-700 rounded p-2"></label><label>Minimum Stok<input id="pMinStock" type="number" value="${Number(p.minStock||0)}" class="mt-1 w-full bg-slate-950 border border-slate-700 rounded p-2"></label><label>Gelen Ham Madde kg<input id="pConvKg" type="number" step="0.001" value="${Number(p.conversionKg||0)}" oninput="v65CalcProductConversion()" class="mt-1 w-full bg-slate-950 border border-slate-700 rounded p-2"></label><label>Bu kg'dan Çıkan Adet<input id="pConvQty" type="number" step="1" value="${Number(p.conversionQty||0)}" oninput="v65CalcProductConversion()" class="mt-1 w-full bg-slate-950 border border-slate-700 rounded p-2"></label><label>kg → adet Katsayısı<div id="pConvResult" class="mt-1 w-full bg-slate-950 border border-slate-700 rounded p-2 text-emerald-300 font-black">-</div></label><label>1 Adet Ham Madde kg<input id="pKg" type="number" step="0.001" value="${Number(p.rawKgPerBlank||0)}" oninput="v65CalcProductConversion()" class="mt-1 w-full bg-slate-950 border border-slate-700 rounded p-2"></label><label>Standart Çevrim · Dakika<input id="pCycleMin" type="number" min="0" step="1" value="${Math.floor(Number(p.standardCycleSec||0)/60)}" class="mt-1 w-full bg-slate-950 border border-slate-700 rounded p-2"></label><label>Standart Çevrim · Saniye<input id="pCycleSec" type="number" min="0" max="59" step="1" value="${Number(p.standardCycleSec||0)%60}" class="mt-1 w-full bg-slate-950 border border-slate-700 rounded p-2"></label><label>İzlenebilirlik Seviyesi<select id="pTrace" class="mt-1 w-full bg-slate-950 border border-slate-700 rounded p-2">${['LOT','LOT + Heat No','Seri No','Seri No + LOT'].map(x=>`<option ${p.traceabilityLevel===x?'selected':''}>${x}</option>`).join('')}</select></label><label class="md:col-span-3">Operasyon Rotası<input id="pRoute" value="${esc(p.route)}" class="mt-1 w-full bg-slate-950 border border-slate-700 rounded p-2"></label><label class="md:col-span-3">Ürün Açıklaması<textarea id="pDesc" class="mt-1 w-full bg-slate-950 border border-slate-700 rounded p-2">${esc(p.description)}</textarea></label><label class="md:col-span-3">Kalite Kontrol Planı<textarea id="pQuality" class="mt-1 w-full bg-slate-950 border border-slate-700 rounded p-2">${esc(p.qualityPlan)}</textarea></label><label class="md:col-span-3">Kritik / Özel Karakteristikler<textarea id="pCritical" class="mt-1 w-full bg-slate-950 border border-slate-700 rounded p-2">${esc(p.criticalCharacteristics)}</textarea></label><label class="md:col-span-3">Paketleme / Etiket / Sevkiyat Talimatı<textarea id="pPack" class="mt-1 w-full bg-slate-950 border border-slate-700 rounded p-2">${esc(p.packaging)}</textarea></label><label class="md:col-span-3">Notlar<textarea id="pNotes" class="mt-1 w-full bg-slate-950 border border-slate-700 rounded p-2">${esc(p.notes)}</textarea></label></div>${identityPanel('product',p,p.code)}<div class="mt-5 border-t border-slate-700 pt-4"><div class="flex justify-between mb-2"><b>Ürün Doküman Kasası</b><button onclick="v63DocAdd()" class="bg-cyan-800 px-3 py-1 rounded text-xs">+ Teknik Resim / PDF / Dosya Bağlantısı</button></div><div id="v63Docs">${docRows(p.documents)}</div><div class="text-[10px] text-slate-500 mt-2">Teknik resim, kontrol planı, proses talimatı, müşteri şartnamesi ve fotoğraflar burada ürün kimliğine bağlanır.</div></div>${productCostPanel66(p)}${activityPanel64('product',p.id)}<div class="mt-5"><div class="flex justify-between mb-2"><b>KURUTLU'ya Özel Ek Ürün Alanları</b><button onclick="v62FieldAdd()" class="bg-blue-700 px-3 py-1 rounded text-xs">+ Hücre / Alan Ekle</button></div><div id="v62Fields">${fieldRows(p.fields)}</div></div><div class="mt-6 flex justify-between"><button onclick="v62DeleteCurrent()" class="bg-red-950 text-red-300 px-4 py-2 rounded">Ürünü Sil</button><button onclick="v62SaveProduct()" class="bg-emerald-700 px-5 py-2 rounded font-bold">Ürün Kartını Kaydet</button></div>`);renderIdentityCodes('product',p,p.code);setTimeout(()=>{v65CalcProductConversion();v70CalcChip()},40)};
+window.v62OpenProduct=function(id){const p=D.products.find(x=>x.id===id);if(!p)return;activeV62={type:'products',id};const opts=D.customers.map(c=>`<option value="${c.id}" ${p.customer===c.id?'selected':''}>${esc(c.name)}</option>`).join('');v62Modal('Ürün Kimlik Kartı · '+esc(p.code),`<div class="grid md:grid-cols-3 gap-3"><label>Ürün Kodu *<input id="pCode" value="${esc(p.code)}" class="mt-1 w-full bg-slate-950 border border-slate-700 rounded p-2"></label><label>Ürün Adı *<input id="pName" value="${esc(p.name)}" class="mt-1 w-full bg-slate-950 border border-slate-700 rounded p-2"></label><label>Durum<select id="pStatus" class="mt-1 w-full bg-slate-950 border border-slate-700 rounded p-2">${['Aktif','Pasif','Numune','Devreye Alma','Revizyon Bekliyor'].map(x=>`<option ${p.status===x?'selected':''}>${x}</option>`).join('')}</select></label><label>Revizyon<input id="pRev" value="${esc(p.revision)}" class="mt-1 w-full bg-slate-950 border border-slate-700 rounded p-2"></label><label>Müşteri<select id="pCustomer" class="mt-1 w-full bg-slate-950 border border-slate-700 rounded p-2"><option value="">-</option>${opts}</select></label><label>Müşteri Parça No<input id="pCustNo" value="${esc(p.customerPartNo)}" class="mt-1 w-full bg-slate-950 border border-slate-700 rounded p-2"></label><label>Teknik Resim No<input id="pDrawing" value="${esc(p.drawingNo)}" class="mt-1 w-full bg-slate-950 border border-slate-700 rounded p-2"></label><label>Teknik Resim Revizyonu<input id="pDrawingRev" value="${esc(p.drawingRev)}" class="mt-1 w-full bg-slate-950 border border-slate-700 rounded p-2"></label><label>Malzeme / Alaşım<input id="pMaterial" value="${esc(p.material)}" class="mt-1 w-full bg-slate-950 border border-slate-700 rounded p-2"></label><label>Malzeme Standardı<input id="pMatStd" value="${esc(p.materialStandard)}" placeholder="EN / ASTM / AMS..." class="mt-1 w-full bg-slate-950 border border-slate-700 rounded p-2"></label><label>Ham Madde Formu<input id="pRawForm" value="${esc(p.rawForm)}" placeholder="Çubuk / plaka / dövme..." class="mt-1 w-full bg-slate-950 border border-slate-700 rounded p-2"></label><label>Ham Madde / Blank Ölçüsü<input id="pRawDim" value="${esc(p.rawDimensions)}" placeholder="Ø60 x 85 mm" class="mt-1 w-full bg-slate-950 border border-slate-700 rounded p-2"></label><label>Ham Madde Tedarik Şekli<select id="pRawSupply" class="mt-1 w-full bg-slate-950 border border-slate-700 rounded p-2"><option value="">- Seçiniz -</option>${['Müşteri Sağlıyor - Tam Boy Çubuk/Profil','Müşteri Sağlıyor - Ebatlanmış','Kurutlu Sağlıyor - Hazır Ebatlanmış Alım','Kurutlu Sağlıyor - İç Ebatlama (Testere)'].map(x=>`<option ${p.rawSupplyMode===x?'selected':''}>${x}</option>`).join('')}</select></label><label class="md:col-span-2">Ham Madde Tedarik Notu<input id="pRawSupplyNote" value="${esc(p.rawSupplyNote)}" placeholder="Örn. gerçek ebatlama ölçüsü, testere no, tedarikçi..." class="mt-1 w-full bg-slate-950 border border-slate-700 rounded p-2"></label><label>Bağlama / Sökme Süresi · dk<input id="pSetupMin" type="number" min="0" step="0.5" value="${Number(p.setupTeardownMin||0)}" class="mt-1 w-full bg-slate-950 border border-slate-700 rounded p-2"></label><label>CAM Programından Tahmini Çevrim · dk<input id="pCamCycleMin" type="number" min="0" step="0.1" value="${(Number(p.camCycleEstimateSec||0)/60).toFixed(1)}" class="mt-1 w-full bg-slate-950 border border-slate-700 rounded p-2"></label><label class="md:col-span-1 text-[10px] text-slate-500 self-end pb-2">CAM/NC dosyasından otomatik hesaplanan yaklaşık süredir (takım değişimi/dwell dahil değil), kesin değildir.</label><label>Bitmiş Parça kg<input id="pFinishedKg" type="number" step="0.001" value="${Number(p.finishedWeight||0)}" class="mt-1 w-full bg-slate-950 border border-slate-700 rounded p-2"></label><label>Malzeme Dolu Ağırlık · gr<input id="pFullGram" type="number" step="0.1" value="${Number(p.materialFullGram||((p.rawKgPerBlank||0)*1000)||0)}" oninput="v70CalcChip()" class="mt-1 w-full bg-slate-950 border border-slate-700 rounded p-2"></label><label>İşleme Sonrası Net Ağırlık · gr<input id="pNetGram" type="number" step="0.1" value="${Number(p.finishedGram||((p.finishedWeight||0)*1000)||0)}" oninput="v70CalcChip()" class="mt-1 w-full bg-slate-950 border border-slate-700 rounded p-2"></label><label>Teorik Talaş · gr/adet<div id="pChipGram" class="mt-1 w-full bg-slate-950 border border-slate-700 rounded p-2 text-amber-300 font-black">-</div></label><label>Birim<input id="pUnit" value="${esc(p.unit||'adet')}" class="mt-1 w-full bg-slate-950 border border-slate-700 rounded p-2"></label><label>Yıllık Tahmin / Forecast<input id="pForecast" type="number" value="${Number(p.annualForecast||0)}" class="mt-1 w-full bg-slate-950 border border-slate-700 rounded p-2"></label><label>Minimum Stok<input id="pMinStock" type="number" value="${Number(p.minStock||0)}" class="mt-1 w-full bg-slate-950 border border-slate-700 rounded p-2"></label><label>Gelen Ham Madde kg<input id="pConvKg" type="number" step="0.001" value="${Number(p.conversionKg||0)}" oninput="v65CalcProductConversion()" class="mt-1 w-full bg-slate-950 border border-slate-700 rounded p-2"></label><label>Bu kg'dan Çıkan Adet<input id="pConvQty" type="number" step="1" value="${Number(p.conversionQty||0)}" oninput="v65CalcProductConversion()" class="mt-1 w-full bg-slate-950 border border-slate-700 rounded p-2"></label><label>kg → adet Katsayısı<div id="pConvResult" class="mt-1 w-full bg-slate-950 border border-slate-700 rounded p-2 text-emerald-300 font-black">-</div></label><label>1 Adet Ham Madde kg<input id="pKg" type="number" step="0.001" value="${Number(p.rawKgPerBlank||0)}" oninput="v65CalcProductConversion()" class="mt-1 w-full bg-slate-950 border border-slate-700 rounded p-2"></label><label>Standart Çevrim · Dakika<input id="pCycleMin" type="number" min="0" step="1" value="${Math.floor(Number(p.standardCycleSec||0)/60)}" class="mt-1 w-full bg-slate-950 border border-slate-700 rounded p-2"></label><label>Standart Çevrim · Saniye<input id="pCycleSec" type="number" min="0" max="59" step="1" value="${Number(p.standardCycleSec||0)%60}" class="mt-1 w-full bg-slate-950 border border-slate-700 rounded p-2"></label><label>İzlenebilirlik Seviyesi<select id="pTrace" class="mt-1 w-full bg-slate-950 border border-slate-700 rounded p-2">${['LOT','LOT + Heat No','Seri No','Seri No + LOT'].map(x=>`<option ${p.traceabilityLevel===x?'selected':''}>${x}</option>`).join('')}</select></label><label class="md:col-span-3">Operasyon Rotası<input id="pRoute" value="${esc(p.route)}" class="mt-1 w-full bg-slate-950 border border-slate-700 rounded p-2"></label><label class="md:col-span-3">Ürün Açıklaması<textarea id="pDesc" class="mt-1 w-full bg-slate-950 border border-slate-700 rounded p-2">${esc(p.description)}</textarea></label><label class="md:col-span-3">Kalite Kontrol Planı<textarea id="pQuality" class="mt-1 w-full bg-slate-950 border border-slate-700 rounded p-2">${esc(p.qualityPlan)}</textarea></label><label class="md:col-span-3">Kritik / Özel Karakteristikler<textarea id="pCritical" class="mt-1 w-full bg-slate-950 border border-slate-700 rounded p-2">${esc(p.criticalCharacteristics)}</textarea></label><label class="md:col-span-3">Paketleme / Etiket / Sevkiyat Talimatı<textarea id="pPack" class="mt-1 w-full bg-slate-950 border border-slate-700 rounded p-2">${esc(p.packaging)}</textarea></label><label class="md:col-span-3">Notlar<textarea id="pNotes" class="mt-1 w-full bg-slate-950 border border-slate-700 rounded p-2">${esc(p.notes)}</textarea></label></div>${identityPanel('product',p,p.code)}${productDocPanel73(p)}${machinesPanel73(p)}${toolListPanel73(p)}${productCostPanel66(p)}${activityPanel64('product',p.id)}<div class="mt-5"><div class="flex justify-between mb-2"><b>KURUTLU'ya Özel Ek Ürün Alanları</b><button onclick="v62FieldAdd()" class="bg-blue-700 px-3 py-1 rounded text-xs">+ Hücre / Alan Ekle</button></div><div id="v62Fields">${fieldRows(p.fields)}</div></div><div class="mt-6 flex justify-between"><button onclick="v62DeleteCurrent()" class="bg-red-950 text-red-300 px-4 py-2 rounded">Ürünü Sil</button><button onclick="v62SaveProduct()" class="bg-emerald-700 px-5 py-2 rounded font-bold">Ürün Kartını Kaydet</button></div>`);renderIdentityCodes('product',p,p.code);setTimeout(()=>{v65CalcProductConversion();v70CalcChip();v73RenderProductDocs(p.id)},40)};
 window.v65CalcProductConversion=function(){const kg=Number(document.getElementById('pConvKg')?.value||0),q=Number(document.getElementById('pConvQty')?.value||0),one=Number(document.getElementById('pKg')?.value||0),el=document.getElementById('pConvResult');if(!el)return;let txt='-';if(kg>0&&q>0)txt=(q/kg).toLocaleString('tr-TR',{maximumFractionDigits:3})+' adet/kg · '+(kg/q).toLocaleString('tr-TR',{maximumFractionDigits:4})+' kg/adet';else if(one>0)txt=(1/one).toLocaleString('tr-TR',{maximumFractionDigits:3})+' adet/kg';el.textContent=txt};
-window.v62SaveProduct=function(){const p=D.products.find(x=>x.id===activeV62?.id);if(!p)return;Object.assign(p,{code:document.getElementById('pCode').value.trim(),name:document.getElementById('pName').value.trim(),status:document.getElementById('pStatus').value,revision:document.getElementById('pRev').value.trim(),customer:document.getElementById('pCustomer').value,customerPartNo:document.getElementById('pCustNo').value.trim(),drawingNo:document.getElementById('pDrawing').value.trim(),drawingRev:document.getElementById('pDrawingRev').value.trim(),material:document.getElementById('pMaterial').value.trim(),materialStandard:document.getElementById('pMatStd').value.trim(),rawForm:document.getElementById('pRawForm').value.trim(),rawDimensions:document.getElementById('pRawDim').value.trim(),rawKgPerBlank:Number(document.getElementById('pKg').value||0),conversionKg:Number(document.getElementById('pConvKg').value||0),conversionQty:Number(document.getElementById('pConvQty').value||0),finishedWeight:Number(document.getElementById('pFinishedKg').value||0),materialFullGram:Number(document.getElementById('pFullGram')?.value||0),finishedGram:Number(document.getElementById('pNetGram')?.value||0),chipGramPerPart:Math.max(0,Number(document.getElementById('pFullGram')?.value||0)-Number(document.getElementById('pNetGram')?.value||0)),unit:document.getElementById('pUnit').value.trim(),annualForecast:Number(document.getElementById('pForecast').value||0),minStock:Number(document.getElementById('pMinStock').value||0),standardCycleSec:(Number(document.getElementById('pCycleMin').value||0)*60)+Math.min(59,Number(document.getElementById('pCycleSec').value||0)),traceabilityLevel:document.getElementById('pTrace').value,route:document.getElementById('pRoute').value.trim(),description:document.getElementById('pDesc').value.trim(),qualityPlan:document.getElementById('pQuality').value.trim(),criticalCharacteristics:document.getElementById('pCritical').value.trim(),packaging:document.getElementById('pPack').value.trim(),notes:document.getElementById('pNotes').value.trim()});save();v62CloseModal();v61Show('products')};
+window.v62SaveProduct=function(){const p=D.products.find(x=>x.id===activeV62?.id);if(!p)return;Object.assign(p,{code:document.getElementById('pCode').value.trim(),name:document.getElementById('pName').value.trim(),status:document.getElementById('pStatus').value,revision:document.getElementById('pRev').value.trim(),customer:document.getElementById('pCustomer').value,customerPartNo:document.getElementById('pCustNo').value.trim(),drawingNo:document.getElementById('pDrawing').value.trim(),drawingRev:document.getElementById('pDrawingRev').value.trim(),material:document.getElementById('pMaterial').value.trim(),materialStandard:document.getElementById('pMatStd').value.trim(),rawForm:document.getElementById('pRawForm').value.trim(),rawDimensions:document.getElementById('pRawDim').value.trim(),rawSupplyMode:document.getElementById('pRawSupply')?.value||'',rawSupplyNote:document.getElementById('pRawSupplyNote')?.value.trim()||'',setupTeardownMin:Number(document.getElementById('pSetupMin')?.value||0),camCycleEstimateSec:Math.round(Number(document.getElementById('pCamCycleMin')?.value||0)*60),rawKgPerBlank:Number(document.getElementById('pKg').value||0),conversionKg:Number(document.getElementById('pConvKg').value||0),conversionQty:Number(document.getElementById('pConvQty').value||0),finishedWeight:Number(document.getElementById('pFinishedKg').value||0),materialFullGram:Number(document.getElementById('pFullGram')?.value||0),finishedGram:Number(document.getElementById('pNetGram')?.value||0),chipGramPerPart:Math.max(0,Number(document.getElementById('pFullGram')?.value||0)-Number(document.getElementById('pNetGram')?.value||0)),unit:document.getElementById('pUnit').value.trim(),annualForecast:Number(document.getElementById('pForecast').value||0),minStock:Number(document.getElementById('pMinStock').value||0),standardCycleSec:(Number(document.getElementById('pCycleMin').value||0)*60)+Math.min(59,Number(document.getElementById('pCycleSec').value||0)),traceabilityLevel:document.getElementById('pTrace').value,route:document.getElementById('pRoute').value.trim(),description:document.getElementById('pDesc').value.trim(),qualityPlan:document.getElementById('pQuality').value.trim(),criticalCharacteristics:document.getElementById('pCritical').value.trim(),packaging:document.getElementById('pPack').value.trim(),notes:document.getElementById('pNotes').value.trim()});save();v62CloseModal();v61Show('products')};
 window.v62OpenSupplier=function(id){const x=D.suppliers.find(s=>s.id===id);if(!x)return;activeV62={type:'suppliers',id};v62Modal('Tedarikçi Kimlik Kartı · '+esc(x.name),`<div class="grid md:grid-cols-3 gap-3"><label>Tedarikçi Kodu<input id="sCode" value="${esc(x.code||x.id)}" class="mt-1 w-full bg-slate-950 border border-slate-700 rounded p-2"></label><label>Ticari Unvan *<input id="sName" value="${esc(x.name)}" class="mt-1 w-full bg-slate-950 border border-slate-700 rounded p-2"></label><label>Kısa Ad<input id="sShort" value="${esc(x.shortName||'')}" class="mt-1 w-full bg-slate-950 border border-slate-700 rounded p-2"></label><label>Kategori<input id="sCat" value="${esc(x.category||'')}" placeholder="Ham madde / takım / fason..." class="mt-1 w-full bg-slate-950 border border-slate-700 rounded p-2"></label><label>Vergi Dairesi<input id="sTaxOffice" value="${esc(x.taxOffice||'')}" class="mt-1 w-full bg-slate-950 border border-slate-700 rounded p-2"></label><label>Vergi / VAT No<input id="sTaxNo" value="${esc(x.taxNo||'')}" class="mt-1 w-full bg-slate-950 border border-slate-700 rounded p-2"></label><label>Ülke<input id="sCountry" value="${esc(x.country||'Türkiye')}" class="mt-1 w-full bg-slate-950 border border-slate-700 rounded p-2"></label><label>Şehir<input id="sCity" value="${esc(x.city||'')}" class="mt-1 w-full bg-slate-950 border border-slate-700 rounded p-2"></label><label>Web<input id="sWeb" value="${esc(x.web||'')}" class="mt-1 w-full bg-slate-950 border border-slate-700 rounded p-2"></label><label>Satış Yetkilisi<input id="sContact" value="${esc(x.contact||'')}" class="mt-1 w-full bg-slate-950 border border-slate-700 rounded p-2"></label><label>Telefon<input id="sPhone" value="${esc(x.phone||'')}" class="mt-1 w-full bg-slate-950 border border-slate-700 rounded p-2"></label><label>E-posta<input id="sEmail" value="${esc(x.email||'')}" class="mt-1 w-full bg-slate-950 border border-slate-700 rounded p-2"></label><label>Para Birimi<input id="sCurrency" value="${esc(x.currency||'TRY')}" class="mt-1 w-full bg-slate-950 border border-slate-700 rounded p-2"></label><label>Ödeme Vadesi<input id="sPayment" value="${esc(x.paymentTerms||'')}" placeholder="30 gün / peşin..." class="mt-1 w-full bg-slate-950 border border-slate-700 rounded p-2"></label><label>Incoterm<input id="sIncoterm" value="${esc(x.incoterm||'')}" class="mt-1 w-full bg-slate-950 border border-slate-700 rounded p-2"></label><label>Kalite Sertifikaları<input id="sCert" value="${esc(x.certifications||'')}" placeholder="ISO 9001, AS9100..." class="mt-1 w-full bg-slate-950 border border-slate-700 rounded p-2"></label><label>Onaylı Tedarikçi Durumu<select id="sApproved" class="mt-1 w-full bg-slate-950 border border-slate-700 rounded p-2">${['Onaylı','Şartlı Onaylı','Değerlendirmede','Pasif'].map(v=>`<option ${x.approvedStatus===v?'selected':''}>${v}</option>`).join('')}</select></label><label>Performans Puanı<input id="sRate" type="number" min="0" max="100" value="${Number(x.rating||0)}" class="mt-1 w-full bg-slate-950 border border-slate-700 rounded p-2"></label><label class="md:col-span-3">Adres<textarea id="sAddress" class="mt-1 w-full bg-slate-950 border border-slate-700 rounded p-2">${esc(x.address||'')}</textarea></label><label class="md:col-span-3">Kalite / Teslimat / Özel Şartlar<textarea id="sRequirements" class="mt-1 w-full bg-slate-950 border border-slate-700 rounded p-2">${esc(x.requirements||'')}</textarea></label><label class="md:col-span-3">Notlar<textarea id="sNotes" class="mt-1 w-full bg-slate-950 border border-slate-700 rounded p-2">${esc(x.notes||'')}</textarea></label></div>${identityPanel('supplier',x,x.code||x.id)}<div class="mt-5"><div class="flex justify-between mb-2"><b>Tedarikçi Doküman Kasası</b><button onclick="v63DocAdd()" class="bg-cyan-800 px-3 py-1 rounded text-xs">+ Sertifika / Sözleşme / Dosya</button></div><div id="v63Docs">${docRows(x.documents)}</div></div><div class="mt-5"><div class="flex justify-between mb-2"><b>KURUTLU'ya Özel Tedarikçi Alanları</b><button onclick="v62FieldAdd()" class="bg-blue-700 px-3 py-1 rounded text-xs">+ Alan Ekle</button></div><div id="v62Fields">${fieldRows(x.fields)}</div></div><div class="mt-6 flex justify-between"><button onclick="v62DeleteCurrent()" class="bg-red-950 text-red-300 px-4 py-2 rounded">Tedarikçiyi Sil</button><button onclick="v62SaveSupplier()" class="bg-emerald-700 px-5 py-2 rounded font-bold">Tedarikçi Kartını Kaydet</button></div>`);renderIdentityCodes('supplier',x,x.code||x.id)};
 window.v62SaveSupplier=function(){const x=D.suppliers.find(s=>s.id===activeV62?.id);if(!x)return;Object.assign(x,{code:document.getElementById('sCode').value.trim(),name:document.getElementById('sName').value.trim(),shortName:document.getElementById('sShort').value.trim(),category:document.getElementById('sCat').value.trim(),taxOffice:document.getElementById('sTaxOffice').value.trim(),taxNo:document.getElementById('sTaxNo').value.trim(),country:document.getElementById('sCountry').value.trim(),city:document.getElementById('sCity').value.trim(),web:document.getElementById('sWeb').value.trim(),contact:document.getElementById('sContact').value.trim(),phone:document.getElementById('sPhone').value.trim(),email:document.getElementById('sEmail').value.trim(),currency:document.getElementById('sCurrency').value.trim(),paymentTerms:document.getElementById('sPayment').value.trim(),incoterm:document.getElementById('sIncoterm').value.trim(),certifications:document.getElementById('sCert').value.trim(),approvedStatus:document.getElementById('sApproved').value,rating:Math.max(0,Math.min(100,Number(document.getElementById('sRate').value||0))),address:document.getElementById('sAddress').value.trim(),requirements:document.getElementById('sRequirements').value.trim(),notes:document.getElementById('sNotes').value.trim()});save();v62CloseModal();v61Show('supply')};
 window.v62OpenPO=function(id){const p=D.purchases.find(x=>x.id===id);if(!p)return;activeV62={type:'purchases',id};const so=D.suppliers.map(x=>`<option value="${x.id}" ${p.supplier===x.id?'selected':''}>${esc(x.name)}</option>`).join(''),po=D.products.map(x=>`<option value="${x.id}" ${p.productId===x.id?'selected':''}>${esc(x.code)} · ${esc(x.name)}</option>`).join('');v62Modal('Satınalma Kartı · '+esc(p.id),`<div class="grid md:grid-cols-3 gap-3"><label>Tedarikçi<select id="poSupplier" class="mt-1 w-full bg-slate-950 border border-slate-700 rounded p-2">${so}</select></label><label>Ürün Kartı Bağlantısı<select id="poProduct" class="mt-1 w-full bg-slate-950 border border-slate-700 rounded p-2"><option value="">Ham madde / genel alım</option>${po}</select></label><label>Malzeme / Ürün<input id="poItem" value="${esc(p.item)}" class="mt-1 w-full bg-slate-950 border border-slate-700 rounded p-2"></label><label>Miktar<input id="poQty" type="number" step="0.001" value="${Number(p.qty||0)}" class="mt-1 w-full bg-slate-950 border border-slate-700 rounded p-2"></label><label>Birim<input id="poUnit" value="${esc(p.unit)}" class="mt-1 w-full bg-slate-950 border border-slate-700 rounded p-2"></label><label>Birim Alış Fiyatı<input id="poPrice" type="number" step="0.01" value="${Number(p.unitPrice||0)}" class="mt-1 w-full bg-slate-950 border border-slate-700 rounded p-2"></label><label>Para Birimi<select id="poCur" class="mt-1 w-full bg-slate-950 border border-slate-700 rounded p-2">${['TRY','EUR','USD','GBP'].map(c=>`<option ${p.currency===c?'selected':''}>${c}</option>`).join('')}</select></label><label>Satın Alan Kişi<input id="poBy" value="${esc(p.purchasedBy||'')}" class="mt-1 w-full bg-slate-950 border border-slate-700 rounded p-2"></label><label>Sipariş Tarihi<input id="poDate" type="date" value="${esc(p.orderDate||'')}" class="mt-1 w-full bg-slate-950 border border-slate-700 rounded p-2"></label><label>Beklenen Teslim<input id="poEta" type="date" value="${esc(p.eta||'')}" class="mt-1 w-full bg-slate-950 border border-slate-700 rounded p-2"></label><label>Durum<input id="poStatus" value="${esc(p.status)}" class="mt-1 w-full bg-slate-950 border border-slate-700 rounded p-2"></label></div><div class="mt-5 bg-slate-950 border border-slate-700 rounded-xl p-4"><b>Toplam:</b> ${money(Number(p.qty||0)*Number(p.unitPrice||0),p.currency)}</div><div class="mt-6 flex justify-between"><button onclick="v62DeleteCurrent()" class="bg-red-950 text-red-300 px-4 py-2 rounded">Kaydı Sil</button><button onclick="v62SavePO()" class="bg-emerald-700 px-5 py-2 rounded">Satınalma Kartını Kaydet</button></div>`)};
@@ -4150,6 +4349,16 @@ window.v78SyncPersonnelFromSupabase=async function(){
     // kayıtları pasif işaretliyoruz - geçmiş beyan/puantaj kayıtları bozulmasın
     // diye siliyor değil, aktif listelerden düşürüyoruz.
     (PERSONNEL_LIST||[]).forEach(p=>{ if(!p.dbId && !p.uuid) p.active=false; });
+    // KMI-FIX (2026-09-25): Fatma Çetin gerçek personel kaydı sadece Supabase senkronundan
+    // sonra PERSONNEL_LIST'e geliyor - sayfa yüklenirken çalışan ilk etiketleme denemesi onu
+    // bulamıyordu. Burada, gerçek roster her senkronize olduğunda tekrar kontrol ediyoruz.
+    if(window.KMI_TESVIYE_SKILL_ID){
+      const fatma=(PERSONNEL_LIST||[]).find(p=>String(p.name||'').trim().toLocaleLowerCase('tr-TR')==='fatma çetin');
+      if(fatma){
+        fatma.skills=Array.isArray(fatma.skills)?fatma.skills:[];
+        if(!fatma.skills.map(Number).includes(Number(window.KMI_TESVIYE_SKILL_ID))) fatma.skills.push(window.KMI_TESVIYE_SKILL_ID);
+      }
+    }
     writeMap(map);
     saveStorage('PERSONNEL_LIST',PERSONNEL_LIST);
     window.PERSONNEL_LIST=PERSONNEL_LIST;
@@ -4478,6 +4687,7 @@ window.kmiOpenJobOrderFile=async function(id){
       <div class="bg-slate-900 rounded-xl p-3"><div class="text-[9px] text-slate-500">VARDİYA</div><div class="text-lg font-black text-white">${esc(j.shift||'-')}</div></div>
       <div class="bg-slate-900 rounded-xl p-3"><div class="text-[9px] text-slate-500">DURUM</div><div class="text-sm font-black text-cyan-300">${esc(j.status||'-')}</div></div>
     </div>
+    <div class="mt-2 flex flex-wrap gap-1.5">${window.kmiJobPostOpBadges?window.kmiJobPostOpBadges(j.id):''}</div>
     <div class="mt-4 bg-slate-900 rounded-xl p-4">
       <div class="flex flex-wrap items-center justify-between gap-2"><b class="text-white"><i class="fa-solid fa-folder-open text-amber-400 mr-1"></i>Belgeler</b><span class="text-[10px] text-slate-500">Kalite sertifikası · Hammadde sertifikası · Ölçüm raporu · Foto · vb.</span></div>
       <div id="kmiJodList" class="mt-3 space-y-1.5 text-xs text-slate-300"><div class="text-slate-500">Yükleniyor…</div></div>
@@ -5412,7 +5622,7 @@ function renderRunning(j,s){
    <div class="bg-slate-900 border border-amber-700 rounded-2xl p-3 text-center"><div class="text-[10px] text-amber-300 font-black">TAHSİS</div><div class="text-3xl font-black mt-1">${N(s.allocated)}</div><div class="flex gap-1 mt-2"><button onclick="kmiAdjust('${E(j.id)}','allocated',-1)" class="flex-1 bg-slate-800 rounded-xl py-3 text-lg font-black">－</button><button onclick="kmiAdjust('${E(j.id)}','allocated',1)" class="flex-1 bg-amber-700 rounded-xl py-3 text-lg font-black">＋</button></div></div>
  </div>
  <div class="grid grid-cols-2 gap-3 mt-3"><button onclick="kmiPause('${E(j.id)}')" class="${paused?'bg-emerald-700':'bg-amber-700'} rounded-2xl py-5 text-xl font-black">${paused?'▶ DEVAM':'Ⅱ DURUŞ'}</button><button onclick="kmiTool('${E(j.id)}')" class="bg-violet-700 rounded-2xl py-5 text-xl font-black">TAKIM</button></div>
- <button onclick="kmiFinish('${E(j.id)}')" class="w-full mt-5 border border-slate-600 bg-slate-900 rounded-2xl py-5 text-xl font-black">■ İŞİ BİTİR</button>
+ <button onclick="kmiFinishChoose('${E(j.id)}')" class="w-full mt-5 border border-slate-600 bg-slate-900 rounded-2xl py-5 text-xl font-black">■ İŞİ BİTİR</button>
  <button onclick="window.kmiOpenHandoff?.('${E(j.id)}')" class="w-full mt-3 border border-amber-800/50 bg-amber-950/30 text-amber-300 rounded-2xl py-4 text-sm font-black">↪ RAHATSIZLANDIM / İŞİ DEVRET</button></div>`;
  clearInterval(window.__kmiTimer);window.__kmiTimer=setInterval(()=>{const x=document.getElementById('kmiWorkTimer');if(x)x.textContent=fmt(elapsed(sess(j.id)));else clearInterval(window.__kmiTimer)},1000);
 }
@@ -5488,7 +5698,24 @@ window.kmiAcceptToolCode=async function(id,type,code){
  put(id,{tools:ts});ev('TOOL_EVENT',j,{type,barcode:code,toolId:t?.id||'',toolCode:t?.code||'',toolName:t?.name||''});
  await window.kmiCloseToolScan();toast(t?`${t.code||t.id} · ${t.name||''} kaydedildi`:`${code} kaydedildi · ana kart eşleşmesi yok`,t?'success':'warn');kmiOpenWork(id)
 };
-window.kmiFinish=function(id){
+// KMI-FIX (2026-09-25): Operatör "İşi Bitir" dediğinde artık nereye gönderileceğini seçiyor -
+// doğrudan Kalite, veya işlem hâlâ bitmediyse Tesviye ya da Vibrasyon operasyonuna. Bu, Operatör
+// Beyanı (legacy form) ekranındaki "Tesviyeye/Vibrasyona Gönder" ile aynı motoru (handleDeclarationSubmit)
+// ve aynı beyan durumlarını kullanır - Ender'in "aynı motor çalışmalı" isteği.
+window.kmiFinishChoose=function(id){
+ sheet('İşi nereye gönderiyorsun?',['Kaliteye Gönder','Tesviyeye Gönder','Vibrasyona Gönder'],choice=>{
+   if(choice==='Tesviyeye Gönder') return window.kmiFinish(id,'tesviye');
+   if(choice==='Vibrasyona Gönder'){
+     const mins=prompt('Vibrasyon süresi (dakika):','15');
+     if(mins===null)return;
+     const n=Math.max(0,Math.round(Number(mins)||0));
+     return window.kmiFinish(id,'vibrasyon',n);
+   }
+   return window.kmiFinish(id,'kalite');
+ });
+};
+window.kmiFinish=function(id,postOp,vibrationMinutes){
+ postOp=postOp||'kalite';
  const j=jobs().find(x=>String(x.id)===String(id)),s=sess(id);if(!j||!s||s.finishedAt)return;
  const finishedAt=new Date().toISOString(),mins=Math.max(1,Math.round(elapsed(s)/60));
  const good=Math.max(0,N(j.completedQty)-N(s.startCompletedQty)),scrap=Math.max(0,N(s.scrap)),allocated=Math.max(0,N(s.allocated));
@@ -5497,26 +5724,30 @@ window.kmiFinish=function(id){
  const toolRows=(s.tools||[]).map(x=>[x.type,x.toolCode||x.toolId||x.barcode,x.toolName].filter(Boolean).join(' / '));
  const pauses=s.pauses||[];
  const downtimeMinutes=Math.round(pauses.reduce((a,p)=>a+Math.max(0,((p.end?new Date(p.end):new Date())-new Date(p.start))/60000),0));
+ const postOpStatus={tesviye:'Tesviye Bekliyor',vibrasyon:'Vibrasyon Bekliyor',kalite:'Kalite Bekliyor'}[postOp]||'Kalite Bekliyor';
  const d={id:declId,date:new Date().toLocaleString('tr-TR',{dateStyle:'short',timeStyle:'short'}),workDate:new Date().toISOString().slice(0,10),
    operator:s.operator||currentPerson()?.name||window.currentUser?.name||'Operatör',shift:s.shift||j.shift||'',machine:s.machine||j.machine||'',jobOrder:j.id,
    qty:good+scrap+allocated,good:good,scrap:scrap,allocated:allocated,tools:toolRows.length?toolRows.join(' | '):'Değişen Takım Yok',changedTools:s.tools||[],
    machineCareScore:100,productionMinutes:mins,oeePlannedMinutes:mins,idealCycleSec:0,
    downtime:{tool:0,setup:0,breakdown:0,material:0,quality:0,other:downtimeMinutes},
-   status:'Kalite Bekliyor',approver:'',shiftClosedAt:finishedAt,bonusFinalized:false,finalizedBonus:0,
+   status:postOpStatus,postOp:postOp,vibrationTargetMinutes:postOp==='vibrasyon'?(Number(vibrationMinutes)||0):undefined,
+   approver:'',shiftClosedAt:finishedAt,bonusFinalized:false,finalizedBonus:0,
    source:'SHOP_FLOOR_LIVE',shopFloorSession:{startedAt:s.startedAt,finishedAt,elapsedSeconds:Math.round(elapsed(s))}
  };
  declarations.unshift(d);saveStorage('declarations',declarations);
  put(id,{finishedAt,elapsedSeconds:Math.round(elapsed(s)),declarationId:declId});
  j.finishedAt=finishedAt;j.productionMinutes=N(j.productionMinutes)+mins;
  const targetReached=j.targetType==='production'?N(j.completedQty)>=N(j.targetQty):true;
- j.status=targetReached?'Kalite Bekliyor':'Üretimde';
- persistJobs();ev('WORK_FINISHED',j,{declarationId:declId,good,scrap,productionMinutes:mins,qualityStatus:'Kalite Bekliyor'});
+ j.status=targetReached?postOpStatus:'Üretimde';
+ persistJobs();ev('WORK_FINISHED',j,{declarationId:declId,good,scrap,productionMinutes:mins,qualityStatus:postOpStatus,postOp});
  try{refreshAllViews()}catch(e){}
+ try{window.kmiRenderPostOpQueues?.();}catch(e){}
  // KMI-FIX (2026-09-25): Hedef adede ulaşılmadan beyan gönderildiğinde bunu açıkça söylüyoruz -
  // eskiden sessizce gönderiliyordu, operatör/yönetici kalan adedin ne kadar olduğunu bilmiyordu
  // ve onay zincirinden geçince iş emri (hatalı biçimde) tam kapanmış gibi görünüyordu.
  const remaining=j.targetType==='production'?Math.max(0,N(j.targetQty)-N(j.completedQty)):0;
- const doneMsg=`${good} sağlam${scrap?` · ${scrap} hurda`:''} kalite kontrol kuyruğuna gönderildi`;
+ const destLabel={tesviye:'tesviye kuyruğuna',vibrasyon:'vibrasyon kuyruğuna',kalite:'kalite kontrol kuyruğuna'}[postOp]||'kalite kontrol kuyruğuna';
+ const doneMsg=`${good} sağlam${scrap?` · ${scrap} hurda`:''} ${destLabel} gönderildi`;
  toast(remaining>0?`${doneMsg}. Bu iş emrinde HEDEFE ULAŞILMADI, kalan: ${remaining} adet. İş emri açık kalacak.`:doneMsg, remaining>0?'warn':undefined);
  setTimeout(kmiOpenShopFloor,250)
 };
@@ -6295,6 +6526,287 @@ function install(){
 }
 window.addEventListener('load',function(){let tries=0;const timer=setInterval(function(){tries++;if(install()||tries>=20)clearInterval(timer)},400);},{once:true});
 window.kmiRefreshFloorNav=install;
+})();
+</script>
+<script id="kmi-v1196-postop-queues">
+(function(){
+'use strict';
+const E=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const N=v=>Number(v||0);
+function toast(t,k){window.kmiToast?window.kmiToast(t,k):console.info(t)}
+// KMI-FIX (2026-09-25): Bu kişi Tesviye/Vibrasyon kuyruğunu görebilir mi? Ya o kabiliyete
+// (Kabiliyet: Tesviye / Vibrasyon) sahip, ya da Kalite ekranına yetkili (Kalite rolü/Yönetici).
+function canSeeOp(skillId){
+ const u=window.currentUser; if(!u) return false;
+ try{ if(getEffectiveRole(u)==='ADMIN') return true; }catch(e){}
+ try{ if(hasScreenAccess(u,'kalite')) return true; }catch(e){}
+ const p=(Array.isArray(window.PERSONNEL_LIST)?window.PERSONNEL_LIST:[]).find(x=>Number(x.id)===Number(u.id)||String(x.name||'')===String(u.name||''));
+ return !!(skillId && p && Array.isArray(p.skills) && p.skills.map(Number).includes(Number(skillId)));
+}
+function jobFor(d){return (Array.isArray(window.jobOrders)?window.jobOrders:[]).find(j=>String(j.id)===String(d.jobOrder));}
+function queueSection(title,icon,colorCls,rows,kind){
+ if(!rows.length) return '';
+ return `<div class="bg-slate-800 border ${colorCls} rounded-lg p-5 shadow-lg mb-4">
+   <h2 class="text-lg font-semibold text-white mb-3"><i class="fa-solid ${icon} mr-2"></i>${title} <span class="text-xs text-slate-500 font-normal">(${rows.length})</span></h2>
+   <div class="overflow-x-auto"><table class="w-full text-left text-xs text-slate-300">
+   <thead><tr class="text-slate-500 border-b border-slate-700"><th class="p-2">Beyan</th><th class="p-2">İş Emri</th><th class="p-2">Operatör</th><th class="p-2">Adet</th><th class="p-2">Aksiyon</th></tr></thead>
+   <tbody>${rows.map(d=>{
+     const j=jobFor(d);
+     if(kind==='vibrasyon'){
+       return `<tr class="border-t border-slate-800"><td class="p-2 font-mono">${E(d.id)}</td><td class="p-2">${E(d.jobOrder)} <span class="text-slate-500">${E(j?.item||'')}</span></td><td class="p-2">${E(d.operator)}</td><td class="p-2">${N(d.good)} sağlam${d.scrap?' · '+N(d.scrap)+' hurda':''}</td>
+       <td class="p-2"><button onclick="window.kmiApproveVibrasyon('${E(d.id)}')" class="bg-indigo-700 hover:bg-indigo-600 text-white px-3 py-1.5 rounded text-[10px] font-bold"><i class="fa-solid fa-check mr-1"></i>Vibrasyon Yapıldı</button></td></tr>`;
+     }
+     return `<tr class="border-t border-slate-800"><td class="p-2 font-mono">${E(d.id)}</td><td class="p-2">${E(d.jobOrder)} <span class="text-slate-500">${E(j?.item||'')}</span></td><td class="p-2">${E(d.operator)}</td><td class="p-2">${N(d.good)} sağlam${d.scrap?' · '+N(d.scrap)+' hurda':''}</td>
+     <td class="p-2"><button onclick="window.kmiApproveTesviye('${E(d.id)}')" class="bg-violet-700 hover:bg-violet-600 text-white px-3 py-1.5 rounded text-[10px] font-bold"><i class="fa-solid fa-check mr-1"></i>Tesviye Yapıldı</button></td></tr>`;
+   }).join('')}</tbody></table></div>
+ </div>`;
+}
+window.kmiRenderPostOpQueues=function(){
+ const box=document.getElementById('kmiPostOpQueues'); if(!box) return;
+ const tesviyeRows=(declarations||[]).filter(d=>d.status==='Tesviye Bekliyor');
+ const vibRows=(declarations||[]).filter(d=>d.status==='Vibrasyon Bekliyor');
+ const showTesviye=canSeeOp(window.KMI_TESVIYE_SKILL_ID), showVib=canSeeOp(window.KMI_VIBRASYON_SKILL_ID);
+ let html='';
+ if(showTesviye) html+=queueSection('Tesviye Onay Kuyruğu','fa-hammer','border-violet-700/60',tesviyeRows,'tesviye');
+ if(showVib) html+=queueSection('Vibrasyon Onay Kuyruğu','fa-wave-square','border-indigo-700/60',vibRows,'vibrasyon');
+ box.innerHTML=html;
+};
+// KMI-FIX (2026-09-25): Tesviye/vibrasyon tamamlanınca beyan otomatik Kaliteye düşer (normal
+// kalite onay akışına girer) ve iş emrinin dosyasında "Tesviye/Vibrasyon Yapıldı" olarak kalıcı
+// iz bırakır (bkz. kmiJobPostOpBadges, kmiOpenJobOrderFile içinde kullanılır).
+window.kmiApproveTesviye=function(declId){
+ const d=(declarations||[]).find(x=>x.id===declId); if(!d||d.status!=='Tesviye Bekliyor')return;
+ d.tesviyeBy=window.currentUser?.name||'-'; d.tesviyeAt=new Date().toISOString();
+ d.status='Kalite Bekliyor'; d.updatedAt=new Date().toISOString();
+ saveStorage('declarations',declarations);
+ try{syncJobOrderWorkflowStatuses();}catch(e){}
+ try{KMI?.event?.('TESVIYE_DONE','JOB_ORDER',d.jobOrder,{label:d.tesviyeBy,source:'KALITE_TAB'});}catch(e){}
+ toast('Tesviye tamamlandı, beyan Kaliteye düştü.','success');
+ try{refreshAllViews();}catch(e){}
+ window.kmiRenderPostOpQueues();
+};
+window.kmiApproveVibrasyon=function(declId){
+ const d=(declarations||[]).find(x=>x.id===declId); if(!d||d.status!=='Vibrasyon Bekliyor')return;
+ const suggested=d.vibrationTargetMinutes||15;
+ const mins=prompt('Vibrasyon süresi (dakika):',String(suggested));
+ if(mins===null)return;
+ d.vibrasyonBy=window.currentUser?.name||'-'; d.vibrasyonAt=new Date().toISOString(); d.vibrationMinutes=Math.max(0,Math.round(Number(mins)||0));
+ d.status='Kalite Bekliyor'; d.updatedAt=new Date().toISOString();
+ saveStorage('declarations',declarations);
+ try{syncJobOrderWorkflowStatuses();}catch(e){}
+ try{KMI?.event?.('VIBRASYON_DONE','JOB_ORDER',d.jobOrder,{label:`${d.vibrasyonBy} · ${d.vibrationMinutes} dk`,source:'KALITE_TAB'});}catch(e){}
+ toast(`Vibrasyon tamamlandı (${d.vibrationMinutes} dk), beyan Kaliteye düştü.`,'success');
+ try{refreshAllViews();}catch(e){}
+ window.kmiRenderPostOpQueues();
+};
+// İş emri dijital dosyasında (kmiOpenJobOrderFile) gösterilecek rozet HTML'i.
+window.kmiJobPostOpBadges=function(jobId){
+ const ds=(declarations||[]).filter(d=>String(d.jobOrder)===String(jobId));
+ const tesviye=ds.find(d=>d.tesviyeAt), vib=ds.find(d=>d.vibrasyonAt);
+ const chips=[];
+ if(tesviye) chips.push(`<span class="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-violet-500/10 border border-violet-500/30 text-violet-300 text-[10px] font-semibold"><i class="fa-solid fa-hammer"></i>Tesviye Yapıldı · ${E(tesviye.tesviyeBy)}</span>`);
+ if(vib) chips.push(`<span class="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-indigo-500/10 border border-indigo-500/30 text-indigo-300 text-[10px] font-semibold"><i class="fa-solid fa-wave-square"></i>Vibrasyon Yapıldı · ${vib.vibrationMinutes||0} dk · ${E(vib.vibrasyonBy)}</span>`);
+ return chips.join(' ');
+};
+document.addEventListener('DOMContentLoaded',()=>setTimeout(()=>{try{window.kmiRenderPostOpQueues();}catch(e){}},400));
+})();
+</script>
+<script id="kmi-v73-product-files">
+(function(){
+'use strict';
+function esc73(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+function pdClient(){return window.kurutluSupabase||window.KURUTLU_SUPABASE?.client||null;}
+
+// KMI-FIX (2026-09-25): Ürün kimlik kartına gerçek dosya eki (teknik resim, STEP/katı model,
+// CAM/NC programı, takım listesi vb.) eklenmesi istendi - iş emri dijital dosyasındaki Supabase
+// Storage yaklaşımı aynen ürünlere de uygulandı (bucket: product-docs, tablo: product_attachments).
+window.productDocPanel73=function(p){
+ const cats=window.DOC73_CATS||{};
+ const catOpts=Object.entries(cats).map(([k,v])=>`<option value="${k}">${esc73(v.label)}</option>`).join('');
+ return `<div class="mt-5 border-t border-slate-700 pt-4">
+  <div class="flex justify-between items-center mb-2 flex-wrap gap-2"><b>Ürün Dosya Kasası · Teknik Resim / Katı Model / CAM / Takım Listesi</b>
+  <div class="flex gap-2 items-center flex-wrap">
+   <select id="v73DocCat" class="bg-slate-950 border border-slate-700 rounded p-2 text-xs">${catOpts}</select>
+   <input type="file" id="v73DocFile" class="text-xs text-slate-300">
+   <button onclick="v73UploadProductDoc('${p.id}')" class="bg-cyan-800 px-3 py-1.5 rounded text-xs font-bold">+ Dosya Yükle</button>
+  </div></div>
+  <div id="v73DocMsg" class="text-[10px] mt-1"></div>
+  <div id="v73Docs" class="mt-2 space-y-1.5">Yükleniyor…</div>
+  <div class="text-[10px] text-slate-500 mt-2">Dosyalar Supabase Storage'da güvenli tutulur; ürün listesinde küçük ikon rozeti olarak görünür.</div>
+ </div>`;
+};
+window.v73RenderProductDocs=async function(id){
+ const box=document.getElementById('v73Docs'); if(!box) return;
+ const c=pdClient();
+ if(!c){box.innerHTML='<span class="text-amber-300 text-[10px]">Supabase bağlantısı hazır değil, dosyalar şu an listelenemiyor.</span>';return;}
+ try{
+  const {data,error}=await c.from('product_attachments').select('*').eq('product_id',String(id)).order('uploaded_at',{ascending:false});
+  if(error) throw error;
+  const p=(window.D?.products||[]).find(x=>x.id===id);
+  if(p){ p.docCategories=[...new Set((data||[]).map(d=>d.category))]; try{window.save&&window.save();}catch(e){} }
+  if(!data||!data.length){box.innerHTML='<span class="text-slate-500 text-[10px]">Henüz dosya yok.</span>';return;}
+  const cats=window.DOC73_CATS||{};
+  const rows=await Promise.all(data.map(async d=>{
+   let url='#';
+   try{const {data:sd}=await c.storage.from('product-docs').createSignedUrl(d.file_path,3600); url=sd?.signedUrl||'#';}catch(e){}
+   const cat=cats[d.category]||cats.diger||{label:d.category,icon:'fa-solid fa-file',cls:'bg-slate-500/10 border-slate-500/30 text-slate-300'};
+   return `<div class="flex items-center justify-between bg-slate-950 border border-slate-800 rounded-lg px-3 py-2"><div class="flex items-center gap-2"><span class="inline-flex items-center justify-center w-6 h-6 rounded-full border ${cat.cls}"><i class="${cat.icon} text-[10px]"></i></span><a href="${url}" target="_blank" class="text-cyan-300 underline text-xs">${esc73(d.file_name)}</a><span class="text-[9px] text-slate-500">${esc73(cat.label)}</span></div><button onclick="v73DeleteProductDoc('${esc73(id)}','${esc73(d.id)}','${esc73(d.file_path)}')" class="text-rose-400 hover:text-rose-300 px-2" title="Sil"><i class="fa-solid fa-trash"></i></button></div>`;
+  }));
+  box.innerHTML=rows.join('');
+ }catch(e){box.innerHTML='<span class="text-red-300 text-[10px]">Dosyalar yüklenemedi: '+esc73(e.message||String(e))+'</span>';}
+};
+window.v73UploadProductDoc=async function(id){
+ const c=pdClient(); const msg=document.getElementById('v73DocMsg');
+ if(!c){if(msg)msg.innerHTML='<span class="text-red-300">Supabase bağlantısı hazır değil.</span>';return;}
+ const fi=document.getElementById('v73DocFile'); const f=fi?.files?.[0];
+ if(!f){if(msg)msg.innerHTML='<span class="text-amber-300">Önce bir dosya seçin.</span>';return;}
+ const cat=document.getElementById('v73DocCat')?.value||'diger';
+ const path=`${id}/${Date.now()}-${f.name}`.replace(/\s+/g,'_');
+ if(msg)msg.innerHTML='<span class="text-cyan-300">Yükleniyor…</span>';
+ try{
+  const up=await c.storage.from('product-docs').upload(path,f,{upsert:false});
+  if(up.error) throw up.error;
+  const pid=window.currentUser?.dbId||window.currentUser?.uuid||null;
+  const ins=await c.from('product_attachments').insert({product_id:String(id),category:cat,file_path:path,file_name:f.name,file_type:f.type||null,file_size:f.size||null,uploaded_by:pid});
+  if(ins.error) throw ins.error;
+  if(msg)msg.innerHTML='<span class="text-emerald-300">Yüklendi.</span>';
+  if(fi)fi.value='';
+  v73RenderProductDocs(id);
+ }catch(e){if(msg)msg.innerHTML='<span class="text-red-300">Yükleme başarısız: '+esc73(e.message||String(e))+'</span>';}
+};
+window.v73DeleteProductDoc=async function(productId,attId,filePath){
+ if(!confirm('Bu dosyayı silmek istediğinize emin misiniz?'))return;
+ const c=pdClient(); if(!c)return alert('Supabase bağlantısı hazır değil.');
+ try{
+  const del=await c.from('product_attachments').delete().eq('id',attId);
+  if(del.error) throw del.error;
+  try{await c.storage.from('product-docs').remove([filePath]);}catch(e){}
+  v73RenderProductDocs(productId);
+ }catch(e){alert('Silinemedi: '+(e?.message||String(e))+' (Bu işlem sadece yönetim rolüne açık olabilir.)');}
+};
+
+// KMI-FIX (2026-09-25): Ürünün hangi makinelerde üretilebileceğinin işaretlenmesi istendi.
+window.machinesPanel73=function(p){
+ const allowed=new Set((p.allowedMachines||[]).map(String));
+ const list=(typeof MACHINES_LIST!=='undefined'?MACHINES_LIST:(window.MACHINES_LIST||[]));
+ const rows=list.map(m=>{
+  const code=m.code, checked=allowed.has(String(code));
+  return `<label class="flex items-center gap-2 bg-slate-950 border border-slate-700 rounded p-2 text-[10px] text-slate-200"><input type="checkbox" class="accent-cyan-500" value="${esc73(code)}" ${checked?'checked':''} onchange="v73MachineToggle('${p.id}','${esc73(code)}',this.checked)"><span>${esc73(code)} · ${esc73(m.name||'')}</span></label>`;
+ }).join('');
+ // KMI-FIX (2026-09-25): Seçili makineler için bağlama/sökme davranışı ve çevrim başına çıkan adet
+ // (batch) not olarak eklenebilsin - çift paletli/çok parçalı makinelerde tek genel süre yetmiyordu.
+ const detailRows=[...allowed].map(code=>{
+  const m=list.find(x=>String(x.code)===code);
+  const note=esc73(p.machineNotes?.[code]||'');
+  const parts=Number(p.partsPerCyclePerMachine?.[code]||1);
+  return `<div class="bg-slate-950 border border-slate-700 rounded p-2 grid md:grid-cols-[1fr_140px] gap-2"><div><div class="text-[10px] text-cyan-300 font-bold mb-1">${esc73(code)} · ${esc73(m?.name||'')}</div><textarea onchange="v73MachineNoteChange('${p.id}','${esc73(code)}',this.value)" placeholder="Bağlama/sökme davranışı, fikstür notu, vb." class="w-full bg-slate-900 border border-slate-700 rounded p-1.5 text-[10px]">${note}</textarea></div><label class="text-[10px] text-slate-400">1 Çevrimde Çıkan Adet<input type="number" min="1" value="${parts}" onchange="v73MachinePartsChange('${p.id}','${esc73(code)}',this.value)" class="mt-1 w-full bg-slate-900 border border-slate-700 rounded p-1.5 text-[10px]"></label></div>`;
+ }).join('');
+ return `<div class="mt-5 border-t border-slate-700 pt-4"><div class="flex justify-between mb-2"><b>Üretilebileceği Makineler</b><span class="text-[10px] text-slate-500">${allowed.size} makine seçili</span></div><div class="grid md:grid-cols-3 gap-2">${rows||'<div class="text-xs text-slate-500">Makine listesi bulunamadı.</div>'}</div>${detailRows?`<div class="mt-3 space-y-2">${detailRows}</div>`:''}<div class="text-[10px] text-slate-500 mt-2">Bu, üretim kısıtlaması için kaydedilir; iş emri açma ekranına makine önerisi olarak bağlanması ayrı bir adımda yapılacak.</div></div>`;
+};
+window.v73MachineToggle=function(productId,code,checked){
+ const p=(window.D?.products||[]).find(x=>x.id===productId); if(!p)return;
+ p.allowedMachines=Array.isArray(p.allowedMachines)?p.allowedMachines:[];
+ const set=new Set(p.allowedMachines.map(String));
+ if(checked) set.add(String(code)); else set.delete(String(code));
+ p.allowedMachines=[...set];
+ try{window.save&&window.save();}catch(e){}
+ window.v62OpenProduct(productId);
+};
+window.v73MachineNoteChange=function(productId,code,value){
+ const p=(window.D?.products||[]).find(x=>x.id===productId); if(!p)return;
+ p.machineNotes=(p.machineNotes&&typeof p.machineNotes==='object')?p.machineNotes:{};
+ p.machineNotes[code]=value;
+ try{window.save&&window.save();}catch(e){}
+};
+window.v73MachinePartsChange=function(productId,code,value){
+ const p=(window.D?.products||[]).find(x=>x.id===productId); if(!p)return;
+ p.partsPerCyclePerMachine=(p.partsPerCyclePerMachine&&typeof p.partsPerCyclePerMachine==='object')?p.partsPerCyclePerMachine:{};
+ p.partsPerCyclePerMachine[code]=Math.max(1,Number(value||1));
+ try{window.save&&window.save();}catch(e){}
+};
+
+// KMI-FIX (2026-09-25): Takım listesi - Excel'den içe aktarma (SheetJS) + elle satır ekleme/düzenleme.
+window.toolListPanel73=function(p){
+ const rows=(p.toolList||[]).map((t,i)=>`<tr class="border-t border-slate-800">
+  <td class="p-1"><input value="${esc73(t.toolNo||'')}" onchange="v73ToolChange('${p.id}',${i},'toolNo',this.value)" class="w-16 bg-slate-950 border border-slate-700 rounded p-1 text-[10px]"></td>
+  <td class="p-1"><input value="${esc73(t.name||'')}" onchange="v73ToolChange('${p.id}',${i},'name',this.value)" class="w-full bg-slate-950 border border-slate-700 rounded p-1 text-[10px]"></td>
+  <td class="p-1"><input value="${esc73(t.code||'')}" onchange="v73ToolChange('${p.id}',${i},'code',this.value)" class="w-24 bg-slate-950 border border-slate-700 rounded p-1 text-[10px]"></td>
+  <td class="p-1"><input value="${esc73(t.clampLength||'')}" onchange="v73ToolChange('${p.id}',${i},'clampLength',this.value)" class="w-16 bg-slate-950 border border-slate-700 rounded p-1 text-[10px]"></td>
+  <td class="p-1"><input type="number" min="0" value="${Number(t.partsPerTool||0)}" onchange="v73ToolChange('${p.id}',${i},'partsPerTool',this.value)" class="w-16 bg-slate-950 border border-slate-700 rounded p-1 text-[10px]" placeholder="adet"></td>
+  <td class="p-1"><button onclick="v73ToolDelete('${p.id}',${i})" class="bg-red-950 text-red-300 px-2 rounded text-[10px]">Sil</button></td>
+ </tr>`).join('');
+ return `<div class="mt-5 border-t border-slate-700 pt-4">
+  <div class="flex justify-between items-center mb-2 flex-wrap gap-2"><b>Takım Listesi</b>
+  <div class="flex gap-2 items-center flex-wrap">
+   <input type="file" id="v73ToolExcelFile" accept=".xlsx,.xls" class="text-xs text-slate-300">
+   <button onclick="v73ImportToolListExcel('${p.id}')" class="bg-emerald-800 px-3 py-1.5 rounded text-xs font-bold">Excel'den İçe Aktar</button>
+   <button onclick="v73ToolAdd('${p.id}')" class="bg-blue-700 px-3 py-1.5 rounded text-xs font-bold">+ Satır Ekle</button>
+  </div></div>
+  <div id="v73ToolMsg" class="text-[10px] mt-1"></div>
+  <div class="overflow-x-auto"><table class="w-full text-left text-[10px] text-slate-300"><thead><tr class="text-slate-500"><th class="p-1">Takım No</th><th class="p-1">Tanım</th><th class="p-1">Takım Kodu</th><th class="p-1">Bağlama Boyu</th><th class="p-1">1 Takım · Adet</th><th class="p-1"></th></tr></thead><tbody id="v73ToolRows">${rows||'<tr><td colspan="6" class="p-2 text-slate-500">Henüz takım listesi yok.</td></tr>'}</tbody></table></div>
+  <div class="text-[10px] text-slate-500 mt-2">"1 Takım · Adet" alanı elle doldurulabilir - CAM/takım tedarikçisi verisinde bulunmuyorsa boş bırakılır.</div>
+ </div>`;
+};
+window.v73ToolAdd=function(productId){
+ const p=(window.D?.products||[]).find(x=>x.id===productId); if(!p)return;
+ p.toolList=Array.isArray(p.toolList)?p.toolList:[];
+ p.toolList.push({toolNo:'',name:'',code:'',clampLength:'',partsPerTool:0});
+ try{window.save&&window.save();}catch(e){}
+ window.v62OpenProduct(productId);
+};
+window.v73ToolChange=function(productId,i,field,value){
+ const p=(window.D?.products||[]).find(x=>x.id===productId); if(!p||!p.toolList||!p.toolList[i])return;
+ p.toolList[i][field]=field==='partsPerTool'?Number(value||0):value;
+ try{window.save&&window.save();}catch(e){}
+};
+window.v73ToolDelete=function(productId,i){
+ const p=(window.D?.products||[]).find(x=>x.id===productId); if(!p||!p.toolList)return;
+ p.toolList.splice(i,1);
+ try{window.save&&window.save();}catch(e){}
+ window.v62OpenProduct(productId);
+};
+window.v73ImportToolListExcel=function(productId){
+ const msg=document.getElementById('v73ToolMsg');
+ const fi=document.getElementById('v73ToolExcelFile'); const f=fi?.files?.[0];
+ if(!f){if(msg)msg.innerHTML='<span class="text-amber-300">Önce bir Excel dosyası seçin.</span>';return;}
+ if(!window.XLSX){if(msg)msg.innerHTML='<span class="text-red-300">Excel kütüphanesi yüklenemedi.</span>';return;}
+ const reader=new FileReader();
+ reader.onload=function(e){
+  try{
+   const wb=XLSX.read(e.target.result,{type:'array'});
+   const ws=wb.Sheets[wb.SheetNames[0]];
+   const rows=XLSX.utils.sheet_to_json(ws,{header:1,defval:null});
+   const norm=s=>String(s||'').toLocaleUpperCase('tr-TR').replace(/İ/g,'I');
+   let headerIdx=-1,colNo=-1,colDesc=-1,colClamp=-1,colCode=-1;
+   for(let r=0;r<Math.min(rows.length,30);r++){
+    const row=rows[r]||[];
+    row.forEach((cell,ci)=>{
+     const t=norm(cell);
+     if(t.includes('TAKIM')&&t.includes('NO')&&colNo<0){colNo=ci;headerIdx=r;}
+     if((t.includes('OPERASYON')||t.includes('ACIKLAMA')||t.includes('TANIM'))&&colDesc<0)colDesc=ci;
+     if(t.includes('BAGLAMA')&&colClamp<0)colClamp=ci;
+     if(t.includes('TAKIM')&&t.includes('KOD')&&colCode<0)colCode=ci;
+    });
+    if(colNo>=0)break;
+   }
+   if(colNo<0){if(msg)msg.innerHTML='<span class="text-red-300">Takım No sütunu bulunamadı - şablon farklı olabilir, satırları elle ekleyin.</span>';return;}
+   const p=(window.D?.products||[]).find(x=>x.id===productId); if(!p)return;
+   const list=[];
+   for(let r=headerIdx+1;r<rows.length;r++){
+    const row=rows[r]||[];
+    const no=row[colNo];
+    if(!no||!String(no).trim())continue;
+    list.push({toolNo:String(no).trim(),name:colDesc>=0?String(row[colDesc]||'').trim():'',code:colCode>=0?String(row[colCode]||'').trim():'',clampLength:colClamp>=0?String(row[colClamp]||'').trim():'',partsPerTool:0});
+   }
+   if(!list.length){if(msg)msg.innerHTML='<span class="text-amber-300">Tablo okundu ama satır bulunamadı.</span>';return;}
+   p.toolList=list;
+   try{window.save&&window.save();}catch(err){}
+   if(msg)msg.innerHTML=`<span class="text-emerald-300">${list.length} takım içe aktarıldı.</span>`;
+   window.v62OpenProduct(productId);
+  }catch(err){if(msg)msg.innerHTML='<span class="text-red-300">Excel okunamadı: '+esc73(err.message||String(err))+'</span>';}
+ };
+ reader.readAsArrayBuffer(f);
+};
 })();
 </script>
 </body>
