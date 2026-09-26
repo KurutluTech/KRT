@@ -2338,7 +2338,7 @@ ead>
         function renderKaliteTable(){
             const tbody=document.getElementById('kaliteTableBody'); if(!tbody)return;
             const methods=['Mastar','CMM','Kumpas','FotoCMM','Mikrometre','Komparatör','Diğer'];
-            tbody.innerHTML=declarations.map(d=>{const g=d.good??Math.max(0,(d.qty||0)-(d.scrap||0)-(d.allocated||0)),sc=d.scrap||0,al=d.allocated||0;const selected=(d.measurementMethods||[])[0]||'';return `<tr><td class="p-2.5 font-mono text-blue-400">${d.id}</td><td class="p-2.5">${d.date}</td><td class="p-2.5">${d.operator}</td><td class="p-2.5">${d.machine}</td><td class="p-2.5">${d.jobOrder}</td><td class="p-2.5"><div class="grid grid-cols-3 gap-1 text-center"><span class="bg-emerald-950/60 text-emerald-300 rounded p-1">S ${g}</span><span class="bg-red-950/60 text-red-300 rounded p-1">H ${sc}</span><span class="bg-amber-950/60 text-amber-300 rounded p-1">T ${al}</span></div></td><td class="p-2.5">${d.status==='Kalite Bekliyor'?`<div class="grid grid-cols-3 gap-1"><input id="qGood-${d.id}" type="number" min="0" value="${g}" class="w-16 bg-slate-900 border border-emerald-700 rounded p-1 text-white"><input id="qScrap-${d.id}" type="number" min="0" value="${sc}" class="w-16 bg-slate-900 border border-red-700 rounded p-1 text-white"><input id="qAllocated-${d.id}" type="number" min="0" value="${al}" class="w-16 bg-slate-900 border border-amber-700 rounded p-1 text-white"></div><select id="qMeasure-${d.id}" class="mt-2 w-full min-w-[190px] bg-slate-950 border border-cyan-700 rounded p-2 text-[10px] text-white"><option value="">Ölçüm cihazı / yöntemi seçin</option>${methods.map(x=>`<option value="${x}" ${selected===x?'selected':''}>${x}</option>`).join('')}</select>`:`<div class="text-[10px]"><b class="text-emerald-300">S ${d.qualityGood??g}</b> · <b class="text-red-300">H ${d.qualityScrap??sc}</b> · <b class="text-amber-300">T ${d.qualityAllocated??al}</b><div class="mt-1 text-cyan-300">${(d.measurementMethods||[]).join(', ')||'Ölçüm yöntemi kaydı yok'}</div></div>`}</td><td class="p-2.5"><span class="text-[10px]">${d.status}</span></td><td class="p-2.5 text-emerald-400">${d.approver||'-'}</td><td class="p-2.5">${d.status==='Kalite Bekliyor'?`<button onclick="approveKalite('${d.id}')" class="bg-emerald-600 text-white px-2 py-1 rounded text-[10px]">Tespiti Kaydet & Onayla</button>`:'<span class="text-emerald-500 text-[10px]">✓ Onaylandı</span>'}</td></tr>`}).join('');
+            tbody.innerHTML=declarations.map(d=>{const g=d.good??Math.max(0,(d.qty||0)-(d.scrap||0)-(d.allocated||0)),sc=d.scrap||0,al=d.allocated||0;const selected=(d.measurementMethods||[])[0]||'';return `<tr><td class="p-2.5 font-mono text-blue-400">${d.id}</td><td class="p-2.5">${d.date}</td><td class="p-2.5">${d.operator}</td><td class="p-2.5">${d.machine}</td><td class="p-2.5">${d.jobOrder}</td><td class="p-2.5"><div class="grid grid-cols-3 gap-1 text-center"><span class="bg-emerald-950/60 text-emerald-300 rounded p-1">S ${g}</span><span class="bg-red-950/60 text-red-300 rounded p-1">H ${sc}</span><span class="bg-amber-950/60 text-amber-300 rounded p-1">T ${al}</span></div></td><td class="p-2.5">${d.status==='Kalite Bekliyor'?`<div class="grid grid-cols-3 gap-1"><input id="qGood-${d.id}" type="number" min="0" value="${g}" class="w-16 bg-slate-900 border border-emerald-700 rounded p-1 text-white"><input id="qScrap-${d.id}" type="number" min="0" value="${sc}" class="w-16 bg-slate-900 border border-red-700 rounded p-1 text-white"><input id="qAllocated-${d.id}" type="number" min="0" value="${al}" class="w-16 bg-slate-900 border border-amber-700 rounded p-1 text-white"></div><select id="qMeasure-${d.id}" class="mt-2 w-full min-w-[190px] bg-slate-950 border border-cyan-700 rounded p-2 text-[10px] text-white"><option value="">Ölçüm cihazı / yöntemi seçin</option>${methods.map(x=>`<option value="${x}" ${selected===x?'selected':''}>${x}</option>`).join('')}</select>`:`<div class="text-[10px]"><b class="text-emerald-300">S ${d.qualityGood??g}</b> · <b class="text-red-300">H ${d.qualityScrap??sc}</b> · <b class="text-amber-300">T ${d.qualityAllocated??al}</b><div class="mt-1 text-cyan-300">${(d.measurementMethods||[]).join(', ')||'Ölçüm yöntemi kaydı yok'}</div></div>`}</td><td class="p-2.5"><span class="text-[10px]">${d.status}</span></td><td class="p-2.5 text-emerald-400">${d.approver||'-'}</td><td class="p-2.5">${d.status==='Kalite Bekliyor'?`<div class="flex flex-wrap gap-1"><button onclick="approveKalite('${d.id}')" class="bg-emerald-600 text-white px-2 py-1 rounded text-[10px]">Tespiti Kaydet & Onayla</button><button onclick="window.kmiOpenRejectModal('${d.id}','kalite')" class="bg-rose-800 hover:bg-rose-700 text-white px-2 py-1 rounded text-[10px]">Reddet</button></div>`:(d.status==='Kalite Reddetti - Üretime İade'?`<span class="text-rose-400 text-[10px]" title="${(d.lastRejection?.reason||'').replace(/"/g,'&quot;')}">✗ Reddedildi - Üretime İade</span>`:'<span class="text-emerald-500 text-[10px]">✓ Onaylandı</span>')}</td></tr>`}).join('');
         }
 
         // KMI-FIX (2026-09-26): Ender'in isteği - iş emri kapatılıp BAŞKA bir makineye/operasyona
@@ -2463,7 +2463,7 @@ ead>
                 <td class="p-3">${jo?.item||d.jobOrder}<div class="text-[10px] text-slate-500">${d.operator}</div><div class="text-[9px] text-amber-300">İrsaliye: ${d.deliveryNoteNo||'-'}</div></td>
                 <td class="p-3 font-bold text-emerald-400">${d.qty} Adet</td>
                 <td class="p-3 text-slate-400">${d.status==='Sevk Edildi'?(d.shippingApprovalDate||'-'):(d.managementApprovalDate||'-')}</td>
-                <td class="p-3">${d.status==='Sevk Onayı Bekliyor' ? `<div><span class="inline-block mb-2 text-amber-300 font-semibold">Sevke Hazır</span><br><button onclick="approveShipment('${d.id}')" class="bg-amber-600 hover:bg-amber-500 text-white px-3 py-2 rounded text-[10px] font-bold"><i class="fa-solid fa-truck-fast mr-1"></i>Sevk Et</button></div>` : `<span class="text-emerald-400 font-semibold">Sevk Edildi</span><div class="text-[9px] text-slate-300">${d.shippingApprover||'-'} · Plaka: ${d.vehiclePlate||'-'}</div><div class="text-[9px] text-cyan-300">Mühür: ${d.shippedAt||'-'}</div>${d.shippingDocumentImage?`<button onclick="showShipmentImage('${d.id}')" class="mt-1 bg-slate-700 px-2 py-1 rounded text-[9px]">İrsaliye Resmi</button>`:''}`}</td>
+                <td class="p-3">${d.status==='Sevk Onayı Bekliyor' ? `<div><span class="inline-block mb-2 text-amber-300 font-semibold">Sevke Hazır</span><br><div class="flex flex-wrap gap-1"><button onclick="approveShipment('${d.id}')" class="bg-amber-600 hover:bg-amber-500 text-white px-3 py-2 rounded text-[10px] font-bold"><i class="fa-solid fa-truck-fast mr-1"></i>Sevk Et</button><button onclick="window.kmiOpenRejectModal('${d.id}','sevkiyat')" class="bg-rose-800 hover:bg-rose-700 text-white px-3 py-2 rounded text-[10px] font-bold"><i class="fa-solid fa-ban mr-1"></i>Reddet</button></div></div>` : `<span class="text-emerald-400 font-semibold">Sevk Edildi</span><div class="text-[9px] text-slate-300">${d.shippingApprover||'-'} · Plaka: ${d.vehiclePlate||'-'}</div><div class="text-[9px] text-cyan-300">Mühür: ${d.shippedAt||'-'}</div>${d.shippingDocumentImage?`<button onclick="showShipmentImage('${d.id}')" class="mt-1 bg-slate-700 px-2 py-1 rounded text-[9px]">İrsaliye Resmi</button>`:''}`}</td>
             </tr>`}).join('')||'<tr><td colspan="5" class="p-4 text-center text-slate-500">Yönetim onayından geçmiş sevkiyat kaydı yok.</td></tr>';
         }
         function approveShipment(id){
@@ -2524,7 +2524,7 @@ ead>
                     <td class="p-2.5">${d.date}</td>
                     <td class="p-2.5"><span class="bg-emerald-900/80 text-emerald-300 px-2 py-0.5 rounded text-[10px]">Hazır</span></td>
                     <td class="p-2.5 text-cyan-300">${d.approver || '-'}</td>
-                    <td class="p-2.5">${currentUser && (isBurcuAccountingAuthority(currentUser) || getEffectiveRole(currentUser)==='ADMIN') ? `<button onclick="approveDeclarationByMuhasebe('${d.id}')" class="bg-emerald-600 hover:bg-emerald-500 text-white px-2 py-1 rounded text-[10px] font-semibold"><i class="fa-solid fa-check-double mr-1"></i>Muhasebe Onayı</button>` : '<span class="text-slate-500">İzleme</span>'}</td>
+                    <td class="p-2.5">${currentUser && (isBurcuAccountingAuthority(currentUser) || getEffectiveRole(currentUser)==='ADMIN') ? `<div class="flex flex-wrap gap-1"><button onclick="approveDeclarationByMuhasebe('${d.id}')" class="bg-emerald-600 hover:bg-emerald-500 text-white px-2 py-1 rounded text-[10px] font-semibold"><i class="fa-solid fa-check-double mr-1"></i>Muhasebe Onayı</button><button onclick="window.kmiOpenRejectModal('${d.id}','muhasebe')" class="bg-rose-800 hover:bg-rose-700 text-white px-2 py-1 rounded text-[10px] font-semibold">Reddet</button></div>` : '<span class="text-slate-500">İzleme</span>'}</td>
                 </tr>`;
             }).join('') || '<tr><td colspan="7" class="p-3 text-center text-slate-500">Muhasebe onayı bekleyen hazır ürün yok.</td></tr>';
 
@@ -6394,7 +6394,7 @@ function renderMuhasebeV98(){
    const localPending=ds.filter(d=>String(d?.status||'')==='Hazır - Muhasebe Onayı Bekliyor');
    portalRows=localPending.map(d=>{
     const jo=jobs.find(j=>String(j.id)===String(d.jobOrder));
-    return `<tr data-v108-local="1"><td class="p-2.5 font-mono text-blue-400">${esc(d.id)}</td><td class="p-2.5">${esc(jo?.item||d.jobOrder||'-')}<div class="text-[9px] text-slate-500">${esc(d.jobOrder||'-')}</div></td><td class="p-2.5">${Number(d.qualityGood??d.good??d.qty??0)} Adet</td><td class="p-2.5">${esc(d.qualityApprovalDate||d.date||'-')}</td><td class="p-2.5"><span class="bg-emerald-900/80 text-emerald-300 px-2 py-0.5 rounded text-[10px]">Kalite Onaylı</span></td><td class="p-2.5 text-cyan-300">${esc(d.approver||'-')}</td><td class="p-2.5"><button onclick="approveDeclarationByMuhasebe('${esc(d.id)}')" class="bg-emerald-600 hover:bg-emerald-500 text-white px-2 py-1 rounded text-[10px] font-semibold"><i class="fa-solid fa-check-double mr-1"></i>Muhasebe Onayı</button></td></tr>`;
+    return `<tr data-v108-local="1"><td class="p-2.5 font-mono text-blue-400">${esc(d.id)}</td><td class="p-2.5">${esc(jo?.item||d.jobOrder||'-')}<div class="text-[9px] text-slate-500">${esc(d.jobOrder||'-')}</div></td><td class="p-2.5">${Number(d.qualityGood??d.good??d.qty??0)} Adet</td><td class="p-2.5">${esc(d.qualityApprovalDate||d.date||'-')}</td><td class="p-2.5"><span class="bg-emerald-900/80 text-emerald-300 px-2 py-0.5 rounded text-[10px]">Kalite Onaylı</span></td><td class="p-2.5 text-cyan-300">${esc(d.approver||'-')}</td><td class="p-2.5"><div class="flex flex-wrap gap-1"><button onclick="approveDeclarationByMuhasebe('${esc(d.id)}')" class="bg-emerald-600 hover:bg-emerald-500 text-white px-2 py-1 rounded text-[10px] font-semibold"><i class="fa-solid fa-check-double mr-1"></i>Muhasebe Onayı</button><button onclick="window.kmiOpenRejectModal('${esc(d.id)}','muhasebe')" class="bg-rose-800 hover:bg-rose-700 text-white px-2 py-1 rounded text-[10px] font-semibold">Reddet</button></div></td></tr>`;
    }).join('');
   }catch(e){console.warn('[V98 muhasebe portal merge]',e);}
   tb.innerHTML=(dbRows+portalRows)||'<tr><td colspan="7" class="p-3 text-center text-slate-500">Muhasebe onayı bekleyen kalite onaylı ürün yok.</td></tr>';
@@ -7399,7 +7399,7 @@ function paintLocalAccountingPending(){
  const jobs=Array.isArray(jobOrders)?jobOrders:[];
  const pending=ds.filter(d=>String(d?.status||'')==='Hazır - Muhasebe Onayı Bekliyor');
  if(!pending.length)return;
- const rows=pending.map(d=>{const jo=jobs.find(j=>String(j.id)===String(d.jobOrder));return `<tr data-v108-local="1"><td class="p-2.5 font-mono text-blue-400">${d.id}</td><td class="p-2.5">${jo?.item||d.jobOrder||'-'}<div class="text-[9px] text-slate-500">${d.jobOrder||'-'}</div></td><td class="p-2.5">${Number(d.qualityGood??d.good??d.qty??0)} Adet</td><td class="p-2.5">${d.qualityApprovalDate||d.date||'-'}</td><td class="p-2.5"><span class="bg-emerald-900/80 text-emerald-300 px-2 py-0.5 rounded text-[10px]">Kalite Onaylı</span></td><td class="p-2.5 text-cyan-300">${d.approver||'-'}</td><td class="p-2.5"><button onclick="approveDeclarationByMuhasebe('${d.id}')" class="bg-emerald-600 hover:bg-emerald-500 text-white px-2 py-1 rounded text-[10px] font-semibold"><i class="fa-solid fa-check-double mr-1"></i>Muhasebe Onayı</button></td></tr>`}).join('');
+ const rows=pending.map(d=>{const jo=jobs.find(j=>String(j.id)===String(d.jobOrder));return `<tr data-v108-local="1"><td class="p-2.5 font-mono text-blue-400">${d.id}</td><td class="p-2.5">${jo?.item||d.jobOrder||'-'}<div class="text-[9px] text-slate-500">${d.jobOrder||'-'}</div></td><td class="p-2.5">${Number(d.qualityGood??d.good??d.qty??0)} Adet</td><td class="p-2.5">${d.qualityApprovalDate||d.date||'-'}</td><td class="p-2.5"><span class="bg-emerald-900/80 text-emerald-300 px-2 py-0.5 rounded text-[10px]">Kalite Onaylı</span></td><td class="p-2.5 text-cyan-300">${d.approver||'-'}</td><td class="p-2.5"><div class="flex flex-wrap gap-1"><button onclick="approveDeclarationByMuhasebe('${d.id}')" class="bg-emerald-600 hover:bg-emerald-500 text-white px-2 py-1 rounded text-[10px] font-semibold"><i class="fa-solid fa-check-double mr-1"></i>Muhasebe Onayı</button><button onclick="window.kmiOpenRejectModal('${d.id}','muhasebe')" class="bg-rose-800 hover:bg-rose-700 text-white px-2 py-1 rounded text-[10px] font-semibold">Reddet</button></div></td></tr>`}).join('');
  // V98 DB renderer shows an empty row when quality_approved_output is empty. Replace it with the real portal declaration queue.
  tb.innerHTML=rows;
 }
@@ -7441,7 +7441,7 @@ function renderProductionApprovals(){
  }).join('');
  const localHtml=localPending.map(d=>{
    const jo=(window.jobOrders||[]).find(j=>String(j.id)===String(d.jobOrder));
-   return `<tr data-v111-source="portal"><td class="p-2 font-mono text-blue-300">${esc(d.jobOrder||d.id)}<div class="text-[9px] text-slate-500">${esc(d.id||'')}</div></td><td class="p-2"><b>${esc(jo?.item||d.item||d.jobOrder||'-')}</b><div class="text-[9px] text-emerald-300">Kalite: ${esc(d.approver||'-')}</div><div class="text-[9px] text-amber-300">İrsaliye: ${esc(d.deliveryNoteNo||'-')} · Muhasebe: ${esc(d.accountingApprover||'-')}</div></td><td class="p-2">${esc(d.operator||'Üretim')}</td><td class="p-2 font-bold text-emerald-300">${Number(d.qualityGood??d.good??d.qty??0)}</td><td class="p-2"><span class="bg-blue-900/70 text-blue-300 px-2 py-1 rounded text-[10px]">Yönetim Onayı Bekliyor</span></td><td class="p-2"><button onclick="approveManagementRecord('${d.id}','declaration')" class="bg-blue-600 hover:bg-blue-500 text-white px-3 py-2 rounded text-[10px] font-bold"><i class="fa-solid fa-check mr-1"></i>Son Onay</button></td></tr>`;
+   return `<tr data-v111-source="portal"><td class="p-2 font-mono text-blue-300">${esc(d.jobOrder||d.id)}<div class="text-[9px] text-slate-500">${esc(d.id||'')}</div></td><td class="p-2"><b>${esc(jo?.item||d.item||d.jobOrder||'-')}</b><div class="text-[9px] text-emerald-300">Kalite: ${esc(d.approver||'-')}</div><div class="text-[9px] text-amber-300">İrsaliye: ${esc(d.deliveryNoteNo||'-')} · Muhasebe: ${esc(d.accountingApprover||'-')}</div></td><td class="p-2">${esc(d.operator||'Üretim')}</td><td class="p-2 font-bold text-emerald-300">${Number(d.qualityGood??d.good??d.qty??0)}</td><td class="p-2"><span class="bg-blue-900/70 text-blue-300 px-2 py-1 rounded text-[10px]">Yönetim Onayı Bekliyor</span></td><td class="p-2"><div class="flex flex-wrap gap-1"><button onclick="approveManagementRecord('${d.id}','declaration')" class="bg-blue-600 hover:bg-blue-500 text-white px-3 py-2 rounded text-[10px] font-bold"><i class="fa-solid fa-check mr-1"></i>Son Onay</button><button onclick="window.kmiOpenRejectModal('${d.id}','yonetim')" class="bg-rose-800 hover:bg-rose-700 text-white px-3 py-2 rounded text-[10px] font-bold">Reddet</button></div></td></tr>`;
  }).join('');
  // KMI-FIX (2026-09-26): Ender'in bildirdiği hata - "iş emri onayları onay merkezine düşmüyor,
  // iş emirlerinin altında gözüküyor ama onay merkezinde yok". Kök sebep: approveJobByMuhasebe()
@@ -7452,7 +7452,7 @@ function renderProductionApprovals(){
  const joList=(typeof jobOrders!=='undefined' && Array.isArray(jobOrders))?jobOrders:(Array.isArray(window.jobOrders)?window.jobOrders:[]);
  const jobRows=joList.filter(j=>String(j?.status||'')==='Yönetim Onayı Bekliyor' && !coveredJobIds.has(String(j.id)));
  const assignees=j=>(Array.isArray(j.assignedTo)?j.assignedTo:[]).map(id=>(window.PERSONNEL_LIST||[]).find(p=>Number(p.id)===Number(id)||String(p.dbId||p.uuid||'')===String(id))?.name).filter(Boolean).join(', ')||'-';
- const jobHtml=jobRows.map(j=>`<tr data-v111-source="job"><td class="p-2 font-mono text-blue-300">${esc(j.id)}</td><td class="p-2"><b>${esc(j.item||j.id)}</b><div class="text-[9px] text-amber-300">Muhasebe: ${esc(j.accountingApprover||'-')}</div></td><td class="p-2">${esc(assignees(j))}</td><td class="p-2 font-bold text-emerald-300">${Number(j.completedQty||0)}</td><td class="p-2"><span class="bg-blue-900/70 text-blue-300 px-2 py-1 rounded text-[10px]">Yönetim Onayı Bekliyor</span></td><td class="p-2"><button onclick="approveManagementRecord('${esc(j.id)}','job')" class="bg-blue-600 hover:bg-blue-500 text-white px-3 py-2 rounded text-[10px] font-bold"><i class="fa-solid fa-check mr-1"></i>Son Onay</button></td></tr>`).join('');
+ const jobHtml=jobRows.map(j=>`<tr data-v111-source="job"><td class="p-2 font-mono text-blue-300">${esc(j.id)}</td><td class="p-2"><b>${esc(j.item||j.id)}</b><div class="text-[9px] text-amber-300">Muhasebe: ${esc(j.accountingApprover||'-')}</div></td><td class="p-2">${esc(assignees(j))}</td><td class="p-2 font-bold text-emerald-300">${Number(j.completedQty||0)}</td><td class="p-2"><span class="bg-blue-900/70 text-blue-300 px-2 py-1 rounded text-[10px]">Yönetim Onayı Bekliyor</span></td><td class="p-2"><div class="flex flex-wrap gap-1"><button onclick="approveManagementRecord('${esc(j.id)}','job')" class="bg-blue-600 hover:bg-blue-500 text-white px-3 py-2 rounded text-[10px] font-bold"><i class="fa-solid fa-check mr-1"></i>Son Onay</button><button onclick="window.kmiOpenRejectJobLevelModal('${esc(j.id)}')" class="bg-rose-800 hover:bg-rose-700 text-white px-3 py-2 rounded text-[10px] font-bold">Reddet</button></div></td></tr>`).join('');
  tb.innerHTML=dbHtml+localHtml+jobHtml||'<tr><td colspan="6" class="p-4 text-center text-slate-500">Üretim tarafında yönetim onayı bekleyen kayıt yok.</td></tr>';
 }
 function centralizePO(){
@@ -9391,10 +9391,10 @@ function queueSection(title,icon,colorCls,rows,kind){
      const j=jobFor(d);
      if(kind==='vibrasyon'){
        return `<tr class="border-t border-slate-800"><td class="p-2 font-mono">${E(d.id)}</td><td class="p-2">${E(d.jobOrder)} <span class="text-slate-500">${E(j?.item||'')}</span></td><td class="p-2">${E(d.operator)}</td><td class="p-2">${N(d.good)} sağlam${d.scrap?' · '+N(d.scrap)+' hurda':''}</td>
-       <td class="p-2"><button onclick="window.kmiApproveVibrasyon('${E(d.id)}')" class="bg-indigo-700 hover:bg-indigo-600 text-white px-3 py-1.5 rounded text-[10px] font-bold"><i class="fa-solid fa-check mr-1"></i>Vibrasyon Yapıldı</button></td></tr>`;
+       <td class="p-2 flex flex-wrap gap-1"><button onclick="window.kmiApproveVibrasyon('${E(d.id)}')" class="bg-indigo-700 hover:bg-indigo-600 text-white px-3 py-1.5 rounded text-[10px] font-bold"><i class="fa-solid fa-check mr-1"></i>Vibrasyon Yapıldı</button><button onclick="window.kmiOpenRejectModal('${E(d.id)}','vibrasyon')" class="bg-rose-800 hover:bg-rose-700 text-white px-3 py-1.5 rounded text-[10px] font-bold"><i class="fa-solid fa-ban mr-1"></i>Reddet</button></td></tr>`;
      }
      return `<tr class="border-t border-slate-800"><td class="p-2 font-mono">${E(d.id)}</td><td class="p-2">${E(d.jobOrder)} <span class="text-slate-500">${E(j?.item||'')}</span></td><td class="p-2">${E(d.operator)}</td><td class="p-2">${N(d.good)} sağlam${d.scrap?' · '+N(d.scrap)+' hurda':''}</td>
-     <td class="p-2"><button onclick="window.kmiApproveTesviye('${E(d.id)}')" class="bg-violet-700 hover:bg-violet-600 text-white px-3 py-1.5 rounded text-[10px] font-bold"><i class="fa-solid fa-check mr-1"></i>Tesviye Yapıldı</button></td></tr>`;
+     <td class="p-2 flex flex-wrap gap-1"><button onclick="window.kmiApproveTesviye('${E(d.id)}')" class="bg-violet-700 hover:bg-violet-600 text-white px-3 py-1.5 rounded text-[10px] font-bold"><i class="fa-solid fa-check mr-1"></i>Tesviye Yapıldı</button><button onclick="window.kmiOpenRejectModal('${E(d.id)}','tesviye')" class="bg-rose-800 hover:bg-rose-700 text-white px-3 py-1.5 rounded text-[10px] font-bold"><i class="fa-solid fa-ban mr-1"></i>Reddet</button></td></tr>`;
    }).join('')}</tbody></table></div>
  </div>`;
 }
@@ -9446,6 +9446,144 @@ window.kmiJobPostOpBadges=function(jobId){
  return chips.join(' ');
 };
 document.addEventListener('DOMContentLoaded',()=>setTimeout(()=>{try{window.kmiRenderPostOpQueues();}catch(e){}},400));
+// KMI-FIX (2026-09-26): Ender'in isteği - "bu tüm onay işlemleri sanki zorunlu gibi, kimse
+// reddedemiyor, red edilmesi şart ve red edilince sırası ile geri gitmesi gerekiyor". Öncesinde
+// Tesviye/Vibrasyon/Kalite/Muhasebe/Yönetim/Sevkiyat aşamalarının HİÇBİRİNDE "Reddet" seçeneği
+// yoktu - sadece onayla vardı. Artık her aşamada ret nedeni zorunlu bir "Reddet" var, ve kayıt
+// otomatik olarak SIRAYLA bir önceki adıma geri gönderiliyor: Kalite→Operatör/Üretim,
+// Muhasebe→Kalite, Yönetim→Muhasebe, Sevkiyat→Yönetim. Tesviye/Vibrasyon özelinde (Ender'in
+// #7 isteği) reddeden kişi kime geri göndereceğini seçer: tesviyeyi/vibrasyonu yapan kalite
+// personeline (kendi kuyruğunda kalır) ya da üreten operatöre (iş emri yeniden üretime açılır).
+window.KMI_REJECT_STAGES={
+ tesviye:{label:'Tesviye',check:d=>d.status==='Tesviye Bekliyor',needsTarget:true},
+ vibrasyon:{label:'Vibrasyon',check:d=>d.status==='Vibrasyon Bekliyor',needsTarget:true},
+ kalite:{label:'Kalite',check:d=>d.status==='Kalite Bekliyor'},
+ muhasebe:{label:'Muhasebe',check:d=>d.status==='Hazır - Muhasebe Onayı Bekliyor'},
+ yonetim:{label:'Yönetim',check:d=>d.status==='Yönetim Onayı Bekliyor'},
+ sevkiyat:{label:'Sevkiyat',check:d=>d.status==='Sevk Onayı Bekliyor'}
+};
+function kmiRejectPermission(stage){
+ if(!currentUser) return false;
+ const role=typeof getEffectiveRole==='function'?getEffectiveRole(currentUser):currentUser.role;
+ if(role==='ADMIN') return true;
+ if(stage==='tesviye') return canSeeOp(window.KMI_TESVIYE_SKILL_ID);
+ if(stage==='vibrasyon') return canSeeOp(window.KMI_VIBRASYON_SKILL_ID);
+ if(stage==='kalite') return role==='KALITE';
+ if(stage==='muhasebe') return typeof isBurcuAccountingAuthority==='function'&&isBurcuAccountingAuthority(currentUser);
+ if(stage==='yonetim') return typeof canManagementApprove==='function'&&canManagementApprove(currentUser);
+ if(stage==='sevkiyat') return typeof hasScreenAccess==='function'&&hasScreenAccess(currentUser,'sevkiyat');
+ return false;
+}
+window.kmiOpenRejectModal=function(declId,stage){
+ const d=(declarations||[]).find(x=>x.id===declId); if(!d){toast('Beyan bulunamadı.','warn');return;}
+ const cfg=window.KMI_REJECT_STAGES[stage]; if(!cfg){toast('Bilinmeyen aşama.','warn');return;}
+ if(!kmiRejectPermission(stage)){alert('Bu aşamayı reddetmek için yetkiniz yok.');return;}
+ if(!cfg.check(d)){alert('Bu kayıt artık bu aşamada değil - sayfa güncel olmayabilir, yenileyin.');try{refreshAllViews();}catch(e){}return;}
+ document.getElementById('kmiRejectModal')?.remove();
+ const jo=(jobOrders||[]).find(j=>String(j.id)===String(d.jobOrder));
+ const m=document.createElement('div');m.id='kmiRejectModal';m.className='fixed inset-0 z-[300] bg-black/70 flex items-center justify-center p-4';
+ m.innerHTML=`<div class="w-full max-w-md bg-slate-900 border border-rose-700 rounded-2xl p-5">
+   <div class="text-lg font-black text-white mb-1"><i class="fa-solid fa-ban text-rose-400 mr-2"></i>${E(cfg.label)} · Reddet</div>
+   <div class="text-xs text-slate-400 mb-3">${E(d.id)} · ${E(d.jobOrder)} ${jo?'· '+E(jo.item||''):''}</div>
+   ${cfg.needsTarget?`<label class="block text-xs text-slate-300 mb-1">Kime geri gönderilsin?</label>
+   <select id="kmiRejectTarget" class="w-full bg-slate-950 border border-slate-700 rounded p-2 text-white text-xs mb-3">
+     <option value="preparer">${E(cfg.label)}i yapan kalite personeline (kendi kuyruğunda kalsın, düzeltip yeniden göndersin)</option>
+     <option value="operator">Üreten üretim operatörüne (iş emri yeniden üretime açılsın)</option>
+   </select>`:''}
+   <label class="block text-xs text-slate-300 mb-1">Ret nedeni (zorunlu)</label>
+   <textarea id="kmiRejectReason" rows="3" class="w-full bg-slate-950 border border-rose-700 rounded p-2 text-white text-xs" placeholder="Neden reddedildiğini yazın, karşı taraf bunu görecek..."></textarea>
+   <div id="kmiRejectMsg" class="text-[11px] text-rose-400 mt-2 hidden"></div>
+   <div class="grid grid-cols-2 gap-2 mt-4">
+     <button onclick="document.getElementById('kmiRejectModal').remove()" class="bg-slate-800 rounded-xl py-2.5 font-bold text-slate-300">Vazgeç</button>
+     <button onclick="window.kmiSubmitReject('${E(declId)}','${stage}')" class="bg-rose-700 hover:bg-rose-600 rounded-xl py-2.5 font-black text-white">Reddet</button>
+   </div>
+ </div>`;
+ document.body.appendChild(m);
+ setTimeout(()=>document.getElementById('kmiRejectReason')?.focus(),50);
+};
+window.kmiSubmitReject=function(declId,stage){
+ const reasonEl=document.getElementById('kmiRejectReason'),msgEl=document.getElementById('kmiRejectMsg');
+ const reason=(reasonEl?.value||'').trim();
+ if(!reason){if(msgEl){msgEl.textContent='Ret nedeni yazmadan reddedemezsiniz.';msgEl.classList.remove('hidden');}return;}
+ const targetSel=document.getElementById('kmiRejectTarget');
+ const target=targetSel?targetSel.value:null;
+ document.getElementById('kmiRejectModal')?.remove();
+ window.kmiRejectDeclaration(declId,stage,reason,target);
+};
+window.kmiRejectDeclaration=function(declId,stage,reason,target){
+ const d=(declarations||[]).find(x=>x.id===declId); if(!d)return;
+ const cfg=window.KMI_REJECT_STAGES[stage]; if(!cfg)return;
+ if(!kmiRejectPermission(stage)){alert('Bu aşamayı reddetmek için yetkiniz yok.');return;}
+ if(!cfg.check(d)){alert('Bu kayıt artık bu aşamada değil - sayfa güncel olmayabilir, yenileyin.');try{refreshAllViews();}catch(e){}return;}
+ const jo=(jobOrders||[]).find(j=>String(j.id)===String(d.jobOrder));
+ d.rejections=Array.isArray(d.rejections)?d.rejections:[];
+ const entry={stage,stageLabel:cfg.label,by:currentUser?.name||'-',at:new Date().toISOString(),reason,target:target||null};
+ d.rejections.unshift(entry);
+ d.lastRejection=entry;
+ if(stage==='tesviye'){
+  if(target==='operator'){ d.status='Tesviye Reddedildi - Üretime İade'; if(jo){jo.status='Üretimde';jo.updatedAt=new Date().toISOString();} }
+  else { d.status='Tesviye Bekliyor'; }
+ } else if(stage==='vibrasyon'){
+  if(target==='operator'){ d.status='Vibrasyon Reddedildi - Üretime İade'; if(jo){jo.status='Üretimde';jo.updatedAt=new Date().toISOString();} }
+  else { d.status='Vibrasyon Bekliyor'; }
+ } else if(stage==='kalite'){
+  d.status='Kalite Reddetti - Üretime İade'; if(jo){jo.status='Üretimde';jo.updatedAt=new Date().toISOString();}
+ } else if(stage==='muhasebe'){
+  d.status='Kalite Bekliyor'; if(jo){jo.status='Kalite Bekliyor';jo.updatedAt=new Date().toISOString();}
+ } else if(stage==='yonetim'){
+  d.status='Hazır - Muhasebe Onayı Bekliyor'; if(jo){jo.status='Muhasebe Onayı Bekliyor';jo.updatedAt=new Date().toISOString();}
+ } else if(stage==='sevkiyat'){
+  d.status='Yönetim Onayı Bekliyor'; if(jo){jo.status='Yönetim Onayı Bekliyor';jo.updatedAt=new Date().toISOString();}
+ }
+ d.updatedAt=new Date().toISOString();
+ saveStorage('declarations',declarations);
+ if(jo) saveStorage('jobOrders',jobOrders);
+ try{queueManagerReport(`${cfg.label} reddetti (${d.jobOrder}): ${reason}`);}catch(e){}
+ try{KMI?.event?.('REJECTED','JOB_ORDER',d.jobOrder,{label:`${cfg.label} reddetti: ${reason}`,source:'REJECT_FLOW'});}catch(e){}
+ try{refreshAllViews();}catch(e){}
+ try{window.kmiRenderPostOpQueues();}catch(e){}
+ toast(cfg.label+' reddedildi, kayıt bir önceki adıma gönderildi.','warn');
+};
+// Job-emri seviyesinde (declarasyonsuz) Muhasebe onayından geçmiş bir iş emrinin Yönetim
+// tarafından reddi - approveJobByMuhasebe akışının tersi, Muhasebe onayı öncesine döner.
+window.kmiRejectJobLevel=function(jobId,reason){
+ const j=(jobOrders||[]).find(x=>String(x.id)===String(jobId)); if(!j)return;
+ if(!(currentUser&&typeof canManagementApprove==='function'&&canManagementApprove(currentUser))){alert('Bu işlem için Yönetim onay yetkisi gerekir.');return;}
+ j.rejections=Array.isArray(j.rejections)?j.rejections:[];
+ const entry={stage:'yonetim',stageLabel:'Yönetim',by:currentUser?.name||'-',at:new Date().toISOString(),reason};
+ j.rejections.unshift(entry); j.lastRejection=entry;
+ j.status='Muhasebe Onayı Bekliyor'; j.updatedAt=new Date().toISOString();
+ saveStorage('jobOrders',jobOrders);
+ try{queueManagerReport(`Yönetim iş emri reddetti (${jobId}): ${reason}`);}catch(e){}
+ try{refreshAllViews();}catch(e){}
+ toast('Reddedildi, iş emri Muhasebe onayına geri gönderildi.','warn');
+};
+window.kmiOpenRejectJobLevelModal=function(jobId){
+ if(!(currentUser&&typeof canManagementApprove==='function'&&canManagementApprove(currentUser))){alert('Bu işlem için Yönetim onay yetkisi gerekir.');return;}
+ document.getElementById('kmiRejectModal')?.remove();
+ const j=(jobOrders||[]).find(x=>String(x.id)===String(jobId));
+ const m=document.createElement('div');m.id='kmiRejectModal';m.className='fixed inset-0 z-[300] bg-black/70 flex items-center justify-center p-4';
+ m.innerHTML=`<div class="w-full max-w-md bg-slate-900 border border-rose-700 rounded-2xl p-5">
+   <div class="text-lg font-black text-white mb-1"><i class="fa-solid fa-ban text-rose-400 mr-2"></i>Yönetim · Reddet</div>
+   <div class="text-xs text-slate-400 mb-3">${E(jobId)}${j?' · '+E(j.item||''):''}</div>
+   <label class="block text-xs text-slate-300 mb-1">Ret nedeni (zorunlu)</label>
+   <textarea id="kmiRejectReason" rows="3" class="w-full bg-slate-950 border border-rose-700 rounded p-2 text-white text-xs" placeholder="Neden reddedildiğini yazın..."></textarea>
+   <div id="kmiRejectMsg" class="text-[11px] text-rose-400 mt-2 hidden"></div>
+   <div class="grid grid-cols-2 gap-2 mt-4">
+     <button onclick="document.getElementById('kmiRejectModal').remove()" class="bg-slate-800 rounded-xl py-2.5 font-bold text-slate-300">Vazgeç</button>
+     <button onclick="window.kmiSubmitRejectJobLevel('${E(jobId)}')" class="bg-rose-700 hover:bg-rose-600 rounded-xl py-2.5 font-black text-white">Reddet</button>
+   </div>
+ </div>`;
+ document.body.appendChild(m);
+ setTimeout(()=>document.getElementById('kmiRejectReason')?.focus(),50);
+};
+window.kmiSubmitRejectJobLevel=function(jobId){
+ const reasonEl=document.getElementById('kmiRejectReason'),msgEl=document.getElementById('kmiRejectMsg');
+ const reason=(reasonEl?.value||'').trim();
+ if(!reason){if(msgEl){msgEl.textContent='Ret nedeni yazmadan reddedemezsiniz.';msgEl.classList.remove('hidden');}return;}
+ document.getElementById('kmiRejectModal')?.remove();
+ window.kmiRejectJobLevel(jobId,reason);
+};
 })();
 </script>
 <script id="kmi-v73-product-files">
