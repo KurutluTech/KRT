@@ -726,10 +726,7 @@ ead>
                     <div>
                       <div class="text-[10px] uppercase tracking-widest text-indigo-400 font-bold mb-2">Personel</div>
                       <div class="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3">
-                        <button class="admin-module-tile" data-module-button="personnel" onclick="openAdminModule('personnel')"><i class="fa-solid fa-users-gear text-indigo-400 text-xl"></i><div class="font-bold text-white mt-3">Personel</div><div class="text-[10px] text-slate-500 mt-1">Personel ve yetkiler</div></button>
-                        <button class="admin-module-tile" data-module-button="personnel" onclick="openAdminModule('personnel');setTimeout(()=>window.kmiExpandRozetPin&&window.kmiExpandRozetPin(),60);"><i class="fa-solid fa-id-card-clip text-cyan-400 text-xl"></i><div class="font-bold text-white mt-3">Rozet / PIN Yönetimi</div><div class="text-[10px] text-slate-500 mt-1">Personel altında · Saha girişi için PIN + QR kart</div></button>
-                        <button class="admin-module-tile" data-module-button="shifts" onclick="openAdminModule('shifts')"><i class="fa-solid fa-people-group text-emerald-400 text-xl"></i><div class="font-bold text-white mt-3">Vardiyalar</div><div class="text-[10px] text-slate-500 mt-1">TeamK1 / TeamK2</div></button>
-                        <button class="admin-module-tile" data-module-button="skills" onclick="openAdminModule('skills')"><i class="fa-solid fa-graduation-cap text-amber-400 text-xl"></i><div class="font-bold text-white mt-3">Kabiliyetler</div><div class="text-[10px] text-slate-500 mt-1">Eğitim ve yetkinlik</div></button>
+                        <button class="admin-module-tile" data-module-button="personnel" onclick="openAdminModule('personnel')"><i class="fa-solid fa-users-gear text-indigo-400 text-xl"></i><div class="font-bold text-white mt-3">Personel</div><div class="text-[10px] text-slate-500 mt-1">Personel · Vardiya · Rozet/PIN · Kabiliyet</div></button>
                         <button class="admin-module-tile" data-module-button="puantaj" onclick="openAdminModule('puantaj')"><i class="fa-solid fa-scale-balanced text-emerald-400 text-xl"></i><div class="font-bold text-white mt-3">Puantaj & Prim</div><div class="text-[10px] text-slate-500 mt-1">Algoritma ve bütçe</div></button>
                         <button class="admin-module-tile" data-module-button="bonuslist" onclick="openAdminModule('bonuslist')"><i class="fa-solid fa-ranking-star text-pink-400 text-xl"></i><div class="font-bold text-white mt-3">Prim Listesi</div><div class="text-[10px] text-slate-500 mt-1">Personel puantaj dağılımı</div></button>
                       </div>
@@ -812,16 +809,10 @@ ead>
                   <div class="overflow-x-auto"><table class="w-full text-xs text-slate-300"><thead class="bg-slate-900 text-slate-400"><tr><th class="p-2 text-left">Kayıt</th><th class="p-2 text-left">Makine</th><th class="p-2 text-left">Tip</th><th class="p-2 text-left">Açıklama</th><th class="p-2 text-left">Plan / Açılış</th><th class="p-2 text-left">Sorumlu</th><th class="p-2 text-left">SLA</th><th class="p-2 text-left">Durum</th><th class="p-2">İşlem</th></tr></thead><tbody id="maintenanceTableBody"></tbody></table></div>
                 </div>
 
-                <!-- VARDİYA YÖNETİMİ -->
-                <div data-admin-module="shifts" class="admin-module-panel admin-card p-5 shadow-lg space-y-4">
-                    <div class="flex flex-wrap justify-between items-center gap-3 border-b border-slate-700 pb-3"><div><h3 class="text-base font-bold text-white"><i class="fa-solid fa-people-group text-emerald-400 mr-2"></i>Vardiya Takım Yönetimi</h3><p class="text-[11px] text-slate-500">1. Vardiya = <b class="text-blue-300">TeamK1</b>, 2. Vardiya = <b class="text-emerald-300">TeamK2</b>, <b class="text-amber-300">Ofis / Destek</b> = üretimde çalışmayan ofis/destek personeli. Yönetici operatörleri takımlara atar; bu bilgi operatör beyanındaki vardiyayı otomatik belirler.</p></div><button onclick="clearAllShiftAssignments()" class="bg-slate-700 hover:bg-slate-600 text-white px-3 py-1.5 rounded text-xs">Tüm Atamaları Temizle</button></div>
-                    <div class="grid grid-cols-1 lg:grid-cols-4 gap-4">
-                        <div class="bg-slate-950/60 border border-slate-700 rounded-xl p-4 space-y-3"><label class="text-xs text-slate-300 font-semibold">Operatör / Personel</label><select id="shiftEmployeeSelect" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-xs text-white"></select><div class="grid grid-cols-1 gap-2"><button onclick="assignSelectedEmployeeToTeam('TeamK1')" class="bg-blue-600 hover:bg-blue-500 rounded p-2 text-xs font-bold text-white">→ TeamK1 · 1. Vardiya</button><button onclick="assignSelectedEmployeeToTeam('TeamK2')" class="bg-emerald-600 hover:bg-emerald-500 rounded p-2 text-xs font-bold text-white">→ TeamK2 · 2. Vardiya</button><button onclick="assignSelectedEmployeeToTeam('TeamOfis')" class="bg-amber-600 hover:bg-amber-500 rounded p-2 text-xs font-bold text-white">→ Ofis / Destek</button></div><button onclick="assignSelectedEmployeeToTeam('')" class="w-full bg-slate-700 hover:bg-slate-600 rounded p-2 text-xs text-white">Vardiya Atamasını Kaldır</button><div id="shiftAssignmentStatus" class="text-[10px] text-slate-500"></div></div>
-                        <div class="shift-team-card"><div class="flex justify-between items-center mb-3"><div><div class="text-blue-300 font-black">TeamK1</div><div class="text-[10px] text-slate-500">1. Vardiya</div></div><span id="teamK1Count" class="text-xs bg-blue-500/10 text-blue-300 px-2 py-1 rounded-full">0 kişi</span></div><div id="teamK1Members" class="space-y-2"></div></div>
-                        <div class="shift-team-card"><div class="flex justify-between items-center mb-3"><div><div class="text-emerald-300 font-black">TeamK2</div><div class="text-[10px] text-slate-500">2. Vardiya</div></div><span id="teamK2Count" class="text-xs bg-emerald-500/10 text-emerald-300 px-2 py-1 rounded-full">0 kişi</span></div><div id="teamK2Members" class="space-y-2"></div></div>
-                        <div class="shift-team-card"><div class="flex justify-between items-center mb-3"><div><div class="text-amber-300 font-black">Ofis / Destek</div><div class="text-[10px] text-slate-500">Üretim Dışı</div></div><span id="teamOfisCount" class="text-xs bg-amber-500/10 text-amber-300 px-2 py-1 rounded-full">0 kişi</span></div><div id="teamOfisMembers" class="space-y-2"></div></div>
-                    </div>
-                </div>
+                <!-- KMI-FIX (2026-09-26): Ender'in isteği - Vardiyalar artık ayrı bir üst-düzey modül
+                     değil, Personel modülünün altında katlanır bir bölüm (bkz. window.kmiExpandVardiya,
+                     #vardiyaCollapse), Rozet/PIN ve Görev Performansı ile aynı desende. -->
+                <!-- (VARDİYA YÖNETİMİ HTML'i artık aşağıda, Personel modülü içinde) -->
 
                 <!-- KALİTE ONAYLI CANLI ÜRETİM DASHBOARD -->
                 <div data-admin-module="dashboard" class="admin-module-panel admin-card p-5 shadow-lg space-y-4 border border-cyan-700/40"><div class="mb-4 bg-slate-950/60 border border-indigo-800/40 rounded-xl p-4"><h4 class="text-xs font-bold text-white"><i class="fa-solid fa-industry mr-2 text-indigo-400"></i>Bugünkü Makine / Vardiya / Personel Atamaları</h4><div id="liveMachineAssignments" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3 mt-3"></div></div>
@@ -838,7 +829,7 @@ ead>
                 <div data-admin-module="personnel" class="admin-module-panel admin-card p-5 shadow-lg space-y-4">
                     <div class="personnel-hero p-5">
                         <div class="flex flex-wrap justify-between items-start gap-4"><div><div class="text-[10px] uppercase tracking-[.18em] text-amber-700 font-bold">İnsan & Yetkinlik Yönetimi</div><h3 class="text-xl font-black mt-1"><i class="fa-solid fa-users-gear mr-2"></i>Personel Yönetim Merkezi</h3><p class="text-xs text-slate-500 mt-1">Personel kartı, görev, departman, erişim, vardiya ve eğitim/kabiliyet yönetimi tek merkezden.</p></div><button onclick="openEmployeeForm()" class="bg-amber-600 hover:bg-amber-500 text-white text-sm font-bold px-5 py-3 rounded-xl shadow"><i class="fa-solid fa-user-plus mr-2"></i>Yeni Personel Ekle</button></div>
-                        <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mt-4"><button onclick="openEmployeeForm()" class="personnel-action"><i class="fa-solid fa-user-plus text-lg"></i><div class="font-bold mt-1">Personel Ekle</div><div class="text-[10px] text-slate-500">Yeni çalışan kartı</div></button><button onclick="openAdminModule('shifts')" class="personnel-action"><i class="fa-solid fa-people-group text-lg"></i><div class="font-bold mt-1">Vardiya Ata</div><div class="text-[10px] text-slate-500">TeamK1 / TeamK2</div></button><button onclick="openAdminModule('skills')" class="personnel-action"><i class="fa-solid fa-certificate text-lg"></i><div class="font-bold mt-1">Kabiliyet Ata</div><div class="text-[10px] text-slate-500">Eğitim onayları</div></button><button onclick="renderPersonnelFileCards();document.getElementById('personnelFileCards')?.scrollIntoView({behavior:'smooth'})" class="personnel-action"><i class="fa-solid fa-address-card text-lg"></i><div class="font-bold mt-1">Personel Listesi</div><div class="text-[10px] text-slate-500">Düzenle / pasife al / sil</div></button></div>
+                        <div class="grid grid-cols-2 md:grid-cols-5 gap-3 mt-4"><button onclick="openEmployeeForm()" class="personnel-action"><i class="fa-solid fa-user-plus text-lg"></i><div class="font-bold mt-1">Personel Ekle</div><div class="text-[10px] text-slate-500">Yeni çalışan kartı</div></button><button onclick="renderPersonnelFileCards();document.getElementById('personnelFileCards')?.scrollIntoView({behavior:'smooth'})" class="personnel-action"><i class="fa-solid fa-address-card text-lg"></i><div class="font-bold mt-1">Personel Listesi</div><div class="text-[10px] text-slate-500">Düzenle / pasife al / sil</div></button><button onclick="window.kmiExpandVardiya&&window.kmiExpandVardiya()" class="personnel-action"><i class="fa-solid fa-people-group text-lg"></i><div class="font-bold mt-1">Vardiya Ata</div><div class="text-[10px] text-slate-500">TeamK1 / TeamK2 / Ofis</div></button><button onclick="window.kmiExpandKabiliyet&&window.kmiExpandKabiliyet()" class="personnel-action"><i class="fa-solid fa-certificate text-lg"></i><div class="font-bold mt-1">Kabiliyet Ata</div><div class="text-[10px] text-slate-500">Eğitim onayları</div></button><button onclick="window.kmiExpandRozetPin&&window.kmiExpandRozetPin()" class="personnel-action"><i class="fa-solid fa-id-card-clip text-lg"></i><div class="font-bold mt-1">Rozet / PIN</div><div class="text-[10px] text-slate-500">Saha girişi PIN + QR</div></button></div>
                     </div>
                     <div id="employeeFormWrap" class="hidden bg-slate-900/80 border border-slate-700 rounded-xl p-4">
                         <form onsubmit="saveEmployee(event)" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-3 text-xs">
@@ -912,22 +903,46 @@ ead>
                             </div>
                         </div>
                     </div>
-                </div>
 
-                <!-- KABİLİYET / EĞİTİM YÖNETİMİ -->
-                <div data-admin-module="skills" class="admin-module-panel admin-card p-5 shadow-lg space-y-4">
-                    <div class="flex flex-wrap justify-between items-center gap-3 border-b border-slate-700 pb-3"><div><h3 class="text-sm font-bold text-white"><i class="fa-solid fa-graduation-cap text-amber-400 mr-2"></i>Kabiliyet & Eğitim Kataloğu</h3><p class="text-[11px] text-slate-500">Bu yetenekler yalnızca eğitimi tamamlamış personele yönetici tarafından atanır. Yeni kabiliyet eklenebilir; mevcut kayıtlar yeniden adlandırılabilir veya silinebilir.</p></div><div class="flex gap-2"><input id="newSkillName" placeholder="Yeni kabiliyet..." class="bg-slate-900 border border-slate-700 rounded px-3 py-1.5 text-xs text-white"><button onclick="addSkillDefinition()" class="bg-amber-600 hover:bg-amber-500 text-white px-3 py-1.5 rounded text-xs font-semibold">+ Ekle</button></div></div>
-                    <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
-                        <div class="lg:col-span-2"><div id="skillCatalogAdmin" class="grid grid-cols-1 md:grid-cols-2 gap-2"></div></div>
-                        <div class="bg-slate-950/60 border border-amber-700/40 rounded-xl p-4 space-y-3">
-                            <div><h4 class="text-sm font-bold text-white"><i class="fa-solid fa-user-check text-amber-400 mr-2"></i>Personele Kabiliyet Ata</h4><p class="text-[10px] text-slate-500 mt-1">Personeli seçin, tamamladığı eğitimleri işaretleyin ve kaydedin.</p></div>
-                            <div><label class="block text-[10px] text-slate-400 mb-1">Personel / Operatör</label><select id="skillEmployeeSelect" onchange="loadSkillAssignmentForEmployee()" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-xs text-white"></select></div>
-                            <div id="skillAssignmentChecklist" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-1 gap-2 max-h-80 overflow-y-auto pr-1"></div>
-                            <button onclick="saveSkillAssignmentForEmployee()" class="w-full bg-amber-600 hover:bg-amber-500 text-white px-3 py-2 rounded text-xs font-bold"><i class="fa-solid fa-certificate mr-1"></i>Seçili Kabiliyetleri Personele Ata</button>
-                            <div id="skillAssignmentStatus" class="text-[10px] text-slate-500"></div>
+                    <!-- KMI-FIX (2026-09-26): Ender'in isteği - Vardiyalar ve Kabiliyetler artık ayrı
+                         üst-düzey modüller değil, Personel modülünün altında katlanır bölümler,
+                         Görev Performansı ve Rozet/PIN ile aynı desende. -->
+                    <div class="border-t border-slate-700 pt-4">
+                        <button type="button" id="vardiyaToggleBtn" onclick="const b=document.getElementById('vardiyaCollapse');const open=b.style.display!=='none';b.style.display=open?'none':'block';document.getElementById('vardiyaToggleLabel').textContent=open?'Vardiya Takımlarını Göster':'Gizle';document.getElementById('vardiyaToggleIcon').classList.toggle('fa-chevron-down',open);document.getElementById('vardiyaToggleIcon').classList.toggle('fa-chevron-up',!open);if(!open){try{renderShiftTeamManager();}catch(e){}}" class="w-full flex items-center justify-between bg-slate-900 hover:bg-slate-950 border border-slate-700 rounded-lg p-3 text-xs font-bold text-slate-200">
+                            <span id="vardiyaToggleLabel"><i class="fa-solid fa-people-group text-emerald-400 mr-2"></i>Vardiya Takımlarını Göster</span>
+                            <i id="vardiyaToggleIcon" class="fa-solid fa-chevron-down"></i>
+                        </button>
+                        <div id="vardiyaCollapse" style="display:none" class="mt-3 space-y-3">
+                            <div class="flex flex-wrap justify-between items-center gap-3"><p class="text-[11px] text-slate-400">1. Vardiya = <b class="text-blue-300">TeamK1</b>, 2. Vardiya = <b class="text-emerald-300">TeamK2</b>, <b class="text-amber-300">Ofis / Destek</b> = üretimde çalışmayan ofis/destek personeli. Yönetici operatörleri takımlara atar; bu bilgi operatör beyanındaki vardiyayı otomatik belirler.</p><button onclick="clearAllShiftAssignments()" class="bg-slate-700 hover:bg-slate-600 text-white px-3 py-1.5 rounded text-xs whitespace-nowrap">Tüm Atamaları Temizle</button></div>
+                            <div class="grid grid-cols-1 lg:grid-cols-4 gap-4">
+                                <div class="bg-slate-950/60 border border-slate-700 rounded-xl p-4 space-y-3"><label class="text-xs text-slate-300 font-semibold">Operatör / Personel</label><select id="shiftEmployeeSelect" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-xs text-white"></select><div class="grid grid-cols-1 gap-2"><button onclick="assignSelectedEmployeeToTeam('TeamK1')" class="bg-blue-600 hover:bg-blue-500 rounded p-2 text-xs font-bold text-white">→ TeamK1 · 1. Vardiya</button><button onclick="assignSelectedEmployeeToTeam('TeamK2')" class="bg-emerald-600 hover:bg-emerald-500 rounded p-2 text-xs font-bold text-white">→ TeamK2 · 2. Vardiya</button><button onclick="assignSelectedEmployeeToTeam('TeamOfis')" class="bg-amber-600 hover:bg-amber-500 rounded p-2 text-xs font-bold text-white">→ Ofis / Destek</button></div><button onclick="assignSelectedEmployeeToTeam('')" class="w-full bg-slate-700 hover:bg-slate-600 rounded p-2 text-xs text-white">Vardiya Atamasını Kaldır</button><div id="shiftAssignmentStatus" class="text-[10px] text-slate-500"></div></div>
+                                <div class="shift-team-card"><div class="flex justify-between items-center mb-3"><div><div class="text-blue-300 font-black">TeamK1</div><div class="text-[10px] text-slate-500">1. Vardiya</div></div><span id="teamK1Count" class="text-xs bg-blue-500/10 text-blue-300 px-2 py-1 rounded-full">0 kişi</span></div><div id="teamK1Members" class="space-y-2"></div></div>
+                                <div class="shift-team-card"><div class="flex justify-between items-center mb-3"><div><div class="text-emerald-300 font-black">TeamK2</div><div class="text-[10px] text-slate-500">2. Vardiya</div></div><span id="teamK2Count" class="text-xs bg-emerald-500/10 text-emerald-300 px-2 py-1 rounded-full">0 kişi</span></div><div id="teamK2Members" class="space-y-2"></div></div>
+                                <div class="shift-team-card"><div class="flex justify-between items-center mb-3"><div><div class="text-amber-300 font-black">Ofis / Destek</div><div class="text-[10px] text-slate-500">Üretim Dışı</div></div><span id="teamOfisCount" class="text-xs bg-amber-500/10 text-amber-300 px-2 py-1 rounded-full">0 kişi</span></div><div id="teamOfisMembers" class="space-y-2"></div></div>
+                            </div>
                         </div>
                     </div>
-                    <div class="border-t border-slate-700 pt-4 mt-4"><div class="flex flex-wrap justify-between items-center gap-3 mb-3"><div><h4 class="text-sm font-bold text-white"><i class="fa-solid fa-briefcase text-cyan-400 mr-2"></i>Görev Kataloğu / Job Description</h4><p class="text-[10px] text-slate-500">Görevler kabiliyetlerden bağımsızdır; eklenebilir, düzenlenebilir, silinebilir ve personele birden fazla görev atanabilir.</p></div><div class="flex gap-2"><input id="newTaskName" placeholder="Yeni görev..." class="bg-slate-900 border border-slate-700 rounded px-3 py-1.5 text-xs text-white"><button onclick="addTaskDefinition()" class="bg-cyan-600 hover:bg-cyan-500 text-white px-3 py-1.5 rounded text-xs font-semibold">+ Görev Ekle</button></div></div><div class="grid grid-cols-1 lg:grid-cols-3 gap-4"><div class="lg:col-span-2"><div id="taskCatalogAdmin" class="grid grid-cols-1 md:grid-cols-2 gap-2"></div></div><div class="bg-slate-950/60 border border-cyan-700/40 rounded-xl p-4 space-y-3"><div><h4 class="text-sm font-bold text-white">Personele Görev Ata</h4><p class="text-[10px] text-slate-500">Örn. Muhasebe Görevlisi + Satın Alma Takibi.</p></div><select id="taskEmployeeSelect" onchange="loadTaskAssignmentForEmployee()" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-xs text-white"></select><div id="taskAssignmentChecklist" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-1 gap-2 max-h-72 overflow-y-auto"></div><button onclick="saveTaskAssignmentForEmployee()" class="w-full bg-cyan-600 hover:bg-cyan-500 text-white px-3 py-2 rounded text-xs font-bold">Seçili Görevleri Personele Ata</button><div id="taskAssignmentStatus" class="text-[10px] text-slate-500"></div></div></div></div>
+
+                    <div class="border-t border-slate-700 pt-4">
+                        <button type="button" id="kabiliyetToggleBtn" onclick="const b=document.getElementById('kabiliyetCollapse');const open=b.style.display!=='none';b.style.display=open?'none':'block';document.getElementById('kabiliyetToggleLabel').textContent=open?'Kabiliyet & Görev Kataloğunu Göster':'Gizle';document.getElementById('kabiliyetToggleIcon').classList.toggle('fa-chevron-down',open);document.getElementById('kabiliyetToggleIcon').classList.toggle('fa-chevron-up',!open);if(!open){try{renderSkillCatalogAdmin();renderSkillAssignmentManager();renderTaskCatalogAdmin();renderTaskAssignmentManager();}catch(e){}}" class="w-full flex items-center justify-between bg-slate-900 hover:bg-slate-950 border border-slate-700 rounded-lg p-3 text-xs font-bold text-slate-200">
+                            <span id="kabiliyetToggleLabel"><i class="fa-solid fa-graduation-cap text-amber-400 mr-2"></i>Kabiliyet & Görev Kataloğunu Göster</span>
+                            <i id="kabiliyetToggleIcon" class="fa-solid fa-chevron-down"></i>
+                        </button>
+                        <div id="kabiliyetCollapse" style="display:none" class="mt-3 space-y-4">
+                            <div class="flex flex-wrap justify-between items-center gap-3"><p class="text-[11px] text-slate-500 max-w-2xl">Bu yetenekler yalnızca eğitimi tamamlamış personele yönetici tarafından atanır. Yeni kabiliyet eklenebilir; mevcut kayıtlar yeniden adlandırılabilir veya silinebilir.</p><div class="flex gap-2"><input id="newSkillName" placeholder="Yeni kabiliyet..." class="bg-slate-900 border border-slate-700 rounded px-3 py-1.5 text-xs text-white"><button onclick="addSkillDefinition()" class="bg-amber-600 hover:bg-amber-500 text-white px-3 py-1.5 rounded text-xs font-semibold whitespace-nowrap">+ Ekle</button></div></div>
+                            <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                                <div class="lg:col-span-2"><div id="skillCatalogAdmin" class="grid grid-cols-1 md:grid-cols-2 gap-2"></div></div>
+                                <div class="bg-slate-950/60 border border-amber-700/40 rounded-xl p-4 space-y-3">
+                                    <div><h4 class="text-sm font-bold text-white"><i class="fa-solid fa-user-check text-amber-400 mr-2"></i>Personele Kabiliyet Ata</h4><p class="text-[10px] text-slate-500 mt-1">Personeli seçin, tamamladığı eğitimleri işaretleyin ve kaydedin.</p></div>
+                                    <div><label class="block text-[10px] text-slate-400 mb-1">Personel / Operatör</label><select id="skillEmployeeSelect" onchange="loadSkillAssignmentForEmployee()" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-xs text-white"></select></div>
+                                    <div id="skillAssignmentChecklist" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-1 gap-2 max-h-80 overflow-y-auto pr-1"></div>
+                                    <button onclick="saveSkillAssignmentForEmployee()" class="w-full bg-amber-600 hover:bg-amber-500 text-white px-3 py-2 rounded text-xs font-bold"><i class="fa-solid fa-certificate mr-1"></i>Seçili Kabiliyetleri Personele Ata</button>
+                                    <div id="skillAssignmentStatus" class="text-[10px] text-slate-500"></div>
+                                </div>
+                            </div>
+                            <div class="border-t border-slate-700 pt-4"><div class="flex flex-wrap justify-between items-center gap-3 mb-3"><div><h4 class="text-sm font-bold text-white"><i class="fa-solid fa-briefcase text-cyan-400 mr-2"></i>Görev Kataloğu / Job Description</h4><p class="text-[10px] text-slate-500">Görevler kabiliyetlerden bağımsızdır; eklenebilir, düzenlenebilir, silinebilir ve personele birden fazla görev atanabilir.</p></div><div class="flex gap-2"><input id="newTaskName" placeholder="Yeni görev..." class="bg-slate-900 border border-slate-700 rounded px-3 py-1.5 text-xs text-white"><button onclick="addTaskDefinition()" class="bg-cyan-600 hover:bg-cyan-500 text-white px-3 py-1.5 rounded text-xs font-semibold whitespace-nowrap">+ Görev Ekle</button></div></div><div class="grid grid-cols-1 lg:grid-cols-3 gap-4"><div class="lg:col-span-2"><div id="taskCatalogAdmin" class="grid grid-cols-1 md:grid-cols-2 gap-2"></div></div><div class="bg-slate-950/60 border border-cyan-700/40 rounded-xl p-4 space-y-3"><div><h4 class="text-sm font-bold text-white">Personele Görev Ata</h4><p class="text-[10px] text-slate-500">Örn. Muhasebe Görevlisi + Satın Alma Takibi.</p></div><select id="taskEmployeeSelect" onchange="loadTaskAssignmentForEmployee()" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-xs text-white"></select><div id="taskAssignmentChecklist" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-1 gap-2 max-h-72 overflow-y-auto"></div><button onclick="saveTaskAssignmentForEmployee()" class="w-full bg-cyan-600 hover:bg-cyan-500 text-white px-3 py-2 rounded text-xs font-bold">Seçili Görevleri Personele Ata</button><div id="taskAssignmentStatus" class="text-[10px] text-slate-500"></div></div></div></div>
+                        </div>
+                    </div>
                 </div>
 
                 <!-- AYLIK PUANTAJ ALGORİTMASI -->
@@ -1263,7 +1278,7 @@ ead>
             const st=document.getElementById('skillAssignmentStatus'); if(st){st.textContent=`✓ ${p.name} için ${p.skills.length} kabiliyet kaydedildi.`;st.className='text-[10px] text-emerald-400 font-semibold';}
             renderEmployeeAdminTableSafe(); renderUserAdminTable(); renderOperatorProfile();
         }
-        function addSkillDefinition(){if(!currentUser||getEffectiveRole(currentUser)!=='ADMIN'){alert('Yalnız yöneticiler kabiliyet ekleyebilir.');return;}const inp=document.getElementById('newSkillName');const name=(inp?.value||'').trim();if(!name)return;if(SKILL_CATALOG.some(x=>x.name.toLocaleLowerCase('tr-TR')===name.toLocaleLowerCase('tr-TR'))){alert('Bu kabiliyet zaten tanımlı.');return;}SKILL_CATALOG.push({id:SKILL_CATALOG.reduce((m,x)=>Math.max(m,Number(x.id)||0),0)+1,name});saveStorage('SKILL_CATALOG',SKILL_CATALOG);if(inp)inp.value='';renderSkillCatalogAdmin();renderSkillAssignmentManager();renderEmployeeSkillsChecklist([]);}
+        function addSkillDefinition(){if(!currentUser||getEffectiveRole(currentUser)!=='ADMIN'){alert('Yalnız yöneticiler kabiliyet ekleyebilir.');return;}const inp=document.getElementById('newSkillName');const name=(inp?.value||'').trim();if(!name)return;if(SKILL_CATALOG.some(x=>x.name.toLocaleLowerCase('tr-TR')===name.toLocaleLowerCase('tr-TR'))){alert('Bu kabiliyet zaten tanımlı.');return;}SKILL_CATALOG.push({id:SKILL_CATALOG.reduce((m,x)=>Math.max(m,Number(x.id)||0),0)+1,name});saveStorage('SKILL_CATALOG',SKILL_CATALOG);if(inp)inp.value='';renderSkillCatalogAdmin();renderSkillAssignmentManager();renderTaskCatalogAdmin();renderTaskAssignmentManager();renderEmployeeSkillsChecklist([]);}
         function editSkillDefinition(id){if(!currentUser||getEffectiveRole(currentUser)!=='ADMIN'){alert('Yalnız yöneticiler kabiliyet düzenleyebilir.');return;}const sk=SKILL_CATALOG.find(x=>Number(x.id)===Number(id));if(!sk)return;const name=prompt('Kabiliyet / eğitim adını düzenleyin:',sk.name);if(name===null)return;const clean=name.trim();if(!clean)return;sk.name=clean;saveStorage('SKILL_CATALOG',SKILL_CATALOG);renderSkillCatalogAdmin();refreshAllViews();}
         function deleteSkillDefinition(id){if(!currentUser||getEffectiveRole(currentUser)!=='ADMIN'){alert('Yalnız yöneticiler kabiliyet silebilir.');return;}const sk=SKILL_CATALOG.find(x=>Number(x.id)===Number(id));if(!sk||!confirm('"'+sk.name+'" kabiliyetini katalogdan ve personel atamalarından silmek istiyor musunuz?'))return;SKILL_CATALOG=SKILL_CATALOG.filter(x=>Number(x.id)!==Number(id));PERSONNEL_LIST.forEach(p=>p.skills=(p.skills||[]).filter(x=>Number(x)!==Number(id)));saveStorage('SKILL_CATALOG',SKILL_CATALOG);saveStorage('PERSONNEL_LIST',PERSONNEL_LIST);renderSkillCatalogAdmin();refreshAllViews();}
         // YÖNETİCİ TANIMLI GÖREV / JOB DESCRIPTION KATALOĞU
@@ -1782,8 +1797,10 @@ ead>
         function openAdminModule(name){
             document.querySelectorAll('[data-admin-module]').forEach(el=>el.classList.toggle('admin-module-open',el.dataset.adminModule===name));
             document.querySelectorAll('[data-module-button]').forEach(b=>b.classList.toggle('active',b.dataset.moduleButton===name));
-            if(name==='shifts') renderShiftTeamManager();
-            if(name==='skills'){renderSkillCatalogAdmin();renderSkillAssignmentManager();}
+            // KMI-FIX (2026-09-26): 'shifts' ve 'skills' artık bağımsız üst-düzey modüller değil;
+            // Vardiyalar ve Kabiliyetler Personel modülünün altında katlanır bölümler (bkz.
+            // window.kmiExpandVardiya / window.kmiExpandKabiliyet, #vardiyaCollapse / #kabiliyetCollapse)
+            // ve render'ları o bölümler açıldığında tetiklenir.
             if(name==='dashboard') renderQualityProductionDashboard();
             if(name==='targets'){renderProductionTargetCenter();const x=document.getElementById('productionTargetMonth');if(x&&!x.dataset.bound){x.addEventListener('change',renderProductionTargetCenter);x.dataset.bound='1';}}
             // KMI-FIX (2026-09-25): Ender'in bildirdiği hata - operatörün girdiği arıza bildirimi
@@ -2324,6 +2341,24 @@ ead>
             tbody.innerHTML=declarations.map(d=>{const g=d.good??Math.max(0,(d.qty||0)-(d.scrap||0)-(d.allocated||0)),sc=d.scrap||0,al=d.allocated||0;const selected=(d.measurementMethods||[])[0]||'';return `<tr><td class="p-2.5 font-mono text-blue-400">${d.id}</td><td class="p-2.5">${d.date}</td><td class="p-2.5">${d.operator}</td><td class="p-2.5">${d.machine}</td><td class="p-2.5">${d.jobOrder}</td><td class="p-2.5"><div class="grid grid-cols-3 gap-1 text-center"><span class="bg-emerald-950/60 text-emerald-300 rounded p-1">S ${g}</span><span class="bg-red-950/60 text-red-300 rounded p-1">H ${sc}</span><span class="bg-amber-950/60 text-amber-300 rounded p-1">T ${al}</span></div></td><td class="p-2.5">${d.status==='Kalite Bekliyor'?`<div class="grid grid-cols-3 gap-1"><input id="qGood-${d.id}" type="number" min="0" value="${g}" class="w-16 bg-slate-900 border border-emerald-700 rounded p-1 text-white"><input id="qScrap-${d.id}" type="number" min="0" value="${sc}" class="w-16 bg-slate-900 border border-red-700 rounded p-1 text-white"><input id="qAllocated-${d.id}" type="number" min="0" value="${al}" class="w-16 bg-slate-900 border border-amber-700 rounded p-1 text-white"></div><select id="qMeasure-${d.id}" class="mt-2 w-full min-w-[190px] bg-slate-950 border border-cyan-700 rounded p-2 text-[10px] text-white"><option value="">Ölçüm cihazı / yöntemi seçin</option>${methods.map(x=>`<option value="${x}" ${selected===x?'selected':''}>${x}</option>`).join('')}</select>`:`<div class="text-[10px]"><b class="text-emerald-300">S ${d.qualityGood??g}</b> · <b class="text-red-300">H ${d.qualityScrap??sc}</b> · <b class="text-amber-300">T ${d.qualityAllocated??al}</b><div class="mt-1 text-cyan-300">${(d.measurementMethods||[]).join(', ')||'Ölçüm yöntemi kaydı yok'}</div></div>`}</td><td class="p-2.5"><span class="text-[10px]">${d.status}</span></td><td class="p-2.5 text-emerald-400">${d.approver||'-'}</td><td class="p-2.5">${d.status==='Kalite Bekliyor'?`<button onclick="approveKalite('${d.id}')" class="bg-emerald-600 text-white px-2 py-1 rounded text-[10px]">Tespiti Kaydet & Onayla</button>`:'<span class="text-emerald-500 text-[10px]">✓ Onaylandı</span>'}</td></tr>`}).join('');
         }
 
+        // KMI-FIX (2026-09-26): Ender'in isteği - iş emri kapatılıp BAŞKA bir makineye/operasyona
+        // gönderiliyorsa (ürünün rota tanımında ara adım), bu SON ürün/sevke hazır üretim SAYILMAMALI;
+        // yalnızca ürünün rota tanımındaki SON operasyonu tamamlanınca sipariş "üretildi" sayılır.
+        // Ürün için rota tanımlı değilse (tek adım) veya son adımın makinesi belirtilmemişse, veri
+        // kaybı yaşanmaması için güvenli tarafta kalınıp SON operasyon kabul edilir.
+        window.kmiIsFinalOperationJobOrder=function(jo){
+            try{
+                const prod=(window.D?.products||[]).find(p=>String(p.id)===String(jo?.productId));
+                const steps=(prod?.routeSteps||[]).filter(s=>s&&(s.machine||s.op));
+                if(steps.length<2) return true;
+                const last=steps[steps.length-1];
+                if(!last.machine) return true;
+                const jm=String(jo.machine||'').trim(); if(!jm) return true;
+                const lm=String(last.machine||'').trim();
+                const codeOf=s=>String(s).split('-')[0].trim();
+                return jm===lm || codeOf(jm)===codeOf(lm);
+            }catch(e){ return true; }
+        };
         function approveKalite(declId) {
             if (!currentUser || !['KALITE','ADMIN'].includes(getEffectiveRole(currentUser))) { alert('Bu işlem yalnızca Kalite yetkilisi tarafından yapılabilir.'); return; }
             const d = declarations.find(x => x.id === declId);
@@ -2362,6 +2397,25 @@ ead>
                         }
                     }
                 }catch(e){ console.error('[Ham madde otomatik güncelleme]',e); }
+                // KMI-FIX (2026-09-26): Ender'in bildirdiği kritik hata - "WO/Üretim'e basınca yine 1000
+                // adetlik iş emri oluşturuyor, üretileni düşemeden". Kök neden: bir iş emri tamamlanınca
+                // (Tamamlandı/Silindi vb.) "aktif iş emri" sayımından düşüyordu AMA buna karşılık müşteri
+                // siparişinin "üretilen" (l.produced) alanı hiç güncellenmiyordu - üretim gerçekten bitmiş
+                // olsa bile sipariş "0 üretilmiş" sanıyor ve WO/Üretim tekrar basılınca TÜM sipariş adedini
+                // yeni baştan iş emri olarak açıyordu. Artık: kalite onaylanan SAĞLAM adet, iş emrinin bağlı
+                // olduğu müşteri siparişine (varsa) OTOMATİK "üretildi" olarak işleniyor - üretim motoru
+                // artık gerçekten operatör iş beyanı + kalite onayı ile çalışıyor, manuel "Bitmiş Ürün"
+                // girişine bağımlı değil. Ara işleme (başka makine/operasyona) giden iş emirleri (ürünün
+                // rota tanımındaki SON operasyon değilse) sipariş üretim sayacına dahil edilmez - o da bir
+                // sonraki operasyonun kendi kalite onayında sayılır.
+                try{
+                    if(jo && jo.salesOrderId && Number(d.qualityGood||0)>0){
+                        const isFinalOp = window.kmiIsFinalOperationJobOrder ? window.kmiIsFinalOperationJobOrder(jo) : true;
+                        if(isFinalOp && window.v118CreditProduction){
+                            window.v118CreditProduction(jo.salesOrderId, jo.productId, Number(d.qualityGood||0));
+                        }
+                    }
+                }catch(e){ console.error('[Sipariş üretim kredisi]',e); }
                 // KMI-FIX (2026-09-25): Operasyonlar arası sevk beyanı (bkz. confirmMachineTransfer).
                 // Bu beyan Muhasebe/Sevkiyat akışına GİRMEZ - iş emri henüz bitmedi, sadece bir
                 // operasyondan diğerine geçiyor. Kalite onayı burada iş emrini gerçekten hedef
@@ -2905,17 +2959,37 @@ ead>
                 // sadece üretim alanındaki (Üretim departmanı / CNC operatörleri) personeli
                 // göstermesini istedi - ofis/destek personeli GEÇKO'dan giriş yapsa bile burada
                 // listelenmesin.
-                const onSite=(data||[]).map(r=>{
-                    const local=(window.PERSONNEL_LIST||[]).find(p=>sameId(p.dbId,r.personnel_id)||sameId(p.uuid,r.personnel_id));
+                // KMI-FIX (2026-09-26): Ender'in bildirdiği hata - "GEÇKO'da içerde üretim personeli
+                // var ama burada kimse gözükmüyor". Kök neden: eşleştirme SADECE personnel_id'nin
+                // yerel kayıttaki dbId/uuid alanına birebir eşleşmesine bakıyordu; bu eşleşme
+                // tutmazsa personel "local" bulunamıyor, departmanı boş kalıyor ve departman="üretim"
+                // filtresi onu SESSİZCE dışarıda bırakıyordu - turnikeden gerçekten giriş yapmış
+                // üretim personeli ekranda hiç görünmüyordu. Artık: (1) dbId/uuid tutmazsa ada göre
+                // de eşleştirme deneniyor, (2) departman boş/farklı ama sistem rolü OPERATOR/BAKIM/CAM
+                // ise yine üretim alanı sayılıyor, (3) hiç eşleşmeyen kayıtlar sessizce kaybolmak
+                // yerine ayrı bir "Eşleşmeyen Kayıt" grubunda gösteriliyor ki veri kaybı fark edilsin.
+                const onSiteRaw=(data||[]).map(r=>{
+                    let local=(window.PERSONNEL_LIST||[]).find(p=>sameId(p.dbId,r.personnel_id)||sameId(p.uuid,r.personnel_id));
+                    if(!local && r.personnel){
+                        const fullName=`${r.personnel.first_name||''} ${r.personnel.last_name||''}`.trim().toLocaleLowerCase('tr-TR');
+                        if(fullName) local=(window.PERSONNEL_LIST||[]).find(p=>String(p.name||'').trim().toLocaleLowerCase('tr-TR')===fullName);
+                    }
                     const name=local?.name || (r.personnel?`${r.personnel.first_name||''} ${r.personnel.last_name||''}`.trim():'Bilinmeyen');
+                    const dept=local?.dept||'';
+                    const role=String(local?.role||'').toUpperCase();
+                    const isProduction = String(dept).trim().toLocaleLowerCase('tr-TR')==='üretim' || ['OPERATOR','BAKIM','CAM'].includes(role);
                     return {
                         name, checkInAt:r.check_in_at,
                         team: local?.shiftTeam || '',
-                        dept: local?.dept || '-',
+                        dept: dept || '-',
                         jobTitle: local?.jobTitle || local?.role || '-',
-                        photo: local?.photo || ''
+                        photo: local?.photo || '',
+                        matched: !!local,
+                        isProduction
                     };
-                }).filter(p=>String(p.dept||'').trim().toLocaleLowerCase('tr-TR')==='üretim');
+                });
+                const unmatched=onSiteRaw.filter(p=>!p.matched);
+                const onSite=onSiteRaw.filter(p=>p.isProduction);
                 const teamLabel={TeamK1:'1. Vardiya · Takım K1', TeamK2:'2. Vardiya · Takım K2', '':'Vardiya Atanmamış'};
                 const teamIcon={TeamK1:'fa-shield-halved text-blue-400', TeamK2:'fa-shield-halved text-rose-400', '':'fa-question text-slate-500'};
                 const groups={};
@@ -2925,8 +2999,9 @@ ead>
                     const players=groups[k];
                     return `<div class="bg-slate-950 border border-slate-700 rounded-2xl p-4"><div class="flex items-center justify-between mb-3"><b class="text-white text-sm"><i class="fa-solid ${teamIcon[k]} mr-2"></i>${teamLabel[k]}</b><span class="text-[10px] text-emerald-400 font-bold">${players.length} vardiyada</span></div><div class="grid grid-cols-2 sm:grid-cols-3 gap-2">${players.map(p=>`<div class="bg-slate-900 border border-slate-800 rounded-xl p-2 text-center"><div class="relative inline-block">${personPhotoHtml?personPhotoHtml(p.name,'w-10 h-10 rounded-full object-cover bg-slate-100 mx-auto'):`<div class="w-10 h-10 rounded-full bg-slate-700 mx-auto"></div>`}<span class="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full bg-emerald-400 border-2 border-slate-900"></span></div><div class="text-[10px] font-bold text-white mt-1 truncate">${escSkill(p.name)}</div><div class="text-[9px] text-slate-500 truncate">${escSkill(p.jobTitle)}</div><div class="text-[8px] text-emerald-400 mt-0.5">${p.checkInAt?new Date(p.checkInAt).toLocaleTimeString('tr-TR',{hour:'2-digit',minute:'2-digit'}):'-'} giriş</div></div>`).join('')}</div></div>`;
                 }).join('');
-                field.innerHTML = cardsHtml || '<div class="col-span-2 text-xs text-slate-500 py-6 text-center">Şu an GEÇKO ile giriş yapmış, vardiyada olan personel yok.</div>';
-                if(status) status.textContent=`Canlı · ${onSite.length} kişi vardiyada · ${new Date().toLocaleTimeString('tr-TR')}`;
+                const unmatchedHtml = unmatched.length ? `<div class="bg-amber-950/30 border border-amber-800/50 rounded-2xl p-4 mt-3"><div class="flex items-center justify-between mb-2"><b class="text-amber-300 text-xs"><i class="fa-solid fa-triangle-exclamation mr-2"></i>Personel Kaydıyla Eşleşmeyen GEÇKO Girişleri</b><span class="text-[10px] text-amber-400 font-bold">${unmatched.length} kayıt</span></div><div class="text-[10px] text-slate-400 mb-2">Bu kişiler GEÇKO'dan giriş yapmış ama Personel listesindeki hiçbir kayda otomatik eşleşmedi (isim/sicil farklı olabilir) - bu yüzden üretim alanı sayımına dahil edilemiyorlar. Personel kartında GEÇKO kaydıyla aynı ad/soyadın yazılı olduğundan emin olun.</div><div class="grid grid-cols-2 sm:grid-cols-3 gap-2">${unmatched.map(p=>`<div class="bg-slate-900 border border-amber-900/40 rounded-xl p-2 text-center"><div class="text-[10px] font-bold text-amber-200 truncate">${escSkill(p.name)}</div><div class="text-[8px] text-slate-500 mt-0.5">${p.checkInAt?new Date(p.checkInAt).toLocaleTimeString('tr-TR',{hour:'2-digit',minute:'2-digit'}):'-'} giriş</div></div>`).join('')}</div></div>` : '';
+                field.innerHTML = (cardsHtml || '<div class="col-span-2 text-xs text-slate-500 py-6 text-center">Şu an GEÇKO ile giriş yapmış, üretim alanında vardiyada olan personel yok.</div>') + unmatchedHtml;
+                if(status) status.textContent=`Canlı · ${onSite.length} üretim personeli vardiyada${unmatched.length?` · ${unmatched.length} eşleşmeyen kayıt`:''} · toplam GEÇKO girişi ${onSiteRaw.length} · ${new Date().toLocaleTimeString('tr-TR')}`;
             }catch(err){
                 console.error('[Saha Live]',err);
                 if(status) status.textContent='Okuma hatası';
@@ -6391,6 +6466,28 @@ window.v118ProductionNeedShiftSplit=function(id){
  else alert('Açık üretim ihtiyacı yok veya zaten aktif iş emirleri ile karşılanıyor.');
 };
 window.v118ReceiveFinished=function(id){if(!can('warehouse'))return alert('Bitmiş ürün girişi için Depo/Yönetim yetkisi gerekir.');const o=V.orders.find(x=>x.id===id);if(!o)return;const l=o.lines[0],q=Number(prompt('Bitmiş ürün giriş adedi','0'));if(!(q>0))return;stockRow(l.productId).onHand+=q;l.produced=(l.produced||0)+q;V.movements.unshift({id:uid('MOV'),at:now(),type:'FINISHED_IN',productId:l.productId,qty:q,ref:o.id});audit('FINISHED_GOODS_IN','SALES_ORDER',o.id,q+' adet');persist();v118Reserve(id,true);v118Render()}
+// KMI-FIX (2026-09-26): Ender'in bildirdiği kritik hata - iş emri kalite onayından geçip
+// tamamlanınca müşteri siparişinin "üretildi" adedi hiç güncellenmiyordu (yalnızca manuel
+// "Bitmiş Ürün" girişiyle artıyordu, ki kimse onu kullanmıyordu). Bu yüzden bir iş emri bitip
+// "aktif iş emirleri" sayımından düşünce, sipariş üretimi "sıfırmış" gibi görünüyor ve WO/Üretim
+// tekrar basılınca TÜM sipariş adedi yeniden iş emri olarak açılıyordu. Bu fonksiyon artık
+// approveKalite() tarafından (kalite onaylanan SAĞLAM adet kadar, ürünün rota tanımındaki SON
+// operasyonuysa) otomatik çağrılıyor - üretim motoru artık gerçek operatör iş beyanı + kalite
+// onayına dayanıyor.
+window.v118CreditProduction=function(salesOrderId,productId,qty){
+ try{
+  if(!salesOrderId||!productId||!(Number(qty)>0)) return;
+  const o=V.orders.find(x=>String(x.id)===String(salesOrderId)); if(!o) return;
+  const l=(o.lines||[]).find(x=>String(x.productId)===String(productId)); if(!l) return;
+  const q=Number(qty);
+  l.produced=Number(l.produced||0)+q;
+  stockRow(l.productId).onHand+=q;
+  V.movements.unshift({id:uid('MOV'),at:now(),type:'FINISHED_IN',productId:l.productId,qty:q,ref:o.id,source:'SHOP_FLOOR_QUALITY'});
+  audit('FINISHED_GOODS_IN','SALES_ORDER',o.id,q+' adet (kalite onayından otomatik · operatör iş beyanı)');
+  persist();
+  try{v118Render();}catch(e){}
+ }catch(e){ console.error('[v118CreditProduction]',e); }
+};
 window.v118Ship=function(id){if(!can('warehouse'))return alert('Sevkiyat için Depo/Sevkiyat/Yönetim yetkisi gerekir.');const o=V.orders.find(x=>x.id===id);if(!o)return;let any=0;o.lines.forEach(l=>{const max=Math.min(l.reserved,Math.max(0,l.qty-l.shipped));if(max<=0)return;const q=Number(prompt(product(l.productId).name+' sevk adedi (max '+max+')',max));if(!(q>0)||q>max)return;const st=stockRow(l.productId);st.onHand-=q;st.reserved-=q;l.reserved-=q;l.shipped+=q;any+=q;V.movements.unshift({id:uid('MOV'),at:now(),type:'SHIP',productId:l.productId,qty:-q,ref:o.id})});if(any){recalc(o);audit('SHIP','SALES_ORDER',o.id,any+' adet');persist();v118Render()}}
 window.v118Invoice=function(id){if(!can('finance'))return alert('Fatura işlemi için Muhasebe/Yönetim yetkisi gerekir.');const o=V.orders.find(x=>x.id===id);if(!o||!o.shippedQty)return alert('Önce sevkiyat yapılmalı.');let inv=V.invoices.find(x=>x.orderId===id);if(!inv){inv={id:uid('INV'),orderId:id,customerId:o.customerId,amount:o.total*(o.shippedQty/o.lines.reduce((a,l)=>a+l.qty,0)),currency:o.currency,status:'OPEN',createdAt:now()};V.invoices.unshift(inv);o.status='INVOICED';audit('INVOICE','INVOICE',inv.id,o.id);persist()}v118Render()}
 window.v118Pay=function(invId){if(!can('finance'))return alert('Tahsilat için Muhasebe/Yönetim yetkisi gerekir.');const inv=V.invoices.find(x=>x.id===invId);if(!inv)return;const paid=V.payments.filter(x=>x.invoiceId===invId).reduce((a,x)=>a+x.amount,0),q=Number(prompt('Tahsilat tutarı · Kalan '+money(inv.amount-paid,inv.currency),inv.amount-paid));if(!(q>0)||q>inv.amount-paid+0.001)return;V.payments.unshift({id:uid('PAY'),invoiceId:invId,amount:q,currency:inv.currency,at:now(),by:window.currentUser?.name||'-'});const np=paid+q;if(np>=inv.amount-.001){inv.status='PAID';const o=V.orders.find(x=>x.id===inv.orderId);if(o)o.status='PAID'}else inv.status='PARTIAL';audit('PAYMENT','INVOICE',inv.id,money(q,inv.currency));persist();v118Render()}
@@ -6665,6 +6762,27 @@ window.kmiExpandRozetPin=function(){
  document.getElementById('rozetPinToggleIcon')?.classList.remove('fa-chevron-down');
  document.getElementById('rozetPinToggleIcon')?.classList.add('fa-chevron-up');
  try{window.kmiRenderBadgePinAdmin&&window.kmiRenderBadgePinAdmin();}catch(e){}
+ setTimeout(()=>b.scrollIntoView({behavior:'smooth',block:'start'}),50);
+};
+// KMI-FIX (2026-09-26): Ender'in isteği - Vardiyalar ve Kabiliyetler de aynı şekilde artık ayrı
+// üst-düzey modül değil, Personel modülü altında katlanır bölüm; bu iki kısayol Personel
+// modülünü açıp ilgili bölümü otomatik genişletiyor.
+window.kmiExpandVardiya=function(){
+ const b=document.getElementById('vardiyaCollapse'); if(!b)return;
+ b.style.display='block';
+ const label=document.getElementById('vardiyaToggleLabel'); if(label)label.innerHTML='<i class="fa-solid fa-people-group text-emerald-400 mr-2"></i>Gizle';
+ document.getElementById('vardiyaToggleIcon')?.classList.remove('fa-chevron-down');
+ document.getElementById('vardiyaToggleIcon')?.classList.add('fa-chevron-up');
+ try{renderShiftTeamManager();}catch(e){}
+ setTimeout(()=>b.scrollIntoView({behavior:'smooth',block:'start'}),50);
+};
+window.kmiExpandKabiliyet=function(){
+ const b=document.getElementById('kabiliyetCollapse'); if(!b)return;
+ b.style.display='block';
+ const label=document.getElementById('kabiliyetToggleLabel'); if(label)label.innerHTML='<i class="fa-solid fa-graduation-cap text-amber-400 mr-2"></i>Gizle';
+ document.getElementById('kabiliyetToggleIcon')?.classList.remove('fa-chevron-down');
+ document.getElementById('kabiliyetToggleIcon')?.classList.add('fa-chevron-up');
+ try{renderSkillCatalogAdmin();renderSkillAssignmentManager();renderTaskCatalogAdmin();renderTaskAssignmentManager();}catch(e){}
  setTimeout(()=>b.scrollIntoView({behavior:'smooth',block:'start'}),50);
 };
 window.kmiRenderBadgePinAdmin=function(){
