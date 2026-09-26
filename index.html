@@ -648,7 +648,11 @@ ead>
      başlıktaydı; artık burada, akışın ilk adımı olarak (önce master veri: müşteri/ürün/malzeme/
      tedarikçi, sonra sipariş) kendi kartlarıyla duruyor. -->
 <div id="v120MasterDataPanel" class="bg-slate-800 border border-amber-700/40 rounded-xl p-5 shadow-lg">
-  <div class="flex flex-wrap justify-between items-center gap-2 mb-4"><div><h2 class="text-lg font-black text-white"><i class="fa-solid fa-database text-amber-400 mr-2"></i>Müşteri · Ürün · Malzeme · Satınalma</h2><p class="text-xs text-slate-400 mt-1">Sipariş almadan önceki temel veriler: müşteri/ürün kartları, ham madde/LOT stoğu ve tedarikçi/satınalma yönetimi.</p></div></div>
+  <!-- KMI-FIX (2026-09-26): Ender'in isteği - "her şey müşteri siparişi ile başlamalı" mantığıyla,
+       "Yeni Müşteri Siparişi" girişi artık müşteri/ürün tanıtımının yapıldığı bu panelde de,
+       akışın doğal ilk adımı olarak görünüyor (Order & Flow Center'daki buton da duruyor,
+       oradan zaten çalışan siparişleri yönetmeye devam edilebilir). -->
+  <div class="flex flex-wrap justify-between items-center gap-2 mb-4"><div><h2 class="text-lg font-black text-white"><i class="fa-solid fa-database text-amber-400 mr-2"></i>Müşteri · Ürün · Malzeme · Satınalma</h2><p class="text-xs text-slate-400 mt-1">Sipariş almadan önceki temel veriler: müşteri/ürün kartları, ham madde/LOT stoğu ve tedarikçi/satınalma yönetimi.</p></div><button onclick="v118OpenOrder()" class="bg-cyan-600 hover:bg-cyan-500 text-white px-4 py-2 rounded-lg text-xs font-black"><i class="fa-solid fa-plus mr-1"></i> Yeni Müşteri Siparişi</button></div>
   <div class="grid sm:grid-cols-3 gap-3">
     <button onclick="openV61Master('products')" class="text-left bg-gradient-to-br from-amber-950/60 to-slate-900 border border-amber-700/50 hover:border-amber-400 rounded-xl p-4 transition group">
       <div class="w-10 h-10 rounded-lg bg-amber-500/15 text-amber-300 flex items-center justify-center text-lg mb-3"><i class="fa-solid fa-address-card"></i></div>
@@ -2232,7 +2236,12 @@ ead>
         function showDeclarationBonusDetail(id){const d=declarations.find(x=>x.id===id);if(!d)return;const a=getDeclarationBonusAudit(d),jo=jobOrders.find(j=>j.id===d.jobOrder);const html=`<div style="font-family:Arial;max-width:760px;margin:auto;padding:24px;color:#172033"><h2>${d.jobOrder} · Prim Geri Bildirimi</h2><p><b>${jo?.item||'-'}</b> · ${d.workDate||d.date} · ${d.machine}</p><div style="display:grid;grid-template-columns:1fr 1fr;gap:12px"><div style="padding:14px;background:#ecfdf5;border-radius:10px"><small>${a.final?'Kesinleşmiş':'Tahmini'} kazanım</small><div style="font-size:26px;font-weight:bold;color:#047857">${a.earned.toLocaleString('tr-TR')} TL</div></div><div style="padding:14px;background:#fff7ed;border-radius:10px"><small>Tahmini kaçırılan fırsat</small><div style="font-size:26px;font-weight:bold;color:#c2410c">${a.lost.toLocaleString('tr-TR')} TL</div></div></div><h3>Doğru yapılanlar</h3><ul>${a.positives.map(x=>`<li>${x}</li>`).join('')||'<li>Henüz pozitif kriter kaydı oluşmadı.</li>'}</ul><h3>Prim kaybına / riske neden olanlar</h3><ul>${a.reasons.map(x=>`<li>${x}</li>`).join('')||'<li>Bu iş emrinde kayıtlı prim kaybı nedeni yok.</li>'}</ul><h3>Yönetici kanaati</h3><p>${escSkill(a.managementNote||'Bu ay için yönetici kanaat notu girilmedi.')}</p><p style="font-size:11px;color:#64748b">Ay kapanmadan görünen TL tutarları tahminidir; devamsızlık, kalite, vardiya, kabiliyet ve yönetici kanaati ay sonuna kadar değişebilir.</p></div>`;const w=window.open('','_blank','width=820,height=760');w.document.write(html);w.document.close();}
         function renderDeclarations() {
             const tbody = document.getElementById('declarationsTableBody');
-            tbody.innerHTML = declarations.filter(d=>jobOrders.find(j=>j.id===d.jobOrder)?.targetType!=='timed').sort((a,b)=>new Date(b.updatedAt||b.shiftClosedAt||b.date)-new Date(a.updatedAt||a.shiftClosedAt||a.date)).map(d => `
+            // KMI-FIX (2026-09-26): Bu tablo "Kişisel Günlük & Aylık Prim Grafiğim" panelinin
+            // hemen üstünde ve aynı mantıkla çalışmalı: yalnızca o an giriş yapmış operatörün
+            // KENDİ geçmiş beyanları görünmeli. Önceden filtre yoktu, TÜM operatörlerin tüm
+            // beyanları herkese gösteriliyordu - kişisel görünüm ilkesine aykırıydı.
+            const myName = currentUser?.name;
+            tbody.innerHTML = declarations.filter(d=>d.operator===myName && jobOrders.find(j=>j.id===d.jobOrder)?.targetType!=='timed').sort((a,b)=>new Date(b.updatedAt||b.shiftClosedAt||b.date)-new Date(a.updatedAt||a.shiftClosedAt||a.date)).map(d => `
                 <tr>
                     <td class="p-2 text-slate-400">${d.date}</td>
                     <td class="p-2 font-medium text-white">${d.operator}</td>
@@ -2241,7 +2250,7 @@ ead>
                     <td class="p-2"><span class="text-emerald-400 font-bold">${d.qty}</span> / <span class="text-red-400">${d.scrap}</span></td>
                     <td class="p-2 text-amber-300">${d.tools}</td><td class="p-2"><button onclick="showDeclarationBonusDetail('${d.id}')" class="bg-cyan-700 hover:bg-cyan-600 text-white px-2 py-1 rounded text-[10px]"><i class="fa-solid fa-chart-line mr-1"></i>Detay</button></td>
                 </tr>
-            `).join('');
+            `).join('') || `<tr><td colspan="7" class="p-3 text-center text-slate-500 text-[11px]">Henüz kendi adınıza kaydedilmiş bir üretim beyanı yok.</td></tr>`;
         }
 
         function renderKaliteTable(){
@@ -2872,11 +2881,51 @@ ead>
         function previewManagerDailyReport(){const r=getDailyManagerReport();alert(buildManagerReportText(r));}
 
         function isBonusPoolOnlyPerson(p){ const n=String(p?.name||'').toLocaleUpperCase('tr-TR'); return n.includes('ENDER KURUTLU')||n.includes('HAKAN KURUTLU'); }
+        // KMI-FIX (2026-09-26): Bu fonksiyon 3 ayrı native dialog kullanıyordu (prompt x2,
+        // confirm x1) - projenin "native dialog yok" ilkesine aykırı (Ender'in ekran görüntüsünde
+        // gördüğü "flow.kurutlu.com says: Telefon numaranız:" tarayıcı kutusu tam olarak buydu).
+        // Tek bir kart modal'a taşındı: telefon, e-posta ve fotoğraf aynı formda, canlı önizlemeli.
         function editMyProfile(){
             if(!currentUser)return; const p=PERSONNEL_LIST.find(x=>Number(x.id)===Number(currentUser.id)); if(!p)return;
-            const phone=prompt('Telefon numaranız:',p.phone||''); if(phone===null)return; const email=prompt('E-posta adresiniz:',p.email||''); if(email===null)return;
-            const inp=document.createElement('input'); inp.type='file'; inp.accept='image/*'; inp.onchange=()=>{const f=inp.files[0]; if(!f){p.phone=phone;p.email=email;saveStorage('PERSONNEL_LIST',PERSONNEL_LIST);currentUser={...p};renderOperatorProfile();return;} if(f.size>1500000){alert('Resim en fazla 1.5 MB olmalıdır.');return;} const r=new FileReader();r.onload=()=>{p.phone=phone;p.email=email;p.photo=r.result;saveStorage('PERSONNEL_LIST',PERSONNEL_LIST);currentUser={...p};renderOperatorProfile();};r.readAsDataURL(f);};
-            p.phone=phone;p.email=email;saveStorage('PERSONNEL_LIST',PERSONNEL_LIST);currentUser={...p};renderOperatorProfile(); if(confirm('Profil resmi de değiştirmek ister misiniz?'))inp.click();
+            document.getElementById('kmiEditProfileModal')?.remove();
+            const d=document.createElement('div'); d.id='kmiEditProfileModal'; d.className='fixed inset-0 z-[270] bg-black/70 flex items-center justify-center p-4';
+            d.innerHTML=`<div class="w-full max-w-sm bg-slate-900 border border-blue-700 rounded-2xl p-5">
+              <div class="text-lg font-black text-white mb-3"><i class="fa-solid fa-user-pen text-blue-400 mr-2"></i>Bilgilerimi / Resmimi Düzenle</div>
+              <div class="flex items-center gap-3 mb-3">
+                <img id="kmiEditProfilePreview" src="${p.photo||''}" class="w-16 h-16 rounded-full object-cover bg-slate-800 border border-slate-700 ${p.photo?'':'hidden'}">
+                <div id="kmiEditProfilePreviewPlaceholder" class="w-16 h-16 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center text-2xl ${p.photo?'hidden':''}">👤</div>
+                <label class="bg-slate-700 hover:bg-slate-600 text-white px-3 py-2 rounded text-[11px] font-bold cursor-pointer">
+                  Fotoğraf Seç
+                  <input id="kmiEditProfilePhotoInput" type="file" accept="image/*" class="hidden">
+                </label>
+              </div>
+              <div class="space-y-2">
+                <div><label class="block text-slate-300 text-[11px] font-medium mb-1">Telefon numaranız</label><input id="kmiEditProfilePhone" type="tel" value="${(p.phone||'').replace(/"/g,'&quot;')}" class="w-full bg-slate-950 border border-slate-700 rounded p-2 text-white text-sm"></div>
+                <div><label class="block text-slate-300 text-[11px] font-medium mb-1">E-posta adresiniz</label><input id="kmiEditProfileEmail" type="email" value="${(p.email||'').replace(/"/g,'&quot;')}" class="w-full bg-slate-950 border border-slate-700 rounded p-2 text-white text-sm"></div>
+              </div>
+              <div id="kmiEditProfileMsg" class="text-[11px] text-rose-400 mt-2 hidden"></div>
+              <div class="grid grid-cols-2 gap-2 mt-4">
+                <button onclick="document.getElementById('kmiEditProfileModal').remove()" class="bg-slate-800 rounded-xl py-3 font-bold text-slate-300">Vazgeç</button>
+                <button onclick="window.kmiSubmitMyProfile()" class="bg-blue-600 hover:bg-blue-500 rounded-xl py-3 font-black text-white">Kaydet</button>
+              </div>
+            </div>`;
+            document.body.appendChild(d);
+            let pendingPhoto=null;
+            document.getElementById('kmiEditProfilePhotoInput').onchange=(e)=>{
+              const f=e.target.files[0]; if(!f)return;
+              const msg=document.getElementById('kmiEditProfileMsg');
+              if(f.size>1500000){ msg.textContent='Resim en fazla 1.5 MB olmalıdır.'; msg.classList.remove('hidden'); return; }
+              msg.classList.add('hidden');
+              const r=new FileReader(); r.onload=()=>{ pendingPhoto=r.result; const img=document.getElementById('kmiEditProfilePreview'),ph=document.getElementById('kmiEditProfilePreviewPlaceholder'); img.src=pendingPhoto; img.classList.remove('hidden'); ph.classList.add('hidden'); }; r.readAsDataURL(f);
+            };
+            window.kmiSubmitMyProfile=function(){
+              p.phone=document.getElementById('kmiEditProfilePhone').value.trim();
+              p.email=document.getElementById('kmiEditProfileEmail').value.trim();
+              if(pendingPhoto)p.photo=pendingPhoto;
+              saveStorage('PERSONNEL_LIST',PERSONNEL_LIST); currentUser={...p}; renderOperatorProfile();
+              document.getElementById('kmiEditProfileModal')?.remove();
+              window.kmiToast?.('Bilgileriniz güncellendi','success');
+            };
         }
         function renderPreviousShiftProduction(){
             const box=document.getElementById('previousShiftProduction'), m=document.getElementById('declMachine')?.value; if(!box||!m)return;
@@ -5575,7 +5624,7 @@ window.v78SyncPersonnelFromSupabase=async function(){
   if(!client) return false;
   try{
     const [pr,dr]=await Promise.all([
-      client.from('personnel').select('id,department_id,first_name,last_name,job_title,email,phone,active,auth_user_id,employee_no,pin_hash'),
+      client.from('personnel').select('id,department_id,first_name,last_name,job_title,email,phone,active,auth_user_id,employee_no,pin_hash,manager_id'),
       client.from('departments').select('id,name')
     ]);
     if(pr.error) throw pr.error;
@@ -5601,6 +5650,16 @@ window.v78SyncPersonnelFromSupabase=async function(){
       // KMI-FIX (2026-09-26): Rozet/PIN girişi employee_no üzerinden çalışıyor - Rozet/PIN
       // Yönetimi ekranının kimin PIN'i olduğunu/olmadığını gösterebilmesi için senkronize ediliyor.
       p.employeeNo=r.employee_no||p.employeeNo||''; p.pinSet=!!r.pin_hash;
+      // KMI-FIX (2026-09-26): Organizasyon şeması artık bulutta (personnel.manager_id) - eskiden
+      // sadece bu tarayıcının localStorage'ında (KMI_ORG_HIERARCHY) tutuluyordu, bu yüzden GitHub
+      // Pages "Enforce HTTPS" gibi bir origin değişikliğinde (http -> https, ayrı bir localStorage
+      // alanı sayılır) tüm şema sessizce kayboluyordu. r.manager_id burada ham Supabase uuid'i;
+      // aşağıdaki ikinci döngüde bunu PERSONNEL_LIST'in kendi sayısal id'sine çeviriyoruz.
+      p.managerDbId=r.manager_id?String(r.manager_id):null;
+    });
+    (PERSONNEL_LIST||[]).forEach(p=>{
+      if(p.managerDbId){ const mgr=(PERSONNEL_LIST||[]).find(x=>String(x.dbId||x.uuid||'')===p.managerDbId); p.managerId=mgr?mgr.id:null; }
+      else { p.managerId=null; }
     });
     // KMI-FIX (2026-09-25): GEÇKO/Supabase'de karşılığı olmayan eski/sahte
     // personel kayıtları Puantaj ve Zirvedekiler'de tutarsızlık yaratıyordu.
@@ -5849,8 +5908,33 @@ if(!cs.length||!ps.length){
   const missing=[];if(!cs.length)missing.push('müşteri');if(!ps.length)missing.push('ürün');
   if(confirm('Sipariş için '+missing.join(' ve ')+' kartı bulunamadı.\nMüşteri & Ürün merkezini açalım mı?')){try{openV61Master('products')}catch(e){}}
   return;
-}let m=document.getElementById('v118OrderModal');if(m)m.remove();m=document.createElement('div');m.id='v118OrderModal';m.className='fixed inset-0 z-[100] bg-slate-950/80 p-3 overflow-y-auto';m.innerHTML=`<div class="max-w-5xl mx-auto my-6 bg-slate-800 border border-cyan-700 rounded-2xl shadow-2xl"><div class="p-5 border-b border-slate-700 flex justify-between"><div><h3 class="text-xl font-black text-white">Yeni Müşteri Siparişi</h3><p class="text-xs text-slate-400">Çok kalemli sipariş · termin · fiyat · iskonto · KDV · stok rezervasyonu</p></div><button onclick="document.getElementById('v118OrderModal').remove()" class="text-slate-400 text-xl">×</button></div><div class="p-5 space-y-4 text-xs"><div class="grid md:grid-cols-4 gap-3"><label>Kayıtlı Müşteri<select id="v118OCustomer" class="mt-1 w-full bg-slate-950 border border-slate-700 rounded p-2">${cs.map(x=>`<option value="${E(x.id)}">${E(x.shortName||x.name||x.legalName||x.id)}</option>`).join('')}</select></label><label>Müşteri PO / Sipariş No<input id="v118OPO" class="mt-1 w-full bg-slate-950 border border-slate-700 rounded p-2" value="${uid('SO')}"></label><label>Sipariş Tarihi<input id="v118ODate" type="date" class="mt-1 w-full bg-slate-950 border border-slate-700 rounded p-2" value="${now().slice(0,10)}"></label><label>Termin<input id="v118ODue" type="date" class="mt-1 w-full bg-slate-950 border border-slate-700 rounded p-2" value="${new Date(Date.now()+7*864e5).toISOString().slice(0,10)}"></label></div><div class="grid md:grid-cols-4 gap-3"><label>Para Birimi<select id="v118OCur" onchange="v118RefreshOrderComposer()" oninput="v118RefreshOrderComposer()" class="mt-1 w-full bg-slate-950 border border-slate-700 rounded p-2"><option>TRY</option><option>EUR</option><option>USD</option><option>GBP</option></select></label><label>İskonto %<input id="v118ODisc" onchange="v118RefreshOrderComposer()" oninput="v118RefreshOrderComposer()" type="number" min="0" max="100" value="0" class="mt-1 w-full bg-slate-950 border border-slate-700 rounded p-2"></label><label>KDV %<input id="v118OVat" onchange="v118RefreshOrderComposer()" oninput="v118RefreshOrderComposer()" type="number" min="0" value="20" class="mt-1 w-full bg-slate-950 border border-slate-700 rounded p-2"></label><label>Ödeme Vadesi (gün)<input id="v118OPayDays" type="number" min="0" value="30" class="mt-1 w-full bg-slate-950 border border-slate-700 rounded p-2"></label></div><label>Sipariş Notu<textarea id="v118ONote" rows="2" class="mt-1 w-full bg-slate-950 border border-slate-700 rounded p-2" placeholder="Teslimat, paketleme, kalite veya müşteri notu..."></textarea></label><div><div class="flex justify-between mb-2"><b class="text-white">Sipariş Kalemleri</b><button onclick="v118AddOrderLine()" class="bg-blue-700 px-3 py-1 rounded font-bold">+ Kalem Ekle</button></div><div id="v118OLines" class="space-y-2"></div></div><div id="v118OrderComposerSummary" class="grid md:grid-cols-4 gap-2 bg-slate-950/70 border border-slate-700 rounded-xl p-3"></div><div class="flex justify-end gap-2 border-t border-slate-700 pt-4"><button onclick="document.getElementById('v118OrderModal').remove()" class="bg-slate-700 px-4 py-2 rounded">Vazgeç</button><button onclick="v118SaveOrder()" class="bg-cyan-600 px-5 py-2 rounded font-black">Siparişi Kaydet & Rezerve Et</button></div></div></div>`;document.body.appendChild(m);window.v118AddOrderLine();}
-window.v118AddOrderLine=function(){const box=document.getElementById('v118OLines'),ps=(window.KMI_MASTER_DATA?.products||[]).filter(x=>x.active!==false&&x.status!=='Pasif');if(!box)return;const row=document.createElement('div');row.className='v118-order-line grid grid-cols-12 gap-2 bg-slate-900 border border-slate-700 rounded-lg p-2';row.innerHTML=`<div class="col-span-12 md:col-span-5"><select onchange="v118RefreshOrderComposer()" class="v118-l-product w-full bg-slate-950 border border-slate-700 rounded p-2">${ps.map(x=>`<option value="${E(x.id)}">${E((x.code?x.code+' · ':'')+(x.name||x.id)+(x.revision?' · Rev '+x.revision:''))}</option>`).join('')}</select><div class="v118-l-info text-[9px] text-slate-500 mt-1"></div></div><input oninput="v118RefreshOrderComposer()" class="v118-l-qty col-span-4 md:col-span-2 bg-slate-950 border border-slate-700 rounded p-2" type="number" min="0.001" step="0.001" value="1" placeholder="Adet"><input oninput="v118RefreshOrderComposer()" class="v118-l-price col-span-5 md:col-span-3 bg-slate-950 border border-slate-700 rounded p-2" type="number" min="0" step="0.01" value="0" placeholder="Birim fiyat"><button onclick="this.closest('.v118-order-line').remove();v118RefreshOrderComposer()" class="col-span-3 md:col-span-2 bg-red-950 text-red-300 rounded">Sil</button>`;box.appendChild(row);v118RefreshOrderComposer()}
+}let m=document.getElementById('v118OrderModal');if(m)m.remove();m=document.createElement('div');m.id='v118OrderModal';m.className='fixed inset-0 z-[100] bg-slate-950/80 p-3 overflow-y-auto';m.innerHTML=`<div class="max-w-5xl mx-auto my-6 bg-slate-800 border border-cyan-700 rounded-2xl shadow-2xl"><div class="p-5 border-b border-slate-700 flex justify-between"><div><h3 class="text-xl font-black text-white">Yeni Müşteri Siparişi</h3><p class="text-xs text-slate-400">Çok kalemli sipariş · termin · fiyat · iskonto · KDV · stok rezervasyonu</p></div><button onclick="document.getElementById('v118OrderModal').remove()" class="text-slate-400 text-xl">×</button></div><div class="p-5 space-y-4 text-xs"><div class="grid md:grid-cols-4 gap-3"><label>Kayıtlı Müşteri<select id="v118OCustomer" onchange="v118OnCustomerChange()" class="mt-1 w-full bg-slate-950 border border-slate-700 rounded p-2">${cs.map(x=>`<option value="${E(x.id)}">${E(x.shortName||x.name||x.legalName||x.id)}</option>`).join('')}</select></label><label>Müşteri PO / Sipariş No<input id="v118OPO" class="mt-1 w-full bg-slate-950 border border-slate-700 rounded p-2" value="${uid('SO')}"></label><label>Sipariş Tarihi<input id="v118ODate" type="date" class="mt-1 w-full bg-slate-950 border border-slate-700 rounded p-2" value="${now().slice(0,10)}"></label><label>Termin<input id="v118ODue" type="date" class="mt-1 w-full bg-slate-950 border border-slate-700 rounded p-2" value="${new Date(Date.now()+7*864e5).toISOString().slice(0,10)}"></label></div><div class="grid md:grid-cols-4 gap-3"><label>Para Birimi<select id="v118OCur" onchange="v118RefreshOrderComposer()" oninput="v118RefreshOrderComposer()" class="mt-1 w-full bg-slate-950 border border-slate-700 rounded p-2"><option>TRY</option><option>EUR</option><option>USD</option><option>GBP</option></select></label><label>İskonto %<input id="v118ODisc" onchange="v118RefreshOrderComposer()" oninput="v118RefreshOrderComposer()" type="number" min="0" max="100" value="0" class="mt-1 w-full bg-slate-950 border border-slate-700 rounded p-2"></label><label>KDV %<input id="v118OVat" onchange="v118RefreshOrderComposer()" oninput="v118RefreshOrderComposer()" type="number" min="0" value="20" class="mt-1 w-full bg-slate-950 border border-slate-700 rounded p-2"></label><label>Ödeme Vadesi (gün)<input id="v118OPayDays" type="number" min="0" value="30" class="mt-1 w-full bg-slate-950 border border-slate-700 rounded p-2"></label></div><label>Sipariş Notu<textarea id="v118ONote" rows="2" class="mt-1 w-full bg-slate-950 border border-slate-700 rounded p-2" placeholder="Teslimat, paketleme, kalite veya müşteri notu..."></textarea></label><div><div class="flex justify-between mb-2"><b class="text-white">Sipariş Kalemleri</b><button onclick="v118AddOrderLine()" class="bg-blue-700 px-3 py-1 rounded font-bold">+ Kalem Ekle</button></div><div id="v118OLines" class="space-y-2"></div></div><div id="v118OrderComposerSummary" class="grid md:grid-cols-4 gap-2 bg-slate-950/70 border border-slate-700 rounded-xl p-3"></div><div class="flex justify-end gap-2 border-t border-slate-700 pt-4"><button onclick="document.getElementById('v118OrderModal').remove()" class="bg-slate-700 px-4 py-2 rounded">Vazgeç</button><button onclick="v118SaveOrder()" class="bg-cyan-600 px-5 py-2 rounded font-black">Siparişi Kaydet & Rezerve Et</button></div></div></div>`;document.body.appendChild(m);window.v118AddOrderLine();}
+// KMI-FIX (2026-09-26): KRİTİK - kalem satırındaki ürün listesi TÜM müşterilerin ürünlerini
+// gösteriyordu, siparişin üstte seçili olan müşterisine göre süzülmüyordu. Ender'in kuralı net:
+// her ürün tek bir müşterinin parçası/projesidir, başka müşteriye asla üretilmez - bu yüzden
+// SKYART için açılan bir siparişte STOEGGER'ın ürünü seçilebiliyordu. Ürün kartında zaten bir
+// "Müşteri" alanı (p.customer) var (bkz. v62OpenProduct/v62SaveProduct) - eskiden sadece kayıt
+// amaçlı tutuluyordu, burada hiç kullanılmıyordu. Artık seçili müşteriye ait ürünler dışındakiler
+// listeye hiç girmiyor. Müşterisi hiç atanmamış (eski/etiketlenmemiş) ürünler "⚠ müşterisiz"
+// etiketiyle ayrıca gösterilir ki veri kaybı olmasın, ama normal akışta karışıklık yaratmasın.
+window.v118AddOrderLine=function(){
+ const box=document.getElementById('v118OLines');if(!box)return;
+ const custId=document.getElementById('v118OCustomer')?.value||'';
+ const all=(window.KMI_MASTER_DATA?.products||[]).filter(x=>x.active!==false&&x.status!=='Pasif');
+ const ps=all.filter(x=>String(x.customer||'')===String(custId));
+ const unassigned=all.filter(x=>!x.customer);
+ const optionsFor=ps.length?ps:unassigned;
+ const warn=!ps.length?(unassigned.length?'<div class="text-amber-400 mt-1">⚠ Bu müşteriye atanmış ürün yok - müşterisi atanmamış ürünler gösteriliyor, ürün kartından müşteri atayın.</div>':'<div class="text-rose-400 mt-1">⚠ Bu müşteri için tanımlı ürün yok. Önce Müşteri & Ürün merkezinden ürün kartı açıp müşteri atayın.</div>'):'';
+ const row=document.createElement('div');row.className='v118-order-line grid grid-cols-12 gap-2 bg-slate-900 border border-slate-700 rounded-lg p-2';row.innerHTML=`<div class="col-span-12 md:col-span-5"><select onchange="v118RefreshOrderComposer()" class="v118-l-product w-full bg-slate-950 border border-slate-700 rounded p-2">${optionsFor.map(x=>`<option value="${E(x.id)}">${E((x.code?x.code+' · ':'')+(x.name||x.id)+(x.revision?' · Rev '+x.revision:''))}</option>`).join('')}</select><div class="v118-l-info text-[9px] text-slate-500 mt-1">${warn}</div></div><input oninput="v118RefreshOrderComposer()" class="v118-l-qty col-span-4 md:col-span-2 bg-slate-950 border border-slate-700 rounded p-2" type="number" min="0.001" step="0.001" value="1" placeholder="Adet"><input oninput="v118RefreshOrderComposer()" class="v118-l-price col-span-5 md:col-span-3 bg-slate-950 border border-slate-700 rounded p-2" type="number" min="0" step="0.01" value="0" placeholder="Birim fiyat"><button onclick="this.closest('.v118-order-line').remove();v118RefreshOrderComposer()" class="col-span-3 md:col-span-2 bg-red-950 text-red-300 rounded">Sil</button>`;box.appendChild(row);v118RefreshOrderComposer()}
+// Müşteri değiştirildiğinde zaten eklenmiş satırlardaki ürün seçimleri de yeni müşteriye göre
+// yeniden süzülsün - eski davranışta müşteri değişse bile satırlar ilk seçilen müşterinin
+// (ya da tüm müşterilerin) ürünlerini göstermeye devam ediyordu.
+window.v118OnCustomerChange=function(){
+ const box=document.getElementById('v118OLines');if(!box)return;
+ const rows=[...box.children];
+ rows.forEach(r=>r.remove());
+ for(let i=0;i<rows.length;i++)window.v118AddOrderLine();
+}
 window.v118RefreshOrderComposer=function(){
  const rows=[...document.querySelectorAll('.v118-order-line')],cur=document.getElementById('v118OCur')?.value||'TRY';
  let qty=0,subtotal=0;
@@ -5869,12 +5953,22 @@ window.v118Cancel=function(id){if(!can('sales'))return alert('İptal için Yöne
 window.v118OrderMetrics=function(o){const lines=o.lines||[];let ordered=0,reserved=0,finished=0,shipped=0;lines.forEach(l=>{ordered+=Number(l.qty||0);reserved+=Number(l.reserved||0);finished+=Number(l.produced||0);shipped+=Number(l.shipped||0)});const productionNeed=Math.max(0,ordered-Math.max(reserved,finished)),ready=Math.max(0,finished-shipped),progress=ordered?Math.min(100,Math.round(((shipped+ready*.75+Math.min(finished,ordered)*.15)/ordered)*100)):0,days=Math.ceil((new Date(o.dueDate)-new Date())/86400000);return{ordered,reserved,finished,shipped,productionNeed,ready,progress,days}};
 window.v118FlowCell=function(o){const m=v118OrderMetrics(o),valid=Number.isFinite(Number(m.days)),days=valid?Number(m.days):null,risk=!valid?'TERMİN YOK':days<0?'GECİKMİŞ':days<=2?'RİSK':days<=7?'YAKIN':'PLANDA',rc=risk==='GECİKMİŞ'?'text-red-300':risk==='RİSK'?'text-orange-300':risk==='YAKIN'?'text-amber-300':risk==='TERMİN YOK'?'text-slate-400':'text-emerald-300',dayText=valid?`${days}g`:'—';return `<div class="min-w-[220px]"><div class="flex justify-between gap-2"><b>${E(o.status)}</b><b class="text-[9px] ${rc}">${risk} · ${dayText}</b></div><div class="h-2 bg-slate-950 rounded-full overflow-hidden mt-2"><div class="h-full bg-cyan-500" style="width:${m.progress}%"></div></div><div class="grid grid-cols-3 gap-1 mt-2 text-[9px]"><div><span class="text-slate-500">Sipariş</span><br><b>${m.ordered}</b></div><div><span class="text-slate-500">Üretilecek</span><br><b class="text-orange-300">${m.productionNeed}</b></div><div><span class="text-slate-500">Hazır</span><br><b class="text-emerald-300">${m.ready}</b></div></div></div>`};
 window.v118OrderCommand=function(id){const o=V.orders.find(x=>x.id===id);if(!o)return;const m=v118OrderMetrics(o),c=customer(o.customerId);document.getElementById('v118CommandModal')?.remove();const d=document.createElement('div');d.id='v118CommandModal';d.className='fixed inset-0 z-[95] bg-slate-950/90 p-4 overflow-y-auto';d.innerHTML=`<div class="max-w-6xl mx-auto mt-4 bg-slate-900 border border-cyan-800/70 rounded-2xl shadow-2xl overflow-hidden"><div class="p-5 border-b border-slate-700 flex justify-between gap-4"><div><div class="text-[10px] tracking-[.28em] font-black text-cyan-300">KMI · ORDER COMMAND</div><h2 class="text-2xl font-black mt-1">${E(o.customerPO||o.id)}</h2><div class="text-slate-400">${E(c.name||c.shortName||c.id)} · Termin ${E(o.dueDate||'-')}</div></div><button onclick="document.getElementById('v118CommandModal').remove()" class="bg-slate-800 px-4 rounded">Kapat</button></div><div class="p-5 grid md:grid-cols-4 gap-3">${[['ORDERED',m.ordered,'text-white'],['PRODUCTION NEED',m.productionNeed,'text-orange-300'],['READY',m.ready,'text-emerald-300'],['SHIPPED',m.shipped,'text-cyan-300']].map(x=>`<div class="bg-slate-950 border border-slate-700 rounded-xl p-4"><div class="text-[9px] text-slate-500">${x[0]}</div><div class="text-3xl font-black ${x[2]}">${x[1]}</div></div>`).join('')}</div><div class="px-5 pb-5"><div class="bg-slate-950 border border-slate-700 rounded-xl p-4"><div class="font-black mb-3">ORDER LINES · LIVE FLOW</div>${(o.lines||[]).map(l=>{const p=product(l.productId),need=Math.max(0,Number(l.qty||0)-Math.max(Number(l.reserved||0),Number(l.produced||0)));return `<div class="grid grid-cols-2 md:grid-cols-6 gap-2 border-t border-slate-800 py-3 text-xs"><div class="md:col-span-2"><b>${E(p.code||p.id)} · ${E(p.name||'')}</b><div class="text-slate-500">${E(p.revision?'Rev '+p.revision:'')}</div></div><div>Sipariş<br><b>${l.qty}</b></div><div>Rezerve<br><b>${l.reserved||0}</b></div><div>Üretilecek<br><b class="text-orange-300">${need}</b></div><div>Bitmiş<br><b class="text-emerald-300">${l.produced||0}</b></div></div>`}).join('')}</div><div class="flex flex-wrap gap-2 mt-4"><button onclick="kmiOpenPassport('${o.id}')" class="bg-purple-700 px-4 py-2 rounded-lg font-black">Digital Passport</button><button onclick="v118Reserve('${o.id}')" class="bg-blue-700 px-4 py-2 rounded-lg font-black">Stok Rezerve</button><button onclick="v118ProductionNeed('${o.id}')" class="bg-orange-700 px-4 py-2 rounded-lg font-black">WO / Üretim</button><button onclick="v118ReceiveFinished('${o.id}')" class="bg-emerald-700 px-4 py-2 rounded-lg font-black">Bitmiş Ürün</button><button onclick="v118Ship('${o.id}')" class="bg-cyan-700 px-4 py-2 rounded-lg font-black">Sevkiyat</button><button onclick="v118Invoice('${o.id}')" class="bg-violet-700 px-4 py-2 rounded-lg font-black">Fatura</button></div></div></div>`;document.body.appendChild(d)};
-window.v118Render=function(){const orders=document.getElementById('v118Orders');if(!orders)return;const f=document.getElementById('v118OrderFilter')?.value||'',list=V.orders.filter(o=>!f||o.status===f);const outstanding=V.invoices.reduce((a,i)=>a+Math.max(0,i.amount-V.payments.filter(p=>p.invoiceId===i.id).reduce((s,p)=>s+p.amount,0)),0);document.getElementById('v118Kpis').innerHTML=[['Açık Sipariş',V.orders.filter(o=>!['PAID','CANCELLED'].includes(o.status)).length],['Rezerve',V.stock.reduce((a,x)=>a+x.reserved,0)+' ad'],['Bitmiş Stok',V.stock.reduce((a,x)=>a+x.onHand,0)+' ad'],['Açık Alacak',money(outstanding)],['Audit',V.audit.length]].map(x=>`<div class="bg-slate-900 border border-slate-700 rounded-lg p-3"><div class="text-[9px] uppercase text-slate-500">${x[0]}</div><div class="text-lg font-black text-cyan-300">${x[1]}</div></div>`).join('');orders.innerHTML=list.map(o=>`<tr class="border-t border-slate-700"><td class="p-2"><b>${E(o.customerPO)}</b><div class="text-[9px] text-slate-500">${E(o.id)}</div></td><td class="p-2">${E(customer(o.customerId).shortName||customer(o.customerId).name||o.customerId)}</td><td class="p-2">${E(o.dueDate)}</td><td class="p-2 text-right">${money(o.total,o.currency)}</td><td class="p-2">${v118FlowCell(o)}</td><td class="p-2"><div class="flex flex-wrap gap-1"><button onclick="v118ProductionNeed('${o.id}')" class="bg-amber-700 px-2 py-1 rounded font-bold">WO / Üretim</button><button onclick="v118OrderCommand('${o.id}')" class="bg-slate-700 hover:bg-cyan-700 px-2 py-1 rounded font-bold">Command</button></div></td></tr>`).join('')||'<tr><td colspan="6" class="p-4 text-center text-slate-500">Sipariş kaydı yok.</td></tr>';document.getElementById('v118Stock').innerHTML=V.stock.map(x=>`<div class="bg-slate-900 border border-slate-700 rounded p-3"><b>${E(product(x.productId).name||x.productId)}</b><div class="text-[10px] text-slate-400">Eldeki ${x.onHand} · Rezerve ${x.reserved} · Kullanılabilir ${available(x.productId)}</div></div>`).join('')||'<div class="text-xs text-slate-500">Stok hareketi yok.</div>';document.getElementById('v118Finance').innerHTML=V.invoices.map(i=>{const paid=V.payments.filter(p=>p.invoiceId===i.id).reduce((a,p)=>a+p.amount,0);return `<div class="bg-slate-900 border border-slate-700 rounded p-3 flex justify-between gap-2"><div><b>${E(i.id)}</b><div class="text-[10px] text-slate-400">${money(i.amount,i.currency)} · Tahsil ${money(paid,i.currency)} · ${E(i.status)}</div></div><button onclick="v118Pay('${i.id}')" class="bg-emerald-700 px-2 rounded text-xs">Tahsilat</button></div>`}).join('')||'<div class="text-xs text-slate-500">Fatura yok.</div>';document.querySelectorAll('#v118Orders tr').forEach(tr=>{const bs=[...tr.querySelectorAll('button')].filter(b=>b.textContent.trim()==='Passport');bs.slice(1).forEach(b=>b.remove())});document.getElementById('v118Audit').innerHTML=V.audit.slice(0,50).map(a=>`<div class="border-b border-slate-700 py-2 text-[10px]"><b class="text-cyan-300">${E(a.action)}</b> · ${E(a.entity)} ${E(a.entityId)}<div class="text-slate-500">${E(a.by)} · ${new Date(a.at).toLocaleString('tr-TR')} · ${E(a.detail)}</div></div>`).join('')||'<div class="text-xs text-slate-500">Audit kaydı yok.</div>'}
+window.v118Render=function(){const orders=document.getElementById('v118Orders');if(!orders)return;const f=document.getElementById('v118OrderFilter')?.value||'',list=V.orders.filter(o=>!f||o.status===f);const outstanding=V.invoices.reduce((a,i)=>a+Math.max(0,i.amount-V.payments.filter(p=>p.invoiceId===i.id).reduce((s,p)=>s+p.amount,0)),0);document.getElementById('v118Kpis').innerHTML=[['Açık Sipariş',V.orders.filter(o=>!['PAID','CANCELLED'].includes(o.status)).length],['Rezerve',V.stock.reduce((a,x)=>a+x.reserved,0)+' ad'],['Bitmiş Stok',V.stock.reduce((a,x)=>a+x.onHand,0)+' ad'],['Açık Alacak',money(outstanding)],['Audit',V.audit.length]].map(x=>`<div class="bg-slate-900 border border-slate-700 rounded-lg p-3"><div class="text-[9px] uppercase text-slate-500">${x[0]}</div><div class="text-lg font-black text-cyan-300">${x[1]}</div></div>`).join('');orders.innerHTML=list.map(o=>`<tr class="border-t border-slate-700"><td class="p-2"><b>${E(o.customerPO)}</b><div class="text-[9px] text-slate-500">${E(o.id)}</div></td><td class="p-2">${E(customer(o.customerId).shortName||customer(o.customerId).name||o.customerId)}</td><td class="p-2">${E(o.dueDate)}</td><td class="p-2 text-right">${money(o.total,o.currency)}</td><td class="p-2">${v118FlowCell(o)}</td><td class="p-2"><div class="flex flex-wrap gap-1"><button onclick="v118ProductionNeed('${o.id}')" class="bg-amber-700 px-2 py-1 rounded font-bold">WO / Üretim</button><button onclick="v118OrderCommand('${o.id}')" class="bg-slate-700 hover:bg-cyan-700 px-2 py-1 rounded font-bold">Command</button></div></td></tr>`).join('')||'<tr><td colspan="6" class="p-4 text-center text-slate-500">Sipariş kaydı yok.</td></tr>';// KMI-FIX (2026-09-26): "Stok Özeti" burada TÜM zamanların TÜM ürünlerini (eski/test/ilgisiz
+// kayıtlar dahil, stockRow() bir ürün ilk kez referans edildiğinde otomatik 0'lık bir satır
+// oluşturuyor) gösteriyordu - Ender'in az önce açtığı SKYART siparişiyle hiç ilgisi olmayan
+// "Mekanizma Çatal Kolu" (0/0/0) gibi alakasız bir kayıt öne çıkabiliyordu. Artık yalnızca şu an
+// AÇIK (PAID/CANCELLED olmayan) siparişlerde geçen ürünlerin stok özetini gösteriyor - "burada
+// ne görüyorsam mevcut işimle ilgili" beklentisine uygun.
+const relevantProductIds=new Set(V.orders.filter(o=>!['PAID','CANCELLED'].includes(o.status)).flatMap(o=>(o.lines||[]).map(l=>l.productId)));
+const relevantStock=V.stock.filter(x=>relevantProductIds.has(x.productId));
+document.getElementById('v118Stock').innerHTML=relevantStock.map(x=>`<div class="bg-slate-900 border border-slate-700 rounded p-3"><b>${E(product(x.productId).name||x.productId)}</b><div class="text-[10px] text-slate-400">Eldeki ${x.onHand} · Rezerve ${x.reserved} · Kullanılabilir ${available(x.productId)}</div></div>`).join('')||'<div class="text-xs text-slate-500">Açık siparişlere ait stok hareketi yok.</div>';document.getElementById('v118Finance').innerHTML=V.invoices.map(i=>{const paid=V.payments.filter(p=>p.invoiceId===i.id).reduce((a,p)=>a+p.amount,0);return `<div class="bg-slate-900 border border-slate-700 rounded p-3 flex justify-between gap-2"><div><b>${E(i.id)}</b><div class="text-[10px] text-slate-400">${money(i.amount,i.currency)} · Tahsil ${money(paid,i.currency)} · ${E(i.status)}</div></div><button onclick="v118Pay('${i.id}')" class="bg-emerald-700 px-2 rounded text-xs">Tahsilat</button></div>`}).join('')||'<div class="text-xs text-slate-500">Fatura yok.</div>';document.querySelectorAll('#v118Orders tr').forEach(tr=>{const bs=[...tr.querySelectorAll('button')].filter(b=>b.textContent.trim()==='Passport');bs.slice(1).forEach(b=>b.remove())});document.getElementById('v118Audit').innerHTML=V.audit.slice(0,50).map(a=>`<div class="border-b border-slate-700 py-2 text-[10px]"><b class="text-cyan-300">${E(a.action)}</b> · ${E(a.entity)} ${E(a.entityId)}<div class="text-slate-500">${E(a.by)} · ${new Date(a.at).toLocaleString('tr-TR')} · ${E(a.detail)}</div></div>`).join('')||'<div class="text-xs text-slate-500">Audit kaydı yok.</div>'}
 async function v118CloudPush(){const c=window.KURUTLU_SUPABASE?.client,u=window.KURUTLU_SUPABASE?.user;if(!c||!u)return;try{await c.from('portal_v118_state').upsert({user_id:u.id,state:V,updated_at:now()},{onConflict:'user_id'})}catch(e){console.warn('[V118] Supabase tablo hazır değil; local kalıcılık aktif.',e)}}
 async function cloudPull(){const c=window.KURUTLU_SUPABASE?.client,u=window.KURUTLU_SUPABASE?.user;if(!c||!u)return;try{const r=await c.from('portal_v118_state').select('state').eq('user_id',u.id).maybeSingle();if(r.data?.state){V={...V,...r.data.state};persist();v118Render()}}catch(e){}}
 window.addEventListener('kurutlu:supabase-identity',()=>setTimeout(cloudPull,500));document.addEventListener('DOMContentLoaded',()=>{setTimeout(v118Render,500);const d=document.getElementById('liveSystemDate');if(d)d.textContent=new Date().toLocaleDateString('tr-TR',{day:'numeric',month:'long',year:'numeric'});});
-// Access integration: admin always sees V118; custom allowedTabs may grant it to Sales/Warehouse/Accounting.
-const oldAllowed=window.getAllowedTabs; if(typeof oldAllowed==='function')window.getAllowedTabs=function(){const a=oldAllowed();const r=role(),d=String(window.currentUser?.dept||'').toLocaleLowerCase('tr-TR');if(['ADMIN','YÖNETİM','YONETIM','MANAGEMENT'].includes(r)||d.includes('satış')||d.includes('satis')||d.includes('depo')||d.includes('sevkiyat')||d.includes('muhasebe'))a.push('siparis');return [...new Set(a)]};
+// KMI-FIX (2026-09-26): Ender'in isteği - "Flow Center" girişine (Sipariş & Stok sekmesi)
+// artık SADECE Yönetim ve Muhasebe erişebilsin. Önceden Satış/Depo/Sevkiyat departmanları da
+// erişebiliyordu - bu erişim kaldırıldı.
+const oldAllowed=window.getAllowedTabs; if(typeof oldAllowed==='function')window.getAllowedTabs=function(){const a=oldAllowed();const r=role(),d=String(window.currentUser?.dept||'').toLocaleLowerCase('tr-TR');if(['ADMIN','YÖNETİM','YONETIM','MANAGEMENT'].includes(r)||d.includes('muhasebe')||r==='MUHASEBE')a.push('siparis');return [...new Set(a)]};
 // Purchase workflow guard/fix: surface stale accounting transitions and keep audit.
 window.v118RepairPurchaseWorkflow=function(){if(!window.D)return 0;let n=0;(D.purchases||[]).forEach(p=>{if(p.workflowStatus==='MANAGEMENT_APPROVED'&&Number(p.receivedQty||0)<Number(p.qty||0)){p.workflowStatus='ORDERED';n++}if(p.workflowStatus==='PENDING_ACCOUNTING'&&!p.purchasedBy)p.purchasedBy='Muhasebe Yetkilisi'});if(n){window.save?.();audit('REPAIR','PURCHASE_WORKFLOW','BATCH',n+' kayıt normalize edildi');persist()}return n};setTimeout(()=>{v118RepairPurchaseWorkflow();v118Render()},1800);
 })();</script>
@@ -6363,7 +6457,16 @@ window.kmiOpenLive=function(){document.getElementById('kmiLiveModal')?.remove();
 const rr=window.v118Render;window.v118Render=function(){rr&&rr();document.querySelectorAll('#v118Orders tr').forEach(tr=>{const id=tr.querySelector('td .text-slate-500')?.textContent?.trim();const cell=tr.lastElementChild?.querySelector('.flex');if(id&&cell&&!cell.querySelector('.kmi-pass')){const b=document.createElement('button');b.className='kmi-pass bg-fuchsia-800 px-2 py-1 rounded';b.textContent='Passport';b.onclick=()=>kmiOpenPassport(id);cell.prepend(b)}});kmiRenderStream()};
 // Capture important existing business actions as live events.
 [['v118Reserve','RESERVATION'],['v118ProductionNeed','PRODUCTION_NEED'],['v118ReceiveFinished','FINISHED_GOODS'],['v118Ship','SHIPMENT'],['v118Invoice','INVOICE'],['v118Pay','PAYMENT'],['v118Cancel','CANCEL']].forEach(([fn,t])=>{const old=window[fn];if(typeof old==='function')window[fn]=function(id,...a){const r=old.call(this,id,...a);KMI.event(t,fn==='v118Pay'?'INVOICE':'SALES_ORDER',id,{label:id,source:'WORKFLOW'});return r}});
-window.V118_STATE=core();
+// KMI-FIX (2026-09-26): KRİTİK - window.V118_STATE sayfa ilk açıldığında BİR KEZ core()
+// ile dolduruluyordu ve bir daha asla yenilenmiyordu. Onlarca fonksiyon (v118OrderCommand,
+// orderById, kmiOpenPassport, global arama, Live panoları vb.) "window.V118_STATE||..." ile
+// önce bu durgun (stale) kopyayı tercih ediyordu - yani sayfa yüklendikten SONRA oluşturulan
+// hiçbir sipariş (ör. bugün açılan SKYART siparişi) bu fonksiyonlarda GÖRÜNMÜYORDU. Bu yüzden
+// "Command" butonu yeni siparişte hiçbir şey yapmıyordu (v118OrderCommand içindeki .find()
+// undefined dönüyor, if(!o)return; sessizce çıkıyordu). Artık gerçek bir statik obje değil,
+// her okunduğunda localStorage'dan taze veri döndüren bir getter - mevcut "window.V118_STATE||..."
+// kullanan hiçbir kodu değiştirmeye gerek kalmadan hepsi otomatik güncel veri görür.
+Object.defineProperty(window,'V118_STATE',{get(){return core();},configurable:true});
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>setTimeout(()=>{kmiRenderStream();try{v118Render()}catch(e){}},900),{once:true});else setTimeout(()=>{kmiRenderStream();try{v118Render()}catch(e){}},500);
 })();
 </script>
@@ -6985,9 +7088,15 @@ window.kmiV121Risk=function(o){
  if(days!==null&&days<0){level='BLOCKED';reasons.push(`Termin geçti · ${Math.abs(days)} gün gecikme`);}
  const sup=supplyReasons(o,m);
  if(sup.length){reasons.push(...sup);if(level!=='BLOCKED')level='AT_RISK';}
+ // KMI-FIX (2026-09-26): Ender'in geri bildirimi - yeni açılan, henüz üretime hiç başlanmamış
+ // (dolayısıyla productionNeed>0 olan) NORMAL bir sipariş, sırf termine 7 gün kaldı diye
+ // otomatik "İZLE/WATCH" olarak işaretleniyordu. Bu, siparişin doğal/beklenen durumu - henüz
+ // üretilmemiş olması tek başına risk değil. Eşik sıkılaştırıldı: WATCH artık yalnız 3 gün
+ // kala (AT_RISK ile aynı pencere, bir erken uyarı katmanı olarak leveli WATCH'ta tutuyor),
+ // gerçek "acil" durum ise 1 gün kala AT_RISK'e yükseliyor. 7 günlük geniş pencere kaldırıldı.
  if(num(m.productionNeed)>0){
-  if(days!==null&&days<=3){if(level!=='BLOCKED')level='AT_RISK';reasons.push(`Termine ${days} gün kaldı, ${m.productionNeed} adet üretimi henüz planlanmadı`);}
-  else if(days!==null&&days<=7&&level==='ON_TRACK'){level='WATCH';reasons.push(`Termine ${days} gün kaldı, ${m.productionNeed} adet planlanacak`);}
+  if(days!==null&&days<=1){if(level!=='BLOCKED')level='AT_RISK';reasons.push(`Termine ${days} gün kaldı, ${m.productionNeed} adet üretimi henüz planlanmadı`);}
+  else if(days!==null&&days<=3&&level==='ON_TRACK'){level='WATCH';reasons.push(`Termine ${days} gün kaldı, ${m.productionNeed} adet planlanacak`);}
   else if(days===null&&level==='ON_TRACK'){level='WATCH';reasons.push('Termin tarihi girilmemiş, üretim ihtiyacı açık');}
  }
  if(level==='ON_TRACK'&&days!==null&&days<=2)level='WATCH';
@@ -7259,7 +7368,13 @@ function kmiLiveWeekMonth(ds){
 function kmiMachineBoard(){
  const js=(()=>{try{return jobOrders}catch(e){return []}})();
  const active=js.filter(j=>!j.deleted&&!['Silindi','Kapalı','Tamamlandı','COMPLETED','CANCELLED'].includes(String(j.status||'')));
- const runningNames=new Set(active.map(j=>j.machine).filter(Boolean));
+ // KMI-FIX (2026-09-26): Bir makineye iş emri ATANMIŞ olması onun üzerinde ÇALIŞILDIĞI anlamına
+ // gelmiyor - yeni açılan her iş emri 'Açık' durumunda başlıyor ve operatör Shop Floor Live'da
+ // "İŞE BAŞLA"ya basana kadar (bkz. kmiStartWork -> j.status='Üretimde') öyle kalıyor. Eskiden
+ // "silinmemiş/kapanmamış her iş emri" running sayılıyordu, bu yüzden atanıp henüz başlanmamış
+ // (ör. Yönetim Onayı Bekliyor, Kalite Bekliyor gibi ara durumdaki veya sadece 'Açık' olan) bir
+ // iş emrinin makinesi hep "ÇALIŞIYOR" görünüyordu - gerçekte kimse o tezgahta çalışmıyor olsa da.
+ const runningNames=new Set(active.filter(j=>String(j.status||'')==='Üretimde').map(j=>j.machine).filter(Boolean));
  const mr=(()=>{try{return maintenanceRecords}catch(e){return []}})();
  return (typeof MACHINES_LIST!=='undefined'?MACHINES_LIST:[]).map(m=>{
    const name=`${m.code} - ${m.name}`;
@@ -7466,15 +7581,36 @@ window.kmiAcceptToolCode=async function(id,type,code){
 // doğrudan Kalite, veya işlem hâlâ bitmediyse Tesviye ya da Vibrasyon operasyonuna. Bu, Operatör
 // Beyanı (legacy form) ekranındaki "Tesviyeye/Vibrasyona Gönder" ile aynı motoru (handleDeclarationSubmit)
 // ve aynı beyan durumlarını kullanır - Ender'in "aynı motor çalışmalı" isteği.
+// KMI-FIX (2026-09-26): native prompt() kullanılıyordu (projenin "native dialog yok" ilkesine
+// aykırı - alert/confirm/prompt testlerde otomatik yakalanan bir anti-pattern). Kart tabanlı
+// mini bir modal ile değiştirildi (diğer tüm giriş akışlarıyla aynı görsel dil).
+window.kmiOpenVibrationMinutesModal=function(id){
+ document.getElementById('kmiVibMinsModal')?.remove();
+ const d=document.createElement('div');d.id='kmiVibMinsModal';d.className='fixed inset-0 z-[270] bg-black/70 flex items-center justify-center p-4';
+ d.innerHTML=`<div class="w-full max-w-sm bg-slate-900 border border-violet-700 rounded-2xl p-5">
+   <div class="text-lg font-black text-white mb-1">Vibrasyon Süresi</div>
+   <div class="text-xs text-slate-400 mb-3">Dakika cinsinden hedef vibrasyon süresini gir.</div>
+   <input id="kmiVibMinsInput" type="number" min="0" step="1" value="15" class="w-full bg-slate-950 border border-violet-700 rounded-xl p-3 text-white text-lg font-bold text-center">
+   <div id="kmiVibMinsMsg" class="text-[11px] text-rose-400 mt-2 hidden"></div>
+   <div class="grid grid-cols-2 gap-2 mt-4">
+    <button onclick="document.getElementById('kmiVibMinsModal').remove()" class="bg-slate-800 rounded-xl py-3 font-bold text-slate-300">Vazgeç</button>
+    <button onclick="window.kmiSubmitVibrationMinutes('${E(id)}')" class="bg-violet-700 hover:bg-violet-600 rounded-xl py-3 font-black text-white">Onayla</button>
+   </div>
+ </div>`;
+ document.body.appendChild(d);
+ setTimeout(()=>document.getElementById('kmiVibMinsInput')?.focus(),50);
+};
+window.kmiSubmitVibrationMinutes=function(id){
+ const input=document.getElementById('kmiVibMinsInput'),msg=document.getElementById('kmiVibMinsMsg');
+ const n=Math.max(0,Math.round(Number(input?.value)||0));
+ if(!input?.value||isNaN(Number(input.value))){ if(msg){msg.textContent='Geçerli bir dakika değeri gir.';msg.classList.remove('hidden');} return; }
+ document.getElementById('kmiVibMinsModal')?.remove();
+ window.kmiFinish(id,'vibrasyon',n);
+};
 window.kmiFinishChoose=function(id){
  sheet('İşi nereye gönderiyorsun?',['Kaliteye Gönder','Tesviyeye Gönder','Vibrasyona Gönder'],choice=>{
    if(choice==='Tesviyeye Gönder') return window.kmiFinish(id,'tesviye');
-   if(choice==='Vibrasyona Gönder'){
-     const mins=prompt('Vibrasyon süresi (dakika):','15');
-     if(mins===null)return;
-     const n=Math.max(0,Math.round(Number(mins)||0));
-     return window.kmiFinish(id,'vibrasyon',n);
-   }
+   if(choice==='Vibrasyona Gönder') return window.kmiOpenVibrationMinutesModal(id);
    return window.kmiFinish(id,'kalite');
  });
 };
@@ -8980,9 +9116,39 @@ window.v75ConvertToJobOrder=function(productId,machineCode){
 // raporlama ağacı (tree) kurmak için yeterli ve kolayca genişletilebilir.
 const KEY='KMI_ORG_HIERARCHY';
 const E=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-function load(){try{return JSON.parse(localStorage.getItem(KEY)||'{}')||{}}catch(e){return {}}}
-function save(m){localStorage.setItem(KEY,JSON.stringify(m))}
+// KMI-FIX (2026-09-26): KRİTİK - şema önceden SADECE bu tarayıcının localStorage'ında
+// (KMI_ORG_HIERARCHY) tutuluyordu. GitHub Pages "Enforce HTTPS" açılınca site http'den
+// https'e taşındı - localStorage tarayıcıda protokol+host+port'a göre AYRI bir kutu olduğundan,
+// http:// üzerinde girilmiş tüm şema https:// tarafından görünmez oldu (silinmedi, sadece
+// artık erişilemez oldu). Artık tek doğru kaynak Supabase (personnel.manager_id) - bu, cihaz/
+// tarayıcı/origin değişse bile kaybolmaz. load() artık PERSONNEL_LIST'in (v78 senkronuyla
+// Supabase'den gelen) managerId alanından okuyor; localStorage sadece eski veriyi bir kerelik
+// buluta taşımak (aşağıdaki migrateLegacyLocalHierarchy) için kullanılıyor.
+function load(){
+ const out={};
+ (Array.isArray(PERSONNEL_LIST)?PERSONNEL_LIST:[]).forEach(p=>{ if(p.managerId!=null) out[String(p.id)]=String(p.managerId); });
+ return out;
+}
 function people(){try{return Array.isArray(PERSONNEL_LIST)?PERSONNEL_LIST.filter(p=>p.active!==false):[]}catch(e){return []}}
+let __kmiOrgMigrated=false;
+async function migrateLegacyLocalHierarchy(){
+ if(__kmiOrgMigrated) return; __kmiOrgMigrated=true;
+ try{
+  const legacy=JSON.parse(localStorage.getItem(KEY)||'{}')||{};
+  const keys=Object.keys(legacy); if(!keys.length) return;
+  const client=window.kurutluSupabase; if(!client) return;
+  let migrated=0;
+  for(const pid of keys){
+   const person=(PERSONNEL_LIST||[]).find(p=>String(p.id)===String(pid));
+   const mgr=(PERSONNEL_LIST||[]).find(p=>String(p.id)===String(legacy[pid]));
+   if(!person?.dbId||!mgr?.dbId) continue;
+   if(person.managerId) continue; // buluttan zaten geldiyse üzerine yazma
+   const {error}=await client.from('personnel').update({manager_id:mgr.dbId}).eq('id',person.dbId);
+   if(!error){ person.managerId=mgr.id; person.managerDbId=mgr.dbId; migrated++; }
+  }
+  if(migrated){ localStorage.removeItem(KEY); window.kmiToast?.(`${migrated} kişilik organizasyon şeması buluta taşındı, artık kalıcı.`,'success'); }
+ }catch(e){ console.warn('[KMI org chart migrate]',e); }
+}
 function isAdmin(u){try{return getEffectiveRole(u)==='ADMIN'}catch(e){return String(u?.role||'').toUpperCase()==='ADMIN'}}
 window.kmiOrgManagerOf=function(personId){const m=load();return m[String(personId)]||null};
 // Bir kişinin ALTINDA (doğrudan + dolaylı) kimler var - BFS ile reports-to ağacını tersten gezer.
@@ -9051,11 +9217,13 @@ window.kmiOrgToggleNode=function(nodeId){
  box.style.display=willCollapse?'none':'';
  if(chev) chev.style.transform=willCollapse?'rotate(-90deg)':'';
 };
-window.kmiOpenOrgChart=function(){
- if(!window.currentUser||!isAdmin(window.currentUser))return window.kmiToast?window.kmiToast('Organizasyon şemasını yalnız yönetim düzenleyebilir','warn'):alert('Bu ekranı yalnız yönetim açabilir.');
+window.kmiOpenOrgChart=async function(){
+ if(!window.currentUser||!isAdmin(window.currentUser))return window.kmiToast?window.kmiToast('Organizasyon şemasını yalnız yönetim düzenleyebilir','warn'):null;
  document.getElementById('kmiOrgChartModal')?.remove();
  const d=document.createElement('div');d.id='kmiOrgChartModal';d.className='fixed inset-0 z-[280] bg-black/85 p-3 md:p-6 overflow-y-auto';
- document.body.appendChild(d);window.kmiRenderOrgChart();
+ document.body.appendChild(d);
+ await migrateLegacyLocalHierarchy();
+ window.kmiRenderOrgChart();
 };
 window.kmiRenderOrgChart=function(){
  const d=document.getElementById('kmiOrgChartModal');if(!d)return;
@@ -9077,15 +9245,24 @@ window.kmiRenderOrgChart=function(){
   <div><h3 class="text-white font-black mb-2"><i class="fa-solid fa-sitemap text-indigo-400 mr-1.5"></i>Şema Görünümü</h3><div class="bg-slate-950/60 border border-slate-800 rounded-2xl p-4 max-h-[70vh] overflow-auto">${roots.map(r=>nodeHTML(r,children,0)).join('')||'<div class="text-xs text-slate-500">Personel yok.</div>'}</div></div>
  </div></div>`;
 };
-window.kmiOrgSetManager=function(personId,managerId){
- const m=load();
- if(!managerId){delete m[String(personId)]}
- else{
-  // Döngü koruması: bir kişi kendi altındaki birinin yöneticisi yapılamaz.
-  if(window.kmiOrgSubordinates(personId).has(String(managerId))){window.kmiToast?window.kmiToast('Bu atama döngü oluşturur (kişi kendi ekibine bağlanamaz)','warn'):alert('Bu atama döngü oluşturur.');window.kmiRenderOrgChart();return}
-  m[String(personId)]=String(managerId);
+window.kmiOrgSetManager=async function(personId,managerId){
+ const person=(PERSONNEL_LIST||[]).find(p=>String(p.id)===String(personId));
+ if(!person){window.kmiToast?.('Personel bulunamadı','warn');return;}
+ if(managerId && window.kmiOrgSubordinates(personId).has(String(managerId))){
+  window.kmiToast?.('Bu atama döngü oluşturur (kişi kendi ekibine bağlanamaz)','warn');
+  window.kmiRenderOrgChart();return;
  }
- save(m);window.kmiRenderOrgChart();
+ const mgr=managerId?(PERSONNEL_LIST||[]).find(p=>String(p.id)===String(managerId)):null;
+ // KMI-FIX (2026-09-26): Artık tek kaynak Supabase (personnel.manager_id) - localStorage'a
+ // yazmıyoruz, böylece bir sonraki origin/cihaz/tarayıcı değişikliğinde bu ayar kaybolmaz.
+ person.managerId=mgr?mgr.id:null;
+ window.kmiRenderOrgChart(); // önce iyimser (optimistic) arayüz güncellemesi
+ if(!person.dbId){ window.kmiToast?.('Bu personelin bulut kaydı yok, atama yalnızca bu oturumda görünür - kalıcı olmayacak.','warn'); return; }
+ try{
+  const client=window.kurutluSupabase;
+  const {error}=await client.from('personnel').update({manager_id:mgr?mgr.dbId:null}).eq('id',person.dbId);
+  if(error){ window.kmiToast?.('Atama buluta kaydedilemedi: '+error.message,'error'); }
+ }catch(e){ window.kmiToast?.('Atama buluta kaydedilemedi.','error'); }
 };
 })();
 </script>
