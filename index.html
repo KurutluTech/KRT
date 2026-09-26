@@ -3211,7 +3211,73 @@ function personnelPerformanceHtml(p){
    ${badges.length?`<div class="flex flex-wrap gap-1.5 mt-3">${badges.join('')}</div>`:''}
   </div>`;
 }
-function openPersonnelFile(id){
+// KMI-FIX (2026-09-26): Ender'in isteği - "Düzenle" butonu artık sayfanın çok altındaki ayrı,
+// kalabalık checkbox-grid formuna (employeeFormWrap) atlamıyor. Tüm personel ayarları (telefon,
+// e-posta, departman, görev, rol, şifre, katsayı, aktif/pasif, kabiliyet, görev) artık Personel
+// Dosyası kartının kendi içinde, aynı yerde, kompakt bir düzenleme formuyla yapılıyor. Telefon/
+// e-posta alanları admin tarafında ilk kez buradan düzenlenebiliyor (önceden sadece kişinin
+// kendi "Bilgilerimi Düzenle" ekranından girilebiliyordu).
+function personnelFileEditHtml(p){
+ const roles=['OPERATOR','BAKIM','CAM','KALITE','SEVKIYAT','MUHASEBE','ADMIN','USER'];
+ const skillSet=new Set((p.skills||[]).map(Number)), taskSet=new Set((p.tasks||[]).map(Number));
+ return `
+  <div class="flex items-center gap-4">
+   <img id="pfEditPhotoPreview" src="${p.photo||''}" class="w-20 h-20 rounded-2xl object-cover bg-slate-800 border border-slate-700 ${p.photo?'':'hidden'}">
+   <div id="pfEditPhotoPlaceholder" class="w-20 h-20 rounded-2xl bg-slate-800 border border-slate-700 flex items-center justify-center text-2xl ${p.photo?'hidden':''}">👤</div>
+   <label class="bg-slate-700 hover:bg-slate-600 text-white px-3 py-2 rounded text-[11px] font-bold cursor-pointer">Fotoğraf Değiştir<input id="pfEditPhotoInput" type="file" accept="image/*" class="hidden"></label>
+  </div>
+  <div class="grid grid-cols-1 md:grid-cols-2 gap-2 mt-4 text-xs">
+   <div class="md:col-span-2"><label class="block text-slate-400 mb-1">Ad Soyad</label><input id="pfEditName" value="${escSkill(p.name)}" class="w-full bg-slate-950 border border-slate-700 rounded p-2 text-white"></div>
+   <div><label class="block text-slate-400 mb-1">Telefon</label><input id="pfEditPhone" type="tel" value="${escSkill(p.phone||'')}" class="w-full bg-slate-950 border border-slate-700 rounded p-2 text-white"></div>
+   <div><label class="block text-slate-400 mb-1">E-posta</label><input id="pfEditEmail" type="email" value="${escSkill(p.email||'')}" class="w-full bg-slate-950 border border-slate-700 rounded p-2 text-white"></div>
+   <div><label class="block text-slate-400 mb-1">Departman</label><input id="pfEditDept" list="deptOptions" value="${escSkill(p.dept||'')}" class="w-full bg-slate-950 border border-slate-700 rounded p-2 text-white"></div>
+   <div><label class="block text-slate-400 mb-1">Görev / İş Tanımı</label><input id="pfEditJobTitle" value="${escSkill(p.jobTitle||'')}" class="w-full bg-slate-950 border border-slate-700 rounded p-2 text-white"></div>
+   <div><label class="block text-slate-400 mb-1">Sistem Rolü</label><select id="pfEditRole" class="w-full bg-slate-950 border border-slate-700 rounded p-2 text-white">${roles.map(r=>`<option value="${r}" ${p.role===r?'selected':''}>${r}</option>`).join('')}</select></div>
+   <div><label class="block text-slate-400 mb-1">Kişisel Katsayı</label><input id="pfEditMultiplier" type="number" step="0.05" min="0.1" value="${Number(p.puantajMultiplier||1)}" class="w-full bg-slate-950 border border-slate-700 rounded p-2 text-white"></div>
+   <div class="md:col-span-2"><label class="block text-slate-400 mb-1">Yeni Şifre <span class="text-slate-600">(boş bırakırsanız değişmez)</span></label><input id="pfEditPass" placeholder="Değiştirmek için yazın" class="w-full bg-slate-950 border border-slate-700 rounded p-2 text-white"></div>
+   <div class="md:col-span-2 flex items-center gap-2 mt-1"><input id="pfEditActive" type="checkbox" ${p.active!==false?'checked':''} class="accent-emerald-500 w-4 h-4"><label for="pfEditActive" class="text-slate-300">Aktif personel</label></div>
+  </div>
+  <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mt-4">
+   <div>
+    <div class="text-[10px] text-slate-500 uppercase font-bold mb-1.5">Onaylı Kabiliyetler</div>
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-1.5 max-h-40 overflow-y-auto pr-1 bg-slate-950/60 border border-slate-800 rounded-lg p-2">${SKILL_CATALOG.length?SKILL_CATALOG.map(sk=>`<label class="flex items-center gap-1.5 text-[10px] text-slate-200"><input type="checkbox" class="pf-skill-check accent-amber-500" value="${sk.id}" ${skillSet.has(Number(sk.id))?'checked':''}><span>${escSkill(sk.name)}</span></label>`).join(''):'<span class="text-[10px] text-slate-500">Kabiliyet kataloğu boş.</span>'}</div>
+   </div>
+   <div>
+    <div class="text-[10px] text-slate-500 uppercase font-bold mb-1.5">Görevler</div>
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-1.5 max-h-40 overflow-y-auto pr-1 bg-slate-950/60 border border-slate-800 rounded-lg p-2">${TASK_CATALOG.length?TASK_CATALOG.map(t=>`<label class="flex items-center gap-1.5 text-[10px] text-slate-200"><input type="checkbox" class="pf-task-check accent-cyan-500" value="${t.id}" ${taskSet.has(Number(t.id))?'checked':''}><span>${escSkill(t.name)}</span></label>`).join(''):'<span class="text-[10px] text-slate-500">Görev kataloğu boş.</span>'}</div>
+   </div>
+  </div>
+  <div id="pfEditMsg" class="text-[11px] text-rose-400 mt-2 hidden"></div>
+  <div class="flex flex-wrap gap-2 mt-5 pt-4 border-t border-slate-800">
+   <button onclick="window.kmiSavePersonnelCard(${p.id})" class="bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2.5 rounded-xl text-xs font-black"><i class="fa-solid fa-floppy-disk mr-1"></i>Kaydet</button>
+   <button onclick="openPersonnelFile(${p.id})" class="bg-slate-700 hover:bg-slate-600 text-white px-4 py-2.5 rounded-xl text-xs font-black">Vazgeç</button>
+  </div>`;
+}
+window.kmiSavePersonnelCard=function(id){
+ const p=PERSONNEL_LIST.find(x=>Number(x.id)===Number(id)); if(!p)return;
+ const msg=document.getElementById('pfEditMsg');
+ if(!currentUser||getEffectiveRole(currentUser)!=='ADMIN'){ if(msg){msg.textContent='Yönetici yetkisi gerekir.';msg.classList.remove('hidden');} return; }
+ const name=document.getElementById('pfEditName').value.trim(), dept=document.getElementById('pfEditDept').value.trim(), jobTitle=document.getElementById('pfEditJobTitle').value.trim();
+ if(!name||!dept||!jobTitle){ if(msg){msg.textContent='Ad Soyad, Departman ve Görev alanları zorunludur.';msg.classList.remove('hidden');} return; }
+ p.name=name; p.dept=dept; p.jobTitle=jobTitle;
+ p.role=document.getElementById('pfEditRole').value;
+ p.phone=document.getElementById('pfEditPhone').value.trim();
+ p.email=document.getElementById('pfEditEmail').value.trim();
+ const mult=Number(document.getElementById('pfEditMultiplier').value); p.puantajMultiplier=Number.isFinite(mult)&&mult>0?mult:1;
+ const newPass=document.getElementById('pfEditPass').value; if(newPass) p.pass=newPass;
+ p.active=document.getElementById('pfEditActive').checked;
+ p.skills=[...document.querySelectorAll('#personnelFileContent .pf-skill-check:checked')].map(x=>Number(x.value));
+ p.tasks=[...document.querySelectorAll('#personnelFileContent .pf-task-check:checked')].map(x=>Number(x.value));
+ if(window.__pfEditPendingPhoto) p.photo=window.__pfEditPendingPhoto;
+ window.__pfEditPendingPhoto=null;
+ saveStorage('PERSONNEL_LIST',PERSONNEL_LIST);
+ try{populateLoginUserDropdown();}catch(e){}
+ if(currentUser && Number(currentUser.id)===Number(p.id)) currentUser={...p};
+ try{refreshAllViews();}catch(e){}
+ window.kmiToast?.(`${p.name} güncellendi`,'success');
+ openPersonnelFile(id);
+};
+function openPersonnelFile(id,editMode){
  const p=PERSONNEL_LIST.find(x=>Number(x.id)===Number(id)); if(!p)return;
  let modal=document.getElementById('personnelFileModal');
  if(!modal){
@@ -3220,10 +3286,24 @@ function openPersonnelFile(id){
    document.body.appendChild(modal);
    modal.addEventListener('click',e=>{if(e.target===modal)closePersonnelFile();});
  }
+ const content=document.getElementById('personnelFileContent');
+ if(editMode){
+   content.innerHTML=`<div class="text-sm text-cyan-300 font-bold mb-2"><i class="fa-solid fa-user-pen mr-1"></i>${escSkill(p.name)} · Düzenle</div>`+personnelFileEditHtml(p);
+   window.__pfEditPendingPhoto=null;
+   const photoInp=document.getElementById('pfEditPhotoInput');
+   if(photoInp) photoInp.onchange=(e)=>{
+     const f=e.target.files[0]; if(!f)return;
+     const msg=document.getElementById('pfEditMsg');
+     if(f.size>1500000){ msg.textContent='Resim en fazla 1.5 MB olmalıdır.'; msg.classList.remove('hidden'); return; }
+     if(msg)msg.classList.add('hidden');
+     const r=new FileReader(); r.onload=()=>{ window.__pfEditPendingPhoto=r.result; const img=document.getElementById('pfEditPhotoPreview'),ph=document.getElementById('pfEditPhotoPlaceholder'); if(img){img.src=window.__pfEditPendingPhoto;img.classList.remove('hidden');} if(ph)ph.classList.add('hidden'); }; r.readAsDataURL(f);
+   };
+   modal.classList.remove('hidden'); modal.classList.add('flex');
+   return;
+ }
  const skills=(p.skills||[]).map(sid=>SKILL_CATALOG.find(s=>Number(s.id)===Number(sid))?.name).filter(Boolean);
  const tasks=(p.tasks||[]).map(tid=>TASK_CATALOG.find(t=>Number(t.id)===Number(tid))?.name).filter(Boolean);
  const managedShift=(typeof getManagedShift==='function')?getManagedShift(p):'';
- const content=document.getElementById('personnelFileContent');
  content.innerHTML=`
   <div class="flex flex-wrap items-center gap-4">${personPhotoHtml(p.name,'w-20 h-20 rounded-2xl object-cover text-2xl')}<div><div class="text-2xl font-black text-white">${escSkill(p.name)}</div><div class="text-sm text-cyan-300 mt-0.5">${escSkill(p.dept||'-')} · ${escSkill(p.jobTitle||'-')}</div><div class="text-xs ${p.active!==false?'text-emerald-400':'text-red-400'} font-bold mt-1">${p.active!==false?'● AKTİF':'● PASİF'} · ${escSkill(managedShift||'Vardiya atanmadı')}</div></div></div>
   <div class="grid grid-cols-2 md:grid-cols-4 gap-2 mt-4 text-xs">
@@ -3247,7 +3327,7 @@ function openPersonnelFile(id){
   </div></div>
   ${personnelPerformanceHtml(p)}
   <div class="flex flex-wrap gap-2 mt-5 pt-4 border-t border-slate-800">
-   <button onclick="closePersonnelFile();openEmployeeForm(${p.id});document.getElementById('employeeFormWrap')?.scrollIntoView({behavior:'smooth'})" class="bg-slate-700 hover:bg-slate-600 text-white px-4 py-2.5 rounded-xl text-xs font-black"><i class="fa-solid fa-pen mr-1"></i>Düzenle</button>
+   <button onclick="openPersonnelFile(${p.id},true)" class="bg-slate-700 hover:bg-slate-600 text-white px-4 py-2.5 rounded-xl text-xs font-black"><i class="fa-solid fa-pen mr-1"></i>Düzenle</button>
    <button onclick="toggleEmployeeActive(${p.id});openPersonnelFile(${p.id})" class="${p.active!==false?'bg-amber-700 hover:bg-amber-600':'bg-emerald-700 hover:bg-emerald-600'} text-white px-4 py-2.5 rounded-xl text-xs font-black">${p.active!==false?'Pasife Al':'Aktifleştir'}</button>
    <button onclick="if(deleteEmployee(${p.id})!==false)closePersonnelFile()" class="bg-red-800 hover:bg-red-700 text-white px-4 py-2.5 rounded-xl text-xs font-black ml-auto"><i class="fa-solid fa-trash mr-1"></i>Sil</button>
   </div>`;
