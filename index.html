@@ -727,7 +727,7 @@ ead>
                       <div class="text-[10px] uppercase tracking-widest text-indigo-400 font-bold mb-2">Personel</div>
                       <div class="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3">
                         <button class="admin-module-tile" data-module-button="personnel" onclick="openAdminModule('personnel')"><i class="fa-solid fa-users-gear text-indigo-400 text-xl"></i><div class="font-bold text-white mt-3">Personel</div><div class="text-[10px] text-slate-500 mt-1">Personel ve yetkiler</div></button>
-                        <button class="admin-module-tile" data-module-button="badgepin" onclick="openAdminModule('badgepin')"><i class="fa-solid fa-id-card-clip text-cyan-400 text-xl"></i><div class="font-bold text-white mt-3">Rozet / PIN Yönetimi</div><div class="text-[10px] text-slate-500 mt-1">Saha girişi için PIN + QR kart</div></button>
+                        <button class="admin-module-tile" data-module-button="personnel" onclick="openAdminModule('personnel');setTimeout(()=>window.kmiExpandRozetPin&&window.kmiExpandRozetPin(),60);"><i class="fa-solid fa-id-card-clip text-cyan-400 text-xl"></i><div class="font-bold text-white mt-3">Rozet / PIN Yönetimi</div><div class="text-[10px] text-slate-500 mt-1">Personel altında · Saha girişi için PIN + QR kart</div></button>
                         <button class="admin-module-tile" data-module-button="shifts" onclick="openAdminModule('shifts')"><i class="fa-solid fa-people-group text-emerald-400 text-xl"></i><div class="font-bold text-white mt-3">Vardiyalar</div><div class="text-[10px] text-slate-500 mt-1">TeamK1 / TeamK2</div></button>
                         <button class="admin-module-tile" data-module-button="skills" onclick="openAdminModule('skills')"><i class="fa-solid fa-graduation-cap text-amber-400 text-xl"></i><div class="font-bold text-white mt-3">Kabiliyetler</div><div class="text-[10px] text-slate-500 mt-1">Eğitim ve yetkinlik</div></button>
                         <button class="admin-module-tile" data-module-button="puantaj" onclick="openAdminModule('puantaj')"><i class="fa-solid fa-scale-balanced text-emerald-400 text-xl"></i><div class="font-bold text-white mt-3">Puantaj & Prim</div><div class="text-[10px] text-slate-500 mt-1">Algoritma ve bütçe</div></button>
@@ -758,15 +758,9 @@ ead>
                     <div id="yonTaskOverviewBody" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-2"></div>
                 </div>
 
-                <!-- KMI-FIX (2026-09-26): Ender'in isteği - yöneticiler dahil herkesin task performans
-                     yüzdesi (haftalık/aylık/genel ortalama + artış-azalış ok işareti) tek tabloda. -->
-                <div class="bg-slate-800 border border-cyan-800/60 rounded-lg p-5 shadow-lg">
-                    <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
-                        <div><h2 class="text-lg font-semibold text-white"><i class="fa-solid fa-gauge-high text-cyan-400 mr-2"></i>Personel Görev Performansı</h2><p class="text-xs text-slate-400">Haftalık, aylık ve genel ortalama zamanında-tamamlama yüzdesi; yanındaki ok bir önceki döneme göre artış/azalışı gösterir. Yöneticiler dahil tüm aktif personel.</p></div>
-                        <button onclick="renderPersonnelTaskPerformanceBoard()" class="bg-slate-700 hover:bg-slate-600 px-3 py-1.5 rounded text-[10px] text-white">Yenile</button>
-                    </div>
-                    <div id="personnelTaskPerfBoardBody" class="grid grid-cols-1 xl:grid-cols-2 gap-2"></div>
-                </div>
+                <!-- KMI-FIX (2026-09-26): Ender'in isteği - "Personel Görev Performansı" burada (Yönetici
+                     Paneli ana sayfası) çok yer kaplıyordu ve gerekli değil. Personel modülünün altına,
+                     tıklanınca açılan katlanır bir bölüm olarak taşındı (bkz. data-admin-module="personnel"). -->
 
                 <!-- KMI-FIX (2026-09-25): Ender'in isteği - editlenebilir organizasyon şeması ve
                      buna göre kimin kime iş emri/bakım emri/task açabileceğinin hiyerarşisi. -->
@@ -794,11 +788,16 @@ ead>
 
                 <!-- AYLIK ÜRETİM HEDEF MERKEZİ -->
                 <div data-admin-module="targets" class="admin-module-panel admin-card p-5 shadow-lg space-y-4 border border-amber-700/40">
-                  <div class="flex flex-wrap justify-between gap-3 items-center border-b border-slate-700 pb-3"><div><h3 class="text-base font-bold text-white"><i class="fa-solid fa-bullseye text-amber-400 mr-2"></i>Aylık Üretim Hedef Merkezi</h3><p class="text-[11px] text-slate-500">Kalite onaylı sağlam üretim esas alınır. Aylık hedef sistemin ana referansıdır; günlük ve vardiya ihtiyacı otomatik hesaplanır.</p></div><div class="flex gap-2"><input id="productionTargetMonth" type="month" class="bg-slate-900 border border-slate-700 rounded p-2 text-white text-xs"><input id="productionTargetQty" type="number" min="0" placeholder="Aylık hedef" class="bg-slate-900 border border-amber-700 rounded p-2 text-white text-xs w-36"><button onclick="saveProductionTarget()" class="bg-amber-600 hover:bg-amber-500 text-white px-3 py-2 rounded text-xs font-bold">Hedefi Kaydet</button></div></div>
-                  <div id="productionTargetKpis" class="grid grid-cols-2 lg:grid-cols-5 gap-3"></div><div class="bg-slate-950/50 rounded-xl p-4"><div class="flex justify-between items-center"><div><b class="text-white text-xs">Ürün Bazlı Aylık Hedefler</b><div class="text-[10px] text-slate-500">Her ürün ayrı hedeflenir; kalite onaylı sağlam adetlerle karşılaştırılır.</div></div><button onclick="addProductTarget()" class="bg-cyan-700 text-white px-3 py-2 rounded text-[10px] font-bold">+ Ürün Hedefi</button></div><div id="productTargetList" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3 mt-3"></div></div>
-                  <div class="bg-slate-950/50 rounded-xl p-4"><div class="flex justify-between text-xs mb-2"><b class="text-white">Aylık İlerleme</b><span id="productionTargetProgressText" class="text-amber-300">-</span></div><div class="h-4 rounded-full bg-slate-800 overflow-hidden"><div id="productionTargetProgressBar" class="h-full bg-amber-500" style="width:0%"></div></div><div id="productionTargetGapNote" class="text-[10px] text-slate-500 mt-2"></div></div>
+                  <div class="flex flex-wrap justify-between gap-3 items-center border-b border-slate-700 pb-3"><div><h3 class="text-base font-bold text-white"><i class="fa-solid fa-bullseye text-amber-400 mr-2"></i>Aylık Üretim Hedef Merkezi</h3><p class="text-[11px] text-slate-500">Kalite onaylı sağlam üretim esas alınır. Aylık toplam hedef, aşağıdaki ürün bazlı hedeflerin toplamından otomatik hesaplanır; ürün hedefi girilmemişse manuel alan kullanılır.</p></div><div class="flex gap-2"><input id="productionTargetMonth" type="month" class="bg-slate-900 border border-slate-700 rounded p-2 text-white text-xs"><input id="productionTargetQty" type="number" min="0" placeholder="Manuel hedef (ürün yoksa)" class="bg-slate-900 border border-amber-700 rounded p-2 text-white text-xs w-44"><button onclick="saveProductionTarget()" class="bg-amber-600 hover:bg-amber-500 text-white px-3 py-2 rounded text-xs font-bold">Hedefi Kaydet</button></div></div>
+                  <div id="productionTargetKpis" class="grid grid-cols-2 lg:grid-cols-5 gap-3"></div>
+                  <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                    <div class="bg-slate-950/50 rounded-xl p-4 flex flex-col items-center justify-center"><b class="text-white text-xs self-start mb-2">Hedefe Yaklaşma · Barometre</b><div id="targetGauge"></div></div>
+                    <div class="bg-slate-950/50 rounded-xl p-4 lg:col-span-2"><div class="flex justify-between text-xs mb-2"><b class="text-white">Aylık İlerleme</b><span id="productionTargetProgressText" class="text-amber-300">-</span></div><div class="h-4 rounded-full bg-slate-800 overflow-hidden"><div id="productionTargetProgressBar" class="h-full bg-amber-500" style="width:0%"></div></div><div id="productionTargetGapNote" class="text-[10px] text-slate-500 mt-2"></div><div id="targetCycleTimeNote" class="text-[10px] text-cyan-300 mt-2"></div></div>
+                  </div>
+                  <div class="bg-slate-950/50 rounded-xl p-4"><div class="flex justify-between items-center"><div><b class="text-white text-xs">Ürün Bazlı Aylık Hedefler</b><div class="text-[10px] text-slate-500">Her ürün ayrı hedeflenir; toplam aylık hedef bunların toplamından otomatik hesaplanır. Katalogdan ürün seçilirse cycle time otomatik gelir.</div></div><button onclick="window.kmiOpenProductTargetModal()" class="bg-cyan-700 text-white px-3 py-2 rounded text-[10px] font-bold">+ Ürün Hedefi</button></div><div id="productTargetList" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3 mt-3"></div></div>
                   <div class="grid grid-cols-1 xl:grid-cols-2 gap-4"><div class="bg-slate-950/50 rounded-xl p-4"><div class="flex justify-between"><b class="text-white text-xs">Günlük Hedef / Gerçekleşen</b><span class="text-[9px] text-slate-500">Kalite onaylı sağlam adet</span></div><div id="targetDailyChart" class="mt-3 min-h-[230px]"></div></div><div class="bg-slate-950/50 rounded-xl p-4"><div class="flex justify-between"><b class="text-white text-xs">Makine Katkısı</b><span class="text-[9px] text-slate-500">Seçili ay</span></div><div id="targetMachineChart" class="mt-3 min-h-[230px]"></div></div></div>
-                  <div class="bg-slate-950/50 rounded-xl p-4"><div class="flex justify-between"><b class="text-white text-xs">Ürün Performans Detayı</b><span class="text-[9px] text-slate-500">Hedef / gerçekleşen / fark</span></div><div id="targetProductDetail" class="mt-3 overflow-x-auto"></div></div>
+                  <div class="bg-slate-950/50 rounded-xl p-4"><div class="flex justify-between"><b class="text-white text-xs">Haftalık Hedef / Gerçekleşen</b><span class="text-[9px] text-slate-500">Seçili ay içindeki haftalar</span></div><div id="targetWeeklyTable" class="mt-3 overflow-x-auto"></div></div>
+                  <div class="bg-slate-950/50 rounded-xl p-4"><div class="flex justify-between"><b class="text-white text-xs">Ürün Performans Detayı</b><span class="text-[9px] text-slate-500">Hedef / gerçekleşen / fark / cycle time</span></div><div id="targetProductDetail" class="mt-3 overflow-x-auto"></div></div>
                 </div>
 
                 <!-- MAKİNE SAĞLIĞI & BAKIM -->
@@ -815,11 +814,12 @@ ead>
 
                 <!-- VARDİYA YÖNETİMİ -->
                 <div data-admin-module="shifts" class="admin-module-panel admin-card p-5 shadow-lg space-y-4">
-                    <div class="flex flex-wrap justify-between items-center gap-3 border-b border-slate-700 pb-3"><div><h3 class="text-base font-bold text-white"><i class="fa-solid fa-people-group text-emerald-400 mr-2"></i>Vardiya Takım Yönetimi</h3><p class="text-[11px] text-slate-500">1. Vardiya = <b class="text-blue-300">TeamK1</b>, 2. Vardiya = <b class="text-emerald-300">TeamK2</b>. Yönetici operatörleri takımlara atar; bu bilgi operatör beyanındaki vardiyayı otomatik belirler.</p></div><button onclick="clearAllShiftAssignments()" class="bg-slate-700 hover:bg-slate-600 text-white px-3 py-1.5 rounded text-xs">Tüm Atamaları Temizle</button></div>
-                    <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
-                        <div class="bg-slate-950/60 border border-slate-700 rounded-xl p-4 space-y-3"><label class="text-xs text-slate-300 font-semibold">Operatör / Personel</label><select id="shiftEmployeeSelect" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-xs text-white"></select><div class="grid grid-cols-2 gap-2"><button onclick="assignSelectedEmployeeToTeam('TeamK1')" class="bg-blue-600 hover:bg-blue-500 rounded p-2 text-xs font-bold text-white">→ TeamK1</button><button onclick="assignSelectedEmployeeToTeam('TeamK2')" class="bg-emerald-600 hover:bg-emerald-500 rounded p-2 text-xs font-bold text-white">→ TeamK2</button></div><button onclick="assignSelectedEmployeeToTeam('')" class="w-full bg-slate-700 hover:bg-slate-600 rounded p-2 text-xs text-white">Vardiya Atamasını Kaldır</button><div id="shiftAssignmentStatus" class="text-[10px] text-slate-500"></div></div>
+                    <div class="flex flex-wrap justify-between items-center gap-3 border-b border-slate-700 pb-3"><div><h3 class="text-base font-bold text-white"><i class="fa-solid fa-people-group text-emerald-400 mr-2"></i>Vardiya Takım Yönetimi</h3><p class="text-[11px] text-slate-500">1. Vardiya = <b class="text-blue-300">TeamK1</b>, 2. Vardiya = <b class="text-emerald-300">TeamK2</b>, <b class="text-amber-300">Ofis / Destek</b> = üretimde çalışmayan ofis/destek personeli. Yönetici operatörleri takımlara atar; bu bilgi operatör beyanındaki vardiyayı otomatik belirler.</p></div><button onclick="clearAllShiftAssignments()" class="bg-slate-700 hover:bg-slate-600 text-white px-3 py-1.5 rounded text-xs">Tüm Atamaları Temizle</button></div>
+                    <div class="grid grid-cols-1 lg:grid-cols-4 gap-4">
+                        <div class="bg-slate-950/60 border border-slate-700 rounded-xl p-4 space-y-3"><label class="text-xs text-slate-300 font-semibold">Operatör / Personel</label><select id="shiftEmployeeSelect" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-xs text-white"></select><div class="grid grid-cols-1 gap-2"><button onclick="assignSelectedEmployeeToTeam('TeamK1')" class="bg-blue-600 hover:bg-blue-500 rounded p-2 text-xs font-bold text-white">→ TeamK1 · 1. Vardiya</button><button onclick="assignSelectedEmployeeToTeam('TeamK2')" class="bg-emerald-600 hover:bg-emerald-500 rounded p-2 text-xs font-bold text-white">→ TeamK2 · 2. Vardiya</button><button onclick="assignSelectedEmployeeToTeam('TeamOfis')" class="bg-amber-600 hover:bg-amber-500 rounded p-2 text-xs font-bold text-white">→ Ofis / Destek</button></div><button onclick="assignSelectedEmployeeToTeam('')" class="w-full bg-slate-700 hover:bg-slate-600 rounded p-2 text-xs text-white">Vardiya Atamasını Kaldır</button><div id="shiftAssignmentStatus" class="text-[10px] text-slate-500"></div></div>
                         <div class="shift-team-card"><div class="flex justify-between items-center mb-3"><div><div class="text-blue-300 font-black">TeamK1</div><div class="text-[10px] text-slate-500">1. Vardiya</div></div><span id="teamK1Count" class="text-xs bg-blue-500/10 text-blue-300 px-2 py-1 rounded-full">0 kişi</span></div><div id="teamK1Members" class="space-y-2"></div></div>
                         <div class="shift-team-card"><div class="flex justify-between items-center mb-3"><div><div class="text-emerald-300 font-black">TeamK2</div><div class="text-[10px] text-slate-500">2. Vardiya</div></div><span id="teamK2Count" class="text-xs bg-emerald-500/10 text-emerald-300 px-2 py-1 rounded-full">0 kişi</span></div><div id="teamK2Members" class="space-y-2"></div></div>
+                        <div class="shift-team-card"><div class="flex justify-between items-center mb-3"><div><div class="text-amber-300 font-black">Ofis / Destek</div><div class="text-[10px] text-slate-500">Üretim Dışı</div></div><span id="teamOfisCount" class="text-xs bg-amber-500/10 text-amber-300 px-2 py-1 rounded-full">0 kişi</span></div><div id="teamOfisMembers" class="space-y-2"></div></div>
                     </div>
                 </div>
 
@@ -848,12 +848,70 @@ ead>
                             <div><label class="block text-slate-400 mb-1">Görev / İş Tanımı</label><input id="employeeJobTitle" required placeholder="Örn. CNC Operatörü" class="w-full bg-slate-800 border border-slate-700 rounded p-2 text-white"></div>
                             <div><label class="block text-slate-400 mb-1">Sistem Rolü</label><select id="employeeRole" class="w-full bg-slate-800 border border-slate-700 rounded p-2 text-white"><option value="OPERATOR">OPERATOR</option><option value="BAKIM">BAKIM</option><option value="CAM">CAM</option><option value="KALITE">KALITE</option><option value="SEVKIYAT">SEVKIYAT</option><option value="MUHASEBE">MUHASEBE</option><option value="ADMIN">ADMIN</option><option value="USER">USER</option></select></div>
                             <div><label class="block text-slate-400 mb-1">İlk Şifre</label><input id="employeePass" value="123" class="w-full bg-slate-800 border border-slate-700 rounded p-2 text-white"></div>
+                            <div><label class="block text-slate-400 mb-1">Telefon</label><input id="employeePhone" type="tel" placeholder="05xx xxx xx xx" class="w-full bg-slate-800 border border-slate-700 rounded p-2 text-white"></div>
+                            <div><label class="block text-slate-400 mb-1">E-posta</label><input id="employeeEmail" type="email" placeholder="ornek@kurutlu.com" class="w-full bg-slate-800 border border-slate-700 rounded p-2 text-white"></div>
                             <div class="md:col-span-2 lg:col-span-5"><div class="flex items-center justify-between mb-2"><label class="block text-slate-300 font-semibold"><i class="fa-solid fa-certificate text-amber-400 mr-1"></i>Eğitimi Tamamlanmış / Yönetici Onaylı Kabiliyetler</label><span class="text-[10px] text-amber-300">Yalnız yönetici atayabilir</span></div><div id="employeeSkillsChecklist" class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-2 bg-slate-950/60 border border-slate-700 rounded-lg p-3"></div></div><div class="md:col-span-2 lg:col-span-5"><div class="flex items-center justify-between mb-2"><label class="block text-slate-300 font-semibold"><i class="fa-solid fa-briefcase text-cyan-400 mr-1"></i>Görevler / Job Description</label><span class="text-[10px] text-cyan-300">Bir personele birden fazla görev atanabilir</span></div><div id="employeeTasksChecklist" class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-2 bg-slate-950/60 border border-slate-700 rounded-lg p-3"></div></div>
                             <div class="md:col-span-2 lg:col-span-5 flex gap-2"><button class="bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2 rounded font-semibold">Kaydet</button><button type="button" onclick="closeEmployeeForm()" class="bg-slate-700 hover:bg-slate-600 text-white px-4 py-2 rounded">Vazgeç</button></div>
                         </form>
                     </div>
                     <div class="border-t border-slate-700 pt-4"><div class="flex justify-between items-center mb-3"><div><h4 class="text-sm font-bold text-white"><i class="fa-solid fa-address-card text-amber-400 mr-2"></i>Personel Dosyaları</h4><p class="text-[10px] text-slate-500">Künye, departman, görev, rol, vardiya, kabiliyet, iletişim ve kişisel puantaj katsayısı kart görünümünde.</p></div><button onclick="renderPersonnelFileCards()" class="bg-slate-700 px-3 py-2 rounded text-[10px] text-white">Listeyi Yenile</button></div><div id="personnelFileCards" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3"></div></div>
                     <div class="overflow-x-auto"><table class="w-full text-left text-xs text-slate-300"><thead class="bg-slate-900 text-slate-400 uppercase text-[10px]"><tr><th class="p-2">ID</th><th class="p-2">Ad Soyad</th><th class="p-2">Departman</th><th class="p-2">Görev</th><th class="p-2">Sistem Rolü</th><th class="p-2">Ekran Yetkileri</th><th class="p-2">Durum</th><th class="p-2 text-right">İşlem</th></tr></thead><tbody id="employeeAdminTableBody" class="divide-y divide-slate-700"></tbody></table></div>
+
+                    <!-- KMI-FIX (2026-09-26): Ender'in isteği - Personel Görev Performansı artık sadece
+                         Personel sayfasının altında, tıklanınca açılan katlanır bir bölüm. -->
+                    <div class="border-t border-slate-700 pt-4">
+                        <button type="button" onclick="const b=document.getElementById('personnelTaskPerfCollapse');const open=b.style.display!=='none';b.style.display=open?'none':'block';document.getElementById('perfToggleLabel').textContent=open?'Görev Performans Panosunu Göster':'Panoyu Gizle';document.getElementById('perfToggleIcon').classList.toggle('fa-chevron-down',open);document.getElementById('perfToggleIcon').classList.toggle('fa-chevron-up',!open);if(!open){try{renderPersonnelTaskPerformanceBoard();}catch(e){}}" class="w-full flex items-center justify-between bg-slate-900 hover:bg-slate-950 border border-slate-700 rounded-lg p-3 text-xs font-bold text-slate-200">
+                            <span id="perfToggleLabel"><i class="fa-solid fa-gauge-high text-cyan-400 mr-2"></i>Görev Performans Panosunu Göster</span>
+                            <i id="perfToggleIcon" class="fa-solid fa-chevron-down"></i>
+                        </button>
+                        <div id="personnelTaskPerfCollapse" style="display:none" class="mt-3">
+                            <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
+                                <p class="text-xs text-slate-400">Haftalık, aylık ve genel ortalama zamanında-tamamlama yüzdesi; yanındaki ok bir önceki döneme göre artış/azalışı gösterir. Yöneticiler dahil tüm aktif personel.</p>
+                                <button onclick="renderPersonnelTaskPerformanceBoard()" class="bg-slate-700 hover:bg-slate-600 px-3 py-1.5 rounded text-[10px] text-white">Yenile</button>
+                            </div>
+                            <div id="personnelTaskPerfBoardBody" class="grid grid-cols-1 xl:grid-cols-2 gap-2"></div>
+                        </div>
+                    </div>
+
+                    <!-- KMI-FIX (2026-09-26): Ender'in isteği "rozet pin yönetimi de öyle / personelin altına" -
+                         Rozet/PIN Yönetimi artık ayrı bir üst-düzey modül değil, Personel modülünün altında,
+                         tıklanınca açılan katlanır bir bölüm (eskiden data-admin-module="badgepin" idi). -->
+                    <div class="border-t border-slate-700 pt-4">
+                        <button type="button" id="rozetPinToggleBtn" onclick="const b=document.getElementById('rozetPinCollapse');const open=b.style.display!=='none';b.style.display=open?'none':'block';document.getElementById('rozetPinToggleLabel').textContent=open?'Rozet / PIN Yönetimini Göster':'Gizle';document.getElementById('rozetPinToggleIcon').classList.toggle('fa-chevron-down',open);document.getElementById('rozetPinToggleIcon').classList.toggle('fa-chevron-up',!open);if(!open){try{window.kmiRenderBadgePinAdmin&&window.kmiRenderBadgePinAdmin();}catch(e){}}" class="w-full flex items-center justify-between bg-slate-900 hover:bg-slate-950 border border-slate-700 rounded-lg p-3 text-xs font-bold text-slate-200">
+                            <span id="rozetPinToggleLabel"><i class="fa-solid fa-id-card-clip text-cyan-400 mr-2"></i>Rozet / PIN Yönetimini Göster</span>
+                            <i id="rozetPinToggleIcon" class="fa-solid fa-chevron-down"></i>
+                        </button>
+                        <div id="rozetPinCollapse" style="display:none" class="mt-3 space-y-3">
+                            <p class="text-[11px] text-slate-400">Saha personeli telefonundan/tabletten rozet numarasını okutup 4 haneli PIN ile giriş yapar. Her personelin PIN'i burada tanımlanır veya sıfırlanır. Sicil numarası (rozet no) atanmamış personel listede görünür ama PIN tanımlanamaz — önce Personel ekranından sicil no girilmeli.</p>
+                            <div class="bg-slate-900/60 border border-slate-700 rounded-xl p-3 flex flex-wrap items-center justify-between gap-2">
+                                <div>
+                                    <div class="text-xs font-bold text-white">Bu cihaz: <span id="kmiKioskStatusLabel">Normal</span></div>
+                                    <div class="text-[10px] text-slate-500">Ortak tablet/kiosk olarak işaretlenen cihazlarda, rozetle giriş yapan personel işini bitirip "Çıkış Yap" dediğinde veya 60 saniye hareketsiz kaldığında otomatik çıkış yapılır — bir sonraki kişi kendi rozetini okutmak zorunda kalır. Kişisel telefon/ofis bilgisayarında bunu açmayın.</div>
+                                </div>
+                                <div class="flex gap-2">
+                                    <button onclick="kmiPrintAllBadgeQR()" class="bg-slate-700 hover:bg-slate-600 text-white text-[11px] font-bold px-3 py-2 rounded-lg whitespace-nowrap"><i class="fa-solid fa-print mr-1"></i>Tüm Rozetleri Yazdır</button>
+                                    <button onclick="kmiToggleKioskDevice()" id="kmiKioskToggleBtn" class="bg-slate-700 hover:bg-slate-600 text-white text-[11px] font-bold px-3 py-2 rounded-lg whitespace-nowrap">Bu Cihazı Kiosk Yap</button>
+                                </div>
+                            </div>
+                            <div id="kmiBadgePinAdminMsg" class="text-[11px] min-h-[16px]"></div>
+                            <div class="overflow-x-auto">
+                                <table class="w-full text-left text-xs text-slate-300">
+                                    <thead class="bg-slate-900 text-slate-400 uppercase text-[10px]">
+                                        <tr>
+                                            <th class="p-2">Sicil No</th>
+                                            <th class="p-2">Adı Soyadı</th>
+                                            <th class="p-2">Departman</th>
+                                            <th class="p-2">PIN Durumu</th>
+                                            <th class="p-2 text-right">Aksiyon</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="kmiBadgePinAdminTableBody" class="divide-y divide-slate-700">
+                                        <!-- Populated by JS -->
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
                 </div>
 
                 <!-- KABİLİYET / EĞİTİM YÖNETİMİ -->
@@ -953,38 +1011,6 @@ ead>
                                 </tr>
                             </thead>
                             <tbody id="userAdminTableBody" class="divide-y divide-slate-700">
-                                <!-- Populated by JS -->
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-
-                <div data-admin-module="badgepin" class="admin-module-panel bg-slate-800 border border-slate-700 rounded-lg p-5 shadow-lg space-y-3">
-                    <h3 class="text-sm font-bold text-white border-b border-slate-700 pb-2"><i class="fa-solid fa-id-card-clip text-cyan-400 mr-2"></i>Rozet / PIN Yönetimi — Saha Girişi</h3>
-                    <p class="text-[11px] text-slate-400">Saha personeli telefonundan/tabletten rozet numarasını okutup 4 haneli PIN ile giriş yapar. Her personelin PIN'i burada tanımlanır veya sıfırlanır. Sicil numarası (rozet no) atanmamış personel listede görünür ama PIN tanımlanamaz — önce Personel ekranından sicil no girilmeli.</p>
-                    <div class="bg-slate-900/60 border border-slate-700 rounded-xl p-3 flex flex-wrap items-center justify-between gap-2">
-                        <div>
-                            <div class="text-xs font-bold text-white">Bu cihaz: <span id="kmiKioskStatusLabel">Normal</span></div>
-                            <div class="text-[10px] text-slate-500">Ortak tablet/kiosk olarak işaretlenen cihazlarda, rozetle giriş yapan personel işini bitirip "Çıkış Yap" dediğinde veya 60 saniye hareketsiz kaldığında otomatik çıkış yapılır — bir sonraki kişi kendi rozetini okutmak zorunda kalır. Kişisel telefon/ofis bilgisayarında bunu açmayın.</div>
-                        </div>
-                        <div class="flex gap-2">
-                            <button onclick="kmiPrintAllBadgeQR()" class="bg-slate-700 hover:bg-slate-600 text-white text-[11px] font-bold px-3 py-2 rounded-lg whitespace-nowrap"><i class="fa-solid fa-print mr-1"></i>Tüm Rozetleri Yazdır</button>
-                            <button onclick="kmiToggleKioskDevice()" id="kmiKioskToggleBtn" class="bg-slate-700 hover:bg-slate-600 text-white text-[11px] font-bold px-3 py-2 rounded-lg whitespace-nowrap">Bu Cihazı Kiosk Yap</button>
-                        </div>
-                    </div>
-                    <div id="kmiBadgePinAdminMsg" class="text-[11px] min-h-[16px]"></div>
-                    <div class="overflow-x-auto">
-                        <table class="w-full text-left text-xs text-slate-300">
-                            <thead class="bg-slate-900 text-slate-400 uppercase text-[10px]">
-                                <tr>
-                                    <th class="p-2">Sicil No</th>
-                                    <th class="p-2">Adı Soyadı</th>
-                                    <th class="p-2">Departman</th>
-                                    <th class="p-2">PIN Durumu</th>
-                                    <th class="p-2 text-right">Aksiyon</th>
-                                </tr>
-                            </thead>
-                            <tbody id="kmiBadgePinAdminTableBody" class="divide-y divide-slate-700">
                                 <!-- Populated by JS -->
                             </tbody>
                         </table>
@@ -1768,27 +1794,37 @@ ead>
             // bildirimleri hem burada hem her makinenin kendi dijital dosyasında (v35OpenMachine)
             // görünür, çünkü ikisi de aynı orders/journal verisini okuyor.
             if(name==='maintenance'){ try{ window.v35RenderAll&&window.v35RenderAll(); }catch(e){ console.warn('[V35 render]',e); } }
-            if(name==='badgepin'){ try{ window.kmiRenderBadgePinAdmin&&window.kmiRenderBadgePinAdmin(); }catch(e){ console.warn('[Rozet/PIN admin render]',e); } }
+            // KMI-FIX (2026-09-26): 'badgepin' artık bağımsız bir üst-düzey modül değil; Rozet/PIN
+            // Yönetimi Personel modülünün altında katlanır bir bölüm (bkz. window.kmiExpandRozetPin,
+            // #rozetPinCollapse) ve render'ı o bölüm açıldığında tetiklenir.
             const first=document.querySelector(`[data-admin-module="${name}"]`); if(first) setTimeout(()=>first.scrollIntoView({behavior:'smooth',block:'start'}),20);
         }
-        function getManagedShift(person){return person?.shiftTeam==='TeamK1'?'1. Vardiya':person?.shiftTeam==='TeamK2'?'2. Vardiya':'';}
+        function getManagedShift(person){return person?.shiftTeam==='TeamK1'?'1. Vardiya':person?.shiftTeam==='TeamK2'?'2. Vardiya':person?.shiftTeam==='TeamOfis'?'Ofis / Destek':'';}
         function renderShiftTeamManager(){
             const sel=document.getElementById('shiftEmployeeSelect'); if(!sel)return;
             const prev=sel.value;
-            const people=PERSONNEL_LIST.filter(p=>p.active!==false && getEffectiveRole(p)!=='ADMIN' && ['OPERATOR','BAKIM','CAM'].includes(getEffectiveRole(p))).sort((a,b)=>String(a.name).localeCompare(String(b.name),'tr'));
-            sel.innerHTML='<option value="">Personel seçiniz...</option>'+people.map(p=>`<option value="${p.id}">${escSkill(p.name)} — ${escSkill(p.dept||'')} ${p.shiftTeam?'· '+p.shiftTeam:''}</option>`).join('');
+            // KMI-FIX (2026-09-26): Ender'in isteği - üretimde çalışmayan ofis/destek personeli de bu listede
+            // görünüp "Ofis / Destek" takımına atanabilsin diye rol kısıtı kaldırıldı (önceden yalnız
+            // OPERATOR/BAKIM/CAM listeleniyordu).
+            const people=PERSONNEL_LIST.filter(p=>p.active!==false && getEffectiveRole(p)!=='ADMIN').sort((a,b)=>String(a.name).localeCompare(String(b.name),'tr'));
+            const teamShortLabel={TeamK1:'TeamK1',TeamK2:'TeamK2',TeamOfis:'Ofis/Destek'};
+            sel.innerHTML='<option value="">Personel seçiniz...</option>'+people.map(p=>`<option value="${p.id}">${escSkill(p.name)} — ${escSkill(p.dept||'')} ${p.shiftTeam?'· '+(teamShortLabel[p.shiftTeam]||p.shiftTeam):''}</option>`).join('');
             if(prev&&people.some(p=>String(p.id)===String(prev)))sel.value=prev;
-            const memberHtml=(p,team)=>`<div class="shift-member"><div><div class="text-xs font-semibold text-white">${escSkill(p.name)}</div><div class="text-[9px] text-slate-500">${escSkill(p.dept||'')} · ${team==='TeamK1'?'1. Vardiya':'2. Vardiya'}</div></div><button onclick="removeEmployeeFromShift(${p.id})" class="text-[10px] text-red-300 hover:text-red-200">Çıkar</button></div>`;
-            const k1=people.filter(p=>p.shiftTeam==='TeamK1'),k2=people.filter(p=>p.shiftTeam==='TeamK2');
+            const teamFullLabel={TeamK1:'1. Vardiya',TeamK2:'2. Vardiya',TeamOfis:'Ofis / Destek'};
+            const memberHtml=(p,team)=>`<div class="shift-member"><div><div class="text-xs font-semibold text-white">${escSkill(p.name)}</div><div class="text-[9px] text-slate-500">${escSkill(p.dept||'')} · ${teamFullLabel[team]}</div></div><button onclick="removeEmployeeFromShift(${p.id})" class="text-[10px] text-red-300 hover:text-red-200">Çıkar</button></div>`;
+            const k1=people.filter(p=>p.shiftTeam==='TeamK1'),k2=people.filter(p=>p.shiftTeam==='TeamK2'),ofis=people.filter(p=>p.shiftTeam==='TeamOfis');
             document.getElementById('teamK1Members').innerHTML=k1.map(p=>memberHtml(p,'TeamK1')).join('')||'<div class="text-[10px] text-slate-500">Henüz personel atanmadı.</div>';
             document.getElementById('teamK2Members').innerHTML=k2.map(p=>memberHtml(p,'TeamK2')).join('')||'<div class="text-[10px] text-slate-500">Henüz personel atanmadı.</div>';
+            document.getElementById('teamOfisMembers').innerHTML=ofis.map(p=>memberHtml(p,'TeamOfis')).join('')||'<div class="text-[10px] text-slate-500">Henüz personel atanmadı.</div>';
             document.getElementById('teamK1Count').textContent=`${k1.length} kişi`; document.getElementById('teamK2Count').textContent=`${k2.length} kişi`;
+            document.getElementById('teamOfisCount').textContent=`${ofis.length} kişi`;
         }
         function assignSelectedEmployeeToTeam(team){
             if(!currentUser||getEffectiveRole(currentUser)!=='ADMIN'){alert('Vardiya atamasını yalnız yönetici yapabilir.');return;}
             const id=Number(document.getElementById('shiftEmployeeSelect')?.value),p=PERSONNEL_LIST.find(x=>Number(x.id)===id);if(!p){alert('Lütfen personel seçin.');return;}
+            const teamName={TeamK1:'TeamK1',TeamK2:'TeamK2',TeamOfis:'Ofis / Destek'}[team]||team;
             p.shiftTeam=team; saveStorage('PERSONNEL_LIST',PERSONNEL_LIST); renderShiftTeamManager(); renderOperatorProfile();
-            const st=document.getElementById('shiftAssignmentStatus');if(st)st.textContent=team?`✓ ${p.name} ${team} takımına atandı.`:`✓ ${p.name} vardiya atamasından çıkarıldı.`;
+            const st=document.getElementById('shiftAssignmentStatus');if(st)st.textContent=team?`✓ ${p.name} ${teamName} takımına atandı.`:`✓ ${p.name} vardiya atamasından çıkarıldı.`;
         }
         function removeEmployeeFromShift(id){const p=PERSONNEL_LIST.find(x=>Number(x.id)===Number(id));if(!p)return;p.shiftTeam='';saveStorage('PERSONNEL_LIST',PERSONNEL_LIST);renderShiftTeamManager();renderOperatorProfile();}
         // KMI-FIX (2026-09-25): Ender'in isteği - Personel Dosyası kartından da vardiya ataması yapılabilsin,
@@ -1804,12 +1840,14 @@ ead>
             openPersonnelFile(id);
         }
         window.kmiAssignShiftDirect=kmiAssignShiftDirect;
-        function clearAllShiftAssignments(){if(!currentUser||getEffectiveRole(currentUser)!=='ADMIN')return;if(!confirm('TeamK1 ve TeamK2 vardiya atamalarının tamamı temizlensin mi?'))return;PERSONNEL_LIST.forEach(p=>p.shiftTeam='');saveStorage('PERSONNEL_LIST',PERSONNEL_LIST);renderShiftTeamManager();}
+        function clearAllShiftAssignments(){if(!currentUser||getEffectiveRole(currentUser)!=='ADMIN')return;if(!confirm('TeamK1, TeamK2 ve Ofis/Destek vardiya atamalarının tamamı temizlensin mi?'))return;PERSONNEL_LIST.forEach(p=>p.shiftTeam='');saveStorage('PERSONNEL_LIST',PERSONNEL_LIST);renderShiftTeamManager();}
 
         function monthKeyNow(){return new Date().toISOString().slice(0,7);}
         function qualityGoodForMonth(month){return declarations.filter(d=>dateKeyOf(d).startsWith(month) && ['Hazır - Muhasebe Onayı Bekliyor','Muhasebe Onayı Bekliyor','Yönetim Onayı Bekliyor','Tamamlandı (Yönetim Onaylı)','Sevke Hazır','Sevk Edildi'].includes(d.status)).reduce((s,d)=>s+Number(d.qualityGood??d.good??d.qty??0),0);}
-        function saveProductionTarget(){const m=document.getElementById('productionTargetMonth')?.value||monthKeyNow(),q=Math.max(0,Number(document.getElementById('productionTargetQty')?.value||0));productionTargets[m]=q;saveStorage('productionTargets',productionTargets);renderProductionTargetCenter();}
-        function renderProductionTargetCenter(){const mi=document.getElementById('productionTargetMonth');if(!mi)return;if(!mi.value)mi.value=monthKeyNow();const m=mi.value,target=Number(productionTargets[m]||0),actual=qualityGoodForMonth(m);document.getElementById('productionTargetQty').value=target||'';const [y,mo]=m.split('-').map(Number),days=new Date(y,mo,0).getDate(),today=new Date(),elapsed=(today.getFullYear()===y&&today.getMonth()+1===mo)?Math.min(days,today.getDate()):days,daily=target/days,should=daily*elapsed,gap=actual-should,pct=target?actual/target*100:0,remain=Math.max(0,target-actual),remainingDays=Math.max(1,days-elapsed),needed=remain/remainingDays;const card=(t,v,s)=>`<div class="bg-slate-950/60 border border-slate-700 rounded-xl p-3"><div class="text-[9px] uppercase text-slate-500">${t}</div><div class="text-lg font-black text-white mt-1">${v}</div><div class="text-[9px] text-slate-500">${s}</div></div>`;document.getElementById('productionTargetKpis').innerHTML=card('Aylık hedef',target.toLocaleString('tr-TR'),'kalite onaylı sağlam')+card('Gerçekleşen',actual.toLocaleString('tr-TR'),`%${pct.toFixed(1)}`)+card('Günlük plan',Math.round(daily).toLocaleString('tr-TR'),'takvim günü bazlı')+card('Bugün itibarıyla fark',(gap>=0?'+':'')+Math.round(gap).toLocaleString('tr-TR'),gap>=0?'hedefin önünde':'hedefin gerisinde')+card('Kalan gün ihtiyacı',Math.round(needed).toLocaleString('tr-TR'),'adet/gün');document.getElementById('productionTargetProgressBar').style.width=Math.min(100,pct)+'%';document.getElementById('productionTargetProgressText').textContent=`${actual.toLocaleString('tr-TR')} / ${target.toLocaleString('tr-TR')} · %${pct.toFixed(1)}`;document.getElementById('productionTargetGapNote').textContent=target?`Kalan ${remain.toLocaleString('tr-TR')} adet. Mevcut takvime göre kalan günlerde günlük yaklaşık ${Math.round(needed).toLocaleString('tr-TR')} kalite onaylı sağlam parça gerekir.`:'Bu ay için yönetim hedefi girilmedi.';}
+        // NOT (2026-09-26): saveProductionTarget ve renderProductionTargetCenter'ın gerçek/güncel
+        // sürümleri aşağıda (productTargetObject'in yanında) tanımlıdır - fonksiyon yeniden tanımlama
+        // (hoisting) nedeniyle BURADAKİ eski sürümler hiç çalışmaz. Ürün bazlı hedef, barometre,
+        // haftalık/aylık grafikler ve toplam cycle time hesabı oradaki sürümdedir.
         function maintenancePeople(){return PERSONNEL_LIST.filter(p=>p.active!==false && (getEffectiveRole(p)==='BAKIM'||String(p.dept||'').toLowerCase().includes('bakım')));}
         function createMaintenanceFromOperator(machine,description,severity,reportedBy){const now=new Date();const rec={id:'BKM-'+Date.now(),machine,type:'Operatör Arıza/Kusur Bildirimi',description,severity,reportedBy,openedAt:now.toISOString(),dueAt:new Date(now.getTime()+8*60*60*1000).toISOString(),status:'Açık',assignedTo:maintenancePeople()[0]?.id||null,source:'operator'};maintenanceRecords.unshift(rec);saveStorage('maintenanceRecords',maintenanceRecords);}
         function openMaintenancePlanPrompt(){const machine=prompt('Makine kodu / adı:');if(!machine)return;const desc=prompt('Planlı bakım, değişim veya kontrol açıklaması:');if(!desc)return;const when=prompt('Planlanan tarih (YYYY-MM-DD):',new Date().toISOString().slice(0,10));maintenanceRecords.unshift({id:'PB-'+Date.now(),machine,type:'Planlı Bakım / Kontrol',description:desc,severity:'planned',reportedBy:currentUser?.name||'Yönetim',openedAt:new Date().toISOString(),plannedAt:when,status:'Planlandı',assignedTo:maintenancePeople()[0]?.id||null,source:'planned'});saveStorage('maintenanceRecords',maintenanceRecords);renderMaintenanceCenter();}
@@ -2222,6 +2260,9 @@ ead>
             const due=prompt('Bitiş tarihi/saat (ISO veya tarih metni):',j.dueAt||''); if(due!==null && due.trim()) { const dt=new Date(due); if(!isNaN(dt)) j.dueAt=dt.toISOString(); }
             const dur=prompt('Süreli iş emri dakika (üretim emri ise 0):',j.durationMinutes||0); if(dur!==null && Number(dur)>=0){j.durationMinutes=Number(dur); if(Number(dur)>0)j.targetType='timed';}
             const ass=prompt('Atanan personel ID’leri (virgülle):',(j.assignedTo||[]).join(',')); if(ass!==null){const ids=ass.split(',').map(x=>Number(x.trim())).filter(x=>PERSONNEL_LIST.some(p=>Number(p.id)===x)); if(ids.length)j.assignedTo=ids;}
+            // NOT: Bu fonksiyon window.editJobOrder (Shop Floor bölümünde, "KMI · WORK ORDER CARD" modalı)
+            // tarafından override edilir ve gerçekte HİÇ ÇALIŞMAZ - "Kaynak Planla" butonu her zaman o modalı
+            // açar. Ham madde LOT ataması oradaki modale eklendi (bkz. window.editJobOrder, data-kmi-job="materialLotId").
             saveStorage('jobOrders', jobOrders);
             updateJobOrderDropdowns();
             refreshAllViews();
@@ -2295,6 +2336,32 @@ ead>
                 d.qualityApprovalDate = new Date().toLocaleString('tr-TR');
                 d.updatedAt = new Date().toISOString();
                 const jo = jobOrders.find(j=>j.id===d.jobOrder);
+                // KMI-FIX (2026-09-26): Ender'in isteği - ham madde canlı takip.
+                // 1) İş emri 101 (Kesmak testere / kesim) makinesindeyse: kalite onaylanan SAĞLAM adet kadar
+                //    otomatik bir ham madde LOT'u oluşur/artar ve hemen "kullanılabilir" (KABUL) olarak
+                //    Malzeme·LOT·Stok sayfasında görünür - başka iş emirlerine oradan bağlanabilir.
+                // 2) İş emrine bir ham madde LOT'u bağlanmışsa (jo.materialLotId): onaylanan sağlam+hurda+tahsis
+                //    toplamı kadar o LOT'un kullanılabilir stoğundan otomatik düşer.
+                try{
+                    if(jo && window.D && Array.isArray(window.D.lots)){
+                        const isSawMachine=/^101\b/.test(String(jo.machine||'').trim());
+                        const totalQty=Number(d.qualityGood||0)+Number(d.qualityScrap||0)+Number(d.qualityAllocated||0);
+                        if(isSawMachine && Number(d.qualityGood||0)>0){
+                            const pid=jo.productId||'';
+                            let lot=window.D.lots.find(l=>l.autoFromMachine101 && String(l.productId||'')===String(pid));
+                            if(!lot){
+                                lot={id:'LOT-'+Date.now(),material:(jo.item||('Ürün '+pid))+' · Kesilmiş Ham Madde (101)',source:'Üretim (101 Kesim)',supplier:'',kgIn:0,kgAvailable:0,blankQty:0,blankAvailable:0,qc:'KABUL',certificate:'101 Kesimden Otomatik Oluşturuldu',date:new Date().toISOString().slice(0,10),productId:pid,autoFromMachine101:true};
+                                window.D.lots.unshift(lot);
+                            }
+                            lot.blankQty=Number(lot.blankQty||0)+Number(d.qualityGood||0);
+                            lot.blankAvailable=Number(lot.blankAvailable||0)+Number(d.qualityGood||0);
+                            try{window.save?.();}catch(e){}
+                        }else if(jo.materialLotId && totalQty>0){
+                            const lot=window.D.lots.find(l=>l.id===jo.materialLotId);
+                            if(lot){ lot.blankAvailable=Math.max(0,Number(lot.blankAvailable||0)-totalQty); try{window.save?.();}catch(e){} }
+                        }
+                    }
+                }catch(e){ console.error('[Ham madde otomatik güncelleme]',e); }
                 // KMI-FIX (2026-09-25): Operasyonlar arası sevk beyanı (bkz. confirmMachineTransfer).
                 // Bu beyan Muhasebe/Sevkiyat akışına GİRMEZ - iş emri henüz bitmedi, sadece bir
                 // operasyondan diğerine geçiyor. Kalite onayı burada iş emrini gerçekten hedef
@@ -2460,12 +2527,12 @@ ead>
         function openEmployeeForm(id=null){
             const wrap=document.getElementById('employeeFormWrap'); if(!wrap)return; wrap.classList.remove('hidden');
             const p=id?PERSONNEL_LIST.find(x=>x.id===id):null;
-            document.getElementById('employeeEditId').value=p?p.id:''; document.getElementById('employeeName').value=p?p.name:''; document.getElementById('employeeDept').value=p?p.dept:''; document.getElementById('employeeJobTitle').value=p?(p.jobTitle||''):''; document.getElementById('employeeRole').value=p?(p.role||'USER'):'OPERATOR'; document.getElementById('employeePass').value=p?(p.pass||'123'):'123'; renderEmployeeSkillsChecklist(p?(p.skills||[]):[]); renderEmployeeTasksChecklist(p?(p.tasks||[]):[]);
+            document.getElementById('employeeEditId').value=p?p.id:''; document.getElementById('employeeName').value=p?p.name:''; document.getElementById('employeeDept').value=p?p.dept:''; document.getElementById('employeeJobTitle').value=p?(p.jobTitle||''):''; document.getElementById('employeeRole').value=p?(p.role||'USER'):'OPERATOR'; document.getElementById('employeePass').value=p?(p.pass||'123'):'123'; document.getElementById('employeePhone').value=p?(p.phone||''):''; document.getElementById('employeeEmail').value=p?(p.email||''):''; renderEmployeeSkillsChecklist(p?(p.skills||[]):[]); renderEmployeeTasksChecklist(p?(p.tasks||[]):[]);
         }
         function closeEmployeeForm(){const w=document.getElementById('employeeFormWrap');if(w)w.classList.add('hidden');}
         function saveEmployee(e){
             e.preventDefault(); if(!currentUser||getEffectiveRole(currentUser)!=='ADMIN'){alert('Yönetici yetkisi gerekir.');return;}
-            const id=Number(document.getElementById('employeeEditId').value); const selectedSkills=[...document.querySelectorAll('.employee-skill-check:checked')].map(x=>Number(x.value)); const selectedTasks=[...document.querySelectorAll('.employee-task-check:checked')].map(x=>Number(x.value)); const data={name:document.getElementById('employeeName').value.trim(),dept:document.getElementById('employeeDept').value.trim(),jobTitle:document.getElementById('employeeJobTitle').value.trim(),role:document.getElementById('employeeRole').value,pass:document.getElementById('employeePass').value||'123',skills:selectedSkills,tasks:selectedTasks};
+            const id=Number(document.getElementById('employeeEditId').value); const selectedSkills=[...document.querySelectorAll('.employee-skill-check:checked')].map(x=>Number(x.value)); const selectedTasks=[...document.querySelectorAll('.employee-task-check:checked')].map(x=>Number(x.value)); const data={name:document.getElementById('employeeName').value.trim(),dept:document.getElementById('employeeDept').value.trim(),jobTitle:document.getElementById('employeeJobTitle').value.trim(),role:document.getElementById('employeeRole').value,pass:document.getElementById('employeePass').value||'123',phone:document.getElementById('employeePhone').value.trim(),email:document.getElementById('employeeEmail').value.trim(),skills:selectedSkills,tasks:selectedTasks};
             if(!data.name||!data.dept||!data.jobTitle)return;
             if(id){const p=PERSONNEL_LIST.find(x=>x.id===id);if(p)Object.assign(p,data,{active:true});} else {const newId=PERSONNEL_LIST.reduce((m,p)=>Math.max(m,Number(p.id)||0),0)+1;PERSONNEL_LIST.push({id:newId,...data,active:true,absenceDays:0,puantajMultiplier:1,allowedTabs:getPersonAllowedTabs(data)});}
             saveStorage('PERSONNEL_LIST',PERSONNEL_LIST);populateLoginUserDropdown();refreshAllViews();closeEmployeeForm();
@@ -3074,13 +3141,238 @@ ead>
 let machineSpareParts = loadStorage('machineSpareParts', []);
 let machineServiceCalls = loadStorage('machineServiceCalls', []);
 function productTargetObject(month){ const raw=productionTargets[month]; if(raw && typeof raw==='object') return raw; return {total:Number(raw||0),products:[]}; }
-function saveProductionTarget(){const m=document.getElementById('productionTargetMonth')?.value||monthKeyNow(),q=Math.max(0,Number(document.getElementById('productionTargetQty')?.value||0)),o=productTargetObject(m);o.total=q;productionTargets[m]=o;saveStorage('productionTargets',productionTargets);renderProductionTargetCenter();}
-function addProductTarget(){const m=document.getElementById('productionTargetMonth')?.value||monthKeyNow(),name=prompt('Ürün cinsi / ürün adı:');if(!name)return;const q=Math.max(0,Number(prompt('Aylık hedef adet:','0'))||0),o=productTargetObject(m);o.products=o.products||[];o.products.push({id:'PT-'+Date.now(),name:name.trim(),target:q});productionTargets[m]=o;saveStorage('productionTargets',productionTargets);renderProductionTargetCenter();}
-function editProductTarget(id){const m=document.getElementById('productionTargetMonth').value,o=productTargetObject(m),x=(o.products||[]).find(x=>x.id===id);if(!x)return;const n=prompt('Ürün adı:',x.name);if(n===null)return;const q=prompt('Hedef adet:',x.target);if(q===null)return;x.name=n.trim();x.target=Math.max(0,Number(q)||0);productionTargets[m]=o;saveStorage('productionTargets',productionTargets);renderProductionTargetCenter();}
 function deleteProductTarget(id){const m=document.getElementById('productionTargetMonth').value,o=productTargetObject(m);if(!confirm('Bu ürün hedefi silinsin mi?'))return;o.products=(o.products||[]).filter(x=>x.id!==id);productionTargets[m]=o;saveStorage('productionTargets',productionTargets);renderProductionTargetCenter();}
-function qualityProductMap(month){const map={};declarations.filter(d=>getRecordMonthKey(d.workDate||d.date)===month&&isQualityPassedDeclaration(d)).forEach(d=>{const jo=jobOrders.find(j=>j.id===d.jobOrder),n=jo?.item||d.jobOrder||'Tanımsız';map[n]=(map[n]||0)+Number(d.qualityGood??d.good??d.qty??0)});return map;}
-const _renderProductionTargetCenter=renderProductionTargetCenter;
-renderProductionTargetCenter=function(){const mi=document.getElementById('productionTargetMonth');if(!mi)return;if(!mi.value)mi.value=monthKeyNow();const m=mi.value,o=productTargetObject(m);if(typeof productionTargets[m]==='object'){const tmp=productionTargets[m];productionTargets[m]=Number(o.total||0);_renderProductionTargetCenter();productionTargets[m]=tmp;}else _renderProductionTargetCenter();document.getElementById('productionTargetQty').value=o.total||'';const actual=qualityProductMap(m),el=document.getElementById('productTargetList');if(el)el.innerHTML=(o.products||[]).map(x=>{const a=Number(actual[x.name]||0),p=x.target?a/x.target*100:0;return `<div class="bg-slate-950 border border-slate-700 rounded-xl p-3"><div class="flex justify-between"><b class="text-white text-xs">${escSkill(x.name)}</b><span class="text-cyan-300 font-bold">%${p.toFixed(1)}</span></div><div class="text-[10px] text-slate-400 mt-2">${a.toLocaleString('tr-TR')} / ${Number(x.target).toLocaleString('tr-TR')} adet</div><div class="h-2 bg-slate-800 rounded mt-2"><div class="h-full bg-cyan-600 rounded" style="width:${Math.min(100,p)}%"></div></div><div class="flex gap-2 mt-2"><button onclick="editProductTarget('${x.id}')" class="text-[9px] bg-slate-700 px-2 py-1 rounded">Düzenle</button><button onclick="deleteProductTarget('${x.id}')" class="text-[9px] bg-red-900 px-2 py-1 rounded">Sil</button></div></div>`}).join('')||'<div class="text-[10px] text-slate-500">Henüz ürün bazlı hedef tanımlanmadı.</div>';};
+// KMI-FIX (2026-09-26): Hedefler Merkezi tamamen yeniden yazıldı - Ender'in isteği: ürün bazlı
+// hedef girilince toplam aylık hedef bunların TOPLAMINDAN otomatik hesaplanmalı (aşağıdan yukarı),
+// toplam cycle time ihtiyacı gösterilmeli, hedefe yaklaşma barometre ile bildirilmeli, günlük/haftalık/
+// aylık gerçekleşen-hedef farkı verilmeli. Eski "+ Ürün Hedefi" prompt() zinciri (saçma sapan kutu
+// diye şikayet edilen) kaldırıldı, yerine gerçek bir modal (kmiOpenProductTargetModal) geldi.
+function productionByProductForMonth(month){
+    const byId={}, byName={};
+    declarations.filter(d=>getRecordMonthKey(d.workDate||d.date)===month && isQualityPassedDeclaration(d)).forEach(d=>{
+        const jo=jobOrders.find(j=>j.id===d.jobOrder);
+        const good=Number(d.qualityGood??d.good??d.qty??0);
+        const name=jo?.item||d.jobOrder||'Tanımsız';
+        if(jo?.productId){ const k=String(jo.productId); byId[k]=byId[k]||{good:0}; byId[k].good+=good; }
+        byName[name]=byName[name]||{good:0}; byName[name].good+=good;
+    });
+    return {byId,byName};
+}
+function actualForProductTarget(pt, byProduct){
+    if(pt.productId && byProduct.byId[String(pt.productId)]) return byProduct.byId[String(pt.productId)].good;
+    const wanted=String(pt.name||'').toLowerCase().trim();
+    if(!wanted) return 0;
+    const nameKey=Object.keys(byProduct.byName).find(n=>{const nl=n.toLowerCase();return nl===wanted||nl.includes(wanted)||wanted.includes(nl);});
+    return nameKey?byProduct.byName[nameKey].good:0;
+}
+function machineProductionForMonth(month){
+    const map={};
+    declarations.filter(d=>getRecordMonthKey(d.workDate||d.date)===month && isQualityPassedDeclaration(d)).forEach(d=>{
+        const mkey=d.machine||'Tanımsız'; map[mkey]=(map[mkey]||0)+Number(d.qualityGood??d.good??d.qty??0);
+    });
+    return map;
+}
+function dailyProductionForMonth(month){
+    const map={};
+    declarations.filter(d=>getRecordMonthKey(d.workDate||d.date)===month && isQualityPassedDeclaration(d)).forEach(d=>{
+        const k=dateKeyOf(d)||''; if(!k)return; map[k]=(map[k]||0)+Number(d.qualityGood??d.good??d.qty??0);
+    });
+    return map;
+}
+function saveProductionTarget(){
+    const m=document.getElementById('productionTargetMonth')?.value||monthKeyNow();
+    const o=productTargetObject(m);
+    if(Array.isArray(o.products)&&o.products.length){ toast('Ürün bazlı hedef tanımlı - aylık toplam bunların toplamından otomatik hesaplanıyor. Manuel değer girmek için önce tüm ürün hedeflerini silin.','warn'); renderProductionTargetCenter(); return; }
+    const q=Math.max(0,Number(document.getElementById('productionTargetQty')?.value||0));
+    o.total=q; productionTargets[m]=o; saveStorage('productionTargets',productionTargets); renderProductionTargetCenter();
+}
+window.kmiOpenProductTargetModal=function(existingId){
+    const m=document.getElementById('productionTargetMonth')?.value||monthKeyNow();
+    const o=productTargetObject(m);
+    const existing=existingId?(o.products||[]).find(p=>p.id===existingId):null;
+    const catalogOpts=(window.D?.products||[]).map(p=>`<option value="${escSkill(p.id)}" data-cycle="${Number(p.standardCycleSec||p.camCycleEstimateSec||0)}" data-name="${escSkill(p.name||p.code||p.id)}">${escSkill(p.code?(p.code+' - '+(p.name||'')):(p.name||p.id))}</option>`).join('');
+    const html=`
+    <div id="kmiProductTargetModal" class="fixed inset-0 bg-black/70 z-[999] flex items-center justify-center p-4">
+      <div class="bg-slate-900 border border-cyan-700 rounded-2xl p-5 w-full max-w-md space-y-3">
+        <div class="flex justify-between items-center"><b class="text-white">${existing?'Ürün Hedefini Düzenle':'Yeni Ürün Hedefi'}</b><button onclick="window.kmiCloseProductTargetModal()" class="text-slate-400 hover:text-white text-lg leading-none">✕</button></div>
+        <label class="text-xs text-slate-400 block">Katalogdan Ürün Seç (opsiyonel)
+          <select id="ptModalCatalog" class="mt-1 w-full bg-slate-950 border border-slate-700 rounded-xl p-3 text-white">
+            <option value="">— Katalogdan seç (cycle time otomatik gelir) —</option>${catalogOpts}
+          </select>
+        </label>
+        <label class="text-xs text-slate-400 block">Ürün Adı<input id="ptModalName" type="text" value="${existing?escSkill(existing.name):''}" class="mt-1 w-full bg-slate-950 border border-slate-700 rounded-xl p-3 text-white" placeholder="Ürün cinsi / adı"></label>
+        <label class="text-xs text-slate-400 block">Aylık Hedef Adet<input id="ptModalTarget" type="number" min="0" value="${existing?Number(existing.target||0):''}" class="mt-1 w-full bg-slate-950 border border-slate-700 rounded-xl p-3 text-white"></label>
+        <label class="text-xs text-slate-400 block">Cycle Time (sn/adet)<input id="ptModalCycle" type="number" min="0" value="${existing&&existing.cycleSec?existing.cycleSec:''}" class="mt-1 w-full bg-slate-950 border border-slate-700 rounded-xl p-3 text-white" placeholder="Katalogdan otomatik gelir, elle de girilebilir"></label>
+        <input type="hidden" id="ptModalId" value="${existing?existing.id:''}">
+        <input type="hidden" id="ptModalProductId" value="${existing&&existing.productId?existing.productId:''}">
+        <div class="flex gap-2 pt-2">
+          <button onclick="window.kmiSaveProductTarget()" class="flex-1 bg-cyan-600 hover:bg-cyan-500 text-white rounded-xl p-3 font-bold text-sm">Kaydet</button>
+          ${existing?`<button onclick="deleteProductTarget('${existing.id}');window.kmiCloseProductTargetModal();" class="bg-red-900 hover:bg-red-700 text-white rounded-xl p-3 font-bold text-sm px-4">Sil</button>`:''}
+          <button onclick="window.kmiCloseProductTargetModal()" class="bg-slate-700 hover:bg-slate-600 text-white rounded-xl p-3 font-bold text-sm px-4">Vazgeç</button>
+        </div>
+      </div>
+    </div>`;
+    document.getElementById('kmiProductTargetModal')?.remove();
+    document.body.insertAdjacentHTML('beforeend', html);
+    const catSel=document.getElementById('ptModalCatalog');
+    if(existing&&existing.productId) catSel.value=existing.productId;
+    catSel.addEventListener('change',()=>{
+        const opt=catSel.selectedOptions[0]; if(!opt||!opt.value){document.getElementById('ptModalProductId').value='';return;}
+        document.getElementById('ptModalProductId').value=opt.value;
+        if(!document.getElementById('ptModalName').value.trim()) document.getElementById('ptModalName').value=opt.dataset.name||'';
+        if(opt.dataset.cycle&&Number(opt.dataset.cycle)>0) document.getElementById('ptModalCycle').value=opt.dataset.cycle;
+    });
+};
+window.kmiCloseProductTargetModal=function(){ document.getElementById('kmiProductTargetModal')?.remove(); };
+window.kmiSaveProductTarget=function(){
+    const m=document.getElementById('productionTargetMonth')?.value||monthKeyNow();
+    const o=productTargetObject(m); o.products=o.products||[];
+    const id=document.getElementById('ptModalId')?.value||'';
+    const name=(document.getElementById('ptModalName')?.value||'').trim();
+    const target=Math.max(0,Number(document.getElementById('ptModalTarget')?.value||0));
+    const cycleSec=Math.max(0,Number(document.getElementById('ptModalCycle')?.value||0));
+    const productId=document.getElementById('ptModalProductId')?.value||'';
+    if(!name){ toast('Ürün adı gerekli.','warn'); return; }
+    if(!target){ toast('Aylık hedef adet 0\'dan büyük olmalı.','warn'); return; }
+    if(id){
+        const x=o.products.find(x=>x.id===id);
+        if(x){ x.name=name; x.target=target; x.cycleSec=cycleSec; x.productId=productId; }
+    }else{
+        o.products.push({id:'PT-'+Date.now(), name, target, cycleSec, productId});
+    }
+    productionTargets[m]=o; saveStorage('productionTargets',productionTargets);
+    window.kmiCloseProductTargetModal();
+    renderProductionTargetCenter();
+};
+function renderProductionTargetCenter(){
+    const mi=document.getElementById('productionTargetMonth'); if(!mi) return;
+    if(!mi.value) mi.value=monthKeyNow();
+    const m=mi.value;
+    const o=productTargetObject(m);
+    const products=Array.isArray(o.products)?o.products:[];
+    const byProduct=productionByProductForMonth(m);
+    const bottomUpTotal=products.reduce((s,p)=>s+Number(p.target||0),0);
+    const total=products.length?bottomUpTotal:Number(o.total||0);
+    if(products.length && Number(o.total||0)!==bottomUpTotal){ o.total=bottomUpTotal; productionTargets[m]=o; saveStorage('productionTargets',productionTargets); }
+    const qtyInput=document.getElementById('productionTargetQty');
+    if(qtyInput){ qtyInput.value=products.length?'':(o.total||''); qtyInput.disabled=products.length>0; qtyInput.placeholder=products.length?('Otomatik: '+bottomUpTotal.toLocaleString('tr-TR')+' (ürün toplamı)'):'Manuel hedef (ürün yoksa)'; }
+
+    const actualTotal=qualityGoodForMonth(m);
+    const [y,mm]=m.split('-').map(Number);
+    const daysInMonth=new Date(y,mm,0).getDate();
+    const today=new Date();
+    const isCurrentMonth=(today.getFullYear()===y && (today.getMonth()+1)===mm);
+    const dayOfMonth=isCurrentMonth?today.getDate():daysInMonth;
+    const dailyPlan=total?total/daysInMonth:0;
+    const expectedSoFar=dailyPlan*dayOfMonth;
+    const gapSoFar=actualTotal-expectedSoFar;
+    const remainingDays=Math.max(1,daysInMonth-dayOfMonth);
+    const remainingQty=Math.max(0,total-actualTotal);
+    const neededPerDay=remainingQty/remainingDays;
+
+    const kpiEl=document.getElementById('productionTargetKpis');
+    if(kpiEl){
+        const kpi=(label,val,cls)=>`<div class="bg-slate-950 border border-slate-700 rounded-xl p-3 text-center"><div class="text-[10px] text-slate-500">${label}</div><div class="text-lg font-black ${cls||'text-white'}">${val}</div></div>`;
+        kpiEl.innerHTML=
+            kpi('Aylık Hedef', total.toLocaleString('tr-TR'))+
+            kpi('Gerçekleşen', actualTotal.toLocaleString('tr-TR'),'text-emerald-300')+
+            kpi('Günlük Plan', dailyPlan?dailyPlan.toFixed(1):'0')+
+            kpi('Bugün İtibarıyla Fark', (gapSoFar>=0?'+':'')+Math.round(gapSoFar).toLocaleString('tr-TR'), gapSoFar>=0?'text-emerald-300':'text-rose-400')+
+            kpi('Kalan Gün İhtiyacı', total?neededPerDay.toFixed(1):'0','text-amber-300');
+    }
+
+    const pct= total?(actualTotal/total*100):0;
+    const gaugeEl=document.getElementById('targetGauge');
+    if(gaugeEl){
+        const clampedPct=Math.max(0,Math.min(100,pct));
+        const angle=clampedPct/100*180;
+        const rad=(180-angle)*Math.PI/180;
+        const cx=90, cy=90, r=70;
+        const gx=cx+r*Math.cos(rad), gy=cy-r*Math.sin(rad);
+        const color=pct>=100?'#10b981':pct>=70?'#22d3ee':pct>=40?'#f59e0b':'#f43f5e';
+        gaugeEl.innerHTML=`<svg width="180" height="105" viewBox="0 0 180 105">
+            <path d="M 20 90 A 70 70 0 0 1 160 90" stroke="#1e293b" stroke-width="14" fill="none" stroke-linecap="round"/>
+            <path d="M 20 90 A 70 70 0 0 1 ${gx.toFixed(1)} ${gy.toFixed(1)}" stroke="${color}" stroke-width="14" fill="none" stroke-linecap="round"/>
+            <text x="90" y="88" text-anchor="middle" style="fill:#fff;font-size:22px;font-weight:900">%${pct.toFixed(1)}</text>
+        </svg>`;
+    }
+
+    const barEl=document.getElementById('productionTargetProgressBar'), textEl=document.getElementById('productionTargetProgressText'), gapNote=document.getElementById('productionTargetGapNote'), cycleNote=document.getElementById('targetCycleTimeNote');
+    if(barEl) barEl.style.width=Math.max(0,Math.min(100,pct))+'%';
+    if(textEl) textEl.textContent=`${actualTotal.toLocaleString('tr-TR')} / ${total.toLocaleString('tr-TR')} · %${pct.toFixed(1)}`;
+    if(gapNote) gapNote.textContent = total? (gapSoFar>=0?`Hedefin ${Math.round(gapSoFar).toLocaleString('tr-TR')} adet önündesiniz.`:`Hedefin ${Math.round(Math.abs(gapSoFar)).toLocaleString('tr-TR')} adet gerisindesiniz - kalan ${remainingDays} günde günde ~${neededPerDay.toFixed(1)} adet gerekiyor.`) : 'Hedef tanımlanmadı.';
+    if(cycleNote){
+        const totalCycleSec=products.reduce((s,p)=>s+Number(p.target||0)*Number(p.cycleSec||0),0);
+        cycleNote.textContent = totalCycleSec? `Toplam hedef için gereken tahmini makine süresi: ${(totalCycleSec/3600).toFixed(1)} saat (cycle time × hedef adet toplamı).` : '';
+    }
+
+    const listEl=document.getElementById('productTargetList');
+    if(listEl){
+        listEl.innerHTML = products.map(p=>{
+            const a=actualForProductTarget(p,byProduct), pr=p.target?Math.min(100,a/p.target*100):0;
+            const fark=a-Number(p.target||0);
+            return `<div class="bg-slate-950 border border-slate-700 rounded-xl p-3">
+                <div class="flex justify-between"><b class="text-white text-xs">${escSkill(p.name)}</b><span class="text-cyan-300 font-bold">%${pr.toFixed(1)}</span></div>
+                <div class="text-[10px] text-slate-400 mt-2">${a.toLocaleString('tr-TR')} / ${Number(p.target||0).toLocaleString('tr-TR')} adet · Fark ${fark>=0?'+':''}${fark.toLocaleString('tr-TR')}</div>
+                ${p.cycleSec?`<div class="text-[9px] text-slate-500">Cycle time: ${p.cycleSec} sn/adet</div>`:''}
+                <div class="h-2 bg-slate-800 rounded mt-2"><div class="h-full bg-cyan-600 rounded" style="width:${pr}%"></div></div>
+                <div class="flex gap-2 mt-2"><button onclick="window.kmiOpenProductTargetModal('${p.id}')" class="text-[9px] bg-slate-700 px-2 py-1 rounded">Düzenle</button><button onclick="deleteProductTarget('${p.id}')" class="text-[9px] bg-red-900 px-2 py-1 rounded">Sil</button></div>
+            </div>`;
+        }).join('') || '<div class="text-[10px] text-slate-500">Henüz ürün bazlı hedef tanımlanmadı. Manuel toplam hedef kullanılıyor.</div>';
+    }
+
+    const dailyEl=document.getElementById('targetDailyChart');
+    if(dailyEl){
+        const daily=dailyProductionForMonth(m);
+        const maxVal=Math.max(dailyPlan, ...Object.values(daily), 1);
+        let bars='';
+        for(let d=1; d<=daysInMonth; d++){
+            const key=`${m}-${String(d).padStart(2,'0')}`;
+            const val=Number(daily[key]||0);
+            const h=Math.max(2,(val/maxVal*180));
+            const isFuture = isCurrentMonth && d>dayOfMonth;
+            bars+=`<div class="flex flex-col items-center justify-end" style="width:${100/daysInMonth}%;min-width:6px;height:200px" title="${key}: ${val}"><div style="height:${h}px;width:70%;background:${isFuture?'#334155':(val>=dailyPlan?'#10b981':'#f59e0b')};border-radius:2px 2px 0 0"></div></div>`;
+        }
+        dailyEl.innerHTML=`<div class="flex items-end gap-[1px]" style="height:200px">${bars}</div><div class="text-[9px] text-slate-500 mt-1">Yeşil = günlük plana ulaşıldı · Turuncu = altında · Plan: ${dailyPlan.toFixed(1)} adet/gün</div>`;
+    }
+
+    const machEl=document.getElementById('targetMachineChart');
+    if(machEl){
+        const byMachine=machineProductionForMonth(m);
+        const entries=Object.entries(byMachine).sort((a,b)=>b[1]-a[1]);
+        const maxM=Math.max(1,...entries.map(e=>e[1]));
+        machEl.innerHTML = entries.length? entries.map(([mach,val])=>`<div class="mb-2"><div class="flex justify-between text-[10px] text-slate-300"><span>${escSkill(mach)}</span><b>${val.toLocaleString('tr-TR')}</b></div><div class="h-2 bg-slate-800 rounded"><div class="h-full bg-indigo-500 rounded" style="width:${(val/maxM*100).toFixed(1)}%"></div></div></div>`).join('') : '<div class="text-[10px] text-slate-500">Bu ay için kalite onaylı üretim yok.</div>';
+    }
+
+    const weekEl=document.getElementById('targetWeeklyTable');
+    if(weekEl){
+        const daily=dailyProductionForMonth(m);
+        const weeks=[]; let wk=[];
+        for(let d=1; d<=daysInMonth; d++){
+            wk.push(d);
+            const dow=new Date(y,mm-1,d).getDay();
+            if(dow===1 && wk.length>1){ weeks.push(wk.slice(0,-1)); wk=[d]; }
+        }
+        if(wk.length) weeks.push(wk);
+        const rows=weeks.map((days,i)=>{
+            const actual=days.reduce((s,d)=>s+Number(daily[`${m}-${String(d).padStart(2,'0')}`]||0),0);
+            const target=dailyPlan*days.length;
+            const fark=actual-target;
+            return `<tr class="border-t border-slate-800"><td class="p-2">Hafta ${i+1} (${days[0]}-${days[days.length-1]})</td><td class="p-2 text-right">${target.toFixed(0)}</td><td class="p-2 text-right text-emerald-300">${actual}</td><td class="p-2 text-right ${fark>=0?'text-emerald-300':'text-rose-400'}">${fark>=0?'+':''}${fark.toFixed(0)}</td></tr>`;
+        }).join('');
+        weekEl.innerHTML = `<table class="w-full text-[10px] text-slate-300"><thead class="text-slate-500"><tr><th class="p-2 text-left">Hafta</th><th class="p-2 text-right">Hedef</th><th class="p-2 text-right">Gerçekleşen</th><th class="p-2 text-right">Fark</th></tr></thead><tbody>${rows||'<tr><td colspan="4" class="p-3 text-center text-slate-500">Veri yok.</td></tr>'}</tbody></table>`;
+    }
+
+    const detailEl=document.getElementById('targetProductDetail');
+    if(detailEl){
+        const rows=products.map(p=>{
+            const a=actualForProductTarget(p,byProduct), fark=a-Number(p.target||0);
+            return `<tr class="border-t border-slate-800"><td class="p-2">${escSkill(p.name)}</td><td class="p-2 text-right">${Number(p.target||0).toLocaleString('tr-TR')}</td><td class="p-2 text-right text-emerald-300">${a.toLocaleString('tr-TR')}</td><td class="p-2 text-right ${fark>=0?'text-emerald-300':'text-rose-400'}">${fark>=0?'+':''}${fark.toLocaleString('tr-TR')}</td><td class="p-2 text-right">${p.cycleSec?p.cycleSec+' sn':'-'}</td></tr>`;
+        }).join('');
+        detailEl.innerHTML = `<table class="w-full text-[10px] text-slate-300"><thead class="text-slate-500"><tr><th class="p-2 text-left">Ürün</th><th class="p-2 text-right">Hedef</th><th class="p-2 text-right">Gerçekleşen</th><th class="p-2 text-right">Fark</th><th class="p-2 text-right">Cycle Time</th></tr></thead><tbody>${rows||'<tr><td colspan="5" class="p-3 text-center text-slate-500">Ürün bazlı hedef tanımlanmadı.</td></tr>'}</tbody></table>`;
+    }
+}
+window.renderProductionTargetCenter=renderProductionTargetCenter;
 function renderDeletedJobOrders(){const b=document.getElementById('deletedJobOrdersTableBody');if(!b)return;const rows=jobOrders.filter(j=>j.deleted||j.status==='Silindi').sort((a,b)=>new Date(b.deletedAt||0)-new Date(a.deletedAt||0));b.innerHTML=rows.map(j=>`<tr class="border-t border-slate-800"><td class="p-2 font-mono">${j.id}</td><td class="p-2">${escSkill(j.item||'-')}</td><td class="p-2">${j.deletedAt?new Date(j.deletedAt).toLocaleString('tr-TR'):'-'}</td><td class="p-2">${j.deletedBy||'-'}</td><td class="p-2">${declarations.filter(d=>d.jobOrder===j.id).length} beyan</td></tr>`).join('')||'<tr><td colspan="5" class="p-3 text-center text-slate-500">Silinen iş emri yok.</td></tr>';}
 const _renderAdminJobOrders=renderAdminJobOrders;
 renderAdminJobOrders=function(){const deleted=jobOrders.filter(j=>j.deleted||j.status==='Silindi'),all=jobOrders;jobOrders=all.filter(j=>!j.deleted&&j.status!=='Silindi');_renderAdminJobOrders();jobOrders=all;renderDeletedJobOrders();};
@@ -3323,6 +3615,7 @@ function openPersonnelFile(id,editMode){
   <div class="mt-4"><div class="text-[10px] text-slate-500 uppercase font-bold mb-1.5">Vardiya Ataması</div><div class="flex flex-wrap gap-2">
    <button onclick="kmiAssignShiftDirect(${p.id},'TeamK1')" class="${p.shiftTeam==='TeamK1'?'bg-blue-600':'bg-slate-800 hover:bg-slate-700'} text-white px-3 py-2 rounded-xl text-xs font-black border border-blue-700/40">1. Vardiya · TeamK1</button>
    <button onclick="kmiAssignShiftDirect(${p.id},'TeamK2')" class="${p.shiftTeam==='TeamK2'?'bg-emerald-600':'bg-slate-800 hover:bg-slate-700'} text-white px-3 py-2 rounded-xl text-xs font-black border border-emerald-700/40">2. Vardiya · TeamK2</button>
+   <button onclick="kmiAssignShiftDirect(${p.id},'TeamOfis')" class="${p.shiftTeam==='TeamOfis'?'bg-amber-600':'bg-slate-800 hover:bg-slate-700'} text-white px-3 py-2 rounded-xl text-xs font-black border border-amber-700/40">Ofis / Destek</button>
    ${p.shiftTeam?`<button onclick="kmiAssignShiftDirect(${p.id},'')" class="bg-slate-800 hover:bg-slate-700 text-slate-300 px-3 py-2 rounded-xl text-xs font-black">Vardiya Atamasını Kaldır</button>`:''}
   </div></div>
   ${personnelPerformanceHtml(p)}
@@ -4486,7 +4779,13 @@ const oldLoad=window.loadActiveJobDraft;window.loadActiveJobDraft=function(jobId
 function qrows(month){return (declarations||[]).filter(d=>String(d.workDate||d.date||'').slice(0,7)===month && (typeof isQualityPassedDeclaration==='function'?isQualityPassedDeclaration(d):Number(d.qualityGood)>=0));}
 function good(d){return Math.max(0,Number(d.qualityGood??d.good??d.qty)||0);}
 function barRows(items,max){return items.map(([n,v],i)=>`<div class="mb-2"><div class="flex justify-between text-[10px]"><span class="text-slate-300">${n}</span><b class="text-cyan-300">${Number(v).toLocaleString('tr-TR')}</b></div><div class="h-2 bg-slate-800 rounded overflow-hidden"><div class="h-full bg-cyan-600 rounded" style="width:${max?Math.max(1,v/max*100):0}%"></div></div></div>`).join('')||'<div class="text-[10px] text-slate-500">Bu ay kalite onaylı üretim yok.</div>';};
-const oldTarget=window.renderProductionTargetCenter;window.renderProductionTargetCenter=function(){try{oldTarget&&oldTarget.apply(this,arguments);}catch(e){console.error('target base',e)}const m=document.getElementById('productionTargetMonth')?.value||getCurrentMonthKey(),rows=qrows(m),o=typeof productTargetObject==='function'?productTargetObject(m):{total:Number(productionTargets[m]||0),products:[]};const [y,mo]=m.split('-').map(Number),days=new Date(y,mo,0).getDate(),dailyTarget=Number(o.total||0)/Math.max(1,days);const day={};rows.forEach(d=>{const k=String(d.workDate||d.date||'').slice(8,10);day[k]=(day[k]||0)+good(d)});const vals=Array.from({length:days},(_,i)=>[String(i+1).padStart(2,'0'),day[String(i+1).padStart(2,'0')]||0]);const max=Math.max(dailyTarget,...vals.map(x=>x[1]),1),w=720,h=210,pad=28,bw=(w-pad*2)/days;document.getElementById('targetDailyChart').innerHTML=`<svg viewBox="0 0 ${w} ${h}" class="w-full h-[210px]">${vals.map(([d,v],i)=>{const bh=(h-45)*v/max,th=(h-45)*dailyTarget/max,x=pad+i*bw;return `<rect x="${x+1}" y="${h-25-bh}" width="${Math.max(2,bw-2)}" height="${bh}" rx="2" fill="#22d3ee" opacity=".8"/><line x1="${x}" x2="${x+bw}" y1="${h-25-th}" y2="${h-25-th}" stroke="#f59e0b" stroke-width="1"/><text x="${x+bw/2}" y="${h-8}" text-anchor="middle" font-size="7" fill="#64748b">${Number(d)}</text>`}).join('')}</svg><div class="text-[9px] text-slate-500">Turkuaz: gerçekleşen · Sarı çizgi: günlük ortalama hedef (${Math.round(dailyTarget)} adet)</div>`;const machines={};rows.forEach(d=>machines[d.machine||'Tanımsız']=(machines[d.machine||'Tanımsız']||0)+good(d));const mi=Object.entries(machines).sort((a,b)=>b[1]-a[1]);document.getElementById('targetMachineChart').innerHTML=barRows(mi,Math.max(...mi.map(x=>x[1]),1));const prodActual={};rows.forEach(d=>{const j=(jobOrders||[]).find(x=>x.id===d.jobOrder),name=j?.item||d.product||d.item||'Tanımsız';prodActual[name]=(prodActual[name]||0)+good(d)});const products=o.products||[];document.getElementById('targetProductDetail').innerHTML=`<table class="w-full text-[10px]"><thead class="text-slate-500"><tr><th class="p-2 text-left">Ürün</th><th>Hedef</th><th>Gerçekleşen</th><th>Fark</th><th>%</th></tr></thead><tbody>${products.map(x=>{const a=Number(prodActual[x.name]||0),t=Number(x.target||0),dif=a-t,p=t?a/t*100:0;return `<tr class="border-t border-slate-800"><td class="p-2 text-white font-semibold">${x.name}</td><td class="text-center">${t}</td><td class="text-center text-cyan-300 font-bold">${a}</td><td class="text-center ${dif>=0?'text-emerald-400':'text-rose-400'}">${dif>=0?'+':''}${dif}</td><td class="text-center">%${p.toFixed(1)}</td></tr>`}).join('')||'<tr><td colspan="5" class="p-3 text-slate-500">Ürün hedefi tanımlanmadı.</td></tr>'}</tbody></table>`;};
+// KMI-FIX (2026-09-26): Bu blok eskiden window.renderProductionTargetCenter'ı BİR KEZ DAHA
+// override edip targetDailyChart/targetMachineChart/targetProductDetail'i kendi (daha basit,
+// cycle time'sız) sürümüyle eziyordu - tam da bu dosyada tekrar tekrar görülen "fonksiyon
+// yeniden tanımlama / hoisting'te sonuncusu kazanır" hata deseni. Hedefler Merkezi artık
+// index.html'de daha yukarıda (productTargetObject'in yanında) TEK PARÇA halinde, ürün bazlı
+// hedef + barometre + haftalık tablo + cycle time dahil, doğru şekilde tanımlı - burada ikinci
+// bir override YOK, window.renderProductionTargetCenter olduğu gibi bırakılıyor.
 const oldBonus=window.renderBonusAdminTable;window.renderBonusAdminTable=function(){oldBonus&&oldBonus.apply(this,arguments);const tb=document.getElementById('bonusAdminTableBody');if(!tb)return;tb.querySelectorAll('tr').forEach(tr=>{const cells=tr.children;if(cells.length>=16){cells[14].classList.add('bg-emerald-950/20');cells[14].style.minWidth='125px';}});};
 const oldOpen=window.openAdminModule;window.openAdminModule=function(n){const r=oldOpen&&oldOpen.apply(this,arguments);if(n==='targets')setTimeout(()=>window.renderProductionTargetCenter(),0);if(n==='bonuslist')setTimeout(()=>window.renderBonusAdminTable(),0);return r;};
 setTimeout(()=>{try{window.renderProductionTargetCenter()}catch(e){}try{window.renderBonusAdminTable()}catch(e){}},450);
@@ -6049,6 +6348,48 @@ window.v118RefreshOrderComposer=function(){
 window.v118SaveOrder=function(){const rows=[...document.querySelectorAll('.v118-order-line')],lines=rows.map(r=>({id:uid('SOL'),productId:r.querySelector('.v118-l-product').value,qty:Number(r.querySelector('.v118-l-qty').value||0),unitPrice:Number(r.querySelector('.v118-l-price').value||0),reserved:0,shipped:0,produced:0})).filter(x=>x.qty>0);if(!lines.length)return alert('En az bir geçerli sipariş kalemi girin.');const cid=document.getElementById('v118OCustomer').value,po=document.getElementById('v118OPO').value.trim();if(!cid||!po)return alert('Müşteri ve sipariş numarası zorunludur.');const disc=Number(document.getElementById('v118ODisc').value||0),vat=Number(document.getElementById('v118OVat').value||0);const o={id:uid('SO'),customerId:cid,customerPO:po,orderDate:document.getElementById('v118ODate').value,dueDate:document.getElementById('v118ODue').value,currency:document.getElementById('v118OCur').value,status:'OPEN',discountPct:disc,vatPct:vat,paymentDays:Number(document.getElementById('v118OPayDays').value||0),note:document.getElementById('v118ONote').value.trim(),createdAt:now(),createdBy:window.currentUser?.name||'-',lines};recalc(o);o.subtotal=o.total;o.discountAmount=o.subtotal*disc/100;o.vatAmount=(o.subtotal-o.discountAmount)*vat/100;o.grandTotal=o.subtotal-o.discountAmount+o.vatAmount;o.total=o.grandTotal;V.orders.unshift(o);audit('CREATE','SALES_ORDER',o.id,po+' · '+lines.length+' kalem');persist();document.getElementById('v118OrderModal')?.remove();v118Reserve(o.id,true);v118Render()}
 window.v118Reserve=function(id,auto=false){if(!can('warehouse')&&!can('sales'))return auto?null:alert('Stok rezervasyonu için yetkiniz yok.');const o=V.orders.find(x=>x.id===id);if(!o)return;o.lines.forEach(l=>{const need=Math.max(0,l.qty-l.reserved-l.shipped),take=Math.min(need,available(l.productId));if(take>0){stockRow(l.productId).reserved+=take;l.reserved+=take;V.movements.unshift({id:uid('MOV'),at:now(),type:'RESERVE',productId:l.productId,qty:take,ref:o.id})}});recalc(o);audit('RESERVE','SALES_ORDER',o.id,'Stok rezervasyonu güncellendi');persist();if(!auto)v118Render()}
 window.v118ProductionNeed=function(id){if(!can('sales'))return alert('Yetki yok.');const o=V.orders.find(x=>x.id===id);if(!o)return;let created=0;(o.lines||[]).forEach(l=>{const ordered=Number(l.qty||0),reserved=Number(l.reserved||0),produced=Number(l.produced||0);const activeWO=(Array.isArray(window.jobOrders)?window.jobOrders:[]).filter(j=>j.salesOrderId===o.id&&String(j.productId)===String(l.productId)&&!['Tamamlandı','CANCELLED','İptal'].includes(j.status)).reduce((s,j)=>s+Math.max(0,Number(j.targetQty||0)-Number(j.completedQty||0)),0);const need=Math.max(0,ordered-reserved-produced-activeWO);if(need<=0)return;const pp=product(l.productId),cc=customer(o.customerId);const jo={id:'WO-'+new Date().getFullYear()+'-'+String(Date.now()).slice(-6)+'-'+(++created),client:cc.shortName||cc.name||o.customerId,item:(pp.code||l.productId)+(pp.name?' · '+pp.name:''),project:(cc.shortName||cc.name||o.customerId)+' / '+o.customerPO,productId:l.productId,department:'CNC Üretim',targetQty:need,completedQty:0,status:'Açık',assignedTo:[],targetType:'production',durationMinutes:0,machine:'',dueAt:o.dueDate?o.dueDate+'T17:00':'',unitPrice:Number(l.unitPrice||0),salesOrderId:o.id,customerPO:o.customerPO,createdAt:now(),source:'KMI_ORDER_INTELLIGENCE',deleted:false};if(Array.isArray(window.jobOrders))window.jobOrders.push(jo);audit('CREATE','WORK_ORDER',jo.id,`${o.customerPO} · ${product(l.productId).code||l.productId} · ${need} adet`)});try{if(Array.isArray(window.jobOrders))localStorage.setItem('jobOrders',JSON.stringify(window.jobOrders))}catch(e){}persist();try{if(typeof refreshAllViews==='function')refreshAllViews()}catch(e){console.warn('KMI full refresh',e)}v118Render();if(created)alert(created+' üretim iş emri oluşturuldu. Yönetim ve Operatör panellerine işlendi.');else{const active=(Array.isArray(window.jobOrders)?window.jobOrders:[]).filter(j=>j.salesOrderId===o.id&&!['Tamamlandı','CANCELLED','İptal'].includes(j.status));alert(active.length?'Bu sipariş için üretim ihtiyacı zaten aktif iş emirleri ile karşılanıyor.':'Açık üretim ihtiyacı yok.')}};
+// KMI-FIX (2026-09-26): Ender'in isteği - 1000 adetlik gibi büyük siparişler tek dev iş emri olarak değil,
+// yönetici tarafından belirlenen vardiya üretim hedefine göre otomatik ayrı vardiya iş emirlerine bölünebilsin.
+// Mevcut v118ProductionNeed'e (ve onu saran audit/event wrapper'a) hiç dokunulmadı; bu tamamen ek/opsiyonel bir yol.
+window.v118ProductionNeedShiftSplit=function(id){
+ if(!can('sales'))return alert('Yetki yok.');
+ const o=V.orders.find(x=>x.id===id);if(!o)return;
+ const raw=prompt('Vardiya başına üretim hedefi (adet) girin.\nBu sipariş için gereken toplam üretim, girdiğiniz hedef büyüklüğünde ayrı vardiya iş emirlerine otomatik bölünüp oluşturulacak.\n(Boş bırakıp Tamam derseniz, mevcut yönteme göre TEK iş emri oluşturulur.)','');
+ if(raw===null)return;
+ if(!raw.trim())return window.v118ProductionNeed(id);
+ const shiftTarget=Math.floor(Number(raw));
+ if(!Number.isFinite(shiftTarget)||shiftTarget<=0){alert('Vardiya hedefi geçerli bir pozitif sayı olmalı.');return;}
+ let created=0;
+ (o.lines||[]).forEach(l=>{
+  const ordered=Number(l.qty||0),reserved=Number(l.reserved||0),produced=Number(l.produced||0);
+  const activeWO=(Array.isArray(window.jobOrders)?window.jobOrders:[]).filter(j=>j.salesOrderId===o.id&&String(j.productId)===String(l.productId)&&!['Tamamlandı','CANCELLED','İptal'].includes(j.status)).reduce((s,j)=>s+Math.max(0,Number(j.targetQty||0)-Number(j.completedQty||0)),0);
+  const need=Math.max(0,ordered-reserved-produced-activeWO);
+  if(need<=0)return;
+  const parts=Math.ceil(need/shiftTarget);
+  const pp=product(l.productId),cc=customer(o.customerId);
+  for(let i=1;i<=parts;i++){
+   const qtyThis=(i<parts)?shiftTarget:(need-shiftTarget*(parts-1));
+   created++;
+   const jo={id:'WO-'+new Date().getFullYear()+'-'+String(Date.now()).slice(-6)+'-'+created+'-V'+i,
+    client:cc.shortName||cc.name||o.customerId,
+    item:(pp.code||l.productId)+(pp.name?' · '+pp.name:''),
+    project:(cc.shortName||cc.name||o.customerId)+' / '+o.customerPO,
+    productId:l.productId,department:'CNC Üretim',targetQty:qtyThis,completedQty:0,status:'Açık',assignedTo:[],
+    targetType:'production',durationMinutes:0,machine:'',dueAt:o.dueDate?o.dueDate+'T17:00':'',
+    unitPrice:Number(l.unitPrice||0),salesOrderId:o.id,customerPO:o.customerPO,createdAt:now(),
+    source:'KMI_ORDER_INTELLIGENCE',deleted:false,
+    shiftTargetQty:shiftTarget,shiftPartIndex:i,shiftPartsTotal:parts};
+   if(Array.isArray(window.jobOrders))window.jobOrders.push(jo);
+   audit('CREATE','WORK_ORDER',jo.id,`${o.customerPO} · ${product(l.productId).code||l.productId} · Vardiya ${i}/${parts} · ${qtyThis} adet`);
+  }
+ });
+ try{if(Array.isArray(window.jobOrders))localStorage.setItem('jobOrders',JSON.stringify(window.jobOrders))}catch(e){}
+ persist();
+ try{if(typeof refreshAllViews==='function')refreshAllViews()}catch(e){}
+ v118Render();
+ if(created)alert(created+' adet vardiya bazlı üretim iş emri oluşturuldu (hedef: '+shiftTarget+' adet/parça).');
+ else alert('Açık üretim ihtiyacı yok veya zaten aktif iş emirleri ile karşılanıyor.');
+};
 window.v118ReceiveFinished=function(id){if(!can('warehouse'))return alert('Bitmiş ürün girişi için Depo/Yönetim yetkisi gerekir.');const o=V.orders.find(x=>x.id===id);if(!o)return;const l=o.lines[0],q=Number(prompt('Bitmiş ürün giriş adedi','0'));if(!(q>0))return;stockRow(l.productId).onHand+=q;l.produced=(l.produced||0)+q;V.movements.unshift({id:uid('MOV'),at:now(),type:'FINISHED_IN',productId:l.productId,qty:q,ref:o.id});audit('FINISHED_GOODS_IN','SALES_ORDER',o.id,q+' adet');persist();v118Reserve(id,true);v118Render()}
 window.v118Ship=function(id){if(!can('warehouse'))return alert('Sevkiyat için Depo/Sevkiyat/Yönetim yetkisi gerekir.');const o=V.orders.find(x=>x.id===id);if(!o)return;let any=0;o.lines.forEach(l=>{const max=Math.min(l.reserved,Math.max(0,l.qty-l.shipped));if(max<=0)return;const q=Number(prompt(product(l.productId).name+' sevk adedi (max '+max+')',max));if(!(q>0)||q>max)return;const st=stockRow(l.productId);st.onHand-=q;st.reserved-=q;l.reserved-=q;l.shipped+=q;any+=q;V.movements.unshift({id:uid('MOV'),at:now(),type:'SHIP',productId:l.productId,qty:-q,ref:o.id})});if(any){recalc(o);audit('SHIP','SALES_ORDER',o.id,any+' adet');persist();v118Render()}}
 window.v118Invoice=function(id){if(!can('finance'))return alert('Fatura işlemi için Muhasebe/Yönetim yetkisi gerekir.');const o=V.orders.find(x=>x.id===id);if(!o||!o.shippedQty)return alert('Önce sevkiyat yapılmalı.');let inv=V.invoices.find(x=>x.orderId===id);if(!inv){inv={id:uid('INV'),orderId:id,customerId:o.customerId,amount:o.total*(o.shippedQty/o.lines.reduce((a,l)=>a+l.qty,0)),currency:o.currency,status:'OPEN',createdAt:now()};V.invoices.unshift(inv);o.status='INVOICED';audit('INVOICE','INVOICE',inv.id,o.id);persist()}v118Render()}
@@ -6056,8 +6397,8 @@ window.v118Pay=function(invId){if(!can('finance'))return alert('Tahsilat için M
 window.v118Cancel=function(id){if(!can('sales'))return alert('İptal için Yönetim/Satış yetkisi gerekir.');const o=V.orders.find(x=>x.id===id);if(!o||!confirm('Sipariş iptal edilsin mi?'))return;o.lines.forEach(l=>{stockRow(l.productId).reserved=Math.max(0,stockRow(l.productId).reserved-l.reserved);l.reserved=0});o.status='CANCELLED';audit('CANCEL','SALES_ORDER',id,'Sipariş iptal');persist();v118Render()}
 window.v118OrderMetrics=function(o){const lines=o.lines||[];let ordered=0,reserved=0,finished=0,shipped=0;lines.forEach(l=>{ordered+=Number(l.qty||0);reserved+=Number(l.reserved||0);finished+=Number(l.produced||0);shipped+=Number(l.shipped||0)});const productionNeed=Math.max(0,ordered-Math.max(reserved,finished)),ready=Math.max(0,finished-shipped),progress=ordered?Math.min(100,Math.round(((shipped+ready*.75+Math.min(finished,ordered)*.15)/ordered)*100)):0,days=Math.ceil((new Date(o.dueDate)-new Date())/86400000);return{ordered,reserved,finished,shipped,productionNeed,ready,progress,days}};
 window.v118FlowCell=function(o){const m=v118OrderMetrics(o),valid=Number.isFinite(Number(m.days)),days=valid?Number(m.days):null,risk=!valid?'TERMİN YOK':days<0?'GECİKMİŞ':days<=2?'RİSK':days<=7?'YAKIN':'PLANDA',rc=risk==='GECİKMİŞ'?'text-red-300':risk==='RİSK'?'text-orange-300':risk==='YAKIN'?'text-amber-300':risk==='TERMİN YOK'?'text-slate-400':'text-emerald-300',dayText=valid?`${days}g`:'—';return `<div class="min-w-[220px]"><div class="flex justify-between gap-2"><b>${E(o.status)}</b><b class="text-[9px] ${rc}">${risk} · ${dayText}</b></div><div class="h-2 bg-slate-950 rounded-full overflow-hidden mt-2"><div class="h-full bg-cyan-500" style="width:${m.progress}%"></div></div><div class="grid grid-cols-3 gap-1 mt-2 text-[9px]"><div><span class="text-slate-500">Sipariş</span><br><b>${m.ordered}</b></div><div><span class="text-slate-500">Üretilecek</span><br><b class="text-orange-300">${m.productionNeed}</b></div><div><span class="text-slate-500">Hazır</span><br><b class="text-emerald-300">${m.ready}</b></div></div></div>`};
-window.v118OrderCommand=function(id){const o=V.orders.find(x=>x.id===id);if(!o)return;const m=v118OrderMetrics(o),c=customer(o.customerId);document.getElementById('v118CommandModal')?.remove();const d=document.createElement('div');d.id='v118CommandModal';d.className='fixed inset-0 z-[95] bg-slate-950/90 p-4 overflow-y-auto';d.innerHTML=`<div class="max-w-6xl mx-auto mt-4 bg-slate-900 border border-cyan-800/70 rounded-2xl shadow-2xl overflow-hidden"><div class="p-5 border-b border-slate-700 flex justify-between gap-4"><div><div class="text-[10px] tracking-[.28em] font-black text-cyan-300">KMI · ORDER COMMAND</div><h2 class="text-2xl font-black mt-1">${E(o.customerPO||o.id)}</h2><div class="text-slate-400">${E(c.name||c.shortName||c.id)} · Termin ${E(o.dueDate||'-')}</div></div><button onclick="document.getElementById('v118CommandModal').remove()" class="bg-slate-800 px-4 rounded">Kapat</button></div><div class="p-5 grid md:grid-cols-4 gap-3">${[['ORDERED',m.ordered,'text-white'],['PRODUCTION NEED',m.productionNeed,'text-orange-300'],['READY',m.ready,'text-emerald-300'],['SHIPPED',m.shipped,'text-cyan-300']].map(x=>`<div class="bg-slate-950 border border-slate-700 rounded-xl p-4"><div class="text-[9px] text-slate-500">${x[0]}</div><div class="text-3xl font-black ${x[2]}">${x[1]}</div></div>`).join('')}</div><div class="px-5 pb-5"><div class="bg-slate-950 border border-slate-700 rounded-xl p-4"><div class="font-black mb-3">ORDER LINES · LIVE FLOW</div>${(o.lines||[]).map(l=>{const p=product(l.productId),need=Math.max(0,Number(l.qty||0)-Math.max(Number(l.reserved||0),Number(l.produced||0)));return `<div class="grid grid-cols-2 md:grid-cols-6 gap-2 border-t border-slate-800 py-3 text-xs"><div class="md:col-span-2"><b>${E(p.code||p.id)} · ${E(p.name||'')}</b><div class="text-slate-500">${E(p.revision?'Rev '+p.revision:'')}</div></div><div>Sipariş<br><b>${l.qty}</b></div><div>Rezerve<br><b>${l.reserved||0}</b></div><div>Üretilecek<br><b class="text-orange-300">${need}</b></div><div>Bitmiş<br><b class="text-emerald-300">${l.produced||0}</b></div></div>`}).join('')}</div><div class="flex flex-wrap gap-2 mt-4"><button onclick="kmiOpenPassport('${o.id}')" class="bg-purple-700 px-4 py-2 rounded-lg font-black">Digital Passport</button><button onclick="v118Reserve('${o.id}')" class="bg-blue-700 px-4 py-2 rounded-lg font-black">Stok Rezerve</button><button onclick="v118ProductionNeed('${o.id}')" class="bg-orange-700 px-4 py-2 rounded-lg font-black">WO / Üretim</button><button onclick="v118ReceiveFinished('${o.id}')" class="bg-emerald-700 px-4 py-2 rounded-lg font-black">Bitmiş Ürün</button><button onclick="v118Ship('${o.id}')" class="bg-cyan-700 px-4 py-2 rounded-lg font-black">Sevkiyat</button><button onclick="v118Invoice('${o.id}')" class="bg-violet-700 px-4 py-2 rounded-lg font-black">Fatura</button></div></div></div>`;document.body.appendChild(d)};
-window.v118Render=function(){const orders=document.getElementById('v118Orders');if(!orders)return;const f=document.getElementById('v118OrderFilter')?.value||'',list=V.orders.filter(o=>!f||o.status===f);const outstanding=V.invoices.reduce((a,i)=>a+Math.max(0,i.amount-V.payments.filter(p=>p.invoiceId===i.id).reduce((s,p)=>s+p.amount,0)),0);document.getElementById('v118Kpis').innerHTML=[['Açık Sipariş',V.orders.filter(o=>!['PAID','CANCELLED'].includes(o.status)).length],['Rezerve',V.stock.reduce((a,x)=>a+x.reserved,0)+' ad'],['Bitmiş Stok',V.stock.reduce((a,x)=>a+x.onHand,0)+' ad'],['Açık Alacak',money(outstanding)],['Audit',V.audit.length]].map(x=>`<div class="bg-slate-900 border border-slate-700 rounded-lg p-3"><div class="text-[9px] uppercase text-slate-500">${x[0]}</div><div class="text-lg font-black text-cyan-300">${x[1]}</div></div>`).join('');orders.innerHTML=list.map(o=>`<tr class="border-t border-slate-700"><td class="p-2"><b>${E(o.customerPO)}</b><div class="text-[9px] text-slate-500">${E(o.id)}</div></td><td class="p-2">${E(customer(o.customerId).shortName||customer(o.customerId).name||o.customerId)}</td><td class="p-2">${E(o.dueDate)}</td><td class="p-2 text-right">${money(o.total,o.currency)}</td><td class="p-2">${v118FlowCell(o)}</td><td class="p-2"><div class="flex flex-wrap gap-1"><button onclick="v118ProductionNeed('${o.id}')" class="bg-amber-700 px-2 py-1 rounded font-bold">WO / Üretim</button><button onclick="v118OrderCommand('${o.id}')" class="bg-slate-700 hover:bg-cyan-700 px-2 py-1 rounded font-bold">Command</button></div></td></tr>`).join('')||'<tr><td colspan="6" class="p-4 text-center text-slate-500">Sipariş kaydı yok.</td></tr>';// KMI-FIX (2026-09-26): "Stok Özeti" burada TÜM zamanların TÜM ürünlerini (eski/test/ilgisiz
+window.v118OrderCommand=function(id){const o=V.orders.find(x=>x.id===id);if(!o)return;const m=v118OrderMetrics(o),c=customer(o.customerId);document.getElementById('v118CommandModal')?.remove();const d=document.createElement('div');d.id='v118CommandModal';d.className='fixed inset-0 z-[95] bg-slate-950/90 p-4 overflow-y-auto';d.innerHTML=`<div class="max-w-6xl mx-auto mt-4 bg-slate-900 border border-cyan-800/70 rounded-2xl shadow-2xl overflow-hidden"><div class="p-5 border-b border-slate-700 flex justify-between gap-4"><div><div class="text-[10px] tracking-[.28em] font-black text-cyan-300">KMI · ORDER COMMAND</div><h2 class="text-2xl font-black mt-1">${E(o.customerPO||o.id)}</h2><div class="text-slate-400">${E(c.name||c.shortName||c.id)} · Termin ${E(o.dueDate||'-')}</div></div><button onclick="document.getElementById('v118CommandModal').remove()" class="bg-slate-800 px-4 rounded">Kapat</button></div><div class="p-5 grid md:grid-cols-4 gap-3">${[['ORDERED',m.ordered,'text-white'],['PRODUCTION NEED',m.productionNeed,'text-orange-300'],['READY',m.ready,'text-emerald-300'],['SHIPPED',m.shipped,'text-cyan-300']].map(x=>`<div class="bg-slate-950 border border-slate-700 rounded-xl p-4"><div class="text-[9px] text-slate-500">${x[0]}</div><div class="text-3xl font-black ${x[2]}">${x[1]}</div></div>`).join('')}</div><div class="px-5 pb-5"><div class="bg-slate-950 border border-slate-700 rounded-xl p-4"><div class="font-black mb-3">ORDER LINES · LIVE FLOW</div>${(o.lines||[]).map(l=>{const p=product(l.productId),need=Math.max(0,Number(l.qty||0)-Math.max(Number(l.reserved||0),Number(l.produced||0)));return `<div class="grid grid-cols-2 md:grid-cols-6 gap-2 border-t border-slate-800 py-3 text-xs"><div class="md:col-span-2"><b>${E(p.code||p.id)} · ${E(p.name||'')}</b><div class="text-slate-500">${E(p.revision?'Rev '+p.revision:'')}</div></div><div>Sipariş<br><b>${l.qty}</b></div><div>Rezerve<br><b>${l.reserved||0}</b></div><div>Üretilecek<br><b class="text-orange-300">${need}</b></div><div>Bitmiş<br><b class="text-emerald-300">${l.produced||0}</b></div></div>`}).join('')}</div><div class="flex flex-wrap gap-2 mt-4"><button onclick="kmiOpenPassport('${o.id}')" class="bg-purple-700 px-4 py-2 rounded-lg font-black">Digital Passport</button><button onclick="v118Reserve('${o.id}')" class="bg-blue-700 px-4 py-2 rounded-lg font-black">Stok Rezerve</button><button onclick="v118ProductionNeed('${o.id}')" class="bg-orange-700 px-4 py-2 rounded-lg font-black">WO / Üretim</button><button onclick="v118ProductionNeedShiftSplit('${o.id}')" class="bg-fuchsia-700 px-4 py-2 rounded-lg font-black">Vardiya Bölerek Üret</button><button onclick="v118ReceiveFinished('${o.id}')" class="bg-emerald-700 px-4 py-2 rounded-lg font-black">Bitmiş Ürün</button><button onclick="v118Ship('${o.id}')" class="bg-cyan-700 px-4 py-2 rounded-lg font-black">Sevkiyat</button><button onclick="v118Invoice('${o.id}')" class="bg-violet-700 px-4 py-2 rounded-lg font-black">Fatura</button></div></div></div>`;document.body.appendChild(d)};
+window.v118Render=function(){const orders=document.getElementById('v118Orders');if(!orders)return;const f=document.getElementById('v118OrderFilter')?.value||'',list=V.orders.filter(o=>!f||o.status===f);const outstanding=V.invoices.reduce((a,i)=>a+Math.max(0,i.amount-V.payments.filter(p=>p.invoiceId===i.id).reduce((s,p)=>s+p.amount,0)),0);document.getElementById('v118Kpis').innerHTML=[['Açık Sipariş',V.orders.filter(o=>!['PAID','CANCELLED'].includes(o.status)).length],['Rezerve',V.stock.reduce((a,x)=>a+x.reserved,0)+' ad'],['Bitmiş Stok',V.stock.reduce((a,x)=>a+x.onHand,0)+' ad'],['Açık Alacak',money(outstanding)],['Audit',V.audit.length]].map(x=>`<div class="bg-slate-900 border border-slate-700 rounded-lg p-3"><div class="text-[9px] uppercase text-slate-500">${x[0]}</div><div class="text-lg font-black text-cyan-300">${x[1]}</div></div>`).join('');orders.innerHTML=list.map(o=>`<tr class="border-t border-slate-700"><td class="p-2"><b>${E(o.customerPO)}</b><div class="text-[9px] text-slate-500">${E(o.id)}</div></td><td class="p-2">${E(customer(o.customerId).shortName||customer(o.customerId).name||o.customerId)}</td><td class="p-2">${E(o.dueDate)}</td><td class="p-2 text-right">${money(o.total,o.currency)}</td><td class="p-2">${v118FlowCell(o)}</td><td class="p-2"><div class="flex flex-wrap gap-1"><button onclick="v118ProductionNeed('${o.id}')" class="bg-amber-700 px-2 py-1 rounded font-bold">WO / Üretim</button><button onclick="v118ProductionNeedShiftSplit('${o.id}')" class="bg-fuchsia-700 px-2 py-1 rounded font-bold">Vardiya Böl</button><button onclick="v118OrderCommand('${o.id}')" class="bg-slate-700 hover:bg-cyan-700 px-2 py-1 rounded font-bold">Command</button></div></td></tr>`).join('')||'<tr><td colspan="6" class="p-4 text-center text-slate-500">Sipariş kaydı yok.</td></tr>';// KMI-FIX (2026-09-26): "Stok Özeti" burada TÜM zamanların TÜM ürünlerini (eski/test/ilgisiz
 // kayıtlar dahil, stockRow() bir ürün ilk kez referans edildiğinde otomatik 0'lık bir satır
 // oluşturuyor) gösteriyordu - Ender'in az önce açtığı SKYART siparişiyle hiç ilgisi olmayan
 // "Mekanizma Çatal Kolu" (0/0/0) gibi alakasız bir kayıt öne çıkabiliyordu. Artık yalnızca şu an
@@ -6313,6 +6654,18 @@ window.kmiKioskFinish=function(){
  if(kmiKioskIdleTimer){clearTimeout(kmiKioskIdleTimer);kmiKioskIdleTimer=null;}
  if(window.__kmiKioskResetIdle){ ['click','touchstart','keydown'].forEach(ev=>document.removeEventListener(ev,window.__kmiKioskResetIdle)); window.__kmiKioskResetIdle=null; }
  try{ window.handleLogout ? window.handleLogout() : handleLogout(); }catch(e){ console.warn('[Kiosk finish]',e); }
+};
+// KMI-FIX (2026-09-26): Ender'in isteği "rozet pin yönetimi de öyle / personelin altına" - modül
+// grid'indeki "Rozet / PIN Yönetimi" kısayolu artık Personel modülünü açıp bu katlanır bölümü
+// otomatik genişletiyor, ayrı bir üst-düzey modül sayfasına gitmiyor.
+window.kmiExpandRozetPin=function(){
+ const b=document.getElementById('rozetPinCollapse'); if(!b)return;
+ b.style.display='block';
+ const label=document.getElementById('rozetPinToggleLabel'); if(label)label.innerHTML='<i class="fa-solid fa-id-card-clip text-cyan-400 mr-2"></i>Gizle';
+ document.getElementById('rozetPinToggleIcon')?.classList.remove('fa-chevron-down');
+ document.getElementById('rozetPinToggleIcon')?.classList.add('fa-chevron-up');
+ try{window.kmiRenderBadgePinAdmin&&window.kmiRenderBadgePinAdmin();}catch(e){}
+ setTimeout(()=>b.scrollIntoView({behavior:'smooth',block:'start'}),50);
 };
 window.kmiRenderBadgePinAdmin=function(){
  kmiRenderKioskStatus();
@@ -6995,6 +7348,7 @@ window.v118OrderCommand=function(id){
  <button onclick="kmiOpenPassport('${esc(o.id)}')" class="bg-purple-700 px-4 py-3 rounded-xl font-black">Passport</button>
  <button onclick="v118Reserve('${esc(o.id)}')" class="bg-blue-700 px-4 py-3 rounded-xl font-black">Stok</button>
  <button onclick="v118ProductionNeed('${esc(o.id)}')" class="bg-orange-700 px-4 py-3 rounded-xl font-black">Üretim</button>
+ <button onclick="v118ProductionNeedShiftSplit('${esc(o.id)}')" class="bg-fuchsia-700 px-4 py-3 rounded-xl font-black">Vardiya Bölerek Üret</button>
  <button onclick="v118ReceiveFinished('${esc(o.id)}')" class="bg-emerald-700 px-4 py-3 rounded-xl font-black">Bitmiş Ürün</button>
  <button onclick="v118Ship('${esc(o.id)}')" class="bg-cyan-700 px-4 py-3 rounded-xl font-black">Sevkiyat</button>
  <button onclick="v118Invoice('${esc(o.id)}')" class="bg-violet-700 px-4 py-3 rounded-xl font-black">Fatura</button></div></div></div>`;
@@ -7093,7 +7447,7 @@ window.v118OrderCommand=function(id){
  <div class="p-4 md:p-5 border-b border-slate-700 flex justify-between gap-3 sticky top-0 bg-slate-900 z-10"><div><div class="text-[10px] tracking-[.22em] font-black text-cyan-300">KMI · ORDER COMMAND</div><h2 class="text-xl md:text-2xl font-black">${esc(o.customerPO||o.id)}</h2><div class="text-xs text-slate-400">Termin ${esc(o.dueDate||'-')} · ${m.productionNeed===0&&m.activeWO>0?'Üretim planlandı':'Planlama gerekiyor'}</div></div><button onclick="this.closest('#v118CommandModal').remove()" class="h-10 bg-slate-800 px-4 rounded-xl">Kapat</button></div>
  <div class="p-4 grid grid-cols-2 md:grid-cols-5 gap-2">${[['SİPARİŞ',m.ordered],['AKTİF WO',m.activeWO],['PLANLANACAK',m.productionNeed],['HAZIR',m.ready],['SEVK',m.shipped]].map(x=>`<div class="bg-slate-950 border border-slate-700 rounded-xl p-3"><div class="text-[9px] text-slate-500">${x[0]}</div><div class="text-2xl font-black">${x[1]}</div></div>`).join('')}</div>
  <div class="px-4 pb-4"><div class="bg-slate-950 border border-slate-700 rounded-xl p-4"><div class="font-black mb-2">ÜRETİM AKIŞI</div>${(o.lines||[]).map(l=>{const w=woRemaining(o.id,l.productId),need=Math.max(0,num(l.qty)-Math.max(num(l.reserved),num(l.produced))-w);return `<div class="grid grid-cols-2 md:grid-cols-6 gap-2 border-t border-slate-800 py-3 text-xs"><div class="md:col-span-2"><b>${esc(productName(l.productId))}</b></div><div>Sipariş<br><b>${num(l.qty)}</b></div><div>Aktif WO<br><b class="text-cyan-300">${w}</b></div><div>Planlanacak<br><b class="${need?'text-orange-300':'text-emerald-300'}">${need}</b></div><div>Bitmiş<br><b>${num(l.produced)}</b></div></div>`}).join('')}</div>
- <div class="grid grid-cols-2 md:flex gap-2 mt-3"><button onclick="kmiOpenPassport('${esc(o.id)}')" class="bg-purple-700 px-4 py-3 rounded-xl font-black">Passport</button><button onclick="v118Reserve('${esc(o.id)}')" class="bg-blue-700 px-4 py-3 rounded-xl font-black">Stok</button><button onclick="v118ProductionNeed('${esc(o.id)}')" class="bg-orange-700 px-4 py-3 rounded-xl font-black">Üretimi Planla</button><button onclick="v118ReceiveFinished('${esc(o.id)}')" class="bg-emerald-700 px-4 py-3 rounded-xl font-black">Bitmiş Ürün</button><button onclick="v118Ship('${esc(o.id)}')" class="bg-cyan-700 px-4 py-3 rounded-xl font-black">Sevkiyat</button><button onclick="v118Invoice('${esc(o.id)}')" class="bg-violet-700 px-4 py-3 rounded-xl font-black">Fatura</button></div></div></div>`;
+ <div class="grid grid-cols-2 md:flex gap-2 mt-3"><button onclick="kmiOpenPassport('${esc(o.id)}')" class="bg-purple-700 px-4 py-3 rounded-xl font-black">Passport</button><button onclick="v118Reserve('${esc(o.id)}')" class="bg-blue-700 px-4 py-3 rounded-xl font-black">Stok</button><button onclick="v118ProductionNeed('${esc(o.id)}')" class="bg-orange-700 px-4 py-3 rounded-xl font-black">Üretimi Planla</button><button onclick="v118ProductionNeedShiftSplit('${esc(o.id)}')" class="bg-fuchsia-700 px-4 py-3 rounded-xl font-black">Vardiya Bölerek Üret</button><button onclick="v118ReceiveFinished('${esc(o.id)}')" class="bg-emerald-700 px-4 py-3 rounded-xl font-black">Bitmiş Ürün</button><button onclick="v118Ship('${esc(o.id)}')" class="bg-cyan-700 px-4 py-3 rounded-xl font-black">Sevkiyat</button><button onclick="v118Invoice('${esc(o.id)}')" class="bg-violet-700 px-4 py-3 rounded-xl font-black">Fatura</button></div></div></div>`;
  document.body.appendChild(d);
 };
 
@@ -7412,6 +7766,12 @@ window.editJobOrder=function(id){
  const d=document.createElement('div');d.id='kmiJobEditor';d.className='fixed inset-0 z-[220] bg-slate-950/90 p-2 md:p-5 overflow-y-auto';
  const optsP=ppl().map(p=>`<option value="${E(p.id)}" ${(j.assignedTo||[]).map(Number).includes(Number(p.id))?'selected':''}>${E(p.name)} · ${E(p.jobTitle||p.dept||'')}</option>`).join('');
  const optsM=mac().map(m=>`<option value="${E(m.code)}" ${String(j.machine||'').startsWith(String(m.code))?'selected':''}>${E(m.code)} · ${E(m.name)}</option>`).join('');
+ // KMI-FIX (2026-09-26): Ender'in isteği - iş emri ekranından, o ürüne ait kullanılabilir ham madde
+ // LOT'u (101 kesimden otomatik oluşanlar dahil) doğrudan seçilip bağlanabilsin. 101'in kendisi hariç
+ // hiçbir iş emri LOT bağlanmadan Shop Floor'da başlatılamaz (bkz. window.kmiStartWork).
+ const isSawJob=/^101\b/.test(String(j.machine||'').trim());
+ const lotCandidates=(window.D?.lots||[]).filter(l=>l.qc==='KABUL' && (Number(l.blankAvailable||0)>0 || l.id===j.materialLotId) && (!j.productId||!l.productId||String(l.productId)===String(j.productId)));
+ const optsLot=lotCandidates.map(l=>`<option value="${E(l.id)}" ${String(j.materialLotId||'')===String(l.id)?'selected':''}>${E(l.id)} · ${E(l.material)} · ${Number(l.blankAvailable||0)} adet</option>`).join('');
  d.innerHTML=`<div class="max-w-3xl mx-auto mt-3 bg-slate-900 border border-cyan-800 rounded-2xl shadow-2xl overflow-hidden"><div class="p-5 border-b border-slate-700 flex justify-between"><div><div class="text-[10px] text-cyan-300 tracking-[.2em] font-black">KMI · WORK ORDER CARD</div><h2 class="text-2xl font-black">${E(j.id)}</h2><div class="text-xs text-slate-500">Değişiklikler otomatik kaydedilir.</div></div><button onclick="kmiCloseJobEditor()" class="bg-slate-800 px-4 rounded-xl">Kaydet & Kapat</button></div>
  <div class="p-5 grid md:grid-cols-2 gap-3">
  ${[['Müşteri / Proje','client',j.client,'text'],['Ürün / İş','item',j.item,'text'],['Hedef Adet','targetQty',j.targetQty,'number'],['Birim Fiyat','price',j.price??j.unitPrice??0,'number'],['Departman','department',j.department||'CNC Üretim','text'],['Termin','dueAt',(j.dueAt||'').slice(0,16),'datetime-local']].map(x=>`<label class="text-xs text-slate-400">${x[0]}<input data-kmi-job="${x[1]}" type="${x[3]}" value="${E(x[2])}" class="mt-1 w-full bg-slate-950 border border-slate-700 rounded-xl p-3 text-white"></label>`).join('')}
@@ -7419,6 +7779,7 @@ window.editJobOrder=function(id){
  <label class="text-xs text-slate-400">Operatör<select data-kmi-job="assignedTo" class="mt-1 w-full bg-slate-950 border border-slate-700 rounded-xl p-3 text-white"><option value="">Atanmamış</option>${optsP}</select></label>
  <label class="text-xs text-slate-400">Vardiya<select data-kmi-job="shift" class="mt-1 w-full bg-slate-950 border border-slate-700 rounded-xl p-3 text-white"><option ${j.shift==='1. Vardiya'?'selected':''}>1. Vardiya</option><option ${j.shift==='2. Vardiya'?'selected':''}>2. Vardiya</option><option ${j.shift==='Genel'?'selected':''}>Genel</option></select></label>
  <label class="text-xs text-slate-400">Planlanan Başlangıç<input data-kmi-job="plannedStart" type="datetime-local" value="${E((j.plannedStart||'').slice(0,16))}" class="mt-1 w-full bg-slate-950 border border-slate-700 rounded-xl p-3 text-white"></label>
+ <label class="text-xs text-slate-400 md:col-span-2">Ham Madde LOT${isSawJob?' <span class="text-slate-600">(Kesim iş emri - gerekmez)</span>':''}<select data-kmi-job="materialLotId" class="mt-1 w-full bg-slate-950 border ${isSawJob?'border-slate-700':(j.materialLotId?'border-emerald-700':'border-rose-700')} rounded-xl p-3 text-white"><option value="">${isSawJob?'Atanmamış (gerekmez)':'Atanmamış - işe başlanamaz'}</option>${optsLot}</select>${!isSawJob&&!lotCandidates.length?'<div class="text-[10px] text-rose-400 mt-1">Bu ürün için kullanılabilir LOT yok - önce 101 testereden kesim beyanı girilip kalite onaylanmalı.</div>':''}</label>
  </div><div class="px-5 pb-5 flex gap-2"><button onclick="document.getElementById('kmiJobEditor').remove();kmiOpenSmartAssign('${E(j.id)}')" class="bg-cyan-800 px-4 py-3 rounded-xl font-black">KMI Akıllı Öneri</button><div class="text-xs text-slate-500 self-center">Makine + operatör önerisini performans verisiyle karşılaştır.</div></div></div>`;
  document.body.appendChild(d);
  d.querySelectorAll('[data-kmi-job]').forEach(el=>el.addEventListener('change',()=>kmiSaveJobEditor(false)));
@@ -7590,7 +7951,7 @@ window.kmiOpenShopFloor=function(){
 };
 window.kmiOpenWork=function(id){
  const j=jobs().find(x=>String(x.id)===String(id));if(!j)return;const d=shell(),s=sess(id);
- if(!s?.startedAt||s?.finishedAt){d.innerHTML=`<div class="max-w-xl mx-auto min-h-screen flex flex-col justify-center p-4"><button onclick="kmiOpenShopFloor()" class="self-start text-slate-400 mb-5">← İşlerim</button><div class="text-xs text-cyan-300 font-black">${E(j.id)}</div><h1 class="text-3xl font-black mt-2">${E(j.item||j.productId)}</h1><div class="bg-slate-900 rounded-2xl p-4 mt-4"><div class="text-sm text-slate-400">MAKİNE</div><div class="text-xl font-black">${E(j.machine||'Atanmamış')}</div><div class="grid grid-cols-2 gap-3 mt-4"><div><span class="text-xs text-slate-500">HEDEF</span><div class="text-2xl font-black">${N(j.targetQty)}</div></div><div><span class="text-xs text-slate-500">VARDİYA</span><div class="text-lg font-black">${E(j.shift||'Genel')}</div></div></div></div><button onclick="kmiStartWork('${E(id)}')" class="mt-5 w-full bg-emerald-600 active:scale-[.98] rounded-2xl py-6 text-2xl font-black">▶ İŞE BAŞLA</button><div class="text-center text-xs text-slate-500 mt-3">Başlatınca gerçek çalışma süresi ve üretim eventleri kaydedilir.</div></div>`;return}
+ if(!s?.startedAt||s?.finishedAt){d.innerHTML=`<div class="max-w-xl mx-auto min-h-screen flex flex-col justify-center p-4"><button onclick="kmiOpenShopFloor()" class="self-start text-slate-400 mb-5">← İşlerim</button><div class="text-xs text-cyan-300 font-black">${E(j.id)}</div><h1 class="text-3xl font-black mt-2">${E(j.item||j.productId)}</h1><div class="bg-slate-900 rounded-2xl p-4 mt-4"><div class="text-sm text-slate-400">MAKİNE</div><div class="text-xl font-black">${E(j.machine||'Atanmamış')}</div><div class="grid grid-cols-2 gap-3 mt-4"><div><span class="text-xs text-slate-500">HEDEF</span><div class="text-2xl font-black">${N(j.targetQty)}</div></div><div><span class="text-xs text-slate-500">VARDİYA</span><div class="text-lg font-black">${E(j.shift||'Genel')}</div></div></div><div class="mt-3 pt-3 border-t border-slate-800"><span class="text-xs text-slate-500">HAM MADDE LOT</span><div class="text-sm font-black ${j.materialLotId?'text-emerald-300':'text-rose-300'}">${j.materialLotId?E(j.materialLotId):(/^101\b/.test(String(j.machine||'').trim())?'Gerekmiyor (kesim iş emri)':'Atanmadı - yönetici atamalı')}</div></div></div><button onclick="kmiStartWork('${E(id)}')" class="mt-5 w-full bg-emerald-600 active:scale-[.98] rounded-2xl py-6 text-2xl font-black">▶ İŞE BAŞLA</button><div class="text-center text-xs text-slate-500 mt-3">Başlatınca gerçek çalışma süresi ve üretim eventleri kaydedilir.</div></div>`;return}
  renderRunning(j,s);
 };
 function renderRunning(j,s){
@@ -7614,6 +7975,10 @@ window.kmiStartWork=function(id){
  const machine=String(j.machine||'').trim(),shift=String(j.shift||'').trim();
  if(!machine||machine==='-'||/atanmad/i.test(machine)){toast('İşe başlamadan önce yönetici makine atamalı.','warn');return}
  if(!shift||shift==='-'||/atanmad/i.test(shift)){toast('İşe başlamadan önce vardiya atanmalı.','warn');return}
+ // KMI-FIX (2026-09-26): Ender'in isteği - ham madde atanmamış iş emri çalışmamalı. 101 (kesim)
+ // makinesi istisnadır - o ham maddeyi üreten iş emridir, kendisi bir LOT'a bağlı olmak zorunda değil.
+ const isSawMachine101=/^101\b/.test(machine);
+ if(!isSawMachine101 && !j.materialLotId){toast('İşe başlamadan önce yönetici bu iş emrine ham madde LOT\'u atamalı (Kaynak Planla).','warn');return}
  // KMI-FIX (2026-09-25): bir operatör aynı anda en fazla 3 iş emrini birlikte
  // takip edebilir (fiziksel olarak 3'ten fazla makineyi aynı anda çalıştıramaz).
  const runningCount=myJobs().filter(x=>String(x.id)!==String(id)).filter(x=>{const xs=sess(x.id);return xs?.startedAt&&!xs?.finishedAt}).length;
