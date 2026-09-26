@@ -2588,11 +2588,29 @@ ead>
             e.preventDefault(); if(!currentUser||getEffectiveRole(currentUser)!=='ADMIN'){alert('Yönetici yetkisi gerekir.');return;}
             const id=Number(document.getElementById('employeeEditId').value); const selectedSkills=[...document.querySelectorAll('.employee-skill-check:checked')].map(x=>Number(x.value)); const selectedTasks=[...document.querySelectorAll('.employee-task-check:checked')].map(x=>Number(x.value)); const data={name:document.getElementById('employeeName').value.trim(),dept:document.getElementById('employeeDept').value.trim(),jobTitle:document.getElementById('employeeJobTitle').value.trim(),role:document.getElementById('employeeRole').value,pass:document.getElementById('employeePass').value||'123',phone:document.getElementById('employeePhone').value.trim(),email:document.getElementById('employeeEmail').value.trim(),skills:selectedSkills,tasks:selectedTasks};
             if(!data.name||!data.dept||!data.jobTitle)return;
-            if(id){const p=PERSONNEL_LIST.find(x=>x.id===id);if(p)Object.assign(p,data,{active:true});} else {const newId=PERSONNEL_LIST.reduce((m,p)=>Math.max(m,Number(p.id)||0),0)+1;PERSONNEL_LIST.push({id:newId,...data,active:true,absenceDays:0,puantajMultiplier:1,allowedTabs:getPersonAllowedTabs(data)});}
+            let savedPerson;
+            if(id){const p=PERSONNEL_LIST.find(x=>x.id===id);if(p){Object.assign(p,data,{active:true});savedPerson=p;}} else {const newId=PERSONNEL_LIST.reduce((m,p)=>Math.max(m,Number(p.id)||0),0)+1;savedPerson={id:newId,...data,active:true,absenceDays:0,puantajMultiplier:1,allowedTabs:getPersonAllowedTabs(data),_localCreatedAt:Date.now()};PERSONNEL_LIST.push(savedPerson);}
             saveStorage('PERSONNEL_LIST',PERSONNEL_LIST);populateLoginUserDropdown();refreshAllViews();closeEmployeeForm();
+            // KMI-FIX (2026-09-26): gerçek Supabase 'personnel' kaydına da yazılıyor - bkz. yukarıdaki
+            // kmiSupabasePersonnelUpsert tanımı, "kayıtlar kayboluyor" hatasının kök çözümü.
+            if(savedPerson && window.kmiSupabasePersonnelUpsert){
+                window.kmiSupabasePersonnelUpsert(savedPerson).then(dbId=>{
+                    if(dbId && !savedPerson.dbId){ savedPerson.dbId=String(dbId); savedPerson.uuid=String(dbId); saveStorage('PERSONNEL_LIST',PERSONNEL_LIST); }
+                });
+            }
         }
-        function toggleEmployeeActive(id){if(!currentUser||getEffectiveRole(currentUser)!=='ADMIN'){alert('Yönetici yetkisi gerekir.');return;}const p=PERSONNEL_LIST.find(x=>x.id===id);if(!p)return;p.active=p.active===false;saveStorage('PERSONNEL_LIST',PERSONNEL_LIST);populateLoginUserDropdown();refreshAllViews();}
-        function deleteEmployee(id){if(!currentUser||getEffectiveRole(currentUser)!=='ADMIN'){alert('Yönetici yetkisi gerekir.');return false;} if(Number(currentUser.id)===Number(id)){alert('Kendi yönetici hesabınızı silemezsiniz.');return false;} const p=PERSONNEL_LIST.find(x=>Number(x.id)===Number(id)); if(!p)return false; if(!confirm(p.name+' personelini kalıcı olarak silmek istediğinize emin misiniz? Eski beyan ve iş emri kayıtları korunacaktır.'))return false; PERSONNEL_LIST=PERSONNEL_LIST.filter(x=>Number(x.id)!==Number(id)); saveStorage('PERSONNEL_LIST',PERSONNEL_LIST); populateLoginUserDropdown(); refreshAllViews(); return true;}
+        function toggleEmployeeActive(id){if(!currentUser||getEffectiveRole(currentUser)!=='ADMIN'){alert('Yönetici yetkisi gerekir.');return;}const p=PERSONNEL_LIST.find(x=>x.id===id);if(!p)return;p.active=p.active===false;saveStorage('PERSONNEL_LIST',PERSONNEL_LIST);populateLoginUserDropdown();refreshAllViews();
+            // KMI-FIX (2026-09-26): aktif/pasif durumu Supabase'e de yazılmazsa bir sonraki v78
+            // senkronunda geri eski haline dönüyordu.
+            const dbId=p.dbId||p.uuid; if(dbId && window.kmiSupabasePersonnelSetActive) window.kmiSupabasePersonnelSetActive(dbId,p.active!==false);
+        }
+        function deleteEmployee(id){if(!currentUser||getEffectiveRole(currentUser)!=='ADMIN'){alert('Yönetici yetkisi gerekir.');return false;} if(Number(currentUser.id)===Number(id)){alert('Kendi yönetici hesabınızı silemezsiniz.');return false;} const p=PERSONNEL_LIST.find(x=>Number(x.id)===Number(id)); if(!p)return false; if(!confirm(p.name+' personelini kalıcı olarak silmek istediğinize emin misiniz? Eski beyan ve iş emri kayıtları korunacaktır.'))return false; const dbId=p.dbId||p.uuid; PERSONNEL_LIST=PERSONNEL_LIST.filter(x=>Number(x.id)!==Number(id)); saveStorage('PERSONNEL_LIST',PERSONNEL_LIST); populateLoginUserDropdown(); refreshAllViews();
+            // KMI-FIX (2026-09-26): "eski personeli siliyorum geri geliyor" - Supabase'deki gerçek
+            // kayıt aktif kaldığı sürece bir sonraki v78 bulut senkronu bu kişiyi otomatik olarak
+            // yeniden ekliyordu. Burada gerçek kayıt da pasife çekiliyor (geçmiş kayıtlar bozulmasın
+            // diye kalıcı silinmiyor, tıpkı yerel silmede olduğu gibi).
+            if(dbId && window.kmiSupabasePersonnelSetActive) window.kmiSupabasePersonnelSetActive(dbId,false);
+            return true;}
         function updatePersonalMultiplier(id,val){const p=PERSONNEL_LIST.find(x=>x.id===id);if(!p)return;const n=Number(val);p.puantajMultiplier=Number.isFinite(n)&&n>0?n:1;saveStorage('PERSONNEL_LIST',PERSONNEL_LIST);renderPuantajAdmin();renderLeaderboard();renderBonusAdminTable();}
 
         function updateUserPassword(id, newPass) {
@@ -4697,7 +4715,13 @@ function myAssignedOrdersBlock(){
  if(!mine.length)return '';
  return `<div class="bg-violet-950/25 border border-violet-700 rounded-xl p-4"><div class="flex items-center gap-2 mb-1"><i class="fa-solid fa-user-gear text-violet-300"></i><b class="text-white">Bana Atanan Bakım Emirleri (${mine.length})</b></div><p class="text-[10px] text-violet-300 mb-3">Bu kayıtlar özellikle sana atandı - ortak kuyruktaki diğer kayıtlardan önce bunları değerlendir.</p><div class="space-y-2">${mine.sort((a,b)=>new Date(a.openedAt)-new Date(b.openedAt)).map(orderRow).join('')}</div></div>`;
 }
-function workspace(){const shown=machines.filter(x=>x.active!==false&&(deptFilter==='ALL'||guessDepartment(x)===deptFilter));const deptTabs=['ALL',...DEPARTMENTS].map(d=>`<button type="button" class="v35-tab ${deptFilter===d?'active':''}" data-v35-deptfilter="${d}">${d==='ALL'?'Tümü':d} ${d==='ALL'?'':'('+machines.filter(x=>x.active!==false&&guessDepartment(x)===d).length+')'}</button>`).join('');return `<div class="space-y-4">${myAssignedOrdersBlock()}<div class="flex flex-wrap justify-between gap-3 items-center"><div><h3 class="text-lg font-black text-white">Makine Filosu · Dijital Sağlık Merkezi</h3><p class="text-[11px] text-slate-500">Arıza → bakım iş emri → DOWN/UP → çözüm → kalıcı makine geçmişi tek veri zinciri. Her makine bir departmana atanır (Üretim / Kalite / Bakım / Diğer) - örn. CMM, FotoCMM gibi Kalite makineleri.</p></div>${canAdmin()?'<button class="v35-btn bg-cyan-700" id="v35AddMachine">+ Yeni Makine</button>':''}</div><div class="flex flex-wrap gap-2">${deptTabs}</div><div class="grid grid-cols-2 md:grid-cols-4 gap-3"><div class="v35-kpi"><small class="text-slate-500">Toplam Makine</small><b class="block text-white text-xl">${machines.filter(x=>x.active!==false).length}</b></div><div class="v35-kpi"><small class="text-slate-500">DOWN</small><b class="block text-red-300 text-xl">${machines.filter(x=>x.status==='DOWN').length}</b></div><div class="v35-kpi"><small class="text-slate-500">Açık Bakım Emri</small><b class="block text-amber-300 text-xl">${orders.filter(x=>!['CLOSED','CANCELLED'].includes(x.status)).length}</b></div><div class="v35-kpi"><small class="text-slate-500">72s+ Açık</small><b class="block text-rose-300 text-xl">${orders.filter(x=>!['CLOSED','CANCELLED'].includes(x.status)&&(Date.now()-new Date(x.openedAt).getTime())>=72*3600000).length}</b></div></div>${typeof window.kmiMachineLeaderboardData==='function'?(()=>{const rows=window.kmiMachineLeaderboardData();return `<div class="rounded-2xl border border-cyan-900/50 bg-gradient-to-br from-slate-900 to-slate-950 p-3 shadow-xl"><div class="flex justify-between items-center mb-2"><b class="text-xs text-white"><i class="fa-solid fa-trophy text-amber-400 mr-1"></i>Makine Performans Sıralaması</b><span class="text-[9px] text-cyan-300">En iyi → en kötü</span></div><div class="grid grid-cols-1 md:grid-cols-2 gap-2">${rows.map((r,i)=>{const photo=(typeof kmiMachinePhoto==='function')?kmiMachinePhoto(r.code):'';return `<div class="flex items-center gap-2 bg-slate-950/70 border ${i===0?'border-amber-500':'border-slate-800'} rounded-lg p-2"><div class="text-base font-black w-6 text-center ${i===0?'text-amber-300':i===1?'text-slate-300':i===2?'text-orange-400':'text-slate-600'}">${i+1}</div><div class="w-8 h-8 rounded-lg overflow-hidden bg-slate-900 border border-slate-700 flex items-center justify-center shrink-0">${photo?`<img src="${photo}" class="w-full h-full object-cover" alt="">`:'<i class="fa-solid fa-industry text-xs text-slate-600"></i>'}</div><div class="flex-1 min-w-0"><b class="block text-[11px] text-white truncate">${esc(r.name)}</b><span class="text-[9px] ${r.down?'text-red-400':'text-slate-500'}">${r.down?'DOWN':'Sağlık '+r.h+'/100'}${r.oee!==null?' · OEE '+r.oee.toFixed(1)+'%':''}</span></div><div class="text-right"><b class="text-cyan-300 text-xs">${r.score}</b><small class="block text-slate-500">PUAN</small></div></div>`}).join('')||'<div class="text-[10px] text-slate-500 py-2">Henüz makine yok.</div>'}</div></div>`})():''}<div class="v35-fleet">${shown.map(card).join('')||'<div class="text-xs text-slate-500 p-4">Bu departmanda makine yok.</div>'}</div><div class="bg-slate-950/50 border border-slate-800 rounded-xl p-4"><div class="flex flex-wrap justify-between gap-2"><div><b class="text-white">Ortak Bakım İş Emri Kuyruğu</b><div class="text-[10px] text-cyan-300 mt-1">Açılan kayıt tüm aktif bakım personeline aynı anda düşer. İlk kapatan bakım personeli kaydı kendi adıyla mühürler.</div></div><span class="text-[10px] text-slate-500">24 saat içinde kapanırsa ×1,10 · 72 saat açık kalırsa ekstra yok</span></div><div class="space-y-2 mt-3">${orders.filter(x=>!['CLOSED','CANCELLED'].includes(x.status)).sort((a,b)=>new Date(a.openedAt)-new Date(b.openedAt)).map(orderRow).join('')||'<div class="text-xs text-slate-500">Açık bakım iş emri yok.</div>'}</div></div><div class="bg-slate-950/50 border border-slate-800 rounded-xl p-4"><b class="text-white">Son Kapatılan Bakım İş Emirleri</b><div class="space-y-2 mt-3">${orders.filter(x=>x.status==='CLOSED').sort((a,b)=>new Date(b.closedAt)-new Date(a.closedAt)).slice(0,12).map(closedQueueRow).join('')||'<div class="text-xs text-slate-500">Henüz kapanmış bakım emri yok.</div>'}</div></div></div>`}
+function workspace(){const shown=machines.filter(x=>x.active!==false&&(deptFilter==='ALL'||guessDepartment(x)===deptFilter));const deptTabs=['ALL',...DEPARTMENTS].map(d=>`<button type="button" class="v35-tab ${deptFilter===d?'active':''}" data-v35-deptfilter="${d}">${d==='ALL'?'Tümü':d} ${d==='ALL'?'':'('+machines.filter(x=>x.active!==false&&guessDepartment(x)===d).length+')'}</button>`).join('');return `<div class="space-y-4">${myAssignedOrdersBlock()}<div class="flex flex-wrap justify-between gap-3 items-center"><div><h3 class="text-lg font-black text-white">Makine Filosu · Dijital Sağlık Merkezi</h3><p class="text-[11px] text-slate-500">Arıza → bakım iş emri → DOWN/UP → çözüm → kalıcı makine geçmişi tek veri zinciri. Her makine bir departmana atanır (Üretim / Kalite / Bakım / Diğer) - örn. CMM, FotoCMM gibi Kalite makineleri.</p></div>${canAdmin()?'<button class="v35-btn bg-cyan-700" id="v35AddMachine">+ Yeni Makine</button>':''}</div><div class="flex flex-wrap gap-2">${deptTabs}</div><div class="grid grid-cols-2 md:grid-cols-4 gap-3"><div class="v35-kpi"><small class="text-slate-500">Toplam Makine</small><b class="block text-white text-xl">${machines.filter(x=>x.active!==false).length}</b></div><div class="v35-kpi"><small class="text-slate-500">DOWN</small><b class="block text-red-300 text-xl">${machines.filter(x=>x.status==='DOWN').length}</b></div><div class="v35-kpi"><small class="text-slate-500">Açık Bakım Emri</small><b class="block text-amber-300 text-xl">${orders.filter(x=>!['CLOSED','CANCELLED'].includes(x.status)).length}</b></div><div class="v35-kpi"><small class="text-slate-500">72s+ Açık</small><b class="block text-rose-300 text-xl">${orders.filter(x=>!['CLOSED','CANCELLED'].includes(x.status)&&(Date.now()-new Date(x.openedAt).getTime())>=72*3600000).length}</b></div></div>${(()=>{
+  // KMI-FIX (2026-09-26): Ender'in isteği - "makine kartları üstte, performans altta olacaktı".
+  // Makine Performans Sıralaması bloğu önceden makine kartlarından ÖNCE geliyordu; sıra değiştirildi.
+  const fleetHtml=`<div class="v35-fleet">${shown.map(card).join('')||'<div class="text-xs text-slate-500 p-4">Bu departmanda makine yok.</div>'}</div>`;
+  const leaderboardHtml=typeof window.kmiMachineLeaderboardData==='function'?(()=>{const rows=window.kmiMachineLeaderboardData();return `<div class="rounded-2xl border border-cyan-900/50 bg-gradient-to-br from-slate-900 to-slate-950 p-3 shadow-xl"><div class="flex justify-between items-center mb-2"><b class="text-xs text-white"><i class="fa-solid fa-trophy text-amber-400 mr-1"></i>Makine Performans Sıralaması</b><span class="text-[9px] text-cyan-300">En iyi → en kötü</span></div><div class="grid grid-cols-1 md:grid-cols-2 gap-2">${rows.map((r,i)=>{const photo=(typeof kmiMachinePhoto==='function')?kmiMachinePhoto(r.code):'';return `<div class="flex items-center gap-2 bg-slate-950/70 border ${i===0?'border-amber-500':'border-slate-800'} rounded-lg p-2"><div class="text-base font-black w-6 text-center ${i===0?'text-amber-300':i===1?'text-slate-300':i===2?'text-orange-400':'text-slate-600'}">${i+1}</div><div class="w-8 h-8 rounded-lg overflow-hidden bg-slate-900 border border-slate-700 flex items-center justify-center shrink-0">${photo?`<img src="${photo}" class="w-full h-full object-cover" alt="">`:'<i class="fa-solid fa-industry text-xs text-slate-600"></i>'}</div><div class="flex-1 min-w-0"><b class="block text-[11px] text-white truncate">${esc(r.name)}</b><span class="text-[9px] ${r.down?'text-red-400':'text-slate-500'}">${r.down?'DOWN':'Sağlık '+r.h+'/100'}${r.oee!==null?' · OEE '+r.oee.toFixed(1)+'%':''}</span></div><div class="text-right"><b class="text-cyan-300 text-xs">${r.score}</b><small class="block text-slate-500">PUAN</small></div></div>`}).join('')||'<div class="text-[10px] text-slate-500 py-2">Henüz makine yok.</div>'}</div></div>`})():'';
+  return fleetHtml+leaderboardHtml;
+})()}<div class="bg-slate-950/50 border border-slate-800 rounded-xl p-4"><div class="flex flex-wrap justify-between gap-2"><div><b class="text-white">Ortak Bakım İş Emri Kuyruğu</b><div class="text-[10px] text-cyan-300 mt-1">Açılan kayıt tüm aktif bakım personeline aynı anda düşer. İlk kapatan bakım personeli kaydı kendi adıyla mühürler.</div></div><span class="text-[10px] text-slate-500">24 saat içinde kapanırsa ×1,10 · 72 saat açık kalırsa ekstra yok</span></div><div class="space-y-2 mt-3">${orders.filter(x=>!['CLOSED','CANCELLED'].includes(x.status)).sort((a,b)=>new Date(a.openedAt)-new Date(b.openedAt)).map(orderRow).join('')||'<div class="text-xs text-slate-500">Açık bakım iş emri yok.</div>'}</div></div><div class="bg-slate-950/50 border border-slate-800 rounded-xl p-4"><b class="text-white">Son Kapatılan Bakım İş Emirleri</b><div class="space-y-2 mt-3">${orders.filter(x=>x.status==='CLOSED').sort((a,b)=>new Date(b.closedAt)-new Date(a.closedAt)).slice(0,12).map(closedQueueRow).join('')||'<div class="text-xs text-slate-500">Henüz kapanmış bakım emri yok.</div>'}</div></div></div>`}
 function orderRow(o){const m=machine(o.machineId),age=(Date.now()-new Date(o.openedAt).getTime())/3600000;const recipients=(o.sharedWithNames&&o.sharedWithNames.length?o.sharedWithNames:maintenanceRecipients().map(x=>x.name));
  // KMI-FIX (2026-09-25): Ender'in isteği - bakım emirleri de iş emirleri gibi belirli bir
  // bakım personeline ATANABİLSİN (sadece ortak kuyruk/ilk kapatan değil). Atanmışsa isim rozet
@@ -5159,7 +5183,7 @@ let activeV62=null;
 // KMI-FIX (2026-09-24): D.purchases (satınalma kayıtları) declarations ile aynı sebepten
 // cihazlar arası paylaşılmıyordu. save() tek merkezi nokta olduğu için buradan debounce'lu
 // best-effort push: legacy_purchases aynasına yazar, mevcut akışı asla bloklamaz/bozmaz.
-let __kmiPurchSyncTimer=null;
+var __kmiPurchSyncTimer=null; // KMI-FIX (2026-09-26): 'let' burada TDZ hatasına yol açıyordu - kmiPatchM3500V2/V3 IIFE'leri (yukarıda, script içinde daha önce çalışıyorlar) save()'i çağırıyor, save() de bu değişkene erişiyor; 'let' henüz initialize olmadığı için her sayfa açılışında "Cannot access '__kmiPurchSyncTimer' before initialization" hatası fırlıyordu. 'var' hoisting ile bu sorunu ortadan kaldırır.
 function kmiSyncRecentPurchases(){
     const client=window.kurutluSupabase; if(!client||!Array.isArray(D?.purchases)||!D.purchases.length) return;
     const cutoff=Date.now()-24*3600*1000;
@@ -5184,7 +5208,7 @@ function kmiSyncRecentPurchases(){
 // tarayıcının kendi localStorage'ında kalıyordu, cihazlar arası (operatör telefonu → yönetim
 // bilgisayarı) hiç paylaşılmıyordu. legacy_purchases ile birebir aynı desende ayrı bir
 // legacy_purchase_requests aynası eklendi.
-let __kmiReqSyncTimer=null;
+var __kmiReqSyncTimer=null; // KMI-FIX (2026-09-26): aynı TDZ sorunu - 'var' ile düzeltildi.
 function kmiSyncRecentPurchaseRequests(){
     const client=window.kurutluSupabase; if(!client||!Array.isArray(D?.purchaseRequests)||!D.purchaseRequests.length) return;
     const cutoff=Date.now()-30*24*3600*1000;
@@ -6144,7 +6168,14 @@ window.v78SyncPersonnelFromSupabase=async function(){
     // Gerçek personel tablosuyla eşleşmeyen (dbId/uuid alamayan) yerel
     // kayıtları pasif işaretliyoruz - geçmiş beyan/puantaj kayıtları bozulmasın
     // diye siliyor değil, aktif listelerden düşürüyoruz.
-    (PERSONNEL_LIST||[]).forEach(p=>{ if(!p.dbId && !p.uuid) p.active=false; });
+    // KMI-FIX (2026-09-26): yeni eklenen bir personelin Supabase kaydı (kmiSupabasePersonnelUpsert)
+    // henüz tamamlanmadan bu senkron araya girirse dbId/uuid hâlâ boş olabiliyordu - böyle bir kayıt
+    // burada yanlışlıkla pasife alınmasın diye 2 dakikadan yeni oluşturulanlar bu kuraldan muaf.
+    (PERSONNEL_LIST||[]).forEach(p=>{
+        if(p.dbId || p.uuid) return;
+        const justCreated = p._localCreatedAt && (Date.now()-Number(p._localCreatedAt) < 120000);
+        if(!justCreated) p.active=false;
+    });
     // KMI-FIX (2026-09-25): Fatma Çetin gerçek personel kaydı sadece Supabase senkronundan
     // sonra PERSONNEL_LIST'e geliyor - sayfa yüklenirken çalışan ilk etiketleme denemesi onu
     // bulamıyordu. Burada, gerçek roster her senkronize olduğunda tekrar kontrol ediyoruz.
@@ -6179,6 +6210,52 @@ window.addEventListener('kurutlu:supabase-identity',()=>{
   // V79: first screen/login is painted first; personnel directory refresh runs quietly afterwards.
   v79PersonnelSyncTimer=setTimeout(()=>window.v78SyncPersonnelFromSupabase(),3500);
 });
+// KMI-FIX (2026-09-26): Ender'in bildirdiği kritik hata - "personel dosyalarına kayıt yapıyorum
+// bu kayıtlar gidiyor, eski personeli siliyorum geri geliyor". Kök sebep: bu ekrandaki
+// Personel Ekle/Düzenle/Sil işlemleri SADECE bu tarayıcının localStorage'ındaki PERSONNEL_LIST'e
+// yazıyordu; gerçek/otoriter kayıt yukarıdaki v78SyncPersonnelFromSupabase'in okuduğu Supabase
+// 'personnel' tablosu. Bu yüzden: (1) yeni eklenen personelin Supabase karşılığı (dbId/uuid) hiç
+// olmadığından bir sonraki v78 senkronunda "eşleşmeyen kayıt" sayılıp otomatik pasife alınıyordu
+// (bkz. yukarıda "if(!p.dbId && !p.uuid) p.active=false"), (2) silinen personel Supabase'de hâlâ
+// aktif kaldığı için bir sonraki v78 senkronunda otomatik yeniden ekleniyordu. Çözüm: artık bu
+// işlemler gerçek 'personnel' tablosuna da (best-effort, RLS is_management() ile) yazıyor.
+async function kmiSupabaseDeptId(client,name){
+  try{
+    const norm=String(name||'').trim(); if(!norm) return null;
+    const {data:existing}=await client.from('departments').select('id,name').ilike('name',norm).limit(1);
+    if(existing && existing.length) return existing[0].id;
+    const code=norm.toLocaleUpperCase('tr-TR').replace(/[^A-ZÇĞİÖŞÜ0-9]+/g,'_').slice(0,20)||'DEPT';
+    const {data:created,error}=await client.from('departments').insert({name:norm,code}).select('id').single();
+    if(error){ console.warn('[KMI Supabase departman ekleme]',error.message); return null; }
+    return created?.id||null;
+  }catch(e){ console.warn('[KMI Supabase departman]',e); return null; }
+}
+window.kmiSupabasePersonnelUpsert=async function(p){
+  try{
+    const client=window.kurutluSupabase; if(!client||!p) return null;
+    const parts=String(p.name||'').trim().split(/\s+/).filter(Boolean);
+    const first_name=parts[0]||p.name||'Personel', last_name=parts.slice(1).join(' ')||'';
+    const department_id=p.dept?await kmiSupabaseDeptId(client,p.dept):null;
+    const payload={first_name,last_name,job_title:p.jobTitle||null,email:p.email||null,phone:p.phone||null,active:p.active!==false,department_id};
+    if(p.dbId||p.uuid){
+      const dbId=String(p.dbId||p.uuid);
+      const {error}=await client.from('personnel').update(payload).eq('id',dbId);
+      if(error){ console.warn('[KMI Supabase personel güncelleme]',error.message); return null; }
+      return dbId;
+    }
+    const {data,error}=await client.from('personnel').insert(payload).select('id').single();
+    if(error){ console.warn('[KMI Supabase personel ekleme]',error.message); return null; }
+    return data?.id||null;
+  }catch(e){ console.warn('[KMI Supabase personel senkron]',e); return null; }
+};
+window.kmiSupabasePersonnelSetActive=async function(dbId,active){
+  try{
+    const client=window.kurutluSupabase; if(!client||!dbId) return false;
+    const {error}=await client.from('personnel').update({active:!!active}).eq('id',String(dbId));
+    if(error){ console.warn('[KMI Supabase personel aktiflik]',error.message); return false; }
+    return true;
+  }catch(e){ console.warn('[KMI Supabase personel aktiflik]',e); return false; }
+};
 })();
 // ===== /V78 =====
 </script>
@@ -6299,7 +6376,29 @@ async function load(force=false){
 }
 function renderAll(){try{window.renderAdminJobOrders?.()}catch(e){};try{renderMuhasebeV98()}catch(e){};try{renderManagementV98()}catch(e){};try{renderShippingV98()}catch(e){}}
 function renderMuhasebeV98(){
- const tb=document.getElementById('muhasebePendingJobsTable');if(tb){const pending=S.quality.filter(q=>!accountingFor(q.id));tb.innerHTML=pending.map(q=>`<tr><td class="p-2.5 font-mono text-blue-400">${esc(String(q.id).slice(0,8))}</td><td class="p-2.5">${esc(woNo(q.work_order_id))}</td><td class="p-2.5">${Number(q.quantity||0)} Adet</td><td class="p-2.5">${q.approved_at?new Date(q.approved_at).toLocaleString('tr-TR'):'-'}</td><td class="p-2.5"><span class="bg-emerald-900/80 text-emerald-300 px-2 py-0.5 rounded text-[10px]">Kalite Onaylı</span></td><td class="p-2.5">-</td><td class="p-2.5"><button onclick="v98AccountingApprove('${q.id}')" class="bg-emerald-600 text-white px-2 py-1 rounded text-[10px] font-semibold">Muhasebe Onayı</button></td></tr>`).join('')||'<tr><td colspan="7" class="p-3 text-center text-slate-500">Muhasebe onayı bekleyen kalite onaylı ürün yok.</td></tr>'}
+ const tb=document.getElementById('muhasebePendingJobsTable');
+ if(tb){
+  const pending=S.quality.filter(q=>!accountingFor(q.id));
+  const dbRows=pending.map(q=>`<tr><td class="p-2.5 font-mono text-blue-400">${esc(String(q.id).slice(0,8))}</td><td class="p-2.5">${esc(woNo(q.work_order_id))}</td><td class="p-2.5">${Number(q.quantity||0)} Adet</td><td class="p-2.5">${q.approved_at?new Date(q.approved_at).toLocaleString('tr-TR'):'-'}</td><td class="p-2.5"><span class="bg-emerald-900/80 text-emerald-300 px-2 py-0.5 rounded text-[10px]">Kalite Onaylı</span></td><td class="p-2.5">-</td><td class="p-2.5"><button onclick="v98AccountingApprove('${q.id}')" class="bg-emerald-600 text-white px-2 py-1 rounded text-[10px] font-semibold">Muhasebe Onayı</button></td></tr>`).join('');
+  // KMI-FIX (2026-09-26): Ender'in bildirdiği hata - "muhasebe ekranına hiç veri düşmedi". Kök
+  // sebep: bu fonksiyon SADECE Supabase'deki quality_approved_output tablosuna bakıyordu, ama
+  // gerçek portal akışı (approveKalite -> declarations, "Hazır - Muhasebe Onayı Bekliyor") o
+  // tabloya hiç yazmıyor. Bu fonksiyon her tetiklendiğinde (approvals sekmesine tıklanınca,
+  // girişte, periyodik senkronda) v108'in az önce bastığı GERÇEK bekleyen kayıtları "Supabase'de
+  // kayıt yok" boş mesajıyla SİLİYORDU - iki ayrı render sistemi aynı tabloyu yarışarak eziyordu.
+  // Artık ikisi birleştiriliyor, biri diğerini silmiyor.
+  let portalRows='';
+  try{
+   const ds=(typeof declarations!=='undefined'&&Array.isArray(declarations))?declarations:(Array.isArray(window.declarations)?window.declarations:[]);
+   const jobs=(typeof jobOrders!=='undefined'&&Array.isArray(jobOrders))?jobOrders:(Array.isArray(window.jobOrders)?window.jobOrders:[]);
+   const localPending=ds.filter(d=>String(d?.status||'')==='Hazır - Muhasebe Onayı Bekliyor');
+   portalRows=localPending.map(d=>{
+    const jo=jobs.find(j=>String(j.id)===String(d.jobOrder));
+    return `<tr data-v108-local="1"><td class="p-2.5 font-mono text-blue-400">${esc(d.id)}</td><td class="p-2.5">${esc(jo?.item||d.jobOrder||'-')}<div class="text-[9px] text-slate-500">${esc(d.jobOrder||'-')}</div></td><td class="p-2.5">${Number(d.qualityGood??d.good??d.qty??0)} Adet</td><td class="p-2.5">${esc(d.qualityApprovalDate||d.date||'-')}</td><td class="p-2.5"><span class="bg-emerald-900/80 text-emerald-300 px-2 py-0.5 rounded text-[10px]">Kalite Onaylı</span></td><td class="p-2.5 text-cyan-300">${esc(d.approver||'-')}</td><td class="p-2.5"><button onclick="approveDeclarationByMuhasebe('${esc(d.id)}')" class="bg-emerald-600 hover:bg-emerald-500 text-white px-2 py-1 rounded text-[10px] font-semibold"><i class="fa-solid fa-check-double mr-1"></i>Muhasebe Onayı</button></td></tr>`;
+   }).join('');
+  }catch(e){console.warn('[V98 muhasebe portal merge]',e);}
+  tb.innerHTML=(dbRows+portalRows)||'<tr><td colspan="7" class="p-3 text-center text-slate-500">Muhasebe onayı bekleyen kalite onaylı ürün yok.</td></tr>';
+ }
  const db=document.getElementById('muhasebeTableBody');if(db)db.innerHTML=S.accounting.map(a=>`<tr><td class="p-2.5 font-mono">${esc(String(a.id).slice(0,8))}</td><td class="p-2.5">${a.approved_at?new Date(a.approved_at).toLocaleString('tr-TR'):'-'}</td><td class="p-2.5">-</td><td class="p-2.5">${esc(woNo(a.work_order_id))}</td><td class="p-2.5">-</td><td class="p-2.5">-</td><td class="p-2.5">-</td><td class="p-2.5 text-cyan-400">${esc(personName(a.approved_by))}<div class="text-[9px] text-amber-300">İrsaliye: ${esc(a.delivery_note_no)}</div></td><td class="p-2.5">-</td></tr>`).join('')||'<tr><td colspan="9" class="p-4 text-center text-slate-500">Supabase muhasebe onayı kaydı yok.</td></tr>';
 }
 function renderManagementV98(){const tb=document.getElementById('managementApprovalTableBody');if(!tb)return;const pending=S.accounting.filter(a=>!managementFor(a.id));tb.innerHTML=pending.map(a=>{const q=S.quality.find(x=>String(x.id)===String(a.quality_approved_output_id));return `<tr><td class="p-2 font-mono">${esc(String(a.id).slice(0,8))}<div class="text-[9px] text-slate-500">${esc(woNo(a.work_order_id))}</div></td><td class="p-2">${esc(woNo(a.work_order_id))}<div class="text-[9px] text-amber-300">İrsaliye: ${esc(a.delivery_note_no)} · Muhasebe: ${esc(personName(a.approved_by))}</div></td><td class="p-2">-</td><td class="p-2 font-bold">${Number(q?.quantity||0)}</td><td class="p-2"><span class="bg-blue-900/70 text-blue-300 px-2 py-0.5 rounded text-[10px]">Yönetim Onayı Bekliyor</span></td><td class="p-2"><button onclick="v98ManagementApprove('${a.id}')" class="bg-blue-600 hover:bg-blue-500 text-white px-2 py-1 rounded text-[10px] font-bold">Son Onay</button></td></tr>`}).join('')||'<tr><td colspan="6" class="p-4 text-center text-slate-500">Yönetim onayı bekleyen Supabase kaydı yok.</td></tr>'}
@@ -7021,11 +7120,47 @@ window.kmiDeleteJobOrderDoc=async function(jobId,attId,filePath){
     kmiRenderJobOrderDocs(jobId);
   }catch(e){alert('Silinemedi: '+(e?.message||String(e))+' (Bu işlem sadece yönetim rolüne açık olabilir.)');}
 };
+// KMI-FIX (2026-09-26): Ender'in bildirdiği kritik hata (#002 nolu iş emri) - bu buton sadece
+// bir event kaydedip "Onay kaydedildi" kutusu gösteriyordu ama GERÇEKTE hiçbir onay/durum
+// değişikliği yapmıyordu; iş emri hep "kalite onayı bekliyor" görünmeye devam ediyordu. Artık
+// bu buton, iş emrinin o anki gerçek bekleyen adımını bulup GERÇEK onay fonksiyonunu (Kalite/
+// Tesviye/Vibrasyon miktar girişi gerektirdiğinden ilgili ekrana yönlendirme; Muhasebe/Yönetim/
+// Sevkiyat için doğrudan gerçek onay) çağırıyor - kullanıcının rolü o adımı onaylamaya
+// yetmiyorsa da açıkça söylüyor, sahte başarı mesajı göstermiyor.
 window.kmiJobOrderScanApprove=function(id){
   const who=window.currentUser?.name||window.currentUser?.email||'Bilinmeyen';
   const role=(typeof getEffectiveRole==='function'&&window.currentUser)?getEffectiveRole(window.currentUser):(window.currentUser?.role||'-');
-  try{KMI.event('SCAN_APPROVE','JOB_ORDER',id,{label:`${who} (${role}) onayladı`,source:'PHONE_CAMERA/SCANNER'});}catch(e){}
-  alert('Onay kaydedildi: '+who+' ('+role+')');
+  try{KMI.event('SCAN_APPROVE','JOB_ORDER',id,{label:`${who} (${role}) onay ekranını açtı`,source:'PHONE_CAMERA/SCANNER'});}catch(e){}
+  const joList=(typeof jobOrders!=='undefined'&&Array.isArray(jobOrders))?jobOrders:(Array.isArray(window.jobOrders)?window.jobOrders:[]);
+  const j=joList.find(x=>String(x.id)===String(id));
+  if(!j){window.kmiToast('İş emri bulunamadı.','warn');return;}
+  const declList=(typeof declarations!=='undefined'&&Array.isArray(declarations))?declarations:(Array.isArray(window.declarations)?window.declarations:[]);
+  const ds=declList.filter(d=>String(d.jobOrder)===String(id));
+  const pending=ds.filter(d=>/Bekliyor/.test(String(d.status||''))).sort((a,b)=>new Date(b.updatedAt||b.shiftClosedAt||0)-new Date(a.updatedAt||a.shiftClosedAt||0))[0];
+  const status=pending?pending.status:j.status;
+  const closeFile=()=>document.getElementById('kmiJobOrderFile')?.remove();
+  if(!pending && !/Bekliyor/.test(String(j.status||''))){
+    window.kmiToast('Bu iş emrinde şu an onay bekleyen bir adım yok.','warn');
+    return;
+  }
+  if(status==='Kalite Bekliyor'||status==='Tesviye Bekliyor'||status==='Vibrasyon Bekliyor'){
+    window.kmiToast('Kalite/Tesviye/Vibrasyon onayı miktar ve ölçüm yöntemi girişi gerektirir - Kalite ekranından onaylayın.','warn');
+    closeFile(); try{switchTab('kalite');}catch(e){}
+    return;
+  }
+  if(status==='Hazır - Muhasebe Onayı Bekliyor' && pending){
+    if(!(isBurcuAccountingAuthority(window.currentUser)||getEffectiveRole(window.currentUser)==='ADMIN')){window.kmiToast('Bu adım Muhasebe yetkisi gerektiriyor - sizin rolünüz ('+role+') onaylayamaz.','warn');return;}
+    approveDeclarationByMuhasebe(pending.id); closeFile(); return;
+  }
+  if(status==='Yönetim Onayı Bekliyor'){
+    if(!canManagementApprove(window.currentUser)){window.kmiToast('Bu adım Yönetim onay yetkisi gerektiriyor - sizin rolünüz ('+role+') onaylayamaz.','warn');return;}
+    approveManagementRecord(pending?pending.id:j.id, pending?'declaration':'job'); closeFile(); return;
+  }
+  if(status==='Sevk Onayı Bekliyor' && pending){
+    if(!(getEffectiveRole(window.currentUser)==='ADMIN'||hasScreenAccess(window.currentUser,'sevkiyat'))){window.kmiToast('Bu adım Sevkiyat yetkisi gerektiriyor - sizin rolünüz ('+role+') onaylayamaz.','warn');return;}
+    approveShipment(pending.id); closeFile(); return;
+  }
+  window.kmiToast('Bu durum ('+(status||'-')+') için barkodla otomatik onay tanımlı değil.','warn');
 };
 window.kmiOpenLive=function(){document.getElementById('kmiLiveModal')?.remove();const st=core(),orders=st.orders||[],stock=st.stock||[],mov=st.movements||[];const open=orders.filter(o=>!['PAID','CANCELLED'].includes(o.status)).length,res=stock.reduce((a,x)=>a+Number(x.reserved||0),0),on=stock.reduce((a,x)=>a+Number(x.onHand||0),0),today=new Date().toISOString().slice(0,10),todayEv=KMI.events.filter(e=>e.at.slice(0,10)===today).length;const m=document.createElement('div');m.id='kmiLiveModal';m.className='fixed inset-0 z-[160] bg-[#07101f] p-5 overflow-y-auto';m.innerHTML=`<div class=\"max-w-7xl mx-auto\"><div class=\"flex justify-between items-start\"><div><div class=\"text-cyan-300 text-sm tracking-[.25em] font-black\">KURUTLU MANUFACTURING INTELLIGENCE</div><h1 class=\"text-4xl md:text-6xl font-black mt-2\">KURUTLU LIVE</h1><div class=\"text-slate-400\">Performance Center · Paperless Machining</div><div class=\"text-slate-500 italic text-sm\">Every movement measured. Every decision informed.</div></div><button onclick=\"this.closest('#kmiLiveModal').remove()\" class=\"bg-slate-800 px-4 py-2 rounded\">Kapat</button></div><div class=\"grid grid-cols-2 lg:grid-cols-4 gap-4 mt-8\">${[['AÇIK SİPARİŞ',open],['REZERVE',res+' ad'],['BİTMİŞ STOK',on+' ad'],['BUGÜN EVENT',todayEv]].map(x=>`<div class=\"bg-slate-900 border border-slate-700 rounded-2xl p-5\"><div class=\"text-xs text-slate-500\">${x[0]}</div><div class=\"text-4xl font-black text-cyan-300 mt-2\">${x[1]}</div></div>`).join('')}</div><div class=\"grid lg:grid-cols-2 gap-4 mt-4\"><div class=\"bg-slate-900 rounded-2xl p-5 border border-slate-700\"><h3 class=\"font-black text-xl\">LIVE FACTORY EVENTS</h3><div class=\"mt-3 space-y-2 text-sm\">${KMI.events.slice(0,12).map(e=>`<div class=\"border-b border-slate-800 pb-2\"><span class=\"text-cyan-300\">${new Date(e.at).toLocaleTimeString('tr-TR')}</span> · <b>${esc(e.type)}</b> · ${esc(e.data?.label||e.entityId)} <span class=\"text-slate-500\">${esc(e.user)}</span></div>`).join('')||'Henüz event yok.'}</div></div><div class=\"bg-slate-900 rounded-2xl p-5 border border-slate-700\"><h3 class=\"font-black text-xl\">ORDER FLOW</h3><div class=\"mt-3 space-y-2 text-sm\">${orders.slice(0,10).map(o=>`<button onclick=\"kmiOpenPassport('${esc(o.id)}')\" class=\"w-full text-left bg-slate-950 border border-slate-800 rounded p-3\"><b>${esc(o.customerPO||o.id)}</b><span class=\"float-right text-cyan-300\">${esc(o.status)}</span><div class=\"text-xs text-slate-500\">Termin ${esc(o.dueDate||'-')}</div></button>`).join('')||'Sipariş yok.'}</div></div></div></div>`;document.body.appendChild(m)};
 // Add Passport button without rewriting the canonical V118 renderer.
@@ -7308,7 +7443,17 @@ function renderProductionApprovals(){
    const jo=(window.jobOrders||[]).find(j=>String(j.id)===String(d.jobOrder));
    return `<tr data-v111-source="portal"><td class="p-2 font-mono text-blue-300">${esc(d.jobOrder||d.id)}<div class="text-[9px] text-slate-500">${esc(d.id||'')}</div></td><td class="p-2"><b>${esc(jo?.item||d.item||d.jobOrder||'-')}</b><div class="text-[9px] text-emerald-300">Kalite: ${esc(d.approver||'-')}</div><div class="text-[9px] text-amber-300">İrsaliye: ${esc(d.deliveryNoteNo||'-')} · Muhasebe: ${esc(d.accountingApprover||'-')}</div></td><td class="p-2">${esc(d.operator||'Üretim')}</td><td class="p-2 font-bold text-emerald-300">${Number(d.qualityGood??d.good??d.qty??0)}</td><td class="p-2"><span class="bg-blue-900/70 text-blue-300 px-2 py-1 rounded text-[10px]">Yönetim Onayı Bekliyor</span></td><td class="p-2"><button onclick="approveManagementRecord('${d.id}','declaration')" class="bg-blue-600 hover:bg-blue-500 text-white px-3 py-2 rounded text-[10px] font-bold"><i class="fa-solid fa-check mr-1"></i>Son Onay</button></td></tr>`;
  }).join('');
- tb.innerHTML=dbHtml+localHtml||'<tr><td colspan="6" class="p-4 text-center text-slate-500">Üretim tarafında yönetim onayı bekleyen kayıt yok.</td></tr>';
+ // KMI-FIX (2026-09-26): Ender'in bildirdiği hata - "iş emri onayları onay merkezine düşmüyor,
+ // iş emirlerinin altında gözüküyor ama onay merkezinde yok". Kök sebep: approveJobByMuhasebe()
+ // (iş emri seviyesinde, beyan/declaration OLMADAN Muhasebe onayı) job.status'u doğrudan
+ // 'Yönetim Onayı Bekliyor' yapıyor, ama bu ekran (v111) sadece declarations tablosuna bakıyordu -
+ // eski renderManagementApprovalQueue'daki "jobRows" mantığı bu yeni ekrana hiç taşınmamıştı.
+ const coveredJobIds=new Set([...localPending.map(d=>String(d.jobOrder||'')),...dbWoNos]);
+ const joList=(typeof jobOrders!=='undefined' && Array.isArray(jobOrders))?jobOrders:(Array.isArray(window.jobOrders)?window.jobOrders:[]);
+ const jobRows=joList.filter(j=>String(j?.status||'')==='Yönetim Onayı Bekliyor' && !coveredJobIds.has(String(j.id)));
+ const assignees=j=>(Array.isArray(j.assignedTo)?j.assignedTo:[]).map(id=>(window.PERSONNEL_LIST||[]).find(p=>Number(p.id)===Number(id)||String(p.dbId||p.uuid||'')===String(id))?.name).filter(Boolean).join(', ')||'-';
+ const jobHtml=jobRows.map(j=>`<tr data-v111-source="job"><td class="p-2 font-mono text-blue-300">${esc(j.id)}</td><td class="p-2"><b>${esc(j.item||j.id)}</b><div class="text-[9px] text-amber-300">Muhasebe: ${esc(j.accountingApprover||'-')}</div></td><td class="p-2">${esc(assignees(j))}</td><td class="p-2 font-bold text-emerald-300">${Number(j.completedQty||0)}</td><td class="p-2"><span class="bg-blue-900/70 text-blue-300 px-2 py-1 rounded text-[10px]">Yönetim Onayı Bekliyor</span></td><td class="p-2"><button onclick="approveManagementRecord('${esc(j.id)}','job')" class="bg-blue-600 hover:bg-blue-500 text-white px-3 py-2 rounded text-[10px] font-bold"><i class="fa-solid fa-check mr-1"></i>Son Onay</button></td></tr>`).join('');
+ tb.innerHTML=dbHtml+localHtml+jobHtml||'<tr><td colspan="6" class="p-4 text-center text-slate-500">Üretim tarafında yönetim onayı bekleyen kayıt yok.</td></tr>';
 }
 function centralizePO(){
  const panel=document.querySelector('[data-admin-module="approvals"]'); if(!panel)return;
