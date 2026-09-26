@@ -138,7 +138,15 @@ ead>
                 <p class="text-xs text-slate-400">Performance Center · Paperless Machining</p>
             </div>
             
-            <form onsubmit="handleLogin(event)" class="space-y-4 text-xs">
+            <!-- KMI-FIX (2026-09-26): Ender ile karar verildi - sahadaki personel (kişisel telefon
+                 veya ortak istasyon tableti) rozet/QR okutup 4 haneli PIN girerek girsin; ofis/yönetim
+                 bilgisayardan mevcut e-posta+şifre ile girmeye devam etsin. -->
+            <div class="grid grid-cols-2 gap-2 text-[11px] font-bold">
+                <button type="button" id="kmiLoginModeEmailBtn" onclick="kmiSetLoginMode('email')" class="py-2 rounded-lg bg-blue-700 text-white">E-posta ile Giriş</button>
+                <button type="button" id="kmiLoginModeBadgeBtn" onclick="kmiSetLoginMode('badge')" class="py-2 rounded-lg bg-slate-700 text-slate-300">Rozet ile Giriş</button>
+            </div>
+
+            <form id="kmiEmailLoginForm" onsubmit="handleLogin(event)" class="space-y-4 text-xs">
                 <div>
                     <label class="block text-slate-300 font-medium mb-1">E-posta</label>
                     <input type="email" id="v76LoginEmail" required style="pointer-events:auto;touch-action:manipulation;position:relative;z-index:2" autocomplete="username" value="enderkurutlu@gmail.com" class="w-full bg-slate-900 border border-slate-700 rounded p-2.5 text-white focus:outline-none focus:border-blue-500" placeholder="ad@kurutlu.com">
@@ -152,6 +160,45 @@ ead>
                     <i class="fa-solid fa-right-to-bracket mr-2"></i> Güvenli Giriş Yap
                 </button>
             </form>
+
+            <div id="kmiBadgeLoginPanel" class="hidden space-y-3 text-xs">
+                <div id="kmiBadgeStep1">
+                    <div id="kmiBadgeCameraBox" class="aspect-video bg-slate-950 border border-slate-700 rounded-xl flex items-center justify-center overflow-hidden">
+                        <div class="text-[11px] text-slate-500 text-center p-3">Kamera başlatılmadı</div>
+                    </div>
+                    <button type="button" onclick="kmiBadgeStartCamera()" class="mt-3 w-full bg-emerald-600 hover:bg-emerald-500 text-white p-2.5 rounded-lg font-bold">
+                        <i class="fa-solid fa-camera mr-2"></i>Kamerayı Aç & Rozeti Okut
+                    </button>
+                    <div class="my-2 text-center text-[10px] text-slate-500">veya rozet numaranı elle yaz</div>
+                    <div class="flex gap-2">
+                        <input id="kmiBadgeNoInput" inputmode="numeric" class="flex-1 bg-slate-900 border border-slate-700 rounded p-2.5 text-white" placeholder="Rozet / Personel No">
+                        <button type="button" onclick="kmiBadgeIdentify(document.getElementById('kmiBadgeNoInput').value)" class="bg-cyan-700 hover:bg-cyan-600 px-4 rounded-lg font-bold text-white">Devam</button>
+                    </div>
+                    <div id="kmiBadgeStep1Msg" class="text-[11px] min-h-[16px] mt-2 text-center"></div>
+                </div>
+                <div id="kmiBadgeStep2" class="hidden text-center space-y-3">
+                    <div>
+                        <div id="kmiBadgeGreeting" class="text-white font-bold text-sm">-</div>
+                        <button type="button" onclick="kmiBadgeReset()" class="text-[10px] text-slate-500 underline mt-1">Ben değilim, başka rozet okut</button>
+                    </div>
+                    <div id="kmiBadgePinDots" class="flex justify-center gap-3"></div>
+                    <div id="kmiBadgePinMsg" class="text-[11px] min-h-[16px]"></div>
+                    <div class="grid grid-cols-3 gap-2 max-w-[240px] mx-auto">
+                        <button type="button" onclick="kmiBadgePinPress('1')" class="bg-slate-900 border border-slate-700 hover:border-cyan-500 text-white text-lg font-bold py-3 rounded-lg">1</button>
+                        <button type="button" onclick="kmiBadgePinPress('2')" class="bg-slate-900 border border-slate-700 hover:border-cyan-500 text-white text-lg font-bold py-3 rounded-lg">2</button>
+                        <button type="button" onclick="kmiBadgePinPress('3')" class="bg-slate-900 border border-slate-700 hover:border-cyan-500 text-white text-lg font-bold py-3 rounded-lg">3</button>
+                        <button type="button" onclick="kmiBadgePinPress('4')" class="bg-slate-900 border border-slate-700 hover:border-cyan-500 text-white text-lg font-bold py-3 rounded-lg">4</button>
+                        <button type="button" onclick="kmiBadgePinPress('5')" class="bg-slate-900 border border-slate-700 hover:border-cyan-500 text-white text-lg font-bold py-3 rounded-lg">5</button>
+                        <button type="button" onclick="kmiBadgePinPress('6')" class="bg-slate-900 border border-slate-700 hover:border-cyan-500 text-white text-lg font-bold py-3 rounded-lg">6</button>
+                        <button type="button" onclick="kmiBadgePinPress('7')" class="bg-slate-900 border border-slate-700 hover:border-cyan-500 text-white text-lg font-bold py-3 rounded-lg">7</button>
+                        <button type="button" onclick="kmiBadgePinPress('8')" class="bg-slate-900 border border-slate-700 hover:border-cyan-500 text-white text-lg font-bold py-3 rounded-lg">8</button>
+                        <button type="button" onclick="kmiBadgePinPress('9')" class="bg-slate-900 border border-slate-700 hover:border-cyan-500 text-white text-lg font-bold py-3 rounded-lg">9</button>
+                        <button type="button" onclick="kmiBadgePinBackspace()" class="bg-slate-800 border border-slate-700 text-slate-300 text-sm font-bold py-3 rounded-lg"><i class="fa-solid fa-delete-left"></i></button>
+                        <button type="button" onclick="kmiBadgePinPress('0')" class="bg-slate-900 border border-slate-700 hover:border-cyan-500 text-white text-lg font-bold py-3 rounded-lg">0</button>
+                        <button type="button" onclick="kmiBadgeReset()" class="bg-slate-800 border border-slate-700 text-slate-300 text-[10px] font-bold py-3 rounded-lg">Vazgeç</button>
+                    </div>
+                </div>
+            </div>
 
             <div id="v75SupabaseStatus" class="bg-slate-950/70 p-3 rounded border border-slate-700 text-[11px] text-slate-400 flex items-center justify-between gap-3">
                 <div><div class="font-bold text-slate-300">Supabase · V108</div><div id="v75SupabaseStatusText">Bağlantı hazırlanıyor…</div></div>
@@ -688,6 +735,7 @@ ead>
                         <button class="admin-module-tile" data-module-button="costanalysis" onclick="openAdminModule('costanalysis')"><i class="fa-solid fa-chart-pie text-emerald-300 text-xl"></i><div class="font-bold text-white mt-3">Cost Analysis</div><div class="text-[10px] text-slate-500 mt-1">Maliyet · P&L · BEP · Nakit</div></button>
                         <button class="admin-module-tile" data-module-button="datamanagement" onclick="openAdminModule('datamanagement')"><i class="fa-solid fa-trash-can text-red-300 text-xl"></i><div class="font-bold text-white mt-3">Veri Yönetimi</div><div class="text-[10px] text-slate-500 mt-1">Kayıtları görüntüle · sil</div></button>
                         <button class="admin-module-tile" data-module-button="users" onclick="openAdminModule('users')"><i class="fa-solid fa-key text-orange-400 text-xl"></i><div class="font-bold text-white mt-3">Kullanıcı Ayarları</div><div class="text-[10px] text-slate-500 mt-1">Şifre ve roller</div></button>
+                        <button class="admin-module-tile" data-module-button="badgepin" onclick="openAdminModule('badgepin')"><i class="fa-solid fa-id-card-clip text-cyan-400 text-xl"></i><div class="font-bold text-white mt-3">Rozet / PIN Yönetimi</div><div class="text-[10px] text-slate-500 mt-1">Saha girişi için PIN + QR kart</div></button>
                         <button class="admin-module-tile" data-module-button="bonuslist" onclick="openAdminModule('bonuslist')"><i class="fa-solid fa-ranking-star text-pink-400 text-xl"></i><div class="font-bold text-white mt-3">Prim Listesi</div><div class="text-[10px] text-slate-500 mt-1">Personel puantaj dağılımı</div></button>
                         <button class="admin-module-tile" data-module-button="gantt" onclick="openAdminModule('gantt')"><i class="fa-solid fa-diagram-project text-cyan-400 text-xl"></i><div class="font-bold text-white mt-3">Kaynak Planlama · Gantt</div><div class="text-[10px] text-slate-500 mt-1">Makine + personel doluluk</div></button>
                     </div>
@@ -871,6 +919,35 @@ ead>
                                 </tr>
                             </thead>
                             <tbody id="userAdminTableBody" class="divide-y divide-slate-700">
+                                <!-- Populated by JS -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div data-admin-module="badgepin" class="admin-module-panel bg-slate-800 border border-slate-700 rounded-lg p-5 shadow-lg space-y-3">
+                    <h3 class="text-sm font-bold text-white border-b border-slate-700 pb-2"><i class="fa-solid fa-id-card-clip text-cyan-400 mr-2"></i>Rozet / PIN Yönetimi — Saha Girişi</h3>
+                    <p class="text-[11px] text-slate-400">Saha personeli telefonundan/tabletten rozet numarasını okutup 4 haneli PIN ile giriş yapar. Her personelin PIN'i burada tanımlanır veya sıfırlanır. Sicil numarası (rozet no) atanmamış personel listede görünür ama PIN tanımlanamaz — önce Personel ekranından sicil no girilmeli.</p>
+                    <div class="bg-slate-900/60 border border-slate-700 rounded-xl p-3 flex flex-wrap items-center justify-between gap-2">
+                        <div>
+                            <div class="text-xs font-bold text-white">Bu cihaz: <span id="kmiKioskStatusLabel">Normal</span></div>
+                            <div class="text-[10px] text-slate-500">Ortak tablet/kiosk olarak işaretlenen cihazlarda, rozetle giriş yapan personel işini bitirip "Çıkış Yap" dediğinde veya 60 saniye hareketsiz kaldığında otomatik çıkış yapılır — bir sonraki kişi kendi rozetini okutmak zorunda kalır. Kişisel telefon/ofis bilgisayarında bunu açmayın.</div>
+                        </div>
+                        <button onclick="kmiToggleKioskDevice()" id="kmiKioskToggleBtn" class="bg-slate-700 hover:bg-slate-600 text-white text-[11px] font-bold px-3 py-2 rounded-lg whitespace-nowrap">Bu Cihazı Kiosk Yap</button>
+                    </div>
+                    <div id="kmiBadgePinAdminMsg" class="text-[11px] min-h-[16px]"></div>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left text-xs text-slate-300">
+                            <thead class="bg-slate-900 text-slate-400 uppercase text-[10px]">
+                                <tr>
+                                    <th class="p-2">Sicil No</th>
+                                    <th class="p-2">Adı Soyadı</th>
+                                    <th class="p-2">Departman</th>
+                                    <th class="p-2">PIN Durumu</th>
+                                    <th class="p-2 text-right">Aksiyon</th>
+                                </tr>
+                            </thead>
+                            <tbody id="kmiBadgePinAdminTableBody" class="divide-y divide-slate-700">
                                 <!-- Populated by JS -->
                             </tbody>
                         </table>
@@ -1654,6 +1731,7 @@ ead>
             // bildirimleri hem burada hem her makinenin kendi dijital dosyasında (v35OpenMachine)
             // görünür, çünkü ikisi de aynı orders/journal verisini okuyor.
             if(name==='maintenance'){ try{ window.v35RenderAll&&window.v35RenderAll(); }catch(e){ console.warn('[V35 render]',e); } }
+            if(name==='badgepin'){ try{ window.kmiRenderBadgePinAdmin&&window.kmiRenderBadgePinAdmin(); }catch(e){ console.warn('[Rozet/PIN admin render]',e); } }
             const first=document.querySelector(`[data-admin-module="${name}"]`); if(first) setTimeout(()=>first.scrollIntoView({behavior:'smooth',block:'start'}),20);
         }
         function getManagedShift(person){return person?.shiftTeam==='TeamK1'?'1. Vardiya':person?.shiftTeam==='TeamK2'?'2. Vardiya':'';}
@@ -5141,7 +5219,7 @@ window.v68Tab=function(k){const b=document.getElementById('v68Body');if(!b)retur
 window.v68Expense=function(i){let x=i>=0?M.expenses[i]:{category:'Yeni',name:'',amount:0,behavior:'VARIABLE',nature:'OTHER',link:'Genel',driver:'ay',qty:1,unit:'ay',currency:'TRY'};let v=prompt('Gider kalemi adı:',x.name);if(v===null)return;x.name=v;v=prompt('Aylık tutar TL:',x.amount);if(v===null)return;x.amount=n(v);v=prompt('SABİT için FIXED, değişken için VARIABLE:',x.behavior);if(v===null)return;x.behavior=String(v).toUpperCase()==='FIXED'?'FIXED':'VARIABLE';v=prompt('Maliyet sınıfı (LABOR/TOOLING/ENERGY/FACILITY/MAINTENANCE/LOGISTICS/MATERIAL/ADMIN/OTHER):',x.nature);if(v===null)return;x.nature=String(v).toUpperCase();v=prompt('İlişki: Genel / Departman / Makine / Ürün / Operasyon / Müşteri / Proje:',x.link);if(v!==null)x.link=v;v=prompt('Cost driver (kWh, makine saati, kg, adet, sevkiyat vb.):',x.driver);if(v!==null)x.driver=v;if(i<0){x.id='E'+Date.now();M.expenses.push(x)}save();v68Tab('expense')};
 window.v68Finance=function(){let v=prompt('Net finansman geliri/gideri (+/- TL):',M.finance.financeNet);if(v!==null)M.finance.financeNet=n(v);v=prompt('Yönetim vergi karşılık oranı (örn 0.25):',M.finance.taxRate);if(v!==null)M.finance.taxRate=n(v);save();v68Tab('pnl')};
 window.v68Reset=function(){if(confirm('Cost Analysis verileri Excel V9 başlangıç bazına dönsün mü?')){M=structuredClone(seed);save();renderV68Cost()}};
-window.v68Print=function(){let w=open('','_blank'),el=document.getElementById('managementCostWorkspace');w.document.write(`<html><head><title>KURUTLU CNC V70 Cost Analysis</title><style>body{font-family:Arial;padding:24px;color:#111}button{display:none}table{width:100%;border-collapse:collapse}td,th{padding:6px;border-bottom:1px solid #ddd}</style></head><body><h1>KURUTLU CNC · Financial & Cost Intelligence</h1>${el.innerHTML}</body></html>`);w.document.close();setTimeout(()=>w.print(),200)};
+window.v68Print=function(){let w=open('','_blank'),el=document.getElementById('managementCostWorkspace');w.document.write(`<html><head><title>KURUTLU CNC V70 Cost Analysis</title><style>body{font-family:Arial;padding:24px;color:#111}button{display:none}table{width:100%;border-collapse:collapse}td,th{padding:6px;border-bottom:1px solid #ddd}</style></head><body><h1>KURUTLU CNC · Financial & Cost Intelligence</h1>${el.innerHTML}${(typeof kmiPrintStampBlockHtml==='function')?kmiPrintStampBlockHtml():''}</body></html>`);w.document.close();setTimeout(()=>w.print(),200)};
 const prev=window.openAdminModule;if(typeof prev==='function')window.openAdminModule=function(name){const r=prev.apply(this,arguments);if(name==='costanalysis')setTimeout(renderV68Cost,0);return r};
 })();
 </script>
@@ -5409,6 +5487,27 @@ window.addEventListener('kurutlu:supabase-identity',()=>{});
     if(!Array.isArray(state.roles) || !state.roles.length) throw new Error('Kullanıcıya portal rolü atanmış değil.');
     return result.data;
   };
+  // KMI-FIX (2026-09-26): Ender'in isteği - saha personeli rozet/QR + PIN ile giriş yapabilsin.
+  // badge-login Edge Function, doğru PIN girildiğinde tek kullanımlık bir "magiclink" OTP üretir;
+  // bu fonksiyon o OTP'yi gerçek bir Supabase oturumuna çevirir (v82SecureSignIn ile birebir aynı
+  // kimlik/rol doğrulama kapısından geçer, sadece giriş yöntemi farklı).
+  window.v82SecureSignInWithOtp=async function(email,otp){
+    if(!state.client) throw new Error('Supabase henüz hazır değil');
+    state.profile=null; state.roles=[]; state.permissions=[];
+    const __ts0=performance.now();
+    const result=await state.client.auth.verifyOtp({email,token:otp,type:'magiclink'});
+    const __ts1=performance.now();
+    if(result.error) throw result.error;
+    const session=result.data?.session||null;
+    if(!session?.user?.id) throw new Error('Supabase oturumu oluşturulamadı.');
+    state.session=session; state.user=session.user;
+    await loadIdentity(session);
+    const __ts2=performance.now();
+    window.__KMI_LOGIN_PERF={signInMs:Math.round(__ts1-__ts0),identityMs:Math.round(__ts2-__ts1)};
+    if(!state.profile || state.profile.active===false) throw new Error('Kullanıcı profili aktif değil.');
+    if(!Array.isArray(state.roles) || !state.roles.length) throw new Error('Kullanıcıya portal rolü atanmış değil.');
+    return result.data;
+  };
   window.v82SecureSignOut=async function(){
     state.profile=null; state.roles=[]; state.permissions=[]; state.user=null; state.session=null;
     try{localStorage.removeItem('kurutluV81VerifiedIdentity');}catch(e){}
@@ -5467,7 +5566,7 @@ window.v78SyncPersonnelFromSupabase=async function(){
   if(!client) return false;
   try{
     const [pr,dr]=await Promise.all([
-      client.from('personnel').select('id,department_id,first_name,last_name,job_title,email,phone,active,auth_user_id'),
+      client.from('personnel').select('id,department_id,first_name,last_name,job_title,email,phone,active,auth_user_id,employee_no,pin_hash'),
       client.from('departments').select('id,name')
     ]);
     if(pr.error) throw pr.error;
@@ -5490,6 +5589,9 @@ window.v78SyncPersonnelFromSupabase=async function(){
       p.dbId=String(r.id); p.uuid=String(r.id); p.authUserId=r.auth_user_id?String(r.auth_user_id):null;
       p.name=name; p.dept=deptMap.get(String(r.department_id))||p.dept||'';
       p.jobTitle=r.job_title||p.jobTitle||p.dept||'Personel'; p.email=r.email||p.email||''; p.phone=r.phone||p.phone||''; p.active=r.active!==false;
+      // KMI-FIX (2026-09-26): Rozet/PIN girişi employee_no üzerinden çalışıyor - Rozet/PIN
+      // Yönetimi ekranının kimin PIN'i olduğunu/olmadığını gösterebilmesi için senkronize ediliyor.
+      p.employeeNo=r.employee_no||p.employeeNo||''; p.pinSet=!!r.pin_hash;
     });
     // KMI-FIX (2026-09-25): GEÇKO/Supabase'de karşılığı olmayan eski/sahte
     // personel kayıtları Puantaj ve Zirvedekiler'de tutarsızlık yaratıyordu.
@@ -5801,6 +5903,227 @@ window.kmiProcessScan=function(raw){let code=String(raw||'').trim();if(!code)ret
  const jo=(Array.isArray(window.jobOrders)?window.jobOrders:[]).find(x=>String(x.id)===code);
  if(jo){KMI.event('SCAN','JOB_ORDER',jo.id,{label:code,source:'PHONE_CAMERA/SCANNER'});const r=document.getElementById('kmiScanResult');if(r)r.innerHTML='<span class=\"text-emerald-300 font-bold\">İş emri bulundu: '+esc(jo.id)+'</span>';setTimeout(()=>{document.getElementById('kmiScanModal')?.remove();kmiOpenJobOrderFile(jo.id)},250);return;}
  const orders=(window.V118_STATE?.orders)||[];let o=orders.find(x=>x.id===code||x.customerPO===code);if(!o){try{const st=JSON.parse(localStorage.getItem('kurutlu_v118_core')||'{}');o=(st.orders||[]).find(x=>x.id===code||x.customerPO===code)}catch(e){}}KMI.event('SCAN',o?'SALES_ORDER':'CODE',o?.id||code,{label:code,source:'PHONE_CAMERA/SCANNER'});const r=document.getElementById('kmiScanResult');if(o){if(r)r.innerHTML='<span class=\"text-emerald-300 font-bold\">Sipariş bulundu: '+esc(o.customerPO||o.id)+'</span>';setTimeout(()=>kmiOpenPassport(o.id),250)}else if(r)r.innerHTML='<span class=\"text-cyan-300\">Kod event olarak kaydedildi: '+esc(code)+'</span>'};
+// KMI-FIX (2026-09-26): Rozet/QR + PIN ile giriş (saha personeli için, Ender ile karar verildi).
+// badge-login Edge Function'ı çağırır: doğru PIN girilirse tek kullanımlık bir OTP döner, bu da
+// window.v82SecureSignInWithOtp ile gerçek bir Supabase oturumuna çevrilir (e-posta+şifre girişiyle
+// birebir aynı kimlik/rol doğrulama kapısından geçer).
+const KMI_BADGE_FN_URL='https://zvpggvvtjtfubqxktkyg.supabase.co/functions/v1/badge-login';
+const KMI_BADGE_ANON_KEY='sb_publishable_JejgFohuQswiZ3hdEnuw9A_6ahtIKX9';
+async function kmiBadgeCall(payload){
+ const res=await fetch(KMI_BADGE_FN_URL,{method:'POST',headers:{'Content-Type':'application/json','apikey':KMI_BADGE_ANON_KEY},body:JSON.stringify(payload)});
+ let data={}; try{data=await res.json();}catch(e){}
+ return {ok:res.ok,status:res.status,data};
+}
+let kmiBadgeStream=null,kmiBadgeScanTimer=null,kmiBadgePin='',kmiBadgeCurrentNo=null,kmiBadgeBusy=false;
+window.kmiSetLoginMode=function(mode){
+ const emailForm=document.getElementById('kmiEmailLoginForm'),badgePanel=document.getElementById('kmiBadgeLoginPanel');
+ const eb=document.getElementById('kmiLoginModeEmailBtn'),bb=document.getElementById('kmiLoginModeBadgeBtn');
+ if(mode==='badge'){emailForm.classList.add('hidden');badgePanel.classList.remove('hidden');eb.className='py-2 rounded-lg bg-slate-700 text-slate-300';bb.className='py-2 rounded-lg bg-blue-700 text-white';}
+ else{badgePanel.classList.add('hidden');emailForm.classList.remove('hidden');bb.className='py-2 rounded-lg bg-slate-700 text-slate-300';eb.className='py-2 rounded-lg bg-blue-700 text-white';kmiBadgeStopCamera();}
+};
+window.kmiBadgeStopCamera=function(){try{if(kmiBadgeScanTimer)clearInterval(kmiBadgeScanTimer);kmiBadgeScanTimer=null;if(kmiBadgeStream)kmiBadgeStream.getTracks().forEach(t=>t.stop());kmiBadgeStream=null;}catch(e){}};
+window.kmiBadgeStartCamera=async function(){
+ const box=document.getElementById('kmiBadgeCameraBox');
+ if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia){box.innerHTML='<div class="p-3 text-amber-300 text-[11px]">Bu bağlantıda kamera kullanılamıyor. Rozet numaranı aşağıya yazabilirsin.</div>';return;}
+ try{
+  kmiBadgeStream=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:'environment'}},audio:false});
+  box.innerHTML='<video id="kmiBadgeVideo" autoplay playsinline class="w-full h-full object-cover"></video>';
+  document.getElementById('kmiBadgeVideo').srcObject=kmiBadgeStream;
+  if('BarcodeDetector' in window){
+   const det=new BarcodeDetector({formats:['qr_code','code_128','ean_13','ean_8','data_matrix']});
+   kmiBadgeScanTimer=setInterval(async()=>{
+    try{const v=document.getElementById('kmiBadgeVideo');if(!v)return;const a=await det.detect(v);
+     if(a[0]?.rawValue){kmiBadgeStopCamera();kmiBadgeIdentify(a[0].rawValue);}
+    }catch(e){}
+   },500);
+  } else {
+   box.insertAdjacentHTML('afterend','<div class="text-[10px] text-amber-300 mt-1">Bu tarayıcı otomatik kod algılamayı desteklemiyor. Rozet numaranı aşağıya yazabilirsin.</div>');
+  }
+ }catch(e){box.innerHTML='<div class="p-3 text-red-300 text-[11px]">Kamera açılamadı: '+String(e.message||e)+'</div>';}
+};
+window.kmiBadgeIdentify=async function(raw){
+ let code=String(raw||'').trim(); if(!code||kmiBadgeBusy)return;
+ try{const u=new URL(code);const p=u.searchParams.get('badge')||u.searchParams.get('scan');if(p)code=p.trim();}catch(e){}
+ kmiBadgeBusy=true;
+ const msg=document.getElementById('kmiBadgeStep1Msg');
+ const setMsg=(text,isError)=>{ if(msg){ msg.className='text-[11px] min-h-[16px] mt-2 text-center '+(isError?'text-red-300 font-bold':'text-slate-400'); msg.textContent=text||''; } };
+ setMsg('Doğrulanıyor…',false);
+ try{
+  const r=await kmiBadgeCall({action:'status',employeeNo:code});
+  if(!r.ok){
+   setMsg(r.data?.error==='not_found'?'Bu rozet/personel numarası sistemde bulunamadı.':'Rozet doğrulanamadı, tekrar deneyin.',true);
+   return;
+  }
+  if(r.data.active===false){setMsg('Bu personel kaydı pasif görünüyor. Yöneticinize başvurun.',true);return;}
+  if(!r.data.pinSet){setMsg(r.data.name+' için henüz PIN tanımlanmamış. Yöneticinizden Rozet/PIN Yönetimi ekranından PIN tanımlamasını isteyin.',true);return;}
+  kmiBadgeCurrentNo=code; kmiBadgePin='';
+  setMsg('',false);
+  document.getElementById('kmiBadgeGreeting').textContent='Merhaba, '+r.data.name;
+  document.getElementById('kmiBadgePinMsg').textContent='';
+  kmiBadgeRenderPin();
+  document.getElementById('kmiBadgeStep1').classList.add('hidden');
+  document.getElementById('kmiBadgeStep2').classList.remove('hidden');
+ }catch(e){
+  console.error('[KMI badge identify]',e);
+  setMsg('Sunucuya ulaşılamadı, internet bağlantınızı kontrol edip tekrar deneyin.',true);
+ } finally { kmiBadgeBusy=false; }
+};
+window.kmiBadgeReset=function(){
+ kmiBadgeCurrentNo=null; kmiBadgePin='';
+ document.getElementById('kmiBadgeStep2').classList.add('hidden');
+ document.getElementById('kmiBadgeStep1').classList.remove('hidden');
+ const input=document.getElementById('kmiBadgeNoInput'); if(input)input.value='';
+ const msg=document.getElementById('kmiBadgeStep1Msg'); if(msg){msg.textContent='';}
+};
+function kmiBadgeRenderPin(){
+ const el=document.getElementById('kmiBadgePinDots'); if(!el)return;
+ el.innerHTML=[0,1,2,3].map(i=>`<span class="w-4 h-4 rounded-full border-2 ${i<kmiBadgePin.length?'bg-cyan-400 border-cyan-400':'border-slate-600'}"></span>`).join('');
+}
+window.kmiBadgePinPress=function(d){
+ if(kmiBadgeBusy||kmiBadgePin.length>=4)return;
+ kmiBadgePin+=d; kmiBadgeRenderPin();
+ if(kmiBadgePin.length===4) kmiBadgeSubmitPin();
+};
+window.kmiBadgePinBackspace=function(){ if(kmiBadgeBusy)return; kmiBadgePin=kmiBadgePin.slice(0,-1); kmiBadgeRenderPin(); };
+window.kmiBadgeSubmitPin=async function(){
+ if(!kmiBadgeCurrentNo||kmiBadgeBusy)return;
+ kmiBadgeBusy=true;
+ const msg=document.getElementById('kmiBadgePinMsg'); if(msg){msg.className='text-[11px] min-h-[16px] text-slate-400';msg.textContent='Doğrulanıyor…';}
+ try{
+  const r=await kmiBadgeCall({action:'login',employeeNo:kmiBadgeCurrentNo,pin:kmiBadgePin});
+  if(!r.ok){
+   kmiBadgePin=''; kmiBadgeRenderPin();
+   if(msg){
+    msg.className='text-[11px] min-h-[16px] text-red-300 font-bold';
+    if(r.data?.error==='wrong_pin')msg.textContent='Yanlış PIN. Kalan deneme: '+(r.data.attemptsLeft??'-');
+    else if(r.data?.error==='locked')msg.textContent='Çok fazla yanlış deneme. Bir süre kilitli, yöneticinize başvurun.';
+    else if(r.data?.error==='pin_not_set')msg.textContent='PIN tanımlanmamış. Yöneticinize başvurun.';
+    else msg.textContent='Giriş yapılamadı, tekrar deneyin.';
+   }
+   return;
+  }
+  const {email,otp}=r.data;
+  const main=document.getElementById('mainSystem'),login=document.getElementById('loginScreen');
+  const t0=performance.now();
+  await window.v82SecureSignInWithOtp(email,otp);
+  if(!window.v77EnterPortalFromSession()) throw new Error('Doğrulanmış kullanıcı profili/rolü olmadan portal açılamaz.');
+  console.info('[KMI badge login] portal açıldı',Math.round(performance.now()-t0),'ms');
+  setTimeout(()=>{
+   try{ initToolRows(); }catch(e){}
+   try{ const gb=document.getElementById('globalBonusBudgetInput'); if(gb) gb.value=globalBonusBudget; }catch(e){}
+   try{ populateLoginUserDropdown(); }catch(e){}
+   (async()=>{ try{ await window.kmiPullJobOrdersFromCloud?.(); }catch(e){} try{ window.kmiRunPendingScan?.(); }catch(e){} })();
+   if(!window.__kmiJobPullInterval){ window.__kmiJobPullInterval=setInterval(()=>{ try{ window.kmiPullJobOrdersFromCloud?.(); }catch(e){} }, 45000); }
+   try{ kmiKioskArm(); }catch(e){ console.warn('[Kiosk arm]',e); }
+  },0);
+ }catch(e){
+  console.error('[KMI badge login]',e);
+  if(msg){msg.className='text-[11px] min-h-[16px] text-red-300 font-bold';msg.textContent='Giriş başarısız: '+(e?.message||'tekrar deneyin.');}
+  kmiBadgePin=''; kmiBadgeRenderPin();
+ } finally { kmiBadgeBusy=false; }
+};
+// KMI-FIX (2026-09-26): Ender'in isteği - saha personeli rozet/QR + PIN ile giriş yapabilsin.
+// set_pin Edge Function aksiyonu ADMIN/MANAGEMENT rolü ister; bu yüzden çağrı geçerli bir
+// Supabase Auth oturum token'ı ile (Authorization: Bearer ...) yapılmalı. kmiBadgeCall'ın
+// aksine burada apikey yeterli değil - kimlik doğrulanmış çağrı.
+window.kmiBadgeAdminCall=async function(payload){
+ const sess=await window.kurutluSupabase?.auth?.getSession();
+ const token=sess?.data?.session?.access_token;
+ if(!token) throw new Error('Oturum bulunamadı, lütfen tekrar giriş yapın.');
+ const res=await fetch(KMI_BADGE_FN_URL,{method:'POST',headers:{'Content-Type':'application/json','apikey':KMI_BADGE_ANON_KEY,'Authorization':'Bearer '+token},body:JSON.stringify(payload)});
+ let data={}; try{data=await res.json();}catch(e){}
+ return {ok:res.ok,status:res.status,data};
+};
+// KMI-FIX (2026-09-26): Ender'in kararı - ortak kiosk/tabletlerde rozetle giriş yapan
+// personel işini bitirince (veya 60sn hareketsiz kalınca) otomatik çıkış yapılsın, bir
+// sonraki kişi hesabı devralmasın. Kişisel telefon/ofis bilgisayarında bu davranış YOK -
+// cihaz bazlı bir localStorage bayrağıyla (kmiKioskDevice) kontrol ediliyor.
+const KMI_KIOSK_KEY='kmiKioskDevice';
+let kmiKioskIdleTimer=null;
+window.kmiIsKioskDevice=function(){ try{return localStorage.getItem(KMI_KIOSK_KEY)==='1';}catch(e){return false;} };
+window.kmiToggleKioskDevice=function(){
+ try{
+  const now=window.kmiIsKioskDevice();
+  localStorage.setItem(KMI_KIOSK_KEY, now?'0':'1');
+ }catch(e){}
+ kmiRenderKioskStatus();
+};
+window.kmiRenderKioskStatus=function(){
+ const lbl=document.getElementById('kmiKioskStatusLabel'), btn=document.getElementById('kmiKioskToggleBtn');
+ const on=window.kmiIsKioskDevice();
+ if(lbl){lbl.textContent=on?'Kiosk (paylaşılan)':'Normal'; lbl.className=on?'text-amber-300 font-bold':'text-slate-300';}
+ if(btn){btn.textContent=on?'Kiosk İşaretini Kaldır':'Bu Cihazı Kiosk Yap';}
+};
+window.kmiKioskArm=function(){
+ if(!window.kmiIsKioskDevice()) return;
+ document.getElementById('kmiKioskFinishBtn')?.remove();
+ const b=document.createElement('button');
+ b.id='kmiKioskFinishBtn';
+ b.className='fixed bottom-4 right-4 z-[160] bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-sm px-5 py-3 rounded-full shadow-lg';
+ b.innerHTML='<i class="fa-solid fa-check mr-2"></i>İşimi Bitirdim · Çıkış Yap';
+ b.onclick=kmiKioskFinish;
+ document.body.appendChild(b);
+ const resetIdle=()=>{ if(kmiKioskIdleTimer) clearTimeout(kmiKioskIdleTimer); kmiKioskIdleTimer=setTimeout(kmiKioskFinish,60000); };
+ ['click','touchstart','keydown'].forEach(ev=>document.addEventListener(ev,resetIdle,{passive:true}));
+ window.__kmiKioskResetIdle=resetIdle;
+ resetIdle();
+};
+window.kmiKioskFinish=function(){
+ document.getElementById('kmiKioskFinishBtn')?.remove();
+ if(kmiKioskIdleTimer){clearTimeout(kmiKioskIdleTimer);kmiKioskIdleTimer=null;}
+ if(window.__kmiKioskResetIdle){ ['click','touchstart','keydown'].forEach(ev=>document.removeEventListener(ev,window.__kmiKioskResetIdle)); window.__kmiKioskResetIdle=null; }
+ try{ window.handleLogout ? window.handleLogout() : handleLogout(); }catch(e){ console.warn('[Kiosk finish]',e); }
+};
+window.kmiRenderBadgePinAdmin=function(){
+ kmiRenderKioskStatus();
+ const body=document.getElementById('kmiBadgePinAdminTableBody'); if(!body)return;
+ const people=(PERSONNEL_LIST||[]).filter(p=>p.active!==false).sort((a,b)=>String(a.name).localeCompare(String(b.name),'tr'));
+ body.innerHTML=people.map(p=>{
+  const no=p.employeeNo||'';
+  const statusHtml=!no?'<span class="text-slate-500">Sicil no yok</span>':(p.pinSet?'<span class="text-emerald-400 font-bold">PIN tanımlı</span>':'<span class="text-amber-300">PIN yok</span>');
+  const actionHtml=!no?'<span class="text-[10px] text-slate-500">Önce sicil no atanmalı</span>':`<button onclick="kmiOpenSetPinModal('${esc(no)}','${esc(p.name||'')}')" class="bg-cyan-700 hover:bg-cyan-600 text-white text-[10px] font-bold px-3 py-1.5 rounded">${p.pinSet?'PIN Sıfırla':'PIN Belirle'}</button>`;
+  return `<tr><td class="p-2 font-mono">${esc(no||'-')}</td><td class="p-2">${esc(p.name||'-')}</td><td class="p-2">${esc(p.dept||'-')}</td><td class="p-2">${statusHtml}</td><td class="p-2 text-right">${actionHtml}</td></tr>`;
+ }).join('')||'<tr><td colspan="5" class="p-3 text-center text-slate-500">Aktif personel bulunamadı.</td></tr>';
+};
+window.kmiOpenSetPinModal=function(employeeNo,name){
+ document.getElementById('kmiSetPinModal')?.remove();
+ const m=document.createElement('div');
+ m.id='kmiSetPinModal'; m.className='fixed inset-0 z-[150] bg-slate-950/80 flex items-center justify-center p-4';
+ m.innerHTML=`<div class="bg-slate-800 border border-cyan-700 rounded-2xl p-5 w-full max-w-sm">
+   <div class="flex justify-between items-center mb-3"><h3 class="text-sm font-bold text-white">PIN Belirle/Sıfırla</h3><button onclick="document.getElementById('kmiSetPinModal').remove()" class="text-slate-400 hover:text-white">✕</button></div>
+   <div class="text-xs text-slate-400 mb-3">${esc(name)} (Sicil: ${esc(employeeNo)})</div>
+   <label class="block text-[11px] text-slate-400 mb-1">Yeni 4 haneli PIN</label>
+   <input id="kmiSetPinInput1" type="password" inputmode="numeric" maxlength="4" class="w-full bg-slate-900 border border-slate-700 rounded p-2.5 text-white mb-2 tracking-[6px] text-center" placeholder="••••">
+   <label class="block text-[11px] text-slate-400 mb-1">PIN (tekrar)</label>
+   <input id="kmiSetPinInput2" type="password" inputmode="numeric" maxlength="4" class="w-full bg-slate-900 border border-slate-700 rounded p-2.5 text-white mb-3 tracking-[6px] text-center" placeholder="••••">
+   <div id="kmiSetPinModalMsg" class="text-[11px] min-h-[16px] text-red-300 font-bold mb-2"></div>
+   <button onclick="kmiSubmitSetPin('${esc(employeeNo)}')" class="w-full bg-cyan-700 hover:bg-cyan-600 text-white font-bold py-2.5 rounded-lg">Kaydet</button>
+ </div>`;
+ document.body.appendChild(m);
+ document.getElementById('kmiSetPinInput1')?.focus();
+};
+window.kmiSubmitSetPin=async function(employeeNo){
+ const p1=document.getElementById('kmiSetPinInput1')?.value||'',p2=document.getElementById('kmiSetPinInput2')?.value||'';
+ const msg=document.getElementById('kmiSetPinModalMsg');
+ const setMsg=t=>{if(msg)msg.textContent=t||'';};
+ if(!/^\d{4}$/.test(p1)){setMsg('PIN tam olarak 4 haneli rakam olmalı.');return;}
+ if(p1!==p2){setMsg('İki PIN girişi birbirini tutmuyor.');return;}
+ setMsg('Kaydediliyor…');
+ try{
+  const r=await kmiBadgeAdminCall({action:'set_pin',employeeNo,pin:p1});
+  if(!r.ok){
+   setMsg(r.data?.error==='forbidden'?'Bu işlem için yönetici/yönetim yetkisi gerekiyor.':r.data?.error==='not_found'?'Bu sicil numarasıyla personel bulunamadı.':'Kaydedilemedi, tekrar deneyin.');
+   return;
+  }
+  document.getElementById('kmiSetPinModal')?.remove();
+  const bar=document.getElementById('kmiBadgePinAdminMsg'); if(bar){bar.className='text-[11px] min-h-[16px] text-emerald-400 font-bold';bar.textContent='✓ PIN kaydedildi.';setTimeout(()=>{bar.textContent='';},4000);}
+  try{ await window.v78SyncPersonnelFromSupabase?.(); }catch(e){}
+  window.kmiRenderBadgePinAdmin();
+ }catch(e){
+  console.error('[KMI set pin]',e);
+  setMsg('Sunucuya ulaşılamadı, internet bağlantınızı kontrol edip tekrar deneyin.');
+ }
+};
 function core(){try{return JSON.parse(localStorage.getItem('kurutlu_v118_core')||'{}')}catch(e){return {}}}
 window.kmiOpenPassport=function(id){const st=core(),o=(st.orders||[]).find(x=>x.id===id);if(!o)return alert('Sipariş bulunamadı.');document.getElementById('kmiPassport')?.remove();const ev=KMI.events.filter(e=>e.entityId===id),mov=(st.movements||[]).filter(x=>x.ref===id),inv=(st.invoices||[]).filter(x=>x.orderId===id);const m=document.createElement('div');m.id='kmiPassport';m.className='fixed inset-0 z-[145] bg-slate-950/90 p-3 overflow-y-auto';m.innerHTML=`<div class=\"max-w-6xl mx-auto bg-slate-800 border border-cyan-700 rounded-2xl p-5\"><div class=\"flex flex-wrap justify-between gap-3\"><div><div class=\"text-[10px] text-cyan-300 font-black\">DIGITAL ORDER PASSPORT</div><h2 class=\"text-2xl font-black\">${esc(o.customerPO||o.id)}</h2><div class=\"text-xs text-slate-400\">${esc(o.id)} · Termin ${esc(o.dueDate||'-')} · ${esc(o.status)}</div></div><div class=\"flex gap-2\"><button onclick=\"kmiPrintOrderQR('${esc(o.id)}')\" class=\"bg-white text-slate-900 px-3 py-2 rounded font-bold\"><i class=\"fa-solid fa-qrcode mr-1\"></i>QR</button><button onclick=\"this.closest('#kmiPassport').remove()\" class=\"bg-slate-700 px-3 py-2 rounded\">Kapat</button></div></div><div class=\"grid md:grid-cols-3 gap-3 mt-5\"><div class=\"bg-slate-900 rounded p-3\"><b>Üretim / Stok</b><div class=\"text-xs text-slate-400 mt-2\">${(o.lines||[]).map(l=>`Ürün ${esc(l.productId)} · ${l.qty} ad · R:${l.reserved||0} · S:${l.shipped||0}`).join('<br>')}</div></div><div class=\"bg-slate-900 rounded p-3\"><b>Hareketler</b><div class=\"text-xs text-slate-400 mt-2\">${mov.slice(0,8).map(x=>`${esc(x.type)} · ${x.qty}`).join('<br>')||'Yok'}</div></div><div class=\"bg-slate-900 rounded p-3\"><b>Finans</b><div class=\"text-xs text-slate-400 mt-2\">${inv.map(x=>`${esc(x.id)} · ${x.amount} ${esc(x.currency)} · ${esc(x.status)}`).join('<br>')||'Fatura yok'}</div></div></div><div class=\"mt-4 bg-slate-900 rounded p-3\"><b>Canlı Event Timeline</b><div class=\"mt-2 space-y-1 text-xs\">${ev.map(e=>`<div class=\"border-l-2 border-cyan-600 pl-2\">${new Date(e.at).toLocaleString('tr-TR')} · <b>${esc(e.type)}</b> · ${esc(e.user)} · ${esc(e.data?.label||'')}</div>`).join('')||'<span class=\"text-slate-500\">Henüz event yok.</span>'}</div></div><div class=\"mt-4 border border-dashed border-slate-600 rounded p-3\"><b>Sipariş Görsel / Belge Hafızası</b><p class=\"text-[10px] text-slate-500\">V119.2.4 LOGIN-SAFE FLOOR NAV yerel pilot: fotoğraf metadata event'i tutulur. Supabase Storage aşamasında gerçek dosyalar siparişe kalıcı bağlanacak.</p><input id=\"kmiMediaInput\" type=\"file\" accept=\"image/*,.pdf\" multiple class=\"mt-2 text-xs\"><button onclick=\"kmiAttachMedia('${esc(id)}')\" class=\"ml-2 bg-cyan-700 px-3 py-1 rounded text-xs\">Siparişe Bağla</button><div class=\"mt-2 text-xs text-slate-400\">${KMI.media.filter(x=>x.orderId===id).map(x=>esc(x.name)+' · '+new Date(x.at).toLocaleString('tr-TR')).join('<br>')||'Bağlı görsel/belge yok.'}</div></div></div>`;document.body.appendChild(m)};
 window.kmiAttachMedia=function(id){const fs=[...(document.getElementById('kmiMediaInput')?.files||[])];if(!fs.length)return;fs.forEach(f=>{KMI.media.unshift({id:'MED-'+Date.now().toString(36),orderId:id,name:f.name,type:f.type,size:f.size,at:new Date().toISOString(),by:window.currentUser?.name||'-'});KMI.event('MEDIA_ATTACHED','SALES_ORDER',id,{label:f.name,source:'PHONE/FILE'})});save(P,KMI.media);kmiOpenPassport(id)};
@@ -6790,7 +7113,7 @@ function pseudoQR(text,size=29){
 window.kmiPrintOrderQR=function(id){
  const st=window.V118_STATE||{},o=(st.orders||[]).find(x=>String(x.id)===String(id)),label=o?.customerPO||id;
  const w=window.open('','_blank','width=760,height=900');if(!w){notify('Tarayıcı çıktı penceresini engelledi','warn');return}
- w.document.write(`<html><head><title>${E(label)} · KMI Passport</title><style>@page{size:A4;margin:14mm}body{font-family:Arial;color:#0f172a;margin:0}.head{border-bottom:3px solid #0891b2;padding-bottom:14px}.brand{letter-spacing:3px;font-size:12px;font-weight:800;color:#0891b2}h1{font-size:30px;margin:8px 0}.grid{display:grid;grid-template-columns:1fr 260px;gap:30px;margin-top:28px}.card{border:1px solid #cbd5e1;border-radius:14px;padding:18px}.muted{color:#64748b;font-size:12px}.foot{margin-top:35px;border-top:1px solid #cbd5e1;padding-top:10px;font-size:10px;color:#64748b}</style></head><body><div class="head" style="display:flex;align-items:center;gap:14px"><img src="${window.KMI_K_LOGO_DATAURI||''}" style="height:48px;width:auto"><div><div class="brand">KURUTLU MANUFACTURING INTELLIGENCE</div><h1 style="margin:4px 0 0">DIGITAL ORDER PASSPORT</h1><div>${E(label)}</div></div></div><div class="grid"><div class="card"><b>Sipariş</b><h2>${E(label)}</h2><p>Termin: ${E(o?.dueDate||'-')}</p><p>Durum: ${E(o?.status||'-')}</p><p class="muted">KMI ID: ${E(id)}</p><p class="muted">Bu belge KMI içindeki sipariş pasaportuna yönlendiren üretim kimliğidir.</p></div><div>${pseudoQR(String(id))}</div></div><div class="foot">Performance Center · Paperless Machining · Every movement measured. Every decision informed.</div></body></html>`);
+ w.document.write(`<html><head><title>${E(label)} · KMI Passport</title><style>@page{size:A4;margin:14mm}body{font-family:Arial;color:#0f172a;margin:0}.head{border-bottom:3px solid #0891b2;padding-bottom:14px}.brand{letter-spacing:3px;font-size:12px;font-weight:800;color:#0891b2}h1{font-size:30px;margin:8px 0}.grid{display:grid;grid-template-columns:1fr 260px;gap:30px;margin-top:28px}.card{border:1px solid #cbd5e1;border-radius:14px;padding:18px}.muted{color:#64748b;font-size:12px}.foot{margin-top:35px;border-top:1px solid #cbd5e1;padding-top:10px;font-size:10px;color:#64748b}</style></head><body><div class="head" style="display:flex;align-items:center;gap:14px"><img src="${window.KMI_K_LOGO_DATAURI||''}" style="height:48px;width:auto"><div><div class="brand">KURUTLU MANUFACTURING INTELLIGENCE</div><h1 style="margin:4px 0 0">DIGITAL ORDER PASSPORT</h1><div>${E(label)}</div></div></div><div class="grid"><div class="card"><b>Sipariş</b><h2>${E(label)}</h2><p>Termin: ${E(o?.dueDate||'-')}</p><p>Durum: ${E(o?.status||'-')}</p><p class="muted">KMI ID: ${E(id)}</p><p class="muted">Bu belge KMI içindeki sipariş pasaportuna yönlendiren üretim kimliğidir.</p></div><div>${pseudoQR(String(id))}</div></div><div class="foot">Performance Center · Paperless Machining · Every movement measured. Every decision informed.</div>${(typeof kmiPrintStampBlockHtml==='function')?kmiPrintStampBlockHtml():''}</body></html>`);
  w.document.close();setTimeout(()=>w.print(),250);
 };
 
