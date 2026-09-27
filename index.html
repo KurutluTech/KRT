@@ -10135,8 +10135,35 @@ function taskState(t){
  return {key:'OPEN',label:'Açık',cls:'border-slate-600 text-slate-300'}
 }
 function event(type,t,data={}){try{window.KMI?.event?.(type,'TASK',t.id,{...data,source:'TASK_FLOW'})}catch(e){}}
+// KMI-FIX (2026-09-27): Ender'in isteği - bir görev, kendi hatası olmayan bir bekleme
+// (ör. birinden bilgi/onay bekleme) sonunda tekrar DEVAM ettiğinde, bekleme süresi kişinin
+// aleyhine "gecikme" olarak sayılmasın - görevin süre sayacı sıfırdan yeniden başlasın.
+// Bu yüzden: bekleme bitip görev yeniden ACTIVE olduğunda başlama zamanı "şimdi"ye alınır
+// ve (planlanan süre tanımlıysa) yeni termin = şimdi + planlanan süre olarak yeniden kurulur.
+// TEK kaynak burada - hem manuel "DEVAM" butonu hem "Bekleniyor" görevine verilen otomatik
+// cevap sonrası devam bunu kullanır.
+function kmiResetTaskClockOnResume(t){
+ const oldDueAt=t.dueAt||null;
+ t.startedAt=now();
+ if(Number(t.plannedMinutes||0)>0){
+  t.dueAt=new Date(Date.now()+Number(t.plannedMinutes)*60000).toISOString();
+ }
+ t.feedback=t.feedback||[];
+ t.feedback.push({at:now(),type:'CLOCK_RESET',text:'Bekleme sona erdi, görev süresi sıfırdan yeniden başladı.'+(oldDueAt&&t.dueAt&&oldDueAt!==t.dueAt?` (Eski termin: ${new Date(oldDueAt).toLocaleString('tr-TR')} → Yeni termin: ${new Date(t.dueAt).toLocaleString('tr-TR')})`:'')});
+}
+window.kmiResetTaskClockOnResume=kmiResetTaskClockOnResume;
+// KMI-CT-FIX (2026-09-28): Ender'in "Department Responsibility" test paketinde bulunan
+// gerçek hata - id sadece Date.now() bazlıydı; aynı milisaniye içinde art arda oluşturulan
+// iki görev (ör. bir görev + onun "bilgi bekleniyor" görevi) AYNI id'yi alabiliyordu, bu da
+// a.find(x=>x.id===id) çağrısında YANLIŞ görevin bulunup bozulmasına yol açardı. Sabit bir
+// sayaç + rastgele ek ile aynı milisaniyede bile benzersizlik garanti ediliyor.
+let __kmiTaskIdSeq=0;
+function kmiGenTaskId(){
+ __kmiTaskIdSeq=(__kmiTaskIdSeq+1)%46656; // 36^3
+ return 'TASK-'+new Date().getFullYear()+'-'+Date.now().toString(36).toUpperCase()+'-'+__kmiTaskIdSeq.toString(36).toUpperCase().padStart(3,'0')+Math.random().toString(36).slice(2,4).toUpperCase();
+}
 window.kmiTaskCreate=function(data){
- const a=tasks(),id='TASK-'+new Date().getFullYear()+'-'+Date.now().toString(36).toUpperCase();
+ const a=tasks(),id=kmiGenTaskId();
  const t={id,title:String(data.title||'').trim(),description:String(data.description||'').trim(),assigneeId:Number(data.assigneeId),createdBy:cur()?.name||'Yönetici',
  priority:data.priority||'NORMAL',plannedMinutes:Number(data.plannedMinutes||0),startAt:data.startAt||'',dueAt:data.dueAt||'',
  approvalRequired:!!data.approvalRequired,evidenceRequired:!!data.evidenceRequired,links:data.links||{},status:'OPEN',
@@ -10148,7 +10175,7 @@ window.kmiTaskAction=function(id,action,payload={}){
  const a=tasks(),t=a.find(x=>x.id===id);if(!t)return;
  if(action==='START'){t.status='ACTIVE';t.startedAt=t.startedAt||now();event('TASK_STARTED',t)}
  if(action==='WAIT'){t.status='WAITING';t.waiting={since:now(),type:payload.type||'KİŞİ',name:payload.name||'',reason:payload.reason||'',expectedAt:payload.expectedAt||'',personId:payload.personId||null,supplierId:payload.supplierId||null,linkedTaskId:payload.linkedTaskId||null};event('TASK_WAITING',t,t.waiting)}
- if(action==='RESUME'){t.status='ACTIVE';if(t.waiting){t.feedback.push({at:now(),type:'WAIT_RESOLVED',text:`Bekleme tamamlandı: ${t.waiting.name||t.waiting.reason}`});t.waiting=null}event('TASK_RESUMED',t)}
+ if(action==='RESUME'){t.status='ACTIVE';if(t.waiting){t.feedback.push({at:now(),type:'WAIT_RESOLVED',text:`Bekleme tamamlandı: ${t.waiting.name||t.waiting.reason}`});t.waiting=null;kmiResetTaskClockOnResume(t)}event('TASK_RESUMED',t)}
  if(action==='COMPLETE'){
    if(t.evidenceRequired && !(t.feedback||[]).some(f=>f.fileName||f.photo)) {window.kmiToast?.('Bu görev kanıt gerektiriyor. Önce belge/fotoğraf ekleyin.','warn');return}
    // KMI-FIX (2026-09-25): Ender'in isteği - görevi tamamlayan kişi, görev oluşturulurken
@@ -10190,6 +10217,7 @@ window.kmiTaskFeedback=function(id,text,file){
    orig.feedback.push({at:now(),by:f.by,type:'WAIT_ANSWERED',text:(f.text||'(dosya eklendi)')+(f.fileName?' · Ek: '+f.fileName:''),fileName:f.fileName,fileType:f.fileType,fileSize:f.fileSize});
    if(orig.status==='WAITING'&&orig.waiting&&orig.waiting.linkedTaskId===t.id){
     orig.status='ACTIVE';orig.waiting=null;
+    kmiResetTaskClockOnResume(orig);
     event('TASK_RESUMED',orig,{reason:'WAIT_ANSWERED',answeredBy:f.by});
    }
   }
@@ -12198,6 +12226,17 @@ window.kmiPC = {
     if(target<=0) return {status:'CANNOT_CALCULATE', reason:'Toplam hedef sıfır'};
     return {status:'OK', value:Number((done/target*100).toFixed(1)), n:jobs.length, target:target, done:done};
   },
+  // KMI-CT-FIX (2026-09-27): Drilldown için - planGerceklesme() İLE AYNI filtreyi kullanarak
+  // (yeni bir hesap İCAT ETMEDEN) o hesaba giren gerçek iş emirlerinin listesini döner.
+  planGerceklesmeJobs: function(range){
+    range=range||{}; const from=range.from?new Date(range.from):null, to=range.to?new Date(range.to):null;
+    return pJobs().filter(function(j){
+      if(!j.dueAt && !j.startedAt) return false;
+      const at=new Date(j.dueAt||j.startedAt); if(isNaN(at)) return false;
+      if(from&&at<from) return false; if(to&&at>to) return false;
+      return j.targetType==='production' && Number(j.targetQty)>0;
+    }).map(function(j){ return {id:j.id, item:j.item||j.productId||'', machine:j.machine||'-', completedQty:Number(j.completedQty||0), targetQty:Number(j.targetQty||0), status:j.status||''}; });
+  },
   // Darboğazın işsiz kalma riski (constraint starvation) - gerçek kuyruk derinliğinden.
   darbogazRiski: function(){
     const jobs=pJobs().filter(j=>!j.deleted && ['Açık','Üretimde'].includes(String(j.status||'')));
@@ -12276,12 +12315,15 @@ window.kmiRenderProductionIntel=function(){
   const risk=window.kmiPC.darbogazRiski();
   function box(label,inner){ return '<div class="bg-slate-900/70 border border-slate-700 rounded-xl p-3 mb-3"><div class="text-[10px] text-slate-500 uppercase mb-1">'+esc(label)+'</div>'+inner+'</div>'; }
   const planHtml = plan.status==='OK'
-    ? '<div class="text-2xl font-black text-emerald-300">%'+plan.value+'</div><div class="text-[10px] text-slate-500">'+plan.done+' / '+plan.target+' adet · '+plan.n+' iş emri</div>'
+    ? '<div class="text-2xl font-black text-emerald-300">%'+plan.value+'</div><div class="text-[10px] text-slate-500">'+plan.done+' / '+plan.target+' adet · '+plan.n+' iş emri</div><button id="kmiPIPlanDrill" class="mt-2 text-[10px] font-bold text-cyan-400 hover:text-cyan-300">İş Emirleri →</button>'
     : '<div class="text-lg font-black text-slate-500">'+window.trLabel('cannot_calculate')+'</div><div class="text-[10px] text-slate-500">'+esc(plan.reason)+'</div>';
   let riskHtml;
   if(risk.status!=='OK'){ riskHtml='<div class="text-[10px] text-slate-500">'+esc(risk.reason)+'</div>'; }
   else if(!risk.rows.length || !risk.riskyCount){ riskHtml='<div class="text-[10px] text-slate-500">Şu an '+window.trLabel('constraint_starvation')+' taşıyan makine yok.</div>'; }
-  else{ riskHtml=risk.rows.filter(r=>r.risk).map(r=>'<div class="bg-amber-950/30 border border-amber-800 rounded p-2 mb-1 text-xs"><b>'+esc(r.machine)+'</b> · '+esc(r.reason)+'</div>').join(''); }
+  // KMI-CT-FIX (2026-09-27): Ender'in "drilldown'lar tıklanabilir olsun" isteği - makine adı
+  // artık gerçek Makine Pasaportuna (V35, window.v35OpenMachine) açılıyor, yeni bir ekran
+  // İCAT EDİLMEDİ.
+  else{ riskHtml=risk.rows.filter(r=>r.risk).map(r=>'<button data-ct-machine="'+esc(r.machine)+'" class="w-full text-left bg-amber-950/30 hover:bg-amber-900/40 border border-amber-800 rounded p-2 mb-1 text-xs"><b class="underline decoration-dotted">'+esc(r.machine)+'</b> · '+esc(r.reason)+'</button>').join(''); }
   el.innerHTML =
     box('Plan Gerçekleşme (bugün)', planHtml) +
     box('Darboğaz / İşsiz Kalma Riski', riskHtml) +
@@ -12295,6 +12337,24 @@ window.kmiRenderProductionIntel=function(){
     out.innerHTML = r.ready
       ? '<span class="text-emerald-400 font-bold">Üretime hazır.</span>'
       : '<div class="text-rose-400 font-bold mb-1">Üretime hazır değil. Eksik:</div>'+r.missing.map(m=>'<div>· '+esc(m)+'</div>').join('');
+  };
+  el.querySelectorAll('[data-ct-machine]').forEach(function(b){
+    b.onclick=function(){ try{ if(typeof window.v35OpenMachine==='function') window.v35OpenMachine(b.getAttribute('data-ct-machine')); }catch(e){} };
+  });
+  const drillBtn=document.getElementById('kmiPIPlanDrill');
+  if(drillBtn) drillBtn.onclick=function(){
+    const jobs=window.kmiPC.planGerceklesmeJobs({from:today.toISOString()});
+    const old=document.getElementById('kmiPIPlanDrillModal'); if(old) old.remove();
+    const m=document.createElement('div'); m.id='kmiPIPlanDrillModal'; m.className='fixed inset-0 z-[280] bg-black/70 flex items-start justify-center overflow-y-auto py-10';
+    m.innerHTML='<div class="w-full max-w-lg mx-auto bg-slate-950 border border-slate-700 rounded-2xl p-4">'+
+      '<div class="flex justify-between items-center mb-3"><b class="text-white">Plan Gerçekleşme · İş Emirleri</b><button onclick="document.getElementById(\'kmiPIPlanDrillModal\').remove()" class="text-slate-400">✕</button></div>'+
+      '<div class="space-y-1 max-h-[60vh] overflow-y-auto">'+jobs.map(function(j){
+        return '<button data-ct-job="'+esc(j.id)+'" class="w-full text-left bg-slate-900 hover:bg-slate-800 border border-slate-800 rounded-lg p-2 text-xs flex justify-between"><span><b>'+esc(j.id)+'</b> · '+esc(j.item)+' · '+esc(j.machine)+'</span><span>'+j.completedQty+'/'+j.targetQty+'</span></button>';
+      }).join('')+'</div></div>';
+    document.body.appendChild(m);
+    m.querySelectorAll('[data-ct-job]').forEach(function(b){
+      b.onclick=function(){ try{ window.kmiOpenJobOrderFile?.(b.getAttribute('data-ct-job')); }catch(e){} };
+    });
   };
 };
 window.kmiOpenProductionIntel=function(){
@@ -12819,6 +12879,653 @@ window.KMI_CALC.kmiPR = {
     lastPrices: (typeof lastPrices71==='function') ? lastPrices71 : undefined,
     statusText: (typeof v73StatusText==='function') ? v73StatusText : undefined,
     canReceive: (typeof v73CanReceive==='function') ? v73CanReceive : undefined
+};
+})();
+</script>
+
+<script id="kmi-ct-v1-control-tower-foundation">
+(function(){
+'use strict';
+// ============================================================================
+// KMI CONTROL TOWER — FAZ 1: TEMEL (FOUNDATION)  [2026-09-27]
+// Ender'in "KMI MASTER LIVE CONTROL TOWER" direktifi, madde 112 (IMPLEMENTATION
+// ORDER) uyarınca yalnız FAZ 1 kapsamı: Permissions, Navigation, Shared
+// Components, KPI Dictionary, Target Engine, Calculation Service Interfaces,
+// Common Filters, Status System, Action Integration, AI Context.
+//
+// Departman dashboard'larının GERÇEK KPI içeriği (Faz 2: Genel Müdür/Üretim/
+// Kalite, Faz 3+: diğerleri) bu blokta YOK - "asla uydurma" ilkesi gereği bu
+// aşamada sahte/demo KPI kartı üretilmedi. Bu katman, VAR OLAN window.KMI_AUTH
+// (yetki) ve window.KMI_CALC (hesaplama federasyonu) üzerine ince bir katman
+// olarak kurulmuştur - hiçbiri yeniden yazılmadı, paralel bir sistem AÇILMADI.
+// ============================================================================
+
+function ctUser(u){
+  try{
+    const raw = u || window.currentUser || (typeof currentUser!=='undefined'&&currentUser) || null;
+    if(!raw) return null;
+    // KMI-CT-FIX: window.currentUser genelde sadece {id,name} taşır - gerçek rol/departman
+    // PERSONNEL_LIST'te. Diğer facade'ler (kmiTaskFloor'daki cur(), currentPerson() vb.) gibi
+    // burada da tam personel kaydına bakılıyor; bulunamazsa ham nesneye düşülüyor.
+    const list=(typeof PERSONNEL_LIST!=='undefined'&&Array.isArray(PERSONNEL_LIST))?PERSONNEL_LIST:(Array.isArray(window.PERSONNEL_LIST)?window.PERSONNEL_LIST:[]);
+    const found=list.find(function(p){return Number(p.id)===Number(raw.id||raw.personId||raw.personnelId);})||list.find(function(p){return String(p.name||'')===String(raw.name||'')&&raw.name;});
+    return found || raw;
+  }catch(e){ return window.currentUser||null; }
+}
+function ctScreen(u,tab){ try{ return typeof hasScreenAccess==='function' && hasScreenAccess(u,tab); }catch(e){ return false; } }
+function ctMgmt(u){ try{ return !!(window.KMI_AUTH && window.KMI_AUTH.can(u,'MANAGEMENT')); }catch(e){ return false; } }
+function ctAdmin(u){ try{ return !!(window.KMI_AUTH && window.KMI_AUTH.can(u,'ADMIN')); }catch(e){ return false; } }
+
+// ---------------------------------------------------------------------------
+// 1) YETKİ (PERMISSIONS) — window.KMI_AUTH.can() üzerine controltower.* adlı
+//    kanonik yetkiler eklendi (sarmalama - mevcut can() DEĞİŞTİRİLMEDİ).
+//
+//    DÜRÜSTLÜK NOTU (Faz 1 sınırı): KMI'de şu an "Üretim Müdürü / Satınalma
+//    Müdürü / Depo Müdürü / Takım Sorumlusu / İK Müdürü / BT Direktörü" gibi
+//    AYRI, departmana özel yönetici ROLLERİ TANIMLI DEĞİL (mevcut roller:
+//    ADMIN, KALİTE, SEVKİYAT, MUHASEBE, OPERATÖR, BAKIM, CAM). Supabase'de
+//    MANAGEMENT/PURCHASING rol kodları var ama henüz ekrana/kişiye atanmış
+//    değil. Bu yüzden, bu roller Ender tarafından tanımlanana kadar, kendi
+//    ekranı/rolü olmayan departmanların (Satınalma, Depo, Takım, İnsan&Yetenek,
+//    BT) Control Tower'ı yalnız ADMIN/MANAGEMENT'a açık - UYDURULMUŞ bir
+//    "departman müdürü" yetkisi YOK. Ender ileride bu rolleri (Personel
+//    ekranından) tanımlarsa, aşağıdaki controltower.*.view kontrolleri o role
+//    de genişletilecek (Faz 2+ notu).
+// ---------------------------------------------------------------------------
+const CT_CAPABILITIES = {
+  'controltower.executive.view': u=>ctMgmt(u),
+  'controltower.production.view': u=>ctMgmt(u),
+  'controltower.quality.view': u=>ctMgmt(u)||ctScreen(u,'kalite'),
+  'controltower.purchasing.view': u=>ctMgmt(u),
+  'controltower.shipping.view': u=>ctMgmt(u)||ctScreen(u,'sevkiyat'),
+  'controltower.maintenance.view': u=>ctMgmt(u)||ctScreen(u,'bakim'),
+  'controltower.tooling.view': u=>ctMgmt(u),
+  'controltower.people.view': u=>ctMgmt(u),
+  'controltower.warehouse.view': u=>ctMgmt(u),
+  'controltower.finance.view': u=>ctMgmt(u)||ctScreen(u,'muhasebe'),
+  'controltower.it.view': u=>ctAdmin(u),
+  'controltower.drilldown': u=>ctMgmt(u)||ctScreen(u,'kalite')||ctScreen(u,'sevkiyat')||ctScreen(u,'bakim')||ctScreen(u,'muhasebe'),
+  'controltower.actions.create': u=>ctMgmt(u),
+  'controltower.targets.manage': u=>ctAdmin(u),
+  'controltower.export': u=>ctMgmt(u),
+  'controltower.admin': u=>ctAdmin(u)
+};
+window.KMI_AUTH = window.KMI_AUTH || {};
+const _ctOrigCan = window.KMI_AUTH.can;
+window.KMI_AUTH.can = function(user, capability){
+  if(Object.prototype.hasOwnProperty.call(CT_CAPABILITIES, capability)){
+    try{ return !!CT_CAPABILITIES[capability](ctUser(user)); }catch(e){ return false; }
+  }
+  return _ctOrigCan ? _ctOrigCan(user, capability) : false;
+};
+// Bir kullanıcının TÜM Control Tower yetkilerini tek seferde döner (Hub ekranı ve testler için).
+window.KMI_AUTH.controlTowerAccess = function(user){
+  const u=ctUser(user), out={};
+  Object.keys(CT_CAPABILITIES).forEach(function(k){ out[k]=window.KMI_AUTH.can(u,k); });
+  return out;
+};
+
+// ---------------------------------------------------------------------------
+// 2) MERKEZİ HESAPLAMA SERVİSİ ARAYÜZÜ — mevcut window.KMI_CALC federasyonuna
+//    kanonik isimlerle ekleme yapıldı. Hiçbir formül burada YENİDEN YAZILMADI;
+//    sadece var olan servisler (kmiPC/kmiQC/kmiIE/kmiPR) kanonik ad altında
+//    da erişilebilir kılındı. Bakım için (henüz KMI_CALC'a bağlanmamış olan)
+//    machineOeeMetrics() ince bir cephe ile eklendi - kendi hesabı yok.
+// ---------------------------------------------------------------------------
+window.KMI_CALC = window.KMI_CALC || {};
+try{
+  window.KMI_CALC.ProductionCalculationService = window.kmiPC || window.KMI_CALC.kmiPC || null;
+  window.KMI_CALC.QualityCalculationService = window.kmiQC || window.KMI_CALC.kmiQC || null;
+  window.KMI_CALC.EngineeringCalculationService = window.KMI_CALC.kmiIE || null;
+  window.KMI_CALC.ProcurementCalculationService = window.KMI_CALC.kmiPR || null;
+  window.KMI_CALC.MaintenanceCalculationService = {
+    oee: function(machine, month){
+      try{
+        const fn = window.machineOeeMetrics || (typeof machineOeeMetrics==='function'?machineOeeMetrics:null);
+        if(typeof fn!=='function') return {status:'CANNOT_CALCULATE', reason:'machineOeeMetrics bulunamadı'};
+        const mk = month || (window.getCurrentMonthKey ? window.getCurrentMonthKey() : (typeof getCurrentMonthKey==='function'?getCurrentMonthKey():undefined));
+        const r = fn(machine, mk);
+        if(!r || !r.rows) return {status:'CANNOT_CALCULATE', reason:'Bu makine/ay için veri yok'};
+        return Object.assign({status:'OK'}, r);
+      }catch(e){ return {status:'CANNOT_CALCULATE', reason:e.message}; }
+    }
+  };
+}catch(e){}
+
+// ---------------------------------------------------------------------------
+// 3) KPI SÖZLÜĞÜ (KMI KPI DICTIONARY) — yalnızca GERÇEKTEN hesaplanabilen
+//    (yukarıdaki servislerde formülü zaten var olan) KPI'lar kayıtlı. Yeni
+//    formül İCAT EDİLMEDİ; bu sözlük mevcut hesapları kataloglar.
+// ---------------------------------------------------------------------------
+window.KMI_KPI_DICTIONARY = window.KMI_KPI_DICTIONARY || {};
+function registerKpi(def){ window.KMI_KPI_DICTIONARY[def.kpiId]=def; }
+window.kmiRegisterKpi = registerKpi;
+[
+  {kpiId:'PLAN_GERCEKLESME', name:'Schedule Attainment', turkishName:'Plan Gerçekleşme', unit:'%',
+   description:'Hedefli iş emirlerinde tamamlanan / hedef oranı.', formula:'done/target*100',
+   source:'ProductionCalculationService.planGerceklesme', owner:'ÜRETİM', refreshFrequency:'CANLI',
+   drilldownDefinition:'İş Emri listesi → tekil İş Emri Pasaportu', requiredInputs:['jobOrders.targetQty','jobOrders.completedQty']},
+  {kpiId:'DARBOGAZ_RISKI', name:'Constraint Starvation Risk', turkishName:'Darboğaz / İşsiz Kalma Riski', unit:'',
+   description:'Sırada bekleyen işi olmayan veya DOWN olan makineler.', formula:'queued===0 && running>0, veya machineDown',
+   source:'ProductionCalculationService.darbogazRiski', owner:'ÜRETİM', refreshFrequency:'CANLI',
+   drilldownDefinition:'Makine → Makine Pasaportu (V35)', requiredInputs:['jobOrders.machine/status','V35 makine durumu']},
+  {kpiId:'URETIME_HAZIRLIK', name:'Production Readiness', turkishName:'Üretime Hazırlık', unit:'',
+   description:'Bir iş emrinin üretime hazır olup olmadığı ve eksik alanlar.', formula:'eksik alan listesi boşsa HAZIR',
+   source:'ProductionCalculationService.uretimeHazirlik', owner:'ÜRETİM', refreshFrequency:'TALEP ÜZERİNE',
+   drilldownDefinition:'İş Emri Pasaportu', requiredInputs:['jobOrders','QMS holds','malzeme rezervasyonu']},
+  {kpiId:'FPY', name:'First Pass Yield', turkishName:'İlk Seferde Doğru Üretim', unit:'%',
+   description:'Kalite onaylı üretimde ilk seferde iyi çıkan oranı.', formula:'firstPassGood/totalQty*100',
+   source:'QualityCalculationService.fpy', owner:'KALİTE', refreshFrequency:'GÜNLÜK',
+   drilldownDefinition:'Beyan listesi → İş Emri', requiredInputs:['declarations.qualityGood/qualityScrap']},
+  {kpiId:'PPM', name:'Defective Parts Per Million', turkishName:'Milyonda Hatalı Parça', unit:'ppm',
+   description:'NCR kayıtlarına göre hatalı parça oranı.', formula:'defectiveQty/totalQty*1e6',
+   source:'QualityCalculationService.ppm', owner:'KALİTE', refreshFrequency:'GÜNLÜK',
+   drilldownDefinition:'NCR listesi', requiredInputs:['QMS.ncrs','declarations']},
+  {kpiId:'CPK', name:'Process Capability Index', turkishName:'Süreç Yeterlilik İndeksi (Cpk)', unit:'',
+   description:'Bir karakteristiğin kontrol planına göre süreç yeterliliği.', formula:'min((USL-mean)/3sd,(mean-LSL)/3sd)',
+   source:'QualityCalculationService.cpk', owner:'KALİTE', refreshFrequency:'ÖLÇÜM BAŞINA',
+   drilldownDefinition:'Karakteristik → Ölçüm geçmişi', requiredInputs:['QMS.controlPlans','QMS.measurements (min 5 örnek)']},
+  {kpiId:'OEE_MTBF_MTTR', name:'OEE / MTBF / MTTR', turkishName:'Toplam Ekipman Etkinliği / Arıza Arası Süre / Onarım Süresi', unit:'',
+   description:'Makine bazlı OEE ile arıza sıklığı/onarım süresi.', formula:'Availability×Performance×Quality; MTBF=çalışma saati/arıza sayısı; MTTR=onarım saati/arıza sayısı',
+   source:'MaintenanceCalculationService.oee', owner:'BAKIM', refreshFrequency:'GÜNLÜK/AYLIK',
+   drilldownDefinition:'Makine Pasaportu (V35) → Arıza olayı', requiredInputs:['V35 makine kayıtları','declarations']},
+  {kpiId:'NET_MALZEME_IHTIYACI', name:'Net Material Requirement', turkishName:'Net Malzeme İhtiyacı', unit:'adet',
+   description:'Gerekli miktar - kullanılabilir stok - açık PO.', formula:'max(0, required - freeStock - openPO)',
+   source:'ProcurementCalculationService.netRequirement', owner:'SATINALMA', refreshFrequency:'TALEP ÜZERİNE',
+   drilldownDefinition:'Satınalma Kalemi → Açık PO', requiredInputs:['D.purchaseItems.stockQty/reservedQty','mrp71 açık PO']}
+].forEach(registerKpi);
+
+// ---------------------------------------------------------------------------
+// 4) HEDEF MOTORU (TARGET ENGINE) — localStorage'da tek, merkezi depo.
+//    Kartların İÇİNE sabit hedef YAZILMASI yasak; hedefler buradan okunur.
+//    Yazma yalnız controltower.targets.manage (ADMIN) ile mümkün.
+// ---------------------------------------------------------------------------
+const CT_TARGETS_KEY='KMI_CT_TARGETS_V1';
+function ctLoadTargets(){ try{ return JSON.parse(localStorage.getItem(CT_TARGETS_KEY)||'{}'); }catch(e){ return {}; } }
+function ctSaveTargets(t){ localStorage.setItem(CT_TARGETS_KEY, JSON.stringify(t)); }
+function ctTargetKey(o){ return [o.kpiId, o.dimension||'company', o.dimensionId||'*', o.period||'daily'].join('::'); }
+// KMI-CT-FIX (2026-09-27): window.KMI_TARGETS ADI ZATEN KULLANIMDA (kmi-ie-v1-plan-vs-actual
+// bloğunda makine/gün bazlı üretim hedefi dizisi - window.kmiSetTarget/kmiGetTarget). Control
+// Tower'ın genel (KPI/departman/hedef dönemi) hedef motoru ÇAKIŞMASIN diye AYRI adla açıldı:
+// window.KMI_CT_TARGETS. Var olan window.KMI_TARGETS dizisine DOKUNULMADI.
+window.KMI_CT_TARGETS = {
+  get: function(o){ const t=ctLoadTargets(); const rec=t[ctTargetKey(o)]; return rec?rec.value:null; },
+  set: function(o, value){
+    if(!window.KMI_AUTH.can(ctUser(), 'controltower.targets.manage')) throw new Error('Yetkiniz yok: hedef tanımlamak için yönetim yetkisi gerekli.');
+    const t=ctLoadTargets(); const key=ctTargetKey(o);
+    t[key]={value:Number(value), kpiId:o.kpiId, dimension:o.dimension||'company', dimensionId:o.dimensionId||'*', period:o.period||'daily', updatedAt:new Date().toISOString(), updatedBy:(ctUser()&&ctUser().name)||'Sistem'};
+    ctSaveTargets(t); return t[key];
+  },
+  list: function(){ return Object.values(ctLoadTargets()); }
+};
+
+// ---------------------------------------------------------------------------
+// 5) DURUM/RENK SİSTEMİ (STATUS SYSTEM) — tüm Control Tower'larda TEK anlam.
+// ---------------------------------------------------------------------------
+window.kmiCTStatusColor=function(level){
+  switch(String(level||'').toUpperCase()){
+    case 'GREEN': case 'HEDEFTE': case 'OK': return {level:'GREEN', cls:'text-emerald-300 border-emerald-700 bg-emerald-950/40', label:'HEDEFTE'};
+    case 'ORANGE': case 'RISK': case 'WARNING': return {level:'ORANGE', cls:'text-amber-300 border-amber-700 bg-amber-950/40', label:'RİSK OLUŞUYOR'};
+    case 'RED': case 'CRITICAL': case 'KRITIK': return {level:'RED', cls:'text-red-300 border-red-700 bg-red-950/40', label:'MÜDAHALE GEREKİYOR'};
+    case 'BLUE': case 'ACTIVE': case 'CANLI': return {level:'BLUE', cls:'text-cyan-300 border-cyan-700 bg-cyan-950/40', label:'AKTİF'};
+    default: return {level:'GRAY', cls:'text-slate-400 border-slate-700 bg-slate-900/60', label:'VERİ YOK'};
+  }
+};
+
+// ---------------------------------------------------------------------------
+// 6) ORTAK BİLEŞENLER (SHARED COMPONENTS) — KPI kartı ve ortak filtre çubuğu.
+//    Bu fonksiyonlar veri HESAPLAMAZ; sadece yukarıdaki servislerden gelen
+//    sonucu (status/value/target/completeness) render eder.
+// ---------------------------------------------------------------------------
+function ctEsc(s){ try{ return esc(s); }catch(e){ return String(s==null?'':s); } }
+window.kmiCTKpiCard=function(cfg){
+  cfg=cfg||{};
+  const st=window.kmiCTStatusColor(cfg.status);
+  const noData = cfg.value==null || cfg.value==='CANNOT_CALCULATE';
+  const valueHtml = noData
+    ? '<div class="text-lg font-black text-slate-500">'+(window.trLabel?ctEsc(window.trLabel('cannot_calculate')):'HESAPLANAMIYOR')+'</div>'+(cfg.missing?'<div class="text-[10px] text-slate-500">Eksik: '+ctEsc(cfg.missing)+'</div>':'')
+    : '<div class="text-2xl font-black">'+ctEsc(cfg.value)+(cfg.unit?ctEsc(cfg.unit):'')+'</div>';
+  const targetHtml = (cfg.target!=null) ? '<div class="text-[10px] text-slate-500">Hedef: '+ctEsc(cfg.target)+(cfg.unit?ctEsc(cfg.unit):'')+'</div>' : '';
+  const trendHtml = cfg.trend ? '<span class="text-xs ml-1">'+(cfg.trend>0?'▲':cfg.trend<0?'▼':'▬')+'</span>' : '';
+  const completenessHtml = (cfg.completeness!=null) ? '<div class="text-[9px] text-slate-600 mt-1">Veri tamlığı: %'+ctEsc(cfg.completeness)+(cfg.missingInputs?' · Eksik: '+ctEsc(cfg.missingInputs):'')+'</div>' : '';
+  const updatedHtml = cfg.updatedAt ? '<div class="text-[9px] text-slate-600">Güncelleme: '+ctEsc(new Date(cfg.updatedAt).toLocaleTimeString('tr-TR',{hour:'2-digit',minute:'2-digit'}))+'</div>' : '';
+  const drillHtml = cfg.onDrilldown ? '<button onclick="'+ctEsc(cfg.onDrilldown)+'" class="mt-2 text-[10px] font-bold text-cyan-400 hover:text-cyan-300">DETAY →</button>' : '';
+  return '<div class="border rounded-xl p-3 '+st.cls+'"><div class="text-[10px] uppercase tracking-wide opacity-80 flex justify-between"><span>'+ctEsc(cfg.name||cfg.kpiId||'')+'</span>'+trendHtml+'</div>'+valueHtml+targetHtml+completenessHtml+updatedHtml+drillHtml+'</div>';
+};
+window.kmiCTFilterBar=function(activeKey){
+  const opts=[['today','BUGÜN'],['shift','VARDİYA'],['yesterday','DÜN'],['7d','7 GÜN'],['30d','30 GÜN'],['month','BU AY'],['custom','ÖZEL TARİH']];
+  return '<div class="flex flex-wrap gap-2" data-kmi-ct-filterbar>'+opts.map(function(o){
+    return '<button type="button" data-ctfilter="'+o[0]+'" class="px-3 py-1.5 rounded-lg text-[11px] font-bold border '+(o[0]===activeKey?'bg-cyan-700 border-cyan-500 text-white':'bg-slate-900 border-slate-700 text-slate-300')+'">'+o[1]+'</button>';
+  }).join('')+'</div>';
+};
+
+// ---------------------------------------------------------------------------
+// 7) AKSİYON ENTEGRASYONU (ACTION INTEGRATION) — AYRI bir Control Tower
+//    aksiyon veritabanı AÇILMADI. Var olan Task/Action motoru (kmiTaskCreate,
+//    KMI_TASKS_V1192) doğrudan kullanılıyor; Control Tower'a özgü alanlar
+//    (kaynak KPI, önce/hedef/sonra) task.links altında taşınıyor.
+// ---------------------------------------------------------------------------
+window.kmiCTCreateAction=function(cfg){
+  cfg=cfg||{};
+  if(!window.KMI_AUTH.can(ctUser(),'controltower.actions.create')) throw new Error('Yetkiniz yok: Control Tower aksiyonu oluşturmak için yönetim yetkisi gerekli.');
+  if(typeof window.kmiTaskCreate!=='function') throw new Error('Görev motoru bulunamadı (kmiTaskCreate).');
+  return window.kmiTaskCreate({
+    title: cfg.issue,
+    description: [cfg.reason?('Neden: '+cfg.reason):'', cfg.impact?('Etki: '+cfg.impact):''].filter(Boolean).join('\n'),
+    assigneeId: cfg.ownerId,
+    priority: cfg.priority||'YÜKSEK',
+    plannedMinutes: cfg.plannedMinutes||0,
+    dueAt: cfg.dueAt,
+    evidenceRequired: !!cfg.evidenceRequired,
+    links: Object.assign({ctSourceKpi:cfg.sourceKpi||null, ctTower:cfg.tower||null, ctBefore:(cfg.before!=null?cfg.before:null), ctTarget:(cfg.target!=null?cfg.target:null)}, cfg.links||{})
+  });
+};
+
+// ---------------------------------------------------------------------------
+// 8) AI BAĞLAM SÖZLEŞMESİ (AI CONTEXT) — Faz 1'de gerçek bir "KMI'YE SOR"
+//    motoru (dış bir dil modeli bağlantısı) KURULMADI; bu, ileride o motorun
+//    alacağı bağlamın SÖZLEŞMESİDİR (kullanıcı/yetki/ekran/filtre/varlık).
+//    Sahte bir AI cevabı ÜRETİLMEDİ - "asla uydurma" ilkesi.
+// ---------------------------------------------------------------------------
+window.kmiCTBuildAiContext=function(towerId, filters, selectedEntity){
+  const u=ctUser();
+  return {
+    user: {id:u&&(u.id||u.personId||u.personnelId), name:u&&u.name, role:(typeof getEffectiveRole==='function'?getEffectiveRole(u):null)},
+    permissions: window.KMI_AUTH.controlTowerAccess(u),
+    dashboard: towerId||null,
+    filters: filters||{},
+    selectedEntity: selectedEntity||null,
+    _note: 'FAZ1_ARAYUZ_SOZLESMESI: gercek KMI YE SOR motoru henuz baglanmadi (Faz 2+).'
+  };
+};
+
+// ---------------------------------------------------------------------------
+// 9) CONTROL TOWER KAYDI (REGISTRY) + NAVİGASYON — "KMI LIVE" girişi.
+//    Zaten var olan GERÇEK ekranlara (Üretim Zekası, Kalite Kulesi) doğrudan
+//    bağlanıyor; henüz kurulmamış olanlar (Faz 2+) açıkça "Hazırlanıyor"
+//    etiketiyle gösteriliyor - sahte/boş bir dashboard AÇILMIYOR.
+// ---------------------------------------------------------------------------
+window.KMI_CONTROL_TOWER = {
+  towers: [
+    {id:'executive', title:'GENEL MÜDÜR', permission:'controltower.executive.view', bridge:{label:'Yönetici Paneli (mevcut ekran)', fn:function(){ try{switchTab('yonetici');}catch(e){} document.getElementById('kmiCTHub')?.remove(); }}, status:'BRIDGE'},
+    {id:'production', title:'ÜRETİM', permission:'controltower.production.view', bridge:{label:'Üretim Zekası (mevcut ekran)', fn:function(){ document.getElementById('kmiCTHub')?.remove(); try{window.kmiOpenProductionIntel();}catch(e){} }}, status:'BRIDGE'},
+    {id:'quality', title:'KALİTE', permission:'controltower.quality.view', bridge:{label:'Kalite Kulesi (mevcut ekran)', fn:function(){ document.getElementById('kmiCTHub')?.remove(); try{window.kmiOpenQualityTower();}catch(e){} }}, status:'BRIDGE'},
+    {id:'purchasing', title:'SATINALMA', permission:'controltower.purchasing.view', status:'PLANNED'},
+    {id:'shipping', title:'SEVKİYAT', permission:'controltower.shipping.view', status:'PLANNED'},
+    {id:'maintenance', title:'BAKIM', permission:'controltower.maintenance.view', status:'PLANNED'},
+    {id:'tooling', title:'TAKIM', permission:'controltower.tooling.view', status:'PLANNED'},
+    {id:'people', title:'İNSAN & YETENEK', permission:'controltower.people.view', status:'PLANNED'},
+    {id:'warehouse', title:'DEPO & STOK', permission:'controltower.warehouse.view', status:'PLANNED'},
+    {id:'finance', title:'MUHASEBE / FİNANS', permission:'controltower.finance.view', status:'PLANNED'},
+    {id:'it', title:'SOFTWARE & IT', permission:'controltower.it.view', status:'PLANNED'}
+  ]
+};
+window.kmiOpenControlTowerHub=function(){
+  document.getElementById('kmiCTHub')?.remove();
+  const u=ctUser();
+  const authorized=window.KMI_CONTROL_TOWER.towers.filter(function(t){ return window.KMI_AUTH.can(u,t.permission); });
+  const m=document.createElement('div'); m.id='kmiCTHub'; m.className='fixed inset-0 z-[272] bg-black/75 flex items-start justify-center overflow-y-auto py-8';
+  m.innerHTML='<div class="w-full max-w-3xl mx-auto bg-slate-950 border border-slate-700 rounded-2xl p-5">'+
+   '<div class="flex justify-between items-center mb-1"><h3 class="text-lg font-black text-white"><i class="fa-solid fa-satellite-dish text-fuchsia-400 mr-2"></i>KMI LIVE · CONTROL TOWER</h3><button onclick="document.getElementById(\'kmiCTHub\').remove()" class="text-slate-400">✕</button></div>'+
+   '<div class="text-[11px] text-slate-500 mb-4">Faz 1 · Temel altyapı devrede. Aşağıdaki panolar mevcut ekranlara bağlanır; henüz kurulmamış panolar Faz 2+\'de eklenecek.</div>'+
+   '<div class="grid sm:grid-cols-2 gap-3">'+(authorized.length?authorized.map(function(t){
+     const ready=t.status==='BRIDGE';
+     return '<div class="border rounded-xl p-4 '+(ready?'border-cyan-700 bg-cyan-950/20':'border-slate-700 bg-slate-900/60')+'">'+
+       '<div class="font-black text-white">'+ctEsc(t.title)+'</div>'+
+       '<div class="text-[10px] mt-1 '+(ready?'text-cyan-300':'text-slate-500')+'">'+(ready?ctEsc(t.bridge.label):'Hazırlanıyor (Faz 2+)')+'</div>'+
+       (ready?'<button data-ct-open="'+ctEsc(t.id)+'" class="mt-3 bg-cyan-700 hover:bg-cyan-600 text-white text-[11px] font-bold px-3 py-1.5 rounded-lg">AÇ →</button>':'')+
+     '</div>';
+   }).join(''):'<div class="text-sm text-slate-500 col-span-2">Bu hesap için tanımlı bir Control Tower yetkisi yok.</div>')+'</div>'+
+  '</div>';
+  document.body.appendChild(m);
+  m.querySelectorAll('[data-ct-open]').forEach(function(btn){
+    btn.onclick=function(){ const t=window.KMI_CONTROL_TOWER.towers.find(x=>x.id===btn.getAttribute('data-ct-open')); if(t&&t.bridge&&t.bridge.fn) t.bridge.fn(); };
+  });
+};
+// Nav girişi: mevcut "🏭 ÜRETİM ZEKASI" ile aynı desende, ikinci navigasyon
+// satırına (#kmiFloorNavRow2) eklenir - üst ana menü kalabalıklaştırılmadı.
+window.addEventListener('load',function(){
+  let tries=0;
+  const timer=setInterval(function(){
+    tries++;
+    try{
+      const row=document.getElementById('kmiFloorNavRow2');
+      const u=ctUser();
+      const anyAccess=window.KMI_CONTROL_TOWER.towers.some(function(t){ return window.KMI_AUTH.can(u,t.permission); });
+      if(row && !document.getElementById('kmiCTNavBtn') && anyAccess){
+        const b=document.createElement('button'); b.id='kmiCTNavBtn'; b.type='button';
+        b.className='px-4 py-3 rounded-xl bg-fuchsia-700 hover:bg-fuchsia-600 text-white font-black border border-fuchsia-500/40';
+        b.innerHTML='🛰️ KMI LIVE';
+        b.onclick=function(){ window.kmiOpenControlTowerHub(); };
+        row.appendChild(b);
+      }
+    }catch(e){}
+    if(tries>=90) clearInterval(timer);
+  },500);
+},{once:true});
+})();
+</script>
+
+<script id="kmi-ct-v2-org-responsibility-and-executive">
+(function(){
+'use strict';
+// ============================================================================
+// KMI CONTROL TOWER — FAZ 2 (Ender direktifi, 2026-09-27):
+//   A) Departman Sorumluluk Modeli (management_assignments) - GERÇEK, sahte
+//      kullanıcı/rol İCAT EDİLMEDİ; kim atanmışsa o yetkiyi alır, atanmayan
+//      departmanda "SORUMLU ATANMADI" gösterilir.
+//   B) Genel Müdür (Executive) Control Tower - yalnız GERÇEK hesabı olan
+//      KPI'lar dolu; hesabı olmayanlar (Money Lost, OTIF, Kapasite/Contribution)
+//      dürüstçe HESAPLANAMIYOR + eksik veri notu ile gösteriliyor.
+//   C) Drilldown'lar tıklanabilir hale getirildi (bkz. kmiPC.planGerceklesmeJobs
+//      ve Üretim Zekası'ndaki makine/iş emri tıklamaları - doğrudan ilgili
+//      blokta düzenlendi, burada değil).
+//   D) "KMI'YE SOR" (AI) - GERÇEK bir dil modeli bağlantısı bu ortamda GÜVENLİ
+//      şekilde KURULAMAZ (API anahtarını istemci tarafı koda gömmek anahtarı
+//      herkese açık hale getirir). Bu yüzden yalnız GÜVENLİ arayüz noktası
+//      (Supabase Edge Function çağrısı) hazırlandı; Ender bir sağlayıcı/anahtar
+//      onaylayana kadar sistem "AI motoru henüz bağlanmadı" der - SAHTE CEVAP
+//      ÜRETİLMEZ.
+// ============================================================================
+
+// ---------------------------------------------------------------------------
+// A) DEPARTMAN MASTER + YÖNETİM ATAMASI (management_assignments)
+// ---------------------------------------------------------------------------
+window.KMI_DEPARTMENTS = [
+  {id:'GENERAL_MANAGEMENT', tower:'executive', name:'Genel Yönetim'},
+  {id:'PRODUCTION', tower:'production', name:'Üretim'},
+  {id:'QUALITY', tower:'quality', name:'Kalite'},
+  {id:'PURCHASING', tower:'purchasing', name:'Satınalma'},
+  {id:'WAREHOUSE', tower:'warehouse', name:'Depo & Stok'},
+  {id:'SHIPPING', tower:'shipping', name:'Sevkiyat / Lojistik'},
+  {id:'MAINTENANCE', tower:'maintenance', name:'Bakım'},
+  {id:'TOOLING', tower:'tooling', name:'Takım Yönetimi'},
+  {id:'PEOPLE_SKILLS', tower:'people', name:'İnsan & Yetenek'},
+  {id:'ACCOUNTING_FINANCE', tower:'finance', name:'Muhasebe / Finans'},
+  {id:'SOFTWARE_IT', tower:'it', name:'Software & IT'}
+];
+const CT_TOWER_DEPT = {}; window.KMI_DEPARTMENTS.forEach(function(d){ CT_TOWER_DEPT[d.tower]=d.id; });
+
+const ORG_KEY='KMI_MGMT_ASSIGNMENTS_V1';
+function orgLoad(){ try{ return JSON.parse(localStorage.getItem(ORG_KEY)||'[]'); }catch(e){ return []; } }
+function orgSave(a){ localStorage.setItem(ORG_KEY, JSON.stringify(a)); }
+function orgPeople(){ try{ return (typeof PERSONNEL_LIST!=='undefined'&&Array.isArray(PERSONNEL_LIST))?PERSONNEL_LIST:(Array.isArray(window.PERSONNEL_LIST)?window.PERSONNEL_LIST:[]); }catch(e){ return []; } }
+function orgIsActive(a, now){
+  now = now || new Date();
+  if(a.status==='REVOKED') return false;
+  if(a.validFrom && new Date(a.validFrom)>now) return false;
+  if(a.validUntil && new Date(a.validUntil)<now) return false;
+  return true;
+}
+window.KMI_ORG = {
+  departments: window.KMI_DEPARTMENTS,
+  list: function(departmentId){ return orgLoad().filter(function(a){ return a.departmentId===departmentId && orgIsActive(a); }); },
+  allRaw: function(){ return orgLoad(); },
+  current: function(departmentId){
+    const active=this.list(departmentId);
+    return active.find(function(a){ return a.isPrimary; }) || active.find(function(a){ return a.responsibilityType!=='DEPUTY' && a.responsibilityType!=='VEKİL'; }) || null;
+  },
+  deputy: function(departmentId){
+    return this.list(departmentId).find(function(a){ return a.responsibilityType==='DEPUTY'||a.responsibilityType==='VEKİL'; }) || null;
+  },
+  // Bir kullanıcının o departman için AKTİF bir ataması (ana sorumlu, sorumlu VEYA vekil) var mı?
+  hasAssignment: function(user, departmentId){
+    if(!user) return false;
+    const pid=Number(user.id||user.personId||user.personnelId);
+    if(!pid) return false;
+    return this.list(departmentId).some(function(a){ return Number(a.personId)===pid; });
+  },
+  resolveControlTowerAccess: function(user){
+    const out={};
+    window.KMI_DEPARTMENTS.forEach(function(d){ out[d.id]=window.KMI_AUTH.can(user, 'controltower.'+d.tower+'.view'); });
+    return out;
+  },
+  // ADMIN/MANAGEMENT gerektirir - "asla sahte kişi atama" ilkesi: personId GERÇEKTEN
+  // PERSONNEL_LIST'te bulunmalı.
+  assign: function(data){
+    if(!window.KMI_AUTH.can(undefined,'controltower.actions.create')) throw new Error('Yetkiniz yok: yönetim sorumluluğu atamak için yönetim yetkisi gerekli.');
+    const dept=window.KMI_DEPARTMENTS.find(function(d){ return d.id===data.departmentId; });
+    if(!dept) throw new Error('Geçersiz departman: '+data.departmentId);
+    const person=orgPeople().find(function(p){ return Number(p.id)===Number(data.personId); });
+    if(!person) throw new Error('Personel bulunamadı - önce Personel ekranından gerçek bir kişi seçilmeli.');
+    const all=orgLoad();
+    // Aynı departmanda YENİ bir "Ana Sorumlu" atanıyorsa, eskisinin ana-sorumluluğu (kaydı
+    // SİLİNMEDEN, sadece isPrimary kaldırılarak) devam ediyor - geçmiş kaybolmasın.
+    if(data.isPrimary){
+      all.filter(function(a){ return a.departmentId===data.departmentId && orgIsActive(a) && a.isPrimary; })
+         .forEach(function(a){ a.isPrimary=false; a.updatedAt=new Date().toISOString(); });
+    }
+    const rec={
+      id:'MGA-'+Date.now().toString(36).toUpperCase(),
+      personId:Number(data.personId), personName:person.name,
+      departmentId:data.departmentId,
+      responsibilityType:data.responsibilityType||'RESPONSIBLE',
+      title:String(data.title||'').trim(),
+      isPrimary:!!data.isPrimary,
+      validFrom:data.validFrom||new Date().toISOString(),
+      validUntil:data.validUntil||null,
+      status:'ACTIVE',
+      delegatedBy:(window.currentUser&&window.currentUser.name)||'Sistem',
+      createdBy:(window.currentUser&&window.currentUser.name)||'Sistem',
+      createdAt:new Date().toISOString(), updatedAt:new Date().toISOString()
+    };
+    all.unshift(rec); orgSave(all);
+    try{ KMI.event('ORG_ASSIGNMENT_CREATED','MGMT_ASSIGNMENT',rec.id,{departmentId:rec.departmentId,personName:rec.personName,responsibilityType:rec.responsibilityType,isPrimary:rec.isPrimary,validFrom:rec.validFrom,validUntil:rec.validUntil}); }catch(e){}
+    return rec;
+  },
+  revoke: function(assignmentId, reason){
+    if(!window.KMI_AUTH.can(undefined,'controltower.actions.create')) throw new Error('Yetkiniz yok.');
+    const all=orgLoad(); const rec=all.find(function(a){ return a.id===assignmentId; });
+    if(!rec) throw new Error('Atama bulunamadı: '+assignmentId);
+    rec.status='REVOKED'; rec.validUntil=new Date().toISOString(); rec.updatedAt=new Date().toISOString();
+    orgSave(all);
+    try{ KMI.event('ORG_ASSIGNMENT_REVOKED','MGMT_ASSIGNMENT',rec.id,{departmentId:rec.departmentId,personName:rec.personName,reason:reason||''}); }catch(e){}
+    return rec;
+  }
+};
+
+// controltower.<dept>.view yetkisini KMI_ORG ataması ile de sağlanabilir hale getir
+// (sarmalama - Faz 1'deki can() DEĞİŞTİRİLMEDİ, üzerine ince bir katman eklendi).
+const _v2OrigCan = window.KMI_AUTH.can;
+window.KMI_AUTH.can = function(user, capability){
+  const m = /^controltower\.([a-z]+)\.view$/.exec(String(capability||''));
+  if(m){
+    const base = _v2OrigCan ? _v2OrigCan(user, capability) : false;
+    if(base) return true;
+    const deptId = CT_TOWER_DEPT[m[1]];
+    if(!deptId) return false;
+    try{ return window.KMI_ORG.hasAssignment(user||window.currentUser, deptId); }catch(e){ return false; }
+  }
+  return _v2OrigCan ? _v2OrigCan(user, capability) : false;
+};
+
+// Aksiyon oluştururken sahiplik: cfg.ownerId verilmezse, o departmanın GÜNCEL ana sorumlusuna
+// otomatik atanır (madde 19/21 - "action ownership"). Kimse atanmamışsa SESSİZCE birine
+// atamak yerine AÇIKÇA hata verir - "asla sahte kişi" ilkesi.
+const _v2OrigCreateAction = window.kmiCTCreateAction;
+window.kmiCTCreateAction = function(cfg){
+  cfg=cfg||{};
+  if(!cfg.ownerId && cfg.tower){
+    const deptId=CT_TOWER_DEPT[cfg.tower];
+    const resp=deptId?window.KMI_ORG.current(deptId):null;
+    if(!resp) throw new Error('Bu departman (' + (deptId||cfg.tower) + ') için sorumlu atanmadı. Önce Organizasyon & Sorumluluklar ekranından bir sorumlu atayın.');
+    cfg.ownerId=resp.personId;
+  }
+  return _v2OrigCreateAction(cfg);
+};
+
+// ---------------------------------------------------------------------------
+// B) YÖNETİM ADMIN UI — "Organizasyon & Sorumluluklar"
+// ---------------------------------------------------------------------------
+const RESP_TYPE_TR = {DIRECTOR:'Direktör', MANAGER:'Müdür', SUPERVISOR:'Vardiya Sorumlusu', RESPONSIBLE:'Sorumlu', DEPUTY:'Vekil'};
+window.kmiOpenOrgAdmin=function(){
+  if(!window.KMI_AUTH.can(undefined,'controltower.admin')){ try{toast?.('Bu ekran yalnız yönetim içindir.','warn');}catch(e){alert('Yetki yok.');} return; }
+  document.getElementById('kmiOrgAdmin')?.remove();
+  const m=document.createElement('div'); m.id='kmiOrgAdmin'; m.className='fixed inset-0 z-[281] bg-black/75 flex items-start justify-center overflow-y-auto py-8';
+  function renderBody(){
+    return window.KMI_DEPARTMENTS.map(function(d){
+      const primary=window.KMI_ORG.current(d.id), dep=window.KMI_ORG.deputy(d.id);
+      const openActions=(function(){ try{ return JSON.parse(localStorage.getItem('KMI_TASKS_V1192')||'[]').filter(function(t){ return t.status!=='COMPLETED' && t.links && t.links.ctTower===d.tower; }).length; }catch(e){ return 0; } })();
+      return '<div class="border border-slate-700 rounded-xl p-3 mb-2 bg-slate-900/60">'+
+        '<div class="flex justify-between items-start"><div><div class="font-black text-white text-sm">'+esc(d.name)+'</div>'+
+        '<div class="text-[11px] mt-1">'+(primary?('<span class="text-emerald-300 font-bold">'+esc(primary.personName)+'</span> · '+esc(primary.title||RESP_TYPE_TR[primary.responsibilityType]||primary.responsibilityType)):'<span class="text-rose-400 font-bold">SORUMLU ATANMADI</span>')+'</div>'+
+        (dep?('<div class="text-[10px] text-slate-500 mt-0.5">Vekil: '+esc(dep.personName)+(dep.validUntil?(' · '+new Date(dep.validUntil).toLocaleDateString('tr-TR')+'\'e kadar'):'')+'</div>'):'')+
+        '<div class="text-[10px] text-slate-600 mt-0.5">Açık aksiyon: '+openActions+'</div></div>'+
+        '<button data-ct-org-assign="'+esc(d.id)+'" class="bg-indigo-700 hover:bg-indigo-600 text-white text-[10px] font-bold px-3 py-1.5 rounded-lg">Ata / Değiştir</button></div>'+
+        (primary?('<button data-ct-org-revoke="'+esc(primary.id)+'" class="mt-2 text-[10px] text-rose-400 hover:text-rose-300">Bu atamayı kaldır</button>'):'')+
+      '</div>';
+    }).join('');
+  }
+  m.innerHTML='<div class="w-full max-w-2xl mx-auto bg-slate-950 border border-slate-700 rounded-2xl p-5">'+
+    '<div class="flex justify-between items-center mb-1"><h3 class="text-lg font-black text-white"><i class="fa-solid fa-sitemap text-indigo-400 mr-2"></i>Organizasyon & Sorumluluklar</h3><button onclick="document.getElementById(\'kmiOrgAdmin\').remove()" class="text-slate-400">✕</button></div>'+
+    '<div class="text-[11px] text-slate-500 mb-3">Her fonksiyon için gerçek bir personel atayın. Atanmayan departmanlar "SORUMLU ATANMADI" gösterir - sahte kişi eklenmez.</div>'+
+    '<div id="kmiOrgBody">'+renderBody()+'</div></div>';
+  document.body.appendChild(m);
+  function wire(){
+    m.querySelectorAll('[data-ct-org-assign]').forEach(function(btn){
+      btn.onclick=function(){ openAssignForm(btn.getAttribute('data-ct-org-assign')); };
+    });
+    m.querySelectorAll('[data-ct-org-revoke]').forEach(function(btn){
+      btn.onclick=function(){
+        try{ window.KMI_ORG.revoke(btn.getAttribute('data-ct-org-revoke')); document.getElementById('kmiOrgBody').innerHTML=renderBody(); wire(); }
+        catch(e){ try{toast?.(e.message,'warn');}catch(x){alert(e.message);} }
+      };
+    });
+  }
+  function openAssignForm(departmentId){
+    const dept=window.KMI_DEPARTMENTS.find(function(d){ return d.id===departmentId; });
+    const people=orgPeople().filter(function(p){ return p.active!==false; }).sort(function(a,b){ return String(a.name).localeCompare(String(b.name),'tr'); });
+    document.getElementById('kmiOrgAssignForm')?.remove();
+    const f=document.createElement('div'); f.id='kmiOrgAssignForm'; f.className='fixed inset-0 z-[282] bg-black/80 flex items-center justify-center';
+    f.innerHTML='<div class="w-full max-w-md mx-auto bg-slate-950 border border-slate-700 rounded-2xl p-5">'+
+      '<div class="flex justify-between items-center mb-3"><b class="text-white">'+esc(dept.name)+' · Sorumlu Ata</b><button onclick="document.getElementById(\'kmiOrgAssignForm\').remove()" class="text-slate-400">✕</button></div>'+
+      '<label class="text-xs text-slate-400">Personel</label><select id="orgPerson" class="w-full mt-1 mb-2 bg-slate-900 border border-slate-700 rounded p-2 text-sm">'+people.map(function(p){ return '<option value="'+p.id+'">'+esc(p.name)+'</option>'; }).join('')+'</select>'+
+      '<label class="text-xs text-slate-400">Yönetim Görevi</label><select id="orgRespType" class="w-full mt-1 mb-2 bg-slate-900 border border-slate-700 rounded p-2 text-sm">'+Object.keys(RESP_TYPE_TR).map(function(k){ return '<option value="'+k+'">'+RESP_TYPE_TR[k]+'</option>'; }).join('')+'</select>'+
+      '<label class="text-xs text-slate-400">Unvan</label><input id="orgTitle" placeholder="örn. Üretim Müdürü" class="w-full mt-1 mb-2 bg-slate-900 border border-slate-700 rounded p-2 text-sm">'+
+      '<label class="text-xs text-slate-400 flex items-center gap-2 mb-2"><input id="orgIsPrimary" type="checkbox" checked> Ana Sorumlu</label>'+
+      '<div class="grid grid-cols-2 gap-2 mb-3"><div><label class="text-xs text-slate-400">Başlangıç</label><input id="orgFrom" type="date" value="'+new Date().toISOString().slice(0,10)+'" class="w-full mt-1 bg-slate-900 border border-slate-700 rounded p-2 text-sm"></div><div><label class="text-xs text-slate-400">Bitiş (opsiyonel - vekalet için)</label><input id="orgUntil" type="date" class="w-full mt-1 bg-slate-900 border border-slate-700 rounded p-2 text-sm"></div></div>'+
+      '<button id="orgSave" class="w-full bg-indigo-700 hover:bg-indigo-600 text-white font-bold py-2 rounded-lg">Kaydet</button>'+
+      '<div id="orgErr" class="text-rose-400 text-xs mt-2"></div></div>';
+    document.body.appendChild(f);
+    document.getElementById('orgSave').onclick=function(){
+      try{
+        window.KMI_ORG.assign({
+          departmentId: departmentId,
+          personId: Number(document.getElementById('orgPerson').value),
+          responsibilityType: document.getElementById('orgRespType').value,
+          title: document.getElementById('orgTitle').value,
+          isPrimary: document.getElementById('orgIsPrimary').checked,
+          validFrom: document.getElementById('orgFrom').value ? new Date(document.getElementById('orgFrom').value).toISOString() : null,
+          validUntil: document.getElementById('orgUntil').value ? new Date(document.getElementById('orgUntil').value).toISOString() : null
+        });
+        f.remove();
+        document.getElementById('kmiOrgBody').innerHTML=renderBody(); wire();
+      }catch(e){ document.getElementById('orgErr').textContent=e.message; }
+    };
+  }
+  wire();
+};
+// Hub'a "Organizasyon" girişini ekle (sarmalama - Faz1'deki hub render'ı DEĞİŞTİRİLMEDİ).
+const _v2OrigOpenHub = window.kmiOpenControlTowerHub;
+window.kmiOpenControlTowerHub=function(){
+  _v2OrigOpenHub();
+  try{
+    const hub=document.getElementById('kmiCTHub');
+    if(hub && window.KMI_AUTH.can(undefined,'controltower.admin')){
+      const box=hub.querySelector(':scope > div');
+      const btn=document.createElement('button'); btn.id='kmiCTOrgBtn';
+      btn.className='mt-4 w-full bg-slate-800 hover:bg-slate-700 text-white text-xs font-bold px-3 py-2 rounded-lg';
+      btn.innerHTML='🗂️ Organizasyon & Sorumluluklar';
+      btn.onclick=function(){ window.kmiOpenOrgAdmin(); };
+      if(box) box.appendChild(btn);
+    }
+  }catch(e){}
+};
+
+// ---------------------------------------------------------------------------
+// C) GENEL MÜDÜR (EXECUTIVE) CONTROL TOWER — yalnız gerçek hesabı olan KPI'lar.
+// ---------------------------------------------------------------------------
+window.kmiOpenExecutiveTower=function(){
+  if(!window.KMI_AUTH.can(undefined,'controltower.executive.view')){ try{toast?.('Bu ekran yalnız yönetim/genel müdür içindir.','warn');}catch(e){alert('Yetki yok.');} return; }
+  document.getElementById('kmiExecTower')?.remove();
+  const m=document.createElement('div'); m.id='kmiExecTower'; m.className='fixed inset-0 z-[275] bg-[#07101f] text-white overflow-y-auto';
+  document.body.appendChild(m);
+  window.kmiRenderExecutiveTower();
+};
+window.kmiRenderExecutiveTower=function(){
+  const el=document.getElementById('kmiExecTower'); if(!el) return;
+  const today=new Date(); today.setHours(0,0,0,0);
+  const plan=window.kmiPC.planGerceklesme({from:today.toISOString()});
+  const risk=window.kmiPC.darbogazRiski();
+  const fpy=window.kmiQC.fpy({from:today.toISOString(), to:new Date().toISOString()});
+  const ppm=window.kmiQC.ppm({from:today.toISOString(), to:new Date().toISOString()});
+  const resp=window.KMI_ORG.current('GENERAL_MANAGEMENT');
+  const running=risk.status==='OK'?risk.rows.filter(function(r){return r.running>0;}).length:null;
+  const down=risk.status==='OK'?risk.rows.filter(function(r){return r.machineDown;}).length:null;
+  const idle=risk.status==='OK'?risk.rows.filter(function(r){return r.risk&&!r.machineDown;}).length:null;
+  el.innerHTML='<div class="max-w-6xl mx-auto p-5">'+
+   '<div class="flex flex-wrap justify-between gap-3 sticky top-0 bg-[#07101f]/95 backdrop-blur py-4 z-10 mb-3">'+
+    '<div><div class="text-[11px] text-fuchsia-300 tracking-[.28em] font-black">KMI LIVE · CONTROL TOWER</div><h1 class="text-3xl font-black">GENEL MÜDÜR</h1><div class="text-slate-400 mt-1 text-sm">'+(resp?('Sorumlu: '+esc(resp.personName)+' · '+esc(resp.title||'')):'<span class="text-rose-400">SORUMLU ATANMADI</span>')+'</div></div>'+
+    '<button onclick="document.getElementById(\'kmiExecTower\').remove()" class="bg-slate-800 px-5 py-3 rounded-xl font-black h-fit">Kapat</button></div>'+
+   '<div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">'+
+     window.kmiCTKpiCard({kpiId:'PLAN_GERCEKLESME', name:'Plan Gerçekleşme', value:plan.status==='OK'?plan.value:null, unit:'%', missing:plan.status!=='OK'?plan.reason:null, status:plan.status==='OK'?(plan.value>=95?'GREEN':(plan.value>=85?'ORANGE':'RED')):'GRAY'})+
+     window.kmiCTKpiCard({kpiId:'FPY', name:'FPY (İlk Seferde Doğru)', value:fpy.status==='OK'?fpy.value:null, unit:'%', missing:fpy.status!=='OK'?fpy.reason:null, status:fpy.status==='OK'?(fpy.value>=98?'GREEN':(fpy.value>=95?'ORANGE':'RED')):'GRAY'})+
+     window.kmiCTKpiCard({kpiId:'PPM', name:'PPM (Milyonda Hatalı)', value:ppm.status==='OK'?ppm.value:null, unit:'', missing:ppm.status!=='OK'?ppm.reason:null, status:ppm.status==='OK'?(ppm.value<=500?'GREEN':(ppm.value<=2000?'ORANGE':'RED')):'GRAY'})+
+     window.kmiCTKpiCard({kpiId:'DARBOGAZ', name:'Darboğaz Riski', value:risk.status==='OK'?risk.riskyCount:null, unit:' makine', missing:risk.status!=='OK'?risk.reason:null, status:risk.status==='OK'?(risk.riskyCount===0?'GREEN':'ORANGE'):'GRAY'})+
+   '</div>'+
+   '<div class="bg-slate-900/70 border border-slate-700 rounded-xl p-4 mb-4"><div class="text-[10px] text-slate-500 uppercase mb-2">Fabrika Şimdi (Factory Now)</div><div class="grid grid-cols-3 gap-3 text-center">'+
+     '<div><div class="text-2xl font-black text-emerald-300">'+(running==null?'—':running)+'</div><div class="text-[10px] text-slate-500">ÇALIŞIYOR</div></div>'+
+     '<div><div class="text-2xl font-black text-red-300">'+(down==null?'—':down)+'</div><div class="text-[10px] text-slate-500">ARIZA/DOWN</div></div>'+
+     '<div><div class="text-2xl font-black text-amber-300">'+(idle==null?'—':idle)+'</div><div class="text-[10px] text-slate-500">BOŞTA KALMA RİSKİ</div></div>'+
+   '</div></div>'+
+   '<div class="grid md:grid-cols-2 gap-4 mb-4">'+
+     window.kmiCTKpiCard({kpiId:'MONEY_LOST', name:'BUGÜNKÜ PARA KAYBI', value:null, missing:'Duruş/hurda/yeniden işleme için birim maliyet verisi KMI\'de henüz tanımlı değil', status:'GRAY'})+
+     window.kmiCTKpiCard({kpiId:'OTIF', name:'OTIF (Zamanında ve Tam Teslimat)', value:null, missing:'Müşteri sipariş bazlı termin/sevkiyat karşılaştırma hesabı henüz kurulmadı', status:'GRAY'})+
+   '</div>'+
+   '<div class="text-[10px] text-slate-600">Not: Yukarıdaki gri kartlar UYDURULMADI - KMI\'de bu hesaplar için henüz gerçek veri/formül yok. Faz 3+\'te ilgili veri (birim maliyet, sipariş-sevkiyat eşleşmesi) tanımlanınca buraya bağlanacak.</div>'+
+  '</div>';
+};
+// Executive Hub bridge'ini "PLANNED"tan "BRIDGE"e yükselt - artık gerçek bir ekranı var.
+try{
+  const execTower=window.KMI_CONTROL_TOWER.towers.find(function(t){ return t.id==='executive'; });
+  if(execTower){ execTower.status='BRIDGE'; execTower.bridge={label:'Genel Müdür Control Tower', fn:function(){ document.getElementById('kmiCTHub')?.remove(); window.kmiOpenExecutiveTower(); }}; }
+}catch(e){}
+
+// ---------------------------------------------------------------------------
+// D) "KMI'YE SOR" — GÜVENLİ ARAYÜZ NOKTASI (gerçek model bağlı DEĞİL).
+//    Sağlayıcı/API anahtarı Ender tarafından onaylanıp bir Supabase Edge
+//    Function'a (sunucu tarafı, gizli) eklenene kadar sistem dürüstçe
+//    "bağlı değil" der - sahte/uydurma bir cevap ASLA üretmez.
+// ---------------------------------------------------------------------------
+window.kmiAskKMI=async function(question, towerId, filters){
+  const ctx=window.kmiCTBuildAiContext(towerId, filters);
+  try{
+    const client=window.kurutluSupabase;
+    if(!client || !client.functions || typeof client.functions.invoke!=='function'){
+      return {status:'NOT_CONFIGURED', answer:'AI motoru henüz bağlanmadı (altyapı hazır değil).'};
+    }
+    const {data, error} = await client.functions.invoke('kmi-ai-brief', {body:{question:question, context:ctx}});
+    if(error) return {status:'NOT_CONFIGURED', answer:'AI motoru henüz yapılandırılmadı: '+(error.message||'edge function bulunamadı')};
+    return {status:'OK', answer:data.answer, evidence:data.evidence||[]};
+  }catch(e){
+    return {status:'NOT_CONFIGURED', answer:'AI motoru henüz bağlanmadı.'};
+  }
+};
+window.kmiOpenAskKMI=function(towerId){
+  document.getElementById('kmiAskKMIModal')?.remove();
+  const m=document.createElement('div'); m.id='kmiAskKMIModal'; m.className='fixed inset-0 z-[290] bg-black/75 flex items-center justify-center';
+  m.innerHTML='<div class="w-full max-w-md mx-auto bg-slate-950 border border-slate-700 rounded-2xl p-5">'+
+    '<div class="flex justify-between items-center mb-3"><b class="text-white">KMI\'YE SOR</b><button onclick="document.getElementById(\'kmiAskKMIModal\').remove()" class="text-slate-400">✕</button></div>'+
+    '<textarea id="askKMIQ" placeholder="Örn: Bugünün en büyük kaybı nedir?" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-sm mb-2" rows="2"></textarea>'+
+    '<button id="askKMIGo" class="bg-fuchsia-700 hover:bg-fuchsia-600 text-white font-bold px-3 py-2 rounded-lg text-sm">Sor</button>'+
+    '<div id="askKMIOut" class="mt-3 text-sm text-slate-300"></div></div>';
+  document.body.appendChild(m);
+  document.getElementById('askKMIGo').onclick=async function(){
+    const q=document.getElementById('askKMIQ').value.trim(); if(!q) return;
+    document.getElementById('askKMIOut').textContent='...';
+    const r=await window.kmiAskKMI(q, towerId||null, {});
+    document.getElementById('askKMIOut').innerHTML = r.status==='OK' ? esc(r.answer) : '<span class="text-amber-300">'+esc(r.answer)+'</span>';
+  };
 };
 })();
 </script>
