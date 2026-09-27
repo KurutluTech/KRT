@@ -704,6 +704,35 @@ ead>
 </section>
 
 <section id="tab-yonetici" class="tab-content space-y-6">
+                <!-- KMI-FIX (2026-09-27): Ender'in isteği - "tüm emirler bir komuta merkezinde
+                     son emirden ilk emire doğru akarak görüntülenecek" ve "yönetim onay merkezine
+                     hiç bir emir düşmüyor". Kök sebep: onay ekranı bir modül kutusunun ARKASINDA
+                     saklıydı (tıklamadan görünmüyordu) ve QR ile hızlı onaylayınca kayıt zaten
+                     anında onaylanıp kuyruktan düşüyordu - o yüzden ayrı ekrana bakınca hep boş
+                     görünüyordu. Artık Yönetim sekmesine girer girmez EN ÜSTTE, gözden
+                     kaçırılamayacak tek bir komuta merkezi var: TÜM iş emirleri (sadece onay
+                     bekleyenler değil) en son harekete göre yeniden eskiye sıralı, her satırda o
+                     anki aşamaya uygun Onayla/Reddet(+Yönlendir) butonu ile. -->
+                <div id="kmiCommandCenterSection" class="bg-slate-800 border-2 border-cyan-600/60 rounded-xl p-5 shadow-lg space-y-3 no-print">
+                  <div class="flex flex-wrap justify-between items-center gap-3">
+                    <div><h3 class="text-lg font-black text-white"><i class="fa-solid fa-tower-broadcast text-cyan-400 mr-2"></i>Komuta Merkezi · Tüm İş Emirleri</h3><p class="text-[11px] text-slate-500 mt-1">Son harekete göre yeniden eskiye sıralı. Onay / Red / Yönlendirme buradan yapılır.</p></div>
+                    <div class="flex items-center gap-2">
+                      <select id="kmiCcStageFilter" onchange="window.kmiRenderCommandCenter()" class="bg-slate-900 border border-slate-700 rounded p-1.5 text-xs text-white">
+                        <option value="">Tüm aşamalar</option>
+                        <option value="pending">Sadece onay/aksiyon bekleyenler</option>
+                        <option value="Kalite Onayı Bekliyor">Kalite</option>
+                        <option value="Tesviye Bekliyor">Tesviye</option>
+                        <option value="Vibrasyon Bekliyor">Vibrasyon</option>
+                        <option value="Muhasebe Onayı Bekliyor">Muhasebe</option>
+                        <option value="Yönetim Onayı Bekliyor">Yönetim</option>
+                        <option value="Sevke Hazır">Sevkiyat</option>
+                        <option value="Sevk Edildi / Kapandı">Kapandı</option>
+                      </select>
+                      <button onclick="window.kmiRenderCommandCenter()" class="bg-cyan-700 hover:bg-cyan-600 px-3 py-1.5 rounded text-[10px] text-white font-bold">Yenile</button>
+                    </div>
+                  </div>
+                  <div class="overflow-x-auto max-h-[520px] overflow-y-auto"><table class="w-full text-left text-xs text-slate-300"><thead class="bg-slate-900 text-slate-400 uppercase text-[10px] sticky top-0"><tr><th class="p-2">İş Emri</th><th class="p-2">Müşteri / Ürün</th><th class="p-2">Adet</th><th class="p-2">Aşama</th><th class="p-2">Son Hareket</th><th class="p-2">Aksiyon</th></tr></thead><tbody id="kmiCommandCenterBody" class="divide-y divide-slate-700"></tbody></table></div>
+                </div>
                 <!-- KMI-FIX (2026-09-26): Ender'in isteği - modül kutuları sayfanın en altında
                      kalıyordu, çok aşağı kaydırmak gerekiyordu; artık panelin ilk kutusu bu
                      (herşeye buradan tek tıkla ulaşılıyor). Kutular da iş akışına göre
@@ -3787,7 +3816,25 @@ getPuantajMetrics=function(person,monthKey=getCurrentMonthKey()){const m=_getPua
 function renderPuantajPersonAudit(){const sel=document.getElementById('puantajAuditPerson'),box=document.getElementById('puantajAuditJobs'),sum=document.getElementById('puantajAuditSummary');if(!sel||!box)return;const month=document.getElementById('puantajMonth')?.value||getCurrentMonthKey(),p=PERSONNEL_LIST.find(x=>Number(x.id)===Number(sel.value));if(!p){box.innerHTML='';return}const m=getPuantajMetrics(p,month);sum.innerHTML=`Puan <b class="text-amber-300">${m.finalPoints.toFixed(2)}</b> · Sıra <b>${m.rank||'-'}</b> · Sıralama katsayısı <b>${m.rankingFactor.toFixed(2)}×</b> · Yönetici ${m.managementAdjustment>=0?'+':''}%${m.managementAdjustment}`;box.innerHTML=`<div class="overflow-x-auto"><table class="w-full text-[10px] text-slate-300"><thead><tr><th class="p-2 text-left">İş Emri</th><th class="p-2">Uygunluk</th><th class="p-2">Üretim</th><th class="p-2">Süre</th><th class="p-2 text-left">Prim Etkisi</th></tr></thead><tbody>${m.jobResults.map(x=>`<tr class="border-t border-slate-800"><td class="p-2">${x.job.id} · ${escSkill(x.job.item||'')}</td><td class="p-2 ${x.eligible?'text-emerald-400':'text-red-400'}">${x.eligible?'Prim aldı':'Prim alamadı'}</td><td class="p-2">×${Number(x.productionMultiplier||0).toFixed(2)}</td><td class="p-2">×${Number(x.timedMultiplier||1).toFixed(2)}</td><td class="p-2">${x.eligible?'Hedef/kalite kriterine dahil':'Hedef veya kalite şartı sağlanmadı'}</td></tr>`).join('')}</tbody></table></div>`;}
 function populatePuantajAuditPeople(){const s=document.getElementById('puantajAuditPerson');if(!s)return;const old=s.value;s.innerHTML='<option value="">Personel seçiniz...</option>'+PERSONNEL_LIST.filter(p=>p.active!==false).map(p=>`<option value="${p.id}">${escSkill(p.name)} — ${escSkill(p.dept||'')}</option>`).join('');if(old)s.value=old;renderPuantajPersonAudit();}
 function renderManagementApprovedHistory(){const el=document.getElementById('managementApprovedHistory');if(!el)return;const rows=declarations.filter(d=>d.managementApprovalDate).sort((a,b)=>new Date(b.updatedAt||0)-new Date(a.updatedAt||0)).slice(0,50);el.innerHTML=rows.map(d=>`<div class="bg-slate-950/60 rounded p-2 text-[10px] flex justify-between"><span><b>${d.jobOrder}</b> · ${escSkill(d.operator)} · ${Number((d.qualityGood ?? d.qty) || 0)} adet</span><span class="text-emerald-400">${d.managementApprover||'-'} · ${d.managementApprovalDate}</span></div>`).join('')||'<div class="text-[10px] text-slate-500">Henüz yönetim son onayı yok.</div>';}
-function renderLiveMachineAssignments(){const el=document.getElementById('liveMachineAssignments');if(!el)return;const today=new Date().toISOString().slice(0,10);el.innerHTML=MACHINES_LIST.map(m=>{const name=`${m.code} - ${m.name}`,jobs=jobOrders.filter(j=>!j.deleted&&j.machine===name&&j.status==='Açık'),people=[...new Set(jobs.flatMap(j=>j.assignedTo||[]))].map(id=>PERSONNEL_LIST.find(p=>Number(p.id)===Number(id))).filter(Boolean);return `<div class="bg-slate-900 rounded-xl p-3"><b class="text-white text-xs">${name}</b><div class="text-[9px] text-slate-500">${today}</div>${people.map(p=>`<div class="mt-2 text-[10px]"><span class="text-cyan-300">${p.shiftTeam||'Vardiya ?'}</span> · ${escSkill(p.name)}</div>`).join('')||'<div class="text-[10px] text-slate-600 mt-2">Atama yok</div>'}</div>`}).join('');}
+// KMI-FIX (2026-09-27): Ender'in isteği - bu pano "j.status==='Açık'" (henüz BAŞLANMAMIŞ atanmış
+// iş) kontrolüyle yanlış bir şekilde "atama var" gösteriyordu, gerçek anlık ÇALIŞMA durumunu
+// yansıtmıyordu. Artık gerçek shop floor oturumlarından (window.kmiMachinesRunningNow) canlı
+// çalışıyor/duraklı durumu ve operatör/iş emri bilgisini gösteriyor.
+function renderLiveMachineAssignments(){
+ const el=document.getElementById('liveMachineAssignments');if(!el)return;
+ const today=new Date().toISOString().slice(0,10);
+ const runningNow=(typeof window.kmiMachinesRunningNow==='function'?window.kmiMachinesRunningNow():[]);
+ el.innerHTML=MACHINES_LIST.map(m=>{
+  const name=`${m.code} - ${m.name}`;
+  const run=runningNow.find(r=>String(r.machine||'').trim()===name);
+  if(run){
+   const startedMin=Math.max(0,Math.round((Date.now()-new Date(run.startedAt).getTime())/60000));
+   return `<div class="bg-slate-900 border ${run.paused?'border-amber-600':'border-emerald-600'} rounded-xl p-3"><div class="flex justify-between items-center"><b class="text-white text-xs">${name}</b><span class="text-[9px] px-1.5 py-0.5 rounded ${run.paused?'bg-amber-900/70 text-amber-300':'bg-emerald-900/70 text-emerald-300'}">${run.paused?'● DURUŞTA':'● ÇALIŞIYOR'}</span></div><div class="text-[10px] text-slate-400 mt-1">${escSkill(run.job?.item||run.jobId)}</div><div class="mt-1 text-[10px] text-cyan-300">${escSkill(run.operator)} · ${startedMin} dk</div></div>`;
+  }
+  const jobs=jobOrders.filter(j=>!j.deleted&&j.machine===name&&j.status==='Açık'),people=[...new Set(jobs.flatMap(j=>j.assignedTo||[]))].map(id=>PERSONNEL_LIST.find(p=>Number(p.id)===Number(id))).filter(Boolean);
+  return `<div class="bg-slate-900 rounded-xl p-3"><b class="text-white text-xs">${name}</b><div class="text-[9px] text-slate-500">${today}</div>${people.map(p=>`<div class="mt-2 text-[10px]"><span class="text-cyan-300">${p.shiftTeam||'Vardiya ?'}</span> · ${escSkill(p.name)}</div>`).join('')||'<div class="text-[10px] text-slate-600 mt-2">Atama yok</div>'}</div>`;
+ }).join('');
+}
 function renderExecutiveDashboard(){const el=document.getElementById('executiveDashboard');if(!el)return;const month=getCurrentMonthKey(),target=productTargetObject(month),actual=qualityGoodForMonth(month),openMaint=maintenanceRecords.filter(r=>r.status!=='Kapalı').length,activeMachines=MACHINES_LIST.filter(m=>machineOeeMetrics(`${m.code} - ${m.name}`,month).rows>0).length,avgOee=MACHINES_LIST.map(m=>machineOeeMetrics(`${m.code} - ${m.name}`,month)).filter(x=>x.rows).reduce((a,x,_,arr)=>a+x.oee/arr.length,0);const cards=[['Aylık üretim',actual.toLocaleString('tr-TR')],['Aylık hedef',Number(target.total||0).toLocaleString('tr-TR')],['Hedef gerçekleşme',target.total?'%'+(actual/target.total*100).toFixed(1):'-'],['Çalışan/üreten makine',activeMachines+'/'+MACHINES_LIST.length],['Ortalama OEE',avgOee?'%'+(avgOee*100).toFixed(1):'-'],['Açık bakım/arıza',openMaint],['Aktif personel',PERSONNEL_LIST.filter(p=>p.active!==false).length]];el.innerHTML='<div class="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-7 gap-2">'+cards.map(c=>`<div class="bg-slate-900 rounded-xl p-3"><div class="text-[9px] text-slate-500">${c[0]}</div><div class="text-lg font-black text-white">${c[1]}</div></div>`).join('')+'</div><div class="mt-3 text-[10px] text-slate-400">Rapor odağı: üretim hedefi → OEE/kayıp → makine sağlığı → personel/kalite → bakım aksiyonları. Günlük ve aylık görünüm aynı veri zincirini kullanır.</div>';}
 function renderShippingToday(){const r=document.getElementById('shippingReadyToday'),s=document.getElementById('shippingSentToday');if(!r||!s)return;const today=new Date().toLocaleDateString('tr-TR'),ready=declarations.filter(d=>d.shipmentReady&&d.status!=='Sevk Edildi'),sent=declarations.filter(d=>d.status==='Sevk Edildi'&&String(d.shippedAt||d.shipmentDate||d.updatedAt||'').includes(new Date().toISOString().slice(0,10)));r.innerHTML=ready.map(d=>`<div>${d.jobOrder} · ${d.operator} · <b>${d.qualityGood??d.qty}</b> adet</div>`).join('')||'<div class="text-slate-500">Bugün sevke hazır kayıt yok.</div>';s.innerHTML=sent.map(d=>`<div>${d.jobOrder} · <b>${d.qualityGood??d.qty}</b> adet · ${d.vehiclePlate||'-'}</div>`).join('')||'<div class="text-slate-500">Bugün sevk edilen kayıt yok.</div>';}
 function enhanceQualityMeasurementUI(){ /* V53: ölçüm seçimi renderKaliteTable içinde tek kaynaktan oluşturulur. */ }
@@ -4297,6 +4344,20 @@ setTimeout(()=>{try{renderServiceCallPanel();}catch(e){}},60);
 // beyanı + son çevrim süresine göre çalışma saati, üretilen adet, o ürünün ay içi toplamı,
 // haftalık/aylık üretim - artış/düşüş oklarıyla (yeşil/kırmızı) - gösteriliyor.
 function kmiMachineActiveRun(machineName){
+ // KMI-FIX (2026-09-27): Ender'in isteği - "aktif edilen iş emri ... makineyi çalışmış olarak
+ // ... live floorda çalışıyor gözükmesine sebep olmalı, burası önemli". Bu fonksiyon önceden
+ // yalnız eski "operatorJobDrafts" (klasik Beyan ekranı) verisine bakıyordu - Shop Floor Live
+ // ekranından (kmiStartWork/kmiPause/kmiFinish) başlatılan işler burada hiç görünmüyordu, bu
+ // yüzden makine künyesi/kartı ve "ÇALIŞIYOR" rozeti gerçek canlı durumu yansıtmıyordu. Şimdi
+ // önce (daha canlı/detaylı olan) Shop Floor oturumlarına bakıyoruz, sonra eski taslak akışına.
+ try{
+  if(typeof window.kmiMachinesRunningNow==='function'){
+   const running=window.kmiMachinesRunningNow().find(r=>r.machine===machineName&&r.job&&!r.job.finishedAt);
+   if(running){
+    return {job:running.job,operatorName:running.operator||'-',startedAt:running.startedAt||null,paused:!!running.paused,source:'shopfloor'};
+   }
+  }
+ }catch(e){}
  try{
   const drafts=loadStorage('operatorJobDrafts',{});
   for(const key in drafts){
@@ -4305,7 +4366,7 @@ function kmiMachineActiveRun(machineName){
    const jo=(jobOrders||[]).find(j=>j.id===d.jobId);
    if(jo&&jo.machine===machineName){
     const op=(PERSONNEL_LIST||[]).find(p=>Number(p.id)===Number(d.operatorId));
-    return {job:jo,operatorName:op?op.name:(d.operatorId?'Operatör #'+d.operatorId:'-'),startedAt:d.startedAt||d.updatedAt||null};
+    return {job:jo,operatorName:op?op.name:(d.operatorId?'Operatör #'+d.operatorId:'-'),startedAt:d.startedAt||d.updatedAt||null,source:'draft'};
    }
   }
  }catch(e){}
@@ -4341,7 +4402,8 @@ function kmiMachineRunBadgeHtml(machineName){
  const run=kmiMachineActiveRun(machineName);
  if(!run)return {label:'ÇALIŞIYOR',sub:''};
  const dur=run.startedAt?kmiFmtHoursMin((Date.now()-new Date(run.startedAt))/60000):'';
- return {label:`ÇALIŞIYOR · ${v33e(run.job.id)}`,sub:`${v33e(run.job.item||'')} · ${v33e(run.operatorName)}${dur?' · '+dur:''}`};
+ const statusWord=run.paused?'DURUŞTA':'ÇALIŞIYOR';
+ return {label:`${statusWord} · ${v33e(run.job.id)}`,sub:`${v33e(run.job.item||'')} · ${v33e(run.operatorName)}${dur?' · '+dur:''}`,paused:!!run.paused};
 }
 function kmiMachineProductionPanelHtml(machineName){
  const s=kmiMachineProductionStats(machineName);
@@ -5119,7 +5181,22 @@ D.orders=(D.orders||[]).map(x=>({...x,
  orderDate:x.orderDate||new Date().toISOString().slice(0,10),dueDate:x.dueDate||'',
  deliveryAddress:x.deliveryAddress||'',notes:x.notes||'',status:x.status||'Yeni Sipariş',
  createdBy:x.createdBy||'',createdAt:x.createdAt||new Date().toISOString(),
- reservation:x.reservation||null}));
+ reservation:x.reservation||null,
+ // KMI-FIX (2026-09-27): Ender'in isteği - müşteri siparişleri üç kaynaktan gelir:
+ // 1) seri imalat (yıl içi sürekli tekrar eden ürün), 2) proje (proje kapsamında birden
+ // çok farklı parça/adet), 3) kurutlu'nun kendi iç üretim ihtiyacı (aparat/fikstür).
+ // 'proje' tipi siparişler kendi başına üretilmez; her satırı ('lines') otomatik olarak
+ // normal bir 'seri' alt-siparişe (parentOrderId ile bağlı) dönüştürülür, böylece mevcut
+ // rezervasyon/iş emri motoru hiç değişmeden her parça için ayrı ayrı çalışır.
+ orderType:x.orderType||'seri',
+ lines:Array.isArray(x.lines)?x.lines:[],
+ parentOrderId:x.parentOrderId||null}));
+window.KMI_INTERNAL_CUSTOMER_NAME='KURUTLU INTERNAL';
+(function kmiEnsureInternalCustomer(){
+ if(!D.customers.some(c=>String(c.name||'').toLocaleUpperCase('tr-TR')===window.KMI_INTERNAL_CUSTOMER_NAME)){
+  D.customers.push({id:'M-INTERNAL',name:window.KMI_INTERNAL_CUSTOMER_NAME,active:true,fields:[],internal:true});
+ }
+})();
 // KMI-FIX (2026-09-25): Ender'in yüklediği teknik resim (Y135MAM0E3 rev.9), STEP katı model,
 // NC programı (1453.nc) ve takım listesi Excel'inden (107-M3500 ÇATAL TAKIM LİSTESİ) M3500 ürün
 // kartı otomatik oluşturuluyor - sadece bir kere, ürün zaten yoksa.
@@ -5387,18 +5464,30 @@ function card(label,val,sub,icon){return `<div class="bg-slate-900 border border
 function renderKpis(){const accepted=D.lots.filter(x=>x.qc==='KABUL'),kg=accepted.reduce((a,x)=>a+Number(x.kgAvailable||0),0),blank=accepted.reduce((a,x)=>a+Number(x.blankAvailable||0),0);document.getElementById('v61Kpis').innerHTML=card('Ürün',D.products.length,'aktif ürün kartı','fa-cube')+card('Müşteri',D.customers.length,'müşteri kartı','fa-building')+card('Açık Sipariş',(D.orders||[]).filter(o=>o.status!=='Kapandı'&&o.status!=='İptal').length,'müşteri siparişi','fa-file-invoice')+card('Kabul Stok',kg.toLocaleString('tr-TR')+' kg','LOT bazlı','fa-weight-hanging')+card('Blank',blank.toLocaleString('tr-TR'),'üretilebilir adet','fa-layer-group')+card('Rework',D.returns.filter(x=>x.status!=='Kapalı').reduce((a,x)=>a+Number(x.qty||0),0),'açık iade adedi','fa-rotate')+card('Açık PO',D.purchases.filter(x=>x.status!=='Kapandı').length,'satınalma siparişi','fa-cart-shopping')}
 function shell(title,desc,buttons,body){return `<section class="bg-slate-900 border border-slate-700 rounded-2xl overflow-hidden"><div class="p-5 border-b border-slate-700 flex flex-wrap justify-between gap-3"><div><h3 class="text-xl font-black">${title}</h3><p class="text-xs text-slate-400 mt-1">${desc}</p></div><div>${buttons||''}</div></div><div class="p-5">${body}</div></section>`}
 function kmiOrderStatusColor(s){return {'Yeni Sipariş':'bg-amber-900/60 text-amber-300','Planlamada':'bg-cyan-900/60 text-cyan-300','Onaylandı':'bg-blue-900/60 text-blue-300','Üretimde':'bg-indigo-900/60 text-indigo-300','Sevk Edildi':'bg-emerald-900/60 text-emerald-300','Kapandı':'bg-slate-800 text-slate-400','İptal':'bg-red-950 text-red-300'}[s]||'bg-slate-800 text-slate-400';}
+const ORDER_TYPE_LABEL={seri:'Seri İmalat',proje:'Proje',ic_uretim:'İç Üretim'};
+const ORDER_TYPE_COLOR={seri:'bg-slate-800 text-slate-400',proje:'bg-amber-950/60 text-amber-300',ic_uretim:'bg-fuchsia-950/60 text-fuchsia-300'};
 function kmiOrderCard(o){
  const p=D.products.find(x=>x.id===o.product);
+ const isProject=o.orderType==='proje';
+ const typeTag=`<span class="text-[9px] px-1.5 py-0.5 rounded ${ORDER_TYPE_COLOR[o.orderType]||ORDER_TYPE_COLOR.seri} font-bold">${esc(ORDER_TYPE_LABEL[o.orderType]||'Seri İmalat')}</span>`;
+ const body=isProject?(()=>{const pr=v62ProjectProgress(o);return `<div class="text-xs text-slate-400 mt-1">${pr.totalLines} parça satırı</div><div class="text-xs text-slate-500 mt-2">${pr.doneQty}/${pr.totalQty} adet tamamlandı · ${pr.doneLines}/${pr.totalLines} satır kapandı</div>`;})():`
+  <div class="text-xs text-slate-400 mt-1">${esc(p?(p.code?p.code+' · ':'')+(p.name||''):'Ürün seçilmedi')}</div>
+  <div class="text-xs text-slate-500 mt-2">${Number(o.qty||0).toLocaleString('tr-TR')} ${esc(o.unit||'adet')}${o.unitPrice?' · '+Number(o.unitPrice).toLocaleString('tr-TR')+' '+esc(o.currency||'TRY')+'/adet':''}</div>`;
  return `<button onclick="v62OpenOrder('${o.id}')" class="text-left bg-slate-950 hover:bg-slate-800 border border-slate-700 rounded-2xl p-4 transition">
   <div class="flex justify-between gap-2"><span class="font-mono text-amber-300 font-black">${esc(o.id)}</span><span class="text-[10px] px-2 py-0.5 rounded ${kmiOrderStatusColor(o.status)}">${esc(o.status)}</span></div>
+  <div class="mt-1.5">${typeTag}${o.parentOrderId?' <span class="text-[9px] text-cyan-400 ml-1">Proje satırı: '+esc(o.parentOrderId)+'</span>':''}</div>
   <div class="font-black text-white mt-2">${esc(name('customers',o.customer))}</div>
-  <div class="text-xs text-slate-400 mt-1">${esc(p?(p.code?p.code+' · ':'')+(p.name||''):'Ürün seçilmedi')}</div>
-  <div class="text-xs text-slate-500 mt-2">${Number(o.qty||0).toLocaleString('tr-TR')} ${esc(o.unit||'adet')}${o.unitPrice?' · '+Number(o.unitPrice).toLocaleString('tr-TR')+' '+esc(o.currency||'TRY')+'/adet':''}</div>
+  ${body}
   <div class="text-[10px] text-slate-500 mt-1">${o.dueDate?'Teslim: '+esc(o.dueDate):'Teslim tarihi yok'}${o.customerPO?' · PO '+esc(o.customerPO):''}</div>
   <div class="text-[10px] text-cyan-300 mt-3">Sipariş kartını aç →</div>
  </button>`;
 }
-function orders_html(list){return list.length?list.map(kmiOrderCard).join(''):'<div class="text-slate-500 text-xs">Sipariş yok.</div>';}
+function orders_html(list){
+ // KMI-FIX (2026-09-27): Proje siparişlerinden otomatik oluşan alt (parça) siparişler burada
+ // ayrı kart olarak KALABALIK yapmasın diye gizlenir - proje kartının içinden erişilir.
+ const top=list.filter(o=>!o.parentOrderId);
+ return top.length?top.map(kmiOrderCard).join(''):'<div class="text-slate-500 text-xs">Sipariş yok.</div>';
+}
 function products(){
  const customers=D.customers.map(c=>`<button onclick="v62OpenCustomer('${c.id}')" class="text-left bg-slate-950 hover:bg-slate-800 border border-slate-700 rounded-2xl p-4 transition"><div class="flex justify-between gap-2"><div class="font-black text-white">${esc(c.name)}</div><span class="text-[10px] ${c.active===false?'text-red-300':'text-emerald-300'}">${c.active===false?'PASİF':'AKTİF'}</span></div><div class="text-xs text-slate-500 mt-1">${D.products.filter(p=>p.customer===c.id).length} ürün · ${esc(c.id)}</div><div class="text-[10px] text-cyan-300 mt-3">Kartı aç / düzenle →</div></button>`).join('');
  const prods=D.products.map(p=>`<button onclick="v62OpenProduct('${p.id}')" class="text-left bg-slate-950 hover:bg-slate-800 border border-slate-700 rounded-2xl p-4 transition"><div class="flex justify-between"><span class="font-mono text-cyan-300 font-black">${esc(p.code)}</span><span class="text-[10px] text-slate-500">REV ${esc(p.revision||'-')}</span></div><div class="font-black text-white mt-2">${esc(p.name)}</div><div class="text-xs text-slate-400 mt-1">${esc(name('customers',p.customer))}</div><div class="text-xs text-slate-500 mt-2">${esc(p.material||'Malzeme tanımsız')}</div>${docBadges73(p)}<div class="text-[10px] text-cyan-300 mt-3">Ürün kimlik kartını aç →</div></button>`).join('');
@@ -5652,9 +5741,89 @@ window.v62DeleteCurrent=function(){if(!activeV62)return;const {type,id}=activeV6
 // kurulacağı temel veri (reservation alanı o modül tarafından doldurulacak). =====
 window.v61AddOrder=function(){
  if(!D.customers.length) return alert('Önce en az bir müşteri kartı ekleyin.');
- const o={id:'SO-'+new Date().getFullYear()+'-'+String(Date.now()).slice(-6),customer:D.customers[0]?.id||'',product:'',qty:0,unit:'adet',unitPrice:0,currency:'TRY',customerPO:'',orderDate:new Date().toISOString().slice(0,10),dueDate:'',deliveryAddress:'',notes:'',status:'Yeni Sipariş',createdBy:currentUser?.name||'-',createdAt:new Date().toISOString(),reservation:null};
+ const o={id:'SO-'+new Date().getFullYear()+'-'+String(Date.now()).slice(-6),customer:D.customers[0]?.id||'',product:'',qty:0,unit:'adet',unitPrice:0,currency:'TRY',customerPO:'',orderDate:new Date().toISOString().slice(0,10),dueDate:'',deliveryAddress:'',notes:'',status:'Yeni Sipariş',createdBy:currentUser?.name||'-',createdAt:new Date().toISOString(),reservation:null,orderType:'seri',lines:[],parentOrderId:null};
  D.orders.unshift(o); save(); v62OpenOrder(o.id);
 };
+// KMI-FIX (2026-09-27): Ender'in isteği - müşteri siparişlerinin 3 kaynağı: seri imalat / proje /
+// kurutlu'nun kendi iç üretim ihtiyacı. Form alanlarını kaybetmeden tip değiştirmek için önce
+// mevcut form değerleri kaydedilir, sonra yeni tipe uygun modal yeniden çizilir.
+function v62CaptureOrderFormInto(o){
+ const val=id=>document.getElementById(id)?.value;
+ if(document.getElementById('ordCustomer')) o.customer=val('ordCustomer');
+ if(document.getElementById('ordProduct')) o.product=val('ordProduct');
+ if(document.getElementById('ordQty')) o.qty=Number(val('ordQty')||0);
+ if(document.getElementById('ordUnit')) o.unit=val('ordUnit')||'adet';
+ if(document.getElementById('ordPrice')) o.unitPrice=Number(val('ordPrice')||0);
+ if(document.getElementById('ordCur')) o.currency=val('ordCur')||'TRY';
+ if(document.getElementById('ordPO')) o.customerPO=val('ordPO')||'';
+ if(document.getElementById('ordDate')) o.orderDate=val('ordDate');
+ if(document.getElementById('ordDue')) o.dueDate=val('ordDue');
+ if(document.getElementById('ordAddr')) o.deliveryAddress=val('ordAddr')||'';
+ if(document.getElementById('ordNotes')) o.notes=val('ordNotes')||'';
+ if(document.getElementById('ordStatus')) o.status=val('ordStatus');
+}
+window.v62OrderTypeChanged=function(){
+ const o=D.orders.find(x=>x.id===activeV62?.id); if(!o) return;
+ v62CaptureOrderFormInto(o);
+ const prevType=o.orderType;
+ o.orderType=document.getElementById('ordType').value;
+ if(o.orderType==='ic_uretim' && prevType!=='ic_uretim'){const ic=D.customers.find(c=>String(c.name||'')===window.KMI_INTERNAL_CUSTOMER_NAME);if(ic)o.customer=ic.id;}
+ save();
+ v62OpenOrder(o.id);
+};
+window.v62ProjectLineAdd=function(){
+ const o=D.orders.find(x=>x.id===activeV62?.id); if(!o) return;
+ v62CaptureOrderFormInto(o);
+ o.lines=Array.isArray(o.lines)?o.lines:[];
+ o.lines.push({productId:'',qty:0,dueDate:o.dueDate||'',childOrderId:null});
+ save(); v62OpenOrder(o.id);
+};
+window.v62ProjectLineRemove=function(i){
+ const o=D.orders.find(x=>x.id===activeV62?.id); if(!o||!o.lines?.[i]) return;
+ const line=o.lines[i];
+ if(line.childOrderId && !confirm('Bu satıra bağlı bir alt sipariş kaydı var. Satırı kaldırmak o kaydı SİLMEZ, sadece bağlantıyı kaldırır. Devam edilsin mi?')) return;
+ o.lines.splice(i,1); save(); v62OpenOrder(o.id);
+};
+window.v62ProjectLineSet=function(i,key,v){
+ const o=D.orders.find(x=>x.id===activeV62?.id); if(!o||!o.lines?.[i]) return;
+ o.lines[i][key]=key==='qty'?Number(v||0):v; save();
+};
+function v62ProjectLinesHtml(o){
+ const rows=(o.lines||[]).map((l,i)=>`<div class="grid grid-cols-12 gap-2 items-center bg-slate-950 border border-slate-800 rounded p-2">
+   <select class="col-span-5 bg-slate-900 border border-slate-700 rounded p-1.5 text-xs" onchange="v62ProjectLineSet(${i},'productId',this.value)">${v62OrderProductOptions(o.customer,l.productId)}</select>
+   <input type="number" min="0" value="${Number(l.qty||0)}" placeholder="Adet" class="col-span-2 bg-slate-900 border border-slate-700 rounded p-1.5 text-xs" onchange="v62ProjectLineSet(${i},'qty',this.value)">
+   <input type="date" value="${esc(l.dueDate||'')}" class="col-span-3 bg-slate-900 border border-slate-700 rounded p-1.5 text-xs" onchange="v62ProjectLineSet(${i},'dueDate',this.value)">
+   <span class="col-span-1 text-[9px] ${l.childOrderId?'text-emerald-400':'text-slate-600'}">${l.childOrderId?`<a href="javascript:void(0)" onclick="v62OpenOrder('${esc(l.childOrderId)}')" class="underline">Açıldı: ${esc(l.childOrderId)}</a>`:'Bekliyor'}</span>
+   <button onclick="v62ProjectLineRemove(${i})" class="col-span-1 text-rose-400 hover:text-rose-300"><i class="fa-solid fa-trash"></i></button>
+ </div>`).join('');
+ return `<div class="mt-4 bg-slate-900/60 border border-amber-800/40 rounded-xl p-3"><div class="flex justify-between items-center mb-2"><h4 class="font-black text-amber-300 text-sm">Proje Satırları · Parça / Adet</h4><button onclick="v62ProjectLineAdd()" class="bg-slate-700 hover:bg-slate-600 px-3 py-1 rounded text-[10px] text-white">+ Satır Ekle</button></div><div class="space-y-2">${rows||'<div class="text-slate-500 text-xs">Henüz satır yok. + Satır Ekle ile her farklı parça/adedi ayrı satıra girin.</div>'}</div><button onclick="v62ProjectGenerateOrders()" class="mt-3 w-full bg-amber-700 hover:bg-amber-600 text-white font-bold py-2 rounded-xl text-xs"><i class="fa-solid fa-bolt mr-1"></i>Satırlardan Ayrı Sipariş Kayıtları Oluştur (her biri kendi rezervasyon/iş emri akışından geçer)</button></div>`;
+}
+window.v62ProjectGenerateOrders=function(){
+ const o=D.orders.find(x=>x.id===activeV62?.id); if(!o) return;
+ if(!o.customer) return alert('Önce müşteri seçin.');
+ const pending=(o.lines||[]).filter(l=>l.productId&&Number(l.qty)>0&&!l.childOrderId);
+ if(!pending.length) return alert('Yeni sipariş açılacak satır yok - satır eksik/tamamlanmamış olabilir ya da hepsi zaten açılmış.');
+ pending.forEach((l,idx)=>{
+  const child={id:'SO-'+new Date().getFullYear()+'-'+String(Date.now()+idx).slice(-6),customer:o.customer,product:l.productId,qty:Number(l.qty),unit:'adet',unitPrice:0,currency:o.currency||'TRY',customerPO:o.customerPO||'',orderDate:new Date().toISOString().slice(0,10),dueDate:l.dueDate||o.dueDate||'',deliveryAddress:o.deliveryAddress||'',notes:'Proje: '+o.id,status:'Yeni Sipariş',createdBy:currentUser?.name||'-',createdAt:new Date().toISOString(),reservation:null,orderType:'seri',lines:[],parentOrderId:o.id};
+  D.orders.push(child); l.childOrderId=child.id;
+ });
+ o.status='Planlamada'; save(); v62OpenOrder(o.id);
+ window.kmiToast?.(pending.length+' satır için ayrı sipariş kaydı oluşturuldu.','ok');
+};
+// Bir proje siparişinin toplam ilerlemesini (satır bazlı) özetler - kaç satırdan kaçı
+// tamamlandı, toplam adet/tamamlanan adet.
+function v62ProjectProgress(o){
+ const lines=(o.lines||[]).filter(l=>l.productId&&Number(l.qty)>0);
+ let doneLines=0,totalQty=0,doneQty=0;
+ lines.forEach(l=>{
+  totalQty+=Number(l.qty||0);
+  const child=l.childOrderId?D.orders.find(x=>x.id===l.childOrderId):null;
+  const childDone=child&&['Sevk Edildi','Kapandı'].includes(child.status);
+  if(childDone){doneLines++;doneQty+=Number(l.qty||0);}
+ });
+ return {totalLines:lines.length,doneLines,totalQty,doneQty};
+}
+window.v62ProjectProgress=v62ProjectProgress;
 window.v62OrderProductOptions=function(customerId,selected){
  return D.products.filter(p=>!customerId||p.customer===customerId).map(p=>`<option value="${p.id}" ${selected===p.id?'selected':''}>${esc(p.code?p.code+' · ':'')}${esc(p.name)}</option>`).join('')||'<option value="">Bu müşteriye ait ürün yok - önce ürün kimlik kartı ekleyin</option>';
 };
@@ -5667,22 +5836,33 @@ window.v62OpenOrder=function(id){
  activeV62={type:'orders',id};
  const custOpts=D.customers.map(c=>`<option value="${c.id}" ${o.customer===c.id?'selected':''}>${esc(c.name)}</option>`).join('');
  const total=Number(o.qty||0)*Number(o.unitPrice||0);
- v62Modal('Müşteri Siparişi · '+esc(o.id),`<div class="grid md:grid-cols-3 gap-3 text-xs">
-  <label>Müşteri *<select id="ordCustomer" onchange="v62OrderCustomerChanged()" class="mt-1 w-full bg-slate-950 border border-slate-700 rounded p-2">${custOpts}</select></label>
+ const isProject=o.orderType==='proje';
+ const typeSelect=`<label class="md:col-span-3">Sipariş Türü *<select id="ordType" onchange="v62OrderTypeChanged()" class="mt-1 w-full bg-slate-950 border border-amber-700 rounded p-2 font-bold">
+   <option value="seri" ${o.orderType==='seri'?'selected':''}>Seri İmalat (yıl içi sürekli tekrar eden ürün)</option>
+   <option value="proje" ${isProject?'selected':''}>Proje (proje kapsamında birden çok farklı parça/adet)</option>
+   <option value="ic_uretim" ${o.orderType==='ic_uretim'?'selected':''}>Kurutlu İç Üretim (kendi aparat / fikstür ihtiyacı)</option>
+ </select></label>`;
+ const parentInfo=o.parentOrderId?`<div class="md:col-span-3 text-[10px] text-cyan-300">Bu kayıt bir proje siparişinin alt kaydıdır: ${esc(o.parentOrderId)}</div>`:'';
+ const singleProductFields=isProject?'':`
   <label class="md:col-span-2">Ürün *<select id="ordProduct" class="mt-1 w-full bg-slate-950 border border-slate-700 rounded p-2">${v62OrderProductOptions(o.customer,o.product)}</select></label>
   <label>Sipariş Adedi *<input id="ordQty" type="number" min="0" value="${Number(o.qty||0)}" oninput="v62OrderCalc()" class="mt-1 w-full bg-slate-950 border border-slate-700 rounded p-2"></label>
-  <label>Birim<input id="ordUnit" value="${esc(o.unit||'adet')}" class="mt-1 w-full bg-slate-950 border border-slate-700 rounded p-2"></label>
+  <label>Birim<input id="ordUnit" value="${esc(o.unit||'adet')}" class="mt-1 w-full bg-slate-950 border border-slate-700 rounded p-2"></label>`;
+ v62Modal('Müşteri Siparişi · '+esc(o.id),`<div class="grid md:grid-cols-3 gap-3 text-xs">
+  ${typeSelect}${parentInfo}
+  <label>Müşteri *<select id="ordCustomer" onchange="v62OrderCustomerChanged()" class="mt-1 w-full bg-slate-950 border border-slate-700 rounded p-2">${custOpts}</select></label>
+  ${singleProductFields}
   <label>Birim Fiyat<input id="ordPrice" type="number" min="0" step="0.01" value="${Number(o.unitPrice||0)}" oninput="v62OrderCalc()" class="mt-1 w-full bg-slate-950 border border-slate-700 rounded p-2"></label>
   <label>Para Birimi<select id="ordCur" onchange="v62OrderCalc()" class="mt-1 w-full bg-slate-950 border border-slate-700 rounded p-2">${['TRY','EUR','USD','GBP'].map(c=>`<option ${o.currency===c?'selected':''}>${c}</option>`).join('')}</select></label>
   <label>Müşteri Sipariş / PO No<input id="ordPO" value="${esc(o.customerPO||'')}" class="mt-1 w-full bg-slate-950 border border-slate-700 rounded p-2"></label>
   <label>Sipariş Tarihi<input id="ordDate" type="date" value="${esc(o.orderDate||'')}" class="mt-1 w-full bg-slate-950 border border-slate-700 rounded p-2"></label>
-  <label>İstenen Teslim Tarihi *<input id="ordDue" type="date" value="${esc(o.dueDate||'')}" class="mt-1 w-full bg-slate-950 border border-slate-700 rounded p-2"></label>
+  <label>İstenen Teslim Tarihi ${isProject?'':'*'}<input id="ordDue" type="date" value="${esc(o.dueDate||'')}" class="mt-1 w-full bg-slate-950 border border-slate-700 rounded p-2"></label>
   <label>Durum<select id="ordStatus" class="mt-1 w-full bg-slate-950 border border-slate-700 rounded p-2">${['Yeni Sipariş','Planlamada','Onaylandı','Üretimde','Sevk Edildi','Kapandı','İptal'].map(s=>`<option ${o.status===s?'selected':''}>${s}</option>`).join('')}</select></label>
   <label class="md:col-span-3">Teslimat Adresi<input id="ordAddr" value="${esc(o.deliveryAddress||'')}" placeholder="Boş bırakılırsa müşteri kartındaki adres kullanılır" class="mt-1 w-full bg-slate-950 border border-slate-700 rounded p-2"></label>
   <label class="md:col-span-3">Notlar<textarea id="ordNotes" class="mt-1 w-full bg-slate-950 border border-slate-700 rounded p-2">${esc(o.notes||'')}</textarea></label>
  </div>
- <div class="mt-4 bg-slate-950 border border-slate-700 rounded-xl p-4"><b>Sipariş Tutarı:</b> <span id="ordTotal">${money(total,o.currency)}</span></div>
- ${kmiReservationPanel(o)}
+ ${isProject?'':`<div class="mt-4 bg-slate-950 border border-slate-700 rounded-xl p-4"><b>Sipariş Tutarı:</b> <span id="ordTotal">${money(total,o.currency)}</span></div>`}
+ ${isProject?v62ProjectLinesHtml(o):''}
+ ${isProject?'':kmiReservationPanel(o)}
  <div class="mt-6 flex justify-between"><button onclick="v69DeleteDRecord('orders','${esc(o.id)}','Müşteri Siparişi')" class="bg-red-950 text-red-300 px-4 py-2 rounded">Siparişi Sil</button><button onclick="v62SaveOrder()" class="bg-emerald-700 px-5 py-2 rounded font-black">Siparişi Kaydet</button></div>`);
 };
 window.v62OrderCalc=function(){
@@ -5691,6 +5871,12 @@ window.v62OrderCalc=function(){
 };
 window.v62SaveOrder=function(){
  const o=D.orders.find(x=>x.id===activeV62?.id); if(!o) return;
+ const isProject=o.orderType==='proje';
+ if(isProject){
+  if(!document.getElementById('ordCustomer').value) return alert('Proje siparişi için müşteri seçilmeli.');
+  Object.assign(o,{customer:document.getElementById('ordCustomer').value,unitPrice:Number(document.getElementById('ordPrice').value||0),currency:document.getElementById('ordCur').value,customerPO:document.getElementById('ordPO').value.trim(),orderDate:document.getElementById('ordDate').value,dueDate:document.getElementById('ordDue').value,deliveryAddress:document.getElementById('ordAddr').value.trim(),notes:document.getElementById('ordNotes').value.trim(),status:document.getElementById('ordStatus').value});
+  save(); v62CloseModal(); v61Show('products'); return;
+ }
  const qty=Number(document.getElementById('ordQty').value||0), dueDate=document.getElementById('ordDue').value, product=document.getElementById('ordProduct').value;
  if(!product) return alert('Bu müşteriye ait bir ürün seçilmeli. Önce Ürün Kimlik Kartı eklemeniz gerekebilir.');
  if(qty<=0) return alert('Sipariş adedi 0\'dan büyük olmalı.');
@@ -5752,7 +5938,7 @@ window.kmiApproveReservationAndOpenJobOrder=function(orderId){
  const p=D.products.find(x=>x.id===o.product); if(!p) return;
  const cust=D.customers.find(c=>c.id===o.customer);
  const id=window.v107NextJobOrderNo?window.v107NextJobOrderNo():`IE-${new Date().getFullYear()}-${String((window.jobOrders||[]).length+1).padStart(3,'0')}`;
- const job={id,client:cust?cust.name:'Müşteri',item:`${p.code?p.code+' · ':''}${p.name}`,department:'Üretim',machine:`${o.reservation.machine} - ${o.reservation.machineName}`,assignedTo:[],targetType:'production',targetQty:Math.floor(o.qty),completedQty:0,price:Number(o.unitPrice||0),status:'Açık',durationMinutes:0,openedAt:new Date().toISOString(),dueAt:o.reservation.plannedEnd,source:'KMI_RESERVATION',orderId:o.id};
+ const job={id,client:cust?cust.name:'Müşteri',item:`${p.code?p.code+' · ':''}${p.name}`,department:'Üretim',machine:`${o.reservation.machine} - ${o.reservation.machineName}`,assignedTo:[],targetType:'production',targetQty:Math.floor(o.qty),completedQty:0,price:Number(o.unitPrice||0),status:'Açık',durationMinutes:0,openedAt:new Date().toISOString(),dueAt:o.reservation.plannedEnd,source:'KMI_RESERVATION',orderId:o.id,productId:p.id};
  (window.jobOrders=window.jobOrders||[]).push(job);
  try{saveStorage('jobOrders',window.jobOrders);}catch(e){}
  o.reservation.approvedBy=currentUser.name; o.reservation.approvedAt=new Date().toISOString(); o.reservation.jobOrderId=id;
@@ -8590,22 +8776,98 @@ window.kmiOpenWork=function(id){
  if(!s?.startedAt||s?.finishedAt){d.innerHTML=`<div class="max-w-xl mx-auto min-h-screen flex flex-col justify-center p-4"><button onclick="kmiOpenShopFloor()" class="self-start text-slate-400 mb-5">← İşlerim</button><div class="text-xs text-cyan-300 font-black">${E(j.id)}</div><h1 class="text-3xl font-black mt-2">${E(j.item||j.productId)}</h1><div class="bg-slate-900 rounded-2xl p-4 mt-4"><div class="text-sm text-slate-400">MAKİNE</div><div class="text-xl font-black">${E(j.machine||'Atanmamış')}</div><div class="grid grid-cols-2 gap-3 mt-4"><div><span class="text-xs text-slate-500">HEDEF</span><div class="text-2xl font-black">${N(j.targetQty)}</div></div><div><span class="text-xs text-slate-500">VARDİYA</span><div class="text-lg font-black">${E(j.shift||'Genel')}</div></div></div><div class="mt-3 pt-3 border-t border-slate-800"><span class="text-xs text-slate-500">HAM MADDE LOT</span><div class="text-sm font-black ${j.materialLotId?'text-emerald-300':'text-rose-300'}">${j.materialLotId?E(j.materialLotId):(/^101\b/.test(String(j.machine||'').trim())?'Gerekmiyor (kesim iş emri)':'Atanmadı - yönetici atamalı')}</div></div></div><button onclick="kmiStartWork('${E(id)}')" class="mt-5 w-full bg-emerald-600 active:scale-[.98] rounded-2xl py-6 text-2xl font-black">▶ İŞE BAŞLA</button><div class="text-center text-xs text-slate-500 mt-3">Başlatınca gerçek çalışma süresi ve üretim eventleri kaydedilir.</div></div>`;return}
  renderRunning(j,s);
 };
+// KMI-FIX (2026-09-27): Ender'in isteği - ham madde kalanı ve ne zaman biteceğinin projeksiyonu,
+// bir önceki vardiyada üretilen adet, ve (varsa) siparişe kalan adet ile bu iş emrinin hedefine
+// kalan adedin AYRI gösterilmesi. Shop Floor'daki gerçek üretim ekranına eklendi.
+function kmiMaterialRemainingHtml(j){
+ const isSaw=/^101\b/.test(String(j.machine||'').trim());
+ if(isSaw)return '';
+ if(!j.materialLotId)return '<div class="mt-3 pt-3 border-t border-slate-800"><span class="text-[10px] text-rose-400 font-black">HAM MADDE LOT ATANMADI</span></div>';
+ const lot=(window.D?.lots||[]).find(l=>l.id===j.materialLotId);
+ if(!lot)return '';
+ const avail=Number(lot.blankAvailable||0);
+ const target=Number(j.targetQty||0),done=Number(j.completedQty||0),remainNeed=Math.max(0,target-done);
+ const short=avail<remainNeed;
+ return `<div class="mt-3 pt-3 border-t border-slate-800 flex justify-between items-center"><div><span class="text-[10px] text-slate-500">HAM MADDE (${E(lot.id)})</span><div class="text-sm font-black ${short?'text-rose-300':'text-emerald-300'}">${avail} adet kaldı${short?' · YETERSİZ, bu iş emrini bitirmeye yetmez':''}</div></div><div class="text-right"><span class="text-[10px] text-slate-500">BU İŞ EMRİ İÇİN GEREKEN</span><div class="text-sm font-black text-white">${remainNeed} adet</div></div></div>`;
+}
+function kmiPrevShiftAndOrderHtml(j){
+ const target=Number(j.targetQty||0),done=Number(j.completedQty||0),jobRemain=Math.max(0,target-done);
+ let orderHtml='';
+ if(j.orderId && window.D && Array.isArray(window.D.orders)){
+  const o=window.D.orders.find(x=>x.id===j.orderId);
+  if(o){const orderRemain=Math.max(0,Number(o.qty||0)-Number(o.shippedQty||o.producedQty||0));
+   orderHtml=`<div><span class="text-[10px] text-slate-500">SİPARİŞE KALAN (${E(o.id)})</span><div class="text-lg font-black text-cyan-300">${orderRemain} adet</div></div>`;}
+ }
+ const ds=(typeof declarations!=='undefined'&&Array.isArray(declarations)?declarations:[]).filter(d=>String(d.jobOrder)===String(j.id));
+ const shifts=[...new Set(ds.map(d=>d.shift).filter(Boolean))];
+ let prevShiftHtml='';
+ if(shifts.length>1){
+  const curShift=j.shift;
+  const prevDs=ds.filter(d=>d.shift&&d.shift!==curShift).sort((a,b)=>new Date(b.updatedAt||b.date||0)-new Date(a.updatedAt||a.date||0));
+  if(prevDs.length){const p=prevDs[0];prevShiftHtml=`<div><span class="text-[10px] text-slate-500">ÖNCEKİ VARDİYA (${E(p.shift)})</span><div class="text-lg font-black text-slate-300">${Number(p.qualityGood??p.good??p.qty??0)} adet</div></div>`;}
+ }
+ if(!orderHtml && !prevShiftHtml)return '';
+ return `<div class="bg-slate-900 rounded-2xl p-4 mt-3 grid grid-cols-2 gap-3">${orderHtml||'<div></div>'}${prevShiftHtml||'<div></div>'}</div>`;
+}
 function renderRunning(j,s){
  const d=shell(),paused=(s.pauses||[]).some(x=>!x.end);
- d.innerHTML=`<div class="max-w-xl mx-auto p-4"><div class="flex justify-between"><button onclick="kmiOpenShopFloor()" class="text-slate-400">← İşlerim</button><div class="text-xs text-cyan-300 font-black">${E(j.id)}</div></div><div class="text-center mt-6"><div class="text-xs ${paused?'text-amber-300':'text-emerald-300'} font-black">${paused?'● DURUŞTA':'● ÇALIŞIYOR'}</div><div id="kmiWorkTimer" class="text-5xl md:text-6xl font-black tabular-nums mt-2">${fmt(elapsed(s))}</div><div class="text-slate-400 mt-2">${E(j.machine||'')} · ${E(j.item||'')}</div></div>
- <div class="bg-slate-900 rounded-2xl p-4 mt-5"><div class="flex justify-between"><div><div class="text-xs text-slate-500">ÜRETİLEN</div><div class="text-4xl font-black">${N(j.completedQty)}</div></div><div class="text-right"><div class="text-xs text-slate-500">HEDEF</div><div class="text-4xl font-black">${N(j.targetQty)}</div></div></div><div class="text-xs text-slate-500 mt-3">Takım olayı ${(s.tools||[]).length} · Duruş ${(s.pauses||[]).length}</div></div>
+ d.innerHTML=`<div class="max-w-xl mx-auto p-4"><div class="flex justify-between"><button onclick="kmiOpenShopFloor()" class="text-slate-400">← İşlerim</button><div class="text-xs text-cyan-300 font-black">${E(j.id)}</div></div><div class="text-center mt-6"><div class="text-xs ${paused?'text-amber-300':'text-emerald-300'} font-black">${paused?'● DURUŞTA':'● ÇALIŞIYOR'}</div><div id="kmiWorkTimer" class="text-5xl md:text-6xl font-black tabular-nums mt-2">${fmt(elapsed(s))}</div><div class="text-slate-400 mt-2">${E(j.machine||'')} · ${E(j.item||'')}</div>${paused?kmiPauseStatusHtml(s):''}</div>
+ <div class="bg-slate-900 rounded-2xl p-4 mt-5"><div class="flex justify-between"><div><div class="text-xs text-slate-500">ÜRETİLEN</div><div class="text-4xl font-black">${N(j.completedQty)}</div></div><div class="text-right"><div class="text-xs text-slate-500">HEDEF</div><div class="text-4xl font-black">${N(j.targetQty)}</div></div></div><div class="text-xs text-slate-500 mt-3">Takım olayı ${(s.tools||[]).length} · Duruş ${(s.pauses||[]).length}${(()=>{const lost=(s.pauses||[]).reduce((sum,x)=>sum+Number(x.lostRevenue||0),0);return lost>0?` · Duruş kaynaklı ciro kaybı ≈ ${lost.toLocaleString('tr-TR')} ${j.currency||'TL'}`:'';})()}</div>${kmiMaterialRemainingHtml(j)}</div>
+ ${kmiPrevShiftAndOrderHtml(j)}
  <!-- KMI-FIX (2026-09-25): Operatör Beyan formundaki Sağlam/Hurda/Tahsis alanlarıyla
-      aynı mantık - Shop Floor'da da +/- ile ayarlanabilir sayaç. -->
+      aynı mantık - Shop Floor'da da +/- ile ayarlanabilir sayaç.
+      KMI-FIX (2026-09-27): Ender'in isteği - "adetleri klavyeden elle de girebilmeli" -
+      +/- butonlarının yanına doğrudan sayı girilebilen bir alan eklendi. -->
  <div class="grid grid-cols-3 gap-2 mt-4">
-   <div class="bg-slate-900 border border-emerald-700 rounded-2xl p-3 text-center"><div class="text-[10px] text-emerald-300 font-black">SAĞLAM</div><div class="text-3xl font-black mt-1">${N(s.produced)}</div><div class="flex gap-1 mt-2"><button onclick="kmiAdjust('${E(j.id)}','good',-1)" class="flex-1 bg-slate-800 rounded-xl py-3 text-lg font-black">－</button><button onclick="kmiAdjust('${E(j.id)}','good',1)" class="flex-1 bg-emerald-700 rounded-xl py-3 text-lg font-black">＋</button></div></div>
-   <div class="bg-slate-900 border border-red-700 rounded-2xl p-3 text-center"><div class="text-[10px] text-red-300 font-black">HURDA</div><div class="text-3xl font-black mt-1">${N(s.scrap)}</div><div class="flex gap-1 mt-2"><button onclick="kmiAdjust('${E(j.id)}','scrap',-1)" class="flex-1 bg-slate-800 rounded-xl py-3 text-lg font-black">－</button><button onclick="kmiScrap('${E(j.id)}')" class="flex-1 bg-red-800 rounded-xl py-3 text-lg font-black">＋</button></div></div>
-   <div class="bg-slate-900 border border-amber-700 rounded-2xl p-3 text-center"><div class="text-[10px] text-amber-300 font-black">TAHSİS</div><div class="text-3xl font-black mt-1">${N(s.allocated)}</div><div class="flex gap-1 mt-2"><button onclick="kmiAdjust('${E(j.id)}','allocated',-1)" class="flex-1 bg-slate-800 rounded-xl py-3 text-lg font-black">－</button><button onclick="kmiAdjust('${E(j.id)}','allocated',1)" class="flex-1 bg-amber-700 rounded-xl py-3 text-lg font-black">＋</button></div></div>
+   <div class="bg-slate-900 border border-emerald-700 rounded-2xl p-3 text-center"><div class="text-[10px] text-emerald-300 font-black">SAĞLAM</div><div class="text-3xl font-black mt-1">${N(s.produced)}</div><div class="flex gap-1 mt-2"><button onclick="kmiAdjust('${E(j.id)}','good',-1)" class="flex-1 bg-slate-800 rounded-xl py-3 text-lg font-black">－</button><button onclick="kmiAdjust('${E(j.id)}','good',1)" class="flex-1 bg-emerald-700 rounded-xl py-3 text-lg font-black">＋</button></div><input type="number" min="0" inputmode="numeric" value="${N(s.produced)}" onchange="kmiSetQty('${E(j.id)}','good',this.value)" class="w-full mt-1.5 bg-slate-950 border border-emerald-800 rounded-lg text-center text-sm p-1.5"></div>
+   <div class="bg-slate-900 border border-red-700 rounded-2xl p-3 text-center"><div class="text-[10px] text-red-300 font-black">HURDA</div><div class="text-3xl font-black mt-1">${N(s.scrap)}</div><div class="flex gap-1 mt-2"><button onclick="kmiAdjust('${E(j.id)}','scrap',-1)" class="flex-1 bg-slate-800 rounded-xl py-3 text-lg font-black">－</button><button onclick="kmiScrap('${E(j.id)}')" class="flex-1 bg-red-800 rounded-xl py-3 text-lg font-black">＋</button></div><input type="number" min="0" inputmode="numeric" value="${N(s.scrap)}" onchange="kmiSetQty('${E(j.id)}','scrap',this.value)" class="w-full mt-1.5 bg-slate-950 border border-red-800 rounded-lg text-center text-sm p-1.5"></div>
+   <div class="bg-slate-900 border border-amber-700 rounded-2xl p-3 text-center"><div class="text-[10px] text-amber-300 font-black">TAHSİS</div><div class="text-3xl font-black mt-1">${N(s.allocated)}</div><div class="flex gap-1 mt-2"><button onclick="kmiAdjust('${E(j.id)}','allocated',-1)" class="flex-1 bg-slate-800 rounded-xl py-3 text-lg font-black">－</button><button onclick="kmiAdjust('${E(j.id)}','allocated',1)" class="flex-1 bg-amber-700 rounded-xl py-3 text-lg font-black">＋</button></div><input type="number" min="0" inputmode="numeric" value="${N(s.allocated)}" onchange="kmiSetQty('${E(j.id)}','allocated',this.value)" class="w-full mt-1.5 bg-slate-950 border border-amber-800 rounded-lg text-center text-sm p-1.5"></div>
  </div>
  <div class="grid grid-cols-2 gap-3 mt-3"><button onclick="kmiPause('${E(j.id)}')" class="${paused?'bg-emerald-700':'bg-amber-700'} rounded-2xl py-5 text-xl font-black">${paused?'▶ DEVAM':'Ⅱ DURUŞ'}</button><button onclick="kmiTool('${E(j.id)}')" class="bg-violet-700 rounded-2xl py-5 text-xl font-black">TAKIM</button></div>
- <button onclick="kmiFinishChoose('${E(j.id)}')" class="w-full mt-5 border border-slate-600 bg-slate-900 rounded-2xl py-5 text-xl font-black">■ İŞİ BİTİR</button>
- <button onclick="window.kmiOpenHandoff?.('${E(j.id)}')" class="w-full mt-3 border border-amber-800/50 bg-amber-950/30 text-amber-300 rounded-2xl py-4 text-sm font-black">↪ RAHATSIZLANDIM / İŞİ DEVRET</button></div>`;
+ <button onclick="kmiFinishChoose('${E(j.id)}')" class="w-full mt-5 border border-slate-600 bg-slate-900 rounded-2xl py-5 text-xl font-black">■ ÜRETİMİ TAMAMLA</button>
+ <button onclick="window.kmiOpenHandoff?.('${E(j.id)}')" class="w-full mt-3 border border-amber-800/50 bg-amber-950/30 text-amber-300 rounded-2xl py-4 text-sm font-black">↪ İŞİ DEVRET</button></div>`;
  clearInterval(window.__kmiTimer);window.__kmiTimer=setInterval(()=>{const x=document.getElementById('kmiWorkTimer');if(x)x.textContent=fmt(elapsed(sess(j.id)));else clearInterval(window.__kmiTimer)},1000);
 }
+// Klavyeden doğrudan sayı girişi - kmiAdjust'ın delta mantığını yeniden kullanır (aradaki
+// farkı tek seferde uygular), böylece hedef/limit kontrolleri ve event kaydı bozulmaz.
+window.kmiSetQty=function(id,field,value){
+ const s=sess(id);if(!s)return;
+ const next=Math.max(0,Math.round(Number(value)||0));
+ const cur=field==='good'?N(s.produced):N(s[field]);
+ const delta=next-cur;
+ if(delta!==0)window.kmiAdjust(id,field,delta);
+ else kmiOpenWork(id);
+};
+// KMI-FIX (2026-09-27): Ender'in isteği - aktif edilen bir iş emri, çalıştığı süre boyunca
+// bağlı olduğu makineyi "çalışmış" olarak MAKİNE DOSYASINA kalıcı kaydetmeli (sadece o anki oturum
+// verisiyle değil, kalıcı bir çalışma-saati kaydıyla). Bu kayıt makine dosyasında (openMachineFile)
+// toplam çalışma saati ve geçmiş olarak görünür; Live Floor/Bugünkü Makine Atamaları ise gerçek
+// anlık "çalışıyor" durumunu (oturum başlamış ve bitmemiş) yansıtır.
+const MACHINE_RUNLOG_KEY='KMI_MACHINE_RUNLOG_V1';
+function kmiMachineRunLogAll(){try{return JSON.parse(localStorage.getItem(MACHINE_RUNLOG_KEY)||'[]')}catch(e){return []}}
+function kmiMachineRunLogSaveAll(arr){try{localStorage.setItem(MACHINE_RUNLOG_KEY,JSON.stringify(arr))}catch(e){}}
+function kmiMachineRunLogOpen(machine,jobId,operator){
+ const all=kmiMachineRunLogAll();
+ all.unshift({id:'MRL-'+Date.now().toString(36).toUpperCase(),machine,jobId,operator,startedAt:new Date().toISOString(),endedAt:null,runMinutes:0,downtimeMinutes:0});
+ kmiMachineRunLogSaveAll(all);
+}
+function kmiMachineRunLogClose(jobId,endedAt,runMinutes,downtimeMinutes){
+ const all=kmiMachineRunLogAll();
+ const entry=all.find(x=>x.jobId===jobId&&!x.endedAt);
+ if(entry){entry.endedAt=endedAt;entry.runMinutes=runMinutes;entry.downtimeMinutes=downtimeMinutes;kmiMachineRunLogSaveAll(all)}
+}
+window.kmiMachineRunLog=function(machine){return kmiMachineRunLogAll().filter(x=>x.machine===machine)};
+window.kmiMachineRunningTotalMinutes=function(machine){return kmiMachineRunLogAll().filter(x=>x.machine===machine).reduce((s,x)=>s+Number(x.runMinutes||0),0)};
+// O an fiilen çalışan (oturum başlamış, bitmemiş, duraklatılmamış) makineleri döner - Live Floor
+// ve Bugünkü Makine Atamaları panosu bunu kullanır, sadece "atanmış iş var mı" değil.
+window.kmiMachinesRunningNow=function(){
+ const sessions=load();
+ return Object.entries(sessions).filter(([jid,s])=>s?.startedAt&&!s?.finishedAt).map(([jid,s])=>{
+  const j=jobs().find(x=>String(x.id)===String(jid));
+  const paused=(s.pauses||[]).some(x=>!x.end);
+  return {jobId:jid,machine:s.machine||j?.machine||'',operator:s.operator||'-',startedAt:s.startedAt,paused,job:j};
+ });
+};
 window.kmiStartWork=function(id){
  const j=jobs().find(x=>String(x.id)===String(id));if(!j)return;
  const machine=String(j.machine||'').trim(),shift=String(j.shift||'').trim();
@@ -8621,7 +8883,9 @@ window.kmiStartWork=function(id){
  if(runningCount>=3){toast('Aynı anda en fazla 3 iş emri birlikte takip edilebilir. Önce birini bitirin/duraklatın.','warn');return}
  const baseline=N(j.completedQty);
  put(id,{startedAt:new Date().toISOString(),finishedAt:null,operator:currentPerson()?.name||window.currentUser?.name||'-',machine:j.machine,shift:j.shift,startCompletedQty:baseline,produced:0,scrap:0,pauses:[],tools:[]});
- j.status='Üretimde';j.startedAt=new Date().toISOString();persistJobs();ev('WORK_STARTED',j,{machine:j.machine,shift:j.shift,operator:currentPerson()?.name});kmiOpenWork(id)
+ j.status='Üretimde';j.startedAt=new Date().toISOString();persistJobs();
+ kmiMachineRunLogOpen(j.machine,id,currentPerson()?.name||window.currentUser?.name||'-');
+ ev('WORK_STARTED',j,{machine:j.machine,shift:j.shift,operator:currentPerson()?.name});kmiOpenWork(id)
 };
 window.kmiAddProduction=function(id){
  const j=jobs().find(x=>String(x.id)===String(id));if(!j)return;const s=sess(id);if(!s)return;
@@ -8650,7 +8914,83 @@ function sheet(title,choices,cb){
  document.getElementById('kmiBottomSheet')?.remove();const d=document.createElement('div');d.id='kmiBottomSheet';d.className='fixed inset-0 z-[260] bg-black/60 flex items-end';d.innerHTML=`<div class="w-full max-w-xl mx-auto bg-slate-900 rounded-t-3xl p-4"><div class="text-lg font-black mb-3">${E(title)}</div><div class="grid grid-cols-2 gap-2">${choices.map((x,i)=>`<button data-i="${i}" class="bg-slate-800 rounded-2xl p-4 text-left font-bold">${E(x)}</button>`).join('')}</div><button onclick="this.closest('#kmiBottomSheet').remove()" class="w-full mt-3 p-3 text-slate-500">Vazgeç</button></div>`;document.body.appendChild(d);d.querySelectorAll('[data-i]').forEach(b=>b.onclick=()=>{const x=choices[N(b.dataset.i)];d.remove();cb(x)})
 }
 window.kmiScrap=function(id){sheet('Hurda nedeni',['Ölçü dışı','Yüzey','Takım kaynaklı','Malzeme','Diğer'],reason=>{const j=jobs().find(x=>String(x.id)===String(id)),s=sess(id);put(id,{scrap:N(s?.scrap)+1});ev('SCRAP',j,{qty:1,reason});toast(`1 hurda · ${reason}`);kmiOpenWork(id)})};
-window.kmiPause=function(id){const j=jobs().find(x=>String(x.id)===String(id)),s=sess(id);if(!s)return;const ps=s.pauses||[],open=ps.find(x=>!x.end);if(open){open.end=new Date().toISOString();put(id,{pauses:ps});ev('DOWNTIME_END',j,{reason:open.reason});kmiOpenWork(id)}else sheet('Duruş nedeni',['Setup / Ayar','Takım bekleme','Malzeme bekleme','Kalite bekleme','Arıza','Diğer'],reason=>{ps.push({start:new Date().toISOString(),reason});put(id,{pauses:ps});ev('DOWNTIME_START',j,{reason});kmiOpenWork(id)})};
+// KMI-FIX (2026-09-27): Ender'in isteği - operatör duruşta CAM veya Kalite talep ederse, aynı
+// vardiyadaki ilgili kişiye otomatik bir TASK EMRİ açılsın; o kişi gelip task'ı kapatana kadar
+// duruş kaydı (ve ona bağlı süre/maliyet) izlenebilir kalsın. Mevcut Task Floor motoru
+// (window.kmiTaskCreate) aynen kullanıldı - ayrı bir görev sistemi icat edilmedi.
+function kmiSameShiftPeople(job,wantRole){
+ const shift=String(job?.shift||'').trim();
+ const list=(typeof PERSONNEL_LIST!=='undefined'?PERSONNEL_LIST:[]).filter(p=>{
+  const role=String(p.role||'').toUpperCase(),dept=String(p.dept||'').toUpperCase();
+  return wantRole==='KALITE'?role==='KALITE':(dept==='CAM'||role==='CAM');
+ });
+ const sameShift=shift?list.filter(p=>String(p.shift||'').trim()===shift):[];
+ return sameShift.length?sameShift:list;
+}
+// KMI-FIX (2026-09-27): Ender'in isteği - duruş maliyeti, o an üretilemeyen SON ÜRÜNÜN adedi ve
+// birim fiyatı üzerinden hesaplanır (o ürün bazında ciro kaybı). Duruş süresi / ürünün standart
+// çevrim süresi = kaçırılan adet; kaçırılan adet × iş emri birim fiyatı (j.price) = kayıp ciro.
+function kmiFindJobProduct(j){
+ if(j.productId){const p=D.products?.find?.(x=>x.id===j.productId);if(p)return p;}
+ const item=String(j.item||'').trim();
+ return (D.products||[]).find(p=>item&&(item===p.name||item.includes(p.code+' · ')||item===(p.code+' · '+p.name)))||null;
+}
+function kmiDowntimeLostRevenue(j,durationMin){
+ const p=kmiFindJobProduct(j);
+ const cycleSec=Number(p?.standardCycleSec||0)||Number(p?.camCycleEstimateSec||0)||0;
+ const unitPrice=Number(j.price||0);
+ if(!cycleSec||!unitPrice||!durationMin)return null;
+ const lostUnits=Math.floor((durationMin*60)/cycleSec);
+ if(lostUnits<=0)return null;
+ return {lostUnits,unitPrice,lostRevenue:lostUnits*unitPrice,cycleSec,productName:p?.name||j.item||'-'};
+}
+function kmiPauseStatusHtml(s){
+ const open=(s.pauses||[]).find(x=>!x.end); if(!open)return '';
+ let extra='';
+ if(open.taskId){
+  let all=[]; try{all=JSON.parse(localStorage.getItem('KMI_TASKS_V1192')||'[]');}catch(e){}
+  const t=all.find(x=>x.id===open.taskId);
+  const label=t?({OPEN:'Açık',ACTIVE:'Görevde',WAITING:'Beklemede',AWAITING_APPROVAL:'Onay Bekliyor',COMPLETED:'Tamamlandı'}[t.status]||t.status):'Bilinmiyor';
+  const done=t?.status==='COMPLETED';
+  extra=`<div class="mt-1 text-[11px] ${done?'text-emerald-300':'text-amber-300'}">${E(open.taskRole||'')} talebi: <b>${E(open.taskAssignee||'-')}</b> · ${E(open.taskId)} · ${label}${done?' ✓ Gelebilirsiniz, DEVAM\'a basabilirsiniz':''}</div>`;
+ }
+ return `<div class="mt-2 text-xs text-slate-400">Duruş nedeni: <b>${E(open.reason||'-')}</b></div>${extra}`;
+}
+window.kmiPause=function(id){
+ const j=jobs().find(x=>String(x.id)===String(id)),s=sess(id);if(!s)return;
+ const ps=s.pauses||[],open=ps.find(x=>!x.end);
+ if(open){
+  open.end=new Date().toISOString();
+  const durationMin=Math.round((new Date(open.end)-new Date(open.start))/60000);
+  const loss=kmiDowntimeLostRevenue(j,durationMin);
+  if(loss){open.lostUnits=loss.lostUnits;open.lostRevenue=loss.lostRevenue;}
+  put(id,{pauses:ps});
+  ev('DOWNTIME_END',j,{reason:open.reason,taskId:open.taskId||null,taskRole:open.taskRole||null,durationMin,lostUnits:loss?.lostUnits||0,lostRevenue:loss?.lostRevenue||0});
+  if(loss)toast(`Duruş ${durationMin} dk sürdü · yaklaşık ${loss.lostUnits} adet ${loss.productName} üretilemedi (≈${loss.lostRevenue.toLocaleString('tr-TR')} ${j.currency||'TL'} ciro kaybı)`,'warn');
+  kmiOpenWork(id);
+ }else{
+  sheet('Duruş nedeni',['Setup / Ayar','Takım bekleme','Malzeme bekleme','Kalite bekleme','CAM bekleme','Arıza','Diğer'],reason=>{
+   const pause={start:new Date().toISOString(),reason};
+   const finalize=()=>{ps.push(pause);put(id,{pauses:ps});ev('DOWNTIME_START',j,{reason,taskId:pause.taskId||null});kmiOpenWork(id)};
+   if(reason==='Kalite bekleme'||reason==='CAM bekleme'){
+    const wantRole=reason==='Kalite bekleme'?'KALITE':'CAM';
+    const people=kmiSameShiftPeople(j,wantRole);
+    if(!people.length){toast(wantRole+' rolünde tanımlı personel bulunamadı - task açılamadı, duruş yine de kaydedildi.','warn');finalize();return}
+    sheet(wantRole+' · Kimden talep edilsin?',people.map(p=>p.name),name=>{
+     const person=people.find(p=>p.name===name);
+     try{
+      const task=window.kmiTaskCreate({title:`${wantRole} talebi · ${j.id} (${j.machine||'-'})`,description:`${currentPerson()?.name||window.currentUser?.name||'Operatör'} üretimi durdurup ${wantRole} talep etti.\nİş Emri: ${j.id} · ${j.item||''}\nMakine: ${j.machine||'-'}`,assigneeId:person.id,priority:'YÜKSEK',plannedMinutes:15,dueAt:new Date(Date.now()+30*60000).toISOString(),evidenceRequired:false});
+      pause.taskId=task.id;pause.taskAssignee=person.name;pause.taskRole=wantRole;
+      toast(person.name+"'e "+wantRole+' task emri açıldı.','ok');
+     }catch(e){toast('Task oluşturulamadı: '+(e?.message||e),'warn')}
+     finalize();
+    });
+    return;
+   }
+   finalize();
+  });
+ }
+};
 window.kmiTool=function(id){sheet('Takım olayı',['Takım değişti','Uç değişti','Takım kırıldı','Takım ölçüldü','Diğer'],type=>{
  if(type==='Takım değişti'||type==='Uç değişti'||type==='Takım kırıldı') return window.kmiToolScan(id,type);
  const j=jobs().find(x=>String(x.id)===String(id)),s=sess(id),ts=s?.tools||[];ts.push({at:new Date().toISOString(),type});put(id,{tools:ts});ev('TOOL_EVENT',j,{type});toast(type);kmiOpenWork(id)
@@ -8741,6 +9081,7 @@ window.kmiFinish=function(id,postOp,vibrationMinutes){
  };
  declarations.unshift(d);saveStorage('declarations',declarations);
  put(id,{finishedAt,elapsedSeconds:Math.round(elapsed(s)),declarationId:declId});
+ kmiMachineRunLogClose(id,finishedAt,mins,downtimeMinutes);
  j.finishedAt=finishedAt;j.productionMinutes=N(j.productionMinutes)+mins;
  const targetReached=j.targetType==='production'?N(j.completedQty)>=N(j.targetQty):true;
  j.status=targetReached?postOpStatus:'Üretimde';
@@ -8766,6 +9107,17 @@ window.kmiMyJobs=myJobs; window.kmiSess=sess; window.kmiElapsed=elapsed; window.
 // operatörler işe başladıkça canlı işaretlensin. Bunun için tüm iş emirlerini + oturum
 // (session) verisini dışa açıyoruz - Task Floor script bloğu bunu okuyup canlı pano çizecek.
 window.kmiAllShopFloorSessions=load; window.kmiAllProductionJobs=function(){return jobs().filter(j=>!j.deleted&&['Açık','Üretimde'].includes(String(j.status||'')))};
+// KMI-FIX (2026-09-27): İş emri devredildiğinde (peer/vardiya/yönetim) shop floor oturumu
+// kapanmıyordu - makine "hâlâ çalışıyor" gibi asılı (ghost) kalabiliyordu. Devir fonksiyonları
+// farklı bir script bloğunda olduğu için bu kapatma işlemini buradan window'a açıyoruz.
+window.kmiCloseShopFloorSession=function(id){
+ const s=sess(id);if(!s||!s.startedAt||s.finishedAt)return;
+ const finishedAt=new Date().toISOString();
+ const mins=Math.max(0,Math.round(elapsed(s)/60));
+ const downtimeMinutes=Math.round((s.pauses||[]).reduce((a,p)=>a+Math.max(0,((p.end?new Date(p.end):new Date())-new Date(p.start))/60000),0));
+ put(id,{finishedAt,elapsedSeconds:Math.round(elapsed(s))});
+ kmiMachineRunLogClose(id,finishedAt,mins,downtimeMinutes);
+};
 window.kmiJobPersonName=personName;
 // kmiOpenShopFloorLive - V11924 login-safe nav'daki "▶ SHOP FLOOR LIVE" butonu bu ismi
 // çağırıyordu ama fonksiyon hiç tanımlanmamıştı (buton hiçbir şey yapmıyordu, sessizce).
@@ -8902,6 +9254,7 @@ window.kmiHandoffConfirmPeer=function(id,toId){
  const to=personnel().find(p=>Number(p.id)===Number(toId));if(!to)return;
  if(!confirm(`${j.id} iş emri ${to.name} adlı çalışana devredilsin mi?`))return;
  const fromName=me()?.name||window.currentUser?.name||'-';
+ try{window.kmiCloseShopFloorSession?.(id);}catch(e){}
  j.assignedTo=[Number(toId)];
  log(j,'PEER',{toId:Number(toId),toName:to.name,fromName});
  j.updatedAt=new Date().toISOString();
@@ -8917,6 +9270,7 @@ window.kmiHandoffNextShift=function(id){
  const fromName=me()?.name||window.currentUser?.name||'-';
  const nextShift=String(j.shift||'').trim()==='1. Vardiya'?'2. Vardiya':(String(j.shift||'').trim()==='2. Vardiya'?'1. Vardiya':j.shift);
  log(j,'NEXT_SHIFT',{fromName,fromShift:j.shift,toShift:nextShift});
+ try{window.kmiCloseShopFloorSession?.(id);}catch(e){}
  j.assignedTo=[];
  j.shift=nextShift;
  j.pendingHandoff=true;
@@ -8931,6 +9285,7 @@ window.kmiHandoffManagement=function(id,reason,note){
  const j=job(id);if(!j)return;
  const fromName=me()?.name||window.currentUser?.name||'-';
  log(j,'MANAGEMENT',{fromName,reason:reason||'',note:note||''});
+ try{window.kmiCloseShopFloorSession?.(id);}catch(e){}
  j.assignedTo=[];
  j.pendingHandoff=true;
  j.handoffReason=reason||'';
@@ -9835,6 +10190,31 @@ window.KMI_REJECT_STAGES={
  yonetim:{label:'Yönetim',check:d=>d.status==='Yönetim Onayı Bekliyor'},
  sevkiyat:{label:'Sevkiyat',check:d=>d.status==='Sevk Onayı Bekliyor'}
 };
+// KMI-FIX (2026-09-27): Ender'in isteği - "yöneticiler direkt istediği departmana
+// yönlendirebilmeli red ettikleri iş emrini" (sadece bir önceki istasyona değil).
+// Bu liste, Yönetim yetkisi olan kullanıcıya red modalinde ek bir "doğrudan yönlendirme"
+// seçeneği sunar; seçilirse varsayılan "bir önceki adım" mantığının yerine geçer.
+window.KMI_REROUTE_TARGETS=[
+ {value:'operator',label:'Üretime İade (Operatör yeniden üretir)',dStatus:'Reddedildi - Üretime İade',joStatus:'Üretimde'},
+ {value:'kalite',label:'Kalite',dStatus:'Kalite Bekliyor',joStatus:'Kalite Onayı Bekliyor'},
+ {value:'tesviye',label:'Tesviye',dStatus:'Tesviye Bekliyor',joStatus:'Tesviye Bekliyor'},
+ {value:'vibrasyon',label:'Vibrasyon',dStatus:'Vibrasyon Bekliyor',joStatus:'Vibrasyon Bekliyor'},
+ {value:'muhasebe',label:'Muhasebe',dStatus:'Hazır - Muhasebe Onayı Bekliyor',joStatus:'Muhasebe Onayı Bekliyor'},
+ {value:'yonetim',label:'Yönetim',dStatus:'Yönetim Onayı Bekliyor',joStatus:'Yönetim Onayı Bekliyor'},
+ {value:'sevkiyat',label:'Sevkiyat',dStatus:'Sevk Onayı Bekliyor',joStatus:'Sevke Hazır'}
+];
+function kmiRerouteSelectHtml(excludeValue){
+ if(!(currentUser&&typeof canManagementApprove==='function'&&canManagementApprove(currentUser)))return '';
+ const opts=window.KMI_REROUTE_TARGETS.filter(t=>t.value!==excludeValue).map(t=>`<option value="${t.value}">${E(t.label)}</option>`).join('');
+ return `<div class="mt-3 pt-3 border-t border-slate-700">
+   <label class="block text-xs text-amber-300 mb-1"><i class="fa-solid fa-route mr-1"></i>Yönetici Yönlendirmesi (opsiyonel)</label>
+   <select id="kmiRejectReroute" class="w-full bg-slate-950 border border-amber-700 rounded p-2 text-white text-xs">
+     <option value="">Varsayılan (bir önceki adıma gönder)</option>
+     ${opts}
+   </select>
+   <div class="text-[10px] text-slate-500 mt-1">Seçilirse kayıt bir önceki adım yerine doğrudan seçilen departmana gönderilir.</div>
+ </div>`;
+}
 function kmiRejectPermission(stage){
  if(!currentUser) return false;
  const role=typeof getEffectiveRole==='function'?getEffectiveRole(currentUser):currentUser.role;
@@ -9865,6 +10245,7 @@ window.kmiOpenRejectModal=function(declId,stage){
    </select>`:''}
    <label class="block text-xs text-slate-300 mb-1">Ret nedeni (zorunlu)</label>
    <textarea id="kmiRejectReason" rows="3" class="w-full bg-slate-950 border border-rose-700 rounded p-2 text-white text-xs" placeholder="Neden reddedildiğini yazın, karşı taraf bunu görecek..."></textarea>
+   ${kmiRerouteSelectHtml(stage)}
    <div id="kmiRejectMsg" class="text-[11px] text-rose-400 mt-2 hidden"></div>
    <div class="grid grid-cols-2 gap-2 mt-4">
      <button onclick="document.getElementById('kmiRejectModal').remove()" class="bg-slate-800 rounded-xl py-2.5 font-bold text-slate-300">Vazgeç</button>
@@ -9880,19 +10261,39 @@ window.kmiSubmitReject=function(declId,stage){
  if(!reason){if(msgEl){msgEl.textContent='Ret nedeni yazmadan reddedemezsiniz.';msgEl.classList.remove('hidden');}return;}
  const targetSel=document.getElementById('kmiRejectTarget');
  const target=targetSel?targetSel.value:null;
+ const rerouteSel=document.getElementById('kmiRejectReroute');
+ const rerouteTo=rerouteSel?rerouteSel.value:'';
  document.getElementById('kmiRejectModal')?.remove();
- window.kmiRejectDeclaration(declId,stage,reason,target);
+ window.kmiRejectDeclaration(declId,stage,reason,target,rerouteTo);
 };
-window.kmiRejectDeclaration=function(declId,stage,reason,target){
+window.kmiRejectDeclaration=function(declId,stage,reason,target,rerouteTo){
  const d=(declarations||[]).find(x=>x.id===declId); if(!d)return;
  const cfg=window.KMI_REJECT_STAGES[stage]; if(!cfg)return;
  if(!kmiRejectPermission(stage)){alert('Bu aşamayı reddetmek için yetkiniz yok.');return;}
  if(!cfg.check(d)){alert('Bu kayıt artık bu aşamada değil - sayfa güncel olmayabilir, yenileyin.');try{refreshAllViews();}catch(e){}return;}
  const jo=(jobOrders||[]).find(j=>String(j.id)===String(d.jobOrder));
  d.rejections=Array.isArray(d.rejections)?d.rejections:[];
- const entry={stage,stageLabel:cfg.label,by:currentUser?.name||'-',at:new Date().toISOString(),reason,target:target||null};
+ const entry={stage,stageLabel:cfg.label,by:currentUser?.name||'-',at:new Date().toISOString(),reason,target:target||null,rerouteTo:rerouteTo||null};
  d.rejections.unshift(entry);
  d.lastRejection=entry;
+ // Yönetici doğrudan yönlendirme seçtiyse (KMI_REROUTE_TARGETS), varsayılan "bir önceki
+ // adım" mantığını atla ve doğrudan seçilen departmana gönder. Sadece Yönetim yetkisi
+ // olan kullanıcılar bu alanı görebildiği için ayrıca yetki kontrolü burada tekrarlanır.
+ if(rerouteTo && currentUser && typeof canManagementApprove==='function' && canManagementApprove(currentUser)){
+  const rt=(window.KMI_REROUTE_TARGETS||[]).find(x=>x.value===rerouteTo);
+  if(rt){
+   d.status=rt.dStatus; if(jo){jo.status=rt.joStatus;jo.updatedAt=new Date().toISOString();}
+   d.updatedAt=new Date().toISOString();
+   saveStorage('declarations',declarations);
+   if(jo) saveStorage('jobOrders',jobOrders);
+   try{queueManagerReport(`${cfg.label} reddetti ve ${rt.label} departmanına yönlendirdi (${d.jobOrder}): ${reason}`);}catch(e){}
+   try{KMI?.event?.('REJECTED_REROUTED','JOB_ORDER',d.jobOrder,{label:`${cfg.label} reddetti, ${rt.label}'a yönlendirdi: ${reason}`,source:'REJECT_FLOW'});}catch(e){}
+   try{refreshAllViews();}catch(e){}
+   try{window.kmiRenderPostOpQueues();}catch(e){}
+   toast(cfg.label+' reddedildi, kayıt doğrudan '+rt.label+' departmanına yönlendirildi.','warn');
+   return;
+  }
+ }
  if(stage==='tesviye'){
   if(target==='operator'){ d.status='Tesviye Reddedildi - Üretime İade'; if(jo){jo.status='Üretimde';jo.updatedAt=new Date().toISOString();} }
   else { d.status='Tesviye Bekliyor'; }
@@ -9919,12 +10320,23 @@ window.kmiRejectDeclaration=function(declId,stage,reason,target){
 };
 // Job-emri seviyesinde (declarasyonsuz) Muhasebe onayından geçmiş bir iş emrinin Yönetim
 // tarafından reddi - approveJobByMuhasebe akışının tersi, Muhasebe onayı öncesine döner.
-window.kmiRejectJobLevel=function(jobId,reason){
+window.kmiRejectJobLevel=function(jobId,reason,rerouteTo){
  const j=(jobOrders||[]).find(x=>String(x.id)===String(jobId)); if(!j)return;
  if(!(currentUser&&typeof canManagementApprove==='function'&&canManagementApprove(currentUser))){alert('Bu işlem için Yönetim onay yetkisi gerekir.');return;}
  j.rejections=Array.isArray(j.rejections)?j.rejections:[];
- const entry={stage:'yonetim',stageLabel:'Yönetim',by:currentUser?.name||'-',at:new Date().toISOString(),reason};
+ const entry={stage:'yonetim',stageLabel:'Yönetim',by:currentUser?.name||'-',at:new Date().toISOString(),reason,rerouteTo:rerouteTo||null};
  j.rejections.unshift(entry); j.lastRejection=entry;
+ if(rerouteTo){
+  const rt=(window.KMI_REROUTE_TARGETS||[]).find(x=>x.value===rerouteTo);
+  if(rt){
+   j.status=rt.joStatus; j.updatedAt=new Date().toISOString();
+   saveStorage('jobOrders',jobOrders);
+   try{queueManagerReport(`Yönetim iş emri reddetti ve ${rt.label} departmanına yönlendirdi (${jobId}): ${reason}`);}catch(e){}
+   try{refreshAllViews();}catch(e){}
+   toast('Reddedildi, iş emri doğrudan '+rt.label+' departmanına yönlendirildi.','warn');
+   return;
+  }
+ }
  j.status='Muhasebe Onayı Bekliyor'; j.updatedAt=new Date().toISOString();
  saveStorage('jobOrders',jobOrders);
  try{queueManagerReport(`Yönetim iş emri reddetti (${jobId}): ${reason}`);}catch(e){}
@@ -9941,6 +10353,7 @@ window.kmiOpenRejectJobLevelModal=function(jobId){
    <div class="text-xs text-slate-400 mb-3">${E(jobId)}${j?' · '+E(j.item||''):''}</div>
    <label class="block text-xs text-slate-300 mb-1">Ret nedeni (zorunlu)</label>
    <textarea id="kmiRejectReason" rows="3" class="w-full bg-slate-950 border border-rose-700 rounded p-2 text-white text-xs" placeholder="Neden reddedildiğini yazın..."></textarea>
+   ${kmiRerouteSelectHtml('yonetim')}
    <div id="kmiRejectMsg" class="text-[11px] text-rose-400 mt-2 hidden"></div>
    <div class="grid grid-cols-2 gap-2 mt-4">
      <button onclick="document.getElementById('kmiRejectModal').remove()" class="bg-slate-800 rounded-xl py-2.5 font-bold text-slate-300">Vazgeç</button>
@@ -9954,9 +10367,79 @@ window.kmiSubmitRejectJobLevel=function(jobId){
  const reasonEl=document.getElementById('kmiRejectReason'),msgEl=document.getElementById('kmiRejectMsg');
  const reason=(reasonEl?.value||'').trim();
  if(!reason){if(msgEl){msgEl.textContent='Ret nedeni yazmadan reddedemezsiniz.';msgEl.classList.remove('hidden');}return;}
+ const rerouteSel=document.getElementById('kmiRejectReroute');
+ const rerouteTo=rerouteSel?rerouteSel.value:'';
  document.getElementById('kmiRejectModal')?.remove();
- window.kmiRejectJobLevel(jobId,reason);
+ window.kmiRejectJobLevel(jobId,reason,rerouteTo);
 };
+})();
+</script>
+<script id="kmi-command-center">
+// ===== KURUTLU · KOMUTA MERKEZİ (Ender'in isteği - 2026-09-27) =====
+// Tüm iş emirlerini tek ekranda, en son harekete göre yeniden eskiye sıralı gösterir; her
+// satırda o anki aşamaya uygun Onayla / Reddet(+Yönlendir) aksiyonu sunar. Onaylama, mevcut
+// kmiJobOrderScanApprove motorunu kullanır (rol yetkisi yoksa açıkça söyler, sahte başarı
+// göstermez; miktar/ölçüm gerektiren aşamalarda ilgili ekrana yönlendirir).
+(function(){
+'use strict';
+function esc(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+const STAGE_LABEL={'Açık':'Açık · Başlamadı','Aktif':'Üretimde','Üretimde':'Üretimde','Tesviye Bekliyor':'Tesviye','Vibrasyon Bekliyor':'Vibrasyon','Kalite Onayı Bekliyor':'Kalite','Kalite Bekliyor':'Kalite','Muhasebe Onayı Bekliyor':'Muhasebe','Yönetim Onayı Bekliyor':'Yönetim','Sevke Hazır':'Sevkiyat','Sevk Edildi / Kapandı':'Kapandı','Tamamlandı (Yönetim Onaylı)':'Kapandı'};
+const STAGE_COLOR={'Kalite':'bg-purple-900/70 text-purple-300','Tesviye':'bg-indigo-900/70 text-indigo-300','Vibrasyon':'bg-indigo-900/70 text-indigo-300','Muhasebe':'bg-amber-900/70 text-amber-300','Yönetim':'bg-blue-900/70 text-blue-300','Sevkiyat':'bg-emerald-900/70 text-emerald-300','Kapandı':'bg-slate-800 text-slate-400','Üretimde':'bg-cyan-900/70 text-cyan-300','Açık · Başlamadı':'bg-slate-800 text-slate-400'};
+function jobLatestDecl(j){
+ const ds=(typeof declarations!=='undefined'&&Array.isArray(declarations)?declarations:[]).filter(d=>String(d.jobOrder)===String(j.id));
+ if(!ds.length)return null;
+ return ds.slice().sort((a,b)=>new Date(b.updatedAt||b.shiftClosedAt||0)-new Date(a.updatedAt||a.shiftClosedAt||0))[0];
+}
+// Bir iş emrinin o anki bekleyen adımını ve o adımı reddetmek için gereken (declarationId/jobId,
+// stage-key) bilgisini döner - reject modallerini doğru şekilde açabilmek için.
+function pendingRejectTarget(j,d){
+ const status=d?d.status:j.status;
+ const map={'Kalite Bekliyor':'kalite','Tesviye Bekliyor':'tesviye','Vibrasyon Bekliyor':'vibrasyon','Hazır - Muhasebe Onayı Bekliyor':'muhasebe','Sevk Onayı Bekliyor':'sevkiyat'};
+ if(d && map[status]) return {kind:'decl',declId:d.id,stage:map[status]};
+ if(status==='Yönetim Onayı Bekliyor'){
+  if(d) return {kind:'decl',declId:d.id,stage:'yonetim'};
+  return {kind:'job',jobId:j.id};
+ }
+ return null;
+}
+window.kmiRenderCommandCenter=function(){
+ const tb=document.getElementById('kmiCommandCenterBody'); if(!tb)return;
+ const joList=(typeof jobOrders!=='undefined'&&Array.isArray(jobOrders))?jobOrders:(Array.isArray(window.jobOrders)?window.jobOrders:[]);
+ const filter=document.getElementById('kmiCcStageFilter')?.value||'';
+ let rows=joList.filter(j=>!j.deleted&&j.status!=='Silindi').map(j=>{
+  const d=jobLatestDecl(j);
+  const label=STAGE_LABEL[j.status]||j.status||'-';
+  const lastAt=new Date(Math.max(new Date(j.updatedAt||j.createdAt||j.openedAt||0).getTime(),d?new Date(d.updatedAt||d.shiftClosedAt||0).getTime():0));
+  return {j,d,label,lastAt};
+ });
+ if(filter==='pending') rows=rows.filter(r=>!['Kapandı','Açık · Başlamadı'].includes(r.label));
+ else if(filter) rows=rows.filter(r=>r.label===filter||r.j.status===filter);
+ rows.sort((a,b)=>b.lastAt-a.lastAt);
+ rows=rows.slice(0,150);
+ const assignees=j=>(Array.isArray(j.assignedTo)?j.assignedTo:[]).map(id=>(window.PERSONNEL_LIST||[]).find(p=>Number(p.id)===Number(id))?.name).filter(Boolean).join(', ')||'-';
+ tb.innerHTML=rows.map(({j,d,label,lastAt})=>{
+  const qty=d?(d.qualityGood??d.good??d.qty??0):(j.completedQty||0);
+  const custItem=`<b class="text-white">${esc(j.client||'-')}</b><div class="text-[10px] text-slate-500">${esc(j.item||'-')}</div>`;
+  const rt=pendingRejectTarget(j,d);
+  let actionHtml='<span class="text-slate-600">—</span>';
+  if(rt){
+   const approveBtn=`<button onclick="window.kmiJobOrderScanApprove('${esc(j.id)}')" class="bg-emerald-600 hover:bg-emerald-500 text-white px-2 py-1 rounded text-[10px] font-semibold"><i class="fa-solid fa-check mr-1"></i>Onayla</button>`;
+   const rejectBtn=rt.kind==='decl'
+     ?`<button onclick="window.kmiOpenRejectModal('${esc(rt.declId)}','${rt.stage}')" class="bg-rose-800 hover:bg-rose-700 text-white px-2 py-1 rounded text-[10px] font-semibold">Reddet</button>`
+     :`<button onclick="window.kmiOpenRejectJobLevelModal('${esc(rt.jobId)}')" class="bg-rose-800 hover:bg-rose-700 text-white px-2 py-1 rounded text-[10px] font-semibold">Reddet</button>`;
+   actionHtml=`<div class="flex flex-wrap gap-1">${approveBtn}${rejectBtn}</div>`;
+  } else if(label==='Kapandı'){
+   actionHtml='<span class="text-emerald-500 text-[10px]"><i class="fa-solid fa-check-double mr-1"></i>Tamamlandı</span>';
+  } else if(label==='Üretimde'||label==='Açık · Başlamadı'){
+   actionHtml=`<span class="text-slate-500 text-[10px]">${esc(assignees(j))}</span>`;
+  }
+  return `<tr><td class="p-2 font-mono text-cyan-300">${esc(j.id)}</td><td class="p-2">${custItem}</td><td class="p-2 font-bold text-white">${Number(qty)||0}</td><td class="p-2"><span class="px-2 py-0.5 rounded text-[10px] ${STAGE_COLOR[label]||'bg-slate-800 text-slate-400'}">${esc(label)}</span></td><td class="p-2 text-[10px] text-slate-400">${lastAt.getTime()?lastAt.toLocaleString('tr-TR'):'-'}</td><td class="p-2">${actionHtml}</td></tr>`;
+ }).join('')||'<tr><td colspan="6" class="p-4 text-center text-slate-500">Gösterilecek iş emri yok.</td></tr>';
+};
+const oldRefresh2=window.refreshAllViews;
+if(typeof oldRefresh2==='function')window.refreshAllViews=function(){const r=oldRefresh2.apply(this,arguments);try{window.kmiRenderCommandCenter();}catch(e){}return r;};
+const oldSwitchTab=window.switchTab;
+if(typeof oldSwitchTab==='function')window.switchTab=function(name){const r=oldSwitchTab.apply(this,arguments);if(name==='yonetici')setTimeout(()=>{try{window.kmiRenderCommandCenter();}catch(e){}},0);return r;};
 })();
 </script>
 <script id="kmi-v73-product-files">
