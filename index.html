@@ -13530,5 +13530,2068 @@ window.kmiOpenAskKMI=function(towerId){
 })();
 </script>
 
+<!-- ===========================================================================
+     KMI-ENT-FIX (2026-09-28): Ender'in "Enterprise Operating Architecture"
+     direktifi, PHASE 0 (Gap Map) + PHASE 1 (Enterprise Foundation - sadece
+     Depo & Stok temeli) uygulaması.
+     ---------------------------------------------------------------------------
+     KAPSAM (bu turda YAPILAN):
+       - window.KMI_WMS: gerçek Warehouse/Location master + kanonik envanter
+         durumları (ON HAND / AVAILABLE / RESERVED ayrımı) + Stock Movement
+         Ledger (append-only, ASLA elle overwrite yok).
+       - warehouse.* permission'ları (KMI_ORG 'WAREHOUSE' departman ataması
+         veya ADMIN).
+       - Gerçek bir "DEPO & STOK" ekranı (window.kmiOpenWarehouse) - liste,
+         bakiye, hareket geçmişi, yeni hareket (mal kabul/transfer/rezerve/
+         çıkış/sayım) formu.
+       - Her hareket KMI.event() ile audit'e düşüyor.
+     KAPSAM DIŞI (bilinçli, Faz 2+'ya bırakıldı - "NO BIG BANG REWRITE"):
+       - Mevcut D.inventoryMovements / D.purchaseItems.stockQty / V.stock
+         (3 paralel eski stok kaynağı, bkz. Gap Map) bu ledger'a MİGRE
+         EDİLMEDİ. Bu üç kaynak olduğu gibi çalışmaya devam ediyor - onlara
+         dokunmak ayrı bir "migration safety" (BACKUP→COUNT→MAP→DRY RUN→
+         VALIDATE) sürecini gerektirir, tek turda güvenle yapılamaz.
+       - Bu yüzden KMI_WMS ledger'ı ŞU AN İÇİN BOŞ başlar (sıfırdan). Yeni
+         mal kabul/transfer işlemleri buradan girilirse gerçek bakiye
+         üretir; eski ekranlardan girilen hareketler bu ledger'a yansımaz.
+       - Departman bazlı TAM üst menü yeniden yapılanması (13 departman +
+         tüm alt ekranların yeniden gruplanması) bu turda YAPILMADI - bu,
+         mevcut ~8 sekmeli nav'ı ve onlarca ekranı etkileyen ayrı, büyük ve
+         riskli bir UI projesi; "Depo & Stok" için tek bir yeni giriş
+         noktası (nav butonu) eklendi, mevcut sekmeler değiştirilmedi.
+       - Muhasebe Phase A (çift taraflı kayıt, hesap planı, cari ledger)
+         bu turda YAPILMADI - ayrı rapor edildi.
+     =========================================================================== -->
+<script>
+(function(){
+'use strict';
+// KMI-ENT-FIX: kanonik envanter durumları (uydurma sayı yok - sadece durum adları)
+window.KMI_WMS_STATES = ['RECEIVING','INCOMING_QUALITY','AVAILABLE','RESERVED','STAGED','ISSUED_TO_PRODUCTION','WIP','FINISHED_GOODS','QUALITY_HOLD','QUARANTINE','SHIPPING_STAGING','SHIPPED','SCRAP','RETURN_TO_SUPPLIER'];
+window.KMI_WMS_MOVEMENT_TYPES = ['PURCHASE_RECEIPT','QUALITY_RELEASE','WAREHOUSE_TRANSFER','DEPARTMENT_ISSUE','WO_RESERVATION','WO_ISSUE','WO_RETURN','WIP_TRANSFER','FINISHED_GOODS_RECEIPT','SHIPPING_STAGE','SHIPMENT','SCRAP','ADJUSTMENT','COUNT_DIFFERENCE','SUPPLIER_RETURN','CUSTOMER_RETURN'];
+
+const WMS_WH_KEY='KMI_WMS_WAREHOUSES_V1', WMS_LOC_KEY='KMI_WMS_LOCATIONS_V1', WMS_MOV_KEY='KMI_WMS_MOVEMENTS_V1';
+function wmsLoad(k,d){ try{ const v=JSON.parse(localStorage.getItem(k)); return Array.isArray(v)?v:(d||[]); }catch(e){ return d||[]; } }
+function wmsSave(k,a){ localStorage.setItem(k, JSON.stringify(a)); }
+function wmsUid(p){ return p+'-'+Date.now().toString(36).toUpperCase()+'-'+Math.random().toString(36).slice(2,5).toUpperCase(); }
+
+// Kanonik depo listesi - yapılandırılabilir (yorum #8: "Do not hard-code only these names")
+function wmsSeedWarehouses(){
+  const existing=wmsLoad(WMS_WH_KEY,null);
+  if(existing) return existing;
+  const seed=[
+    {id:'WH-HAMMADDE',name:'Hammadde Deposu',active:true},
+    {id:'WH-TAKIM',name:'Takım / Sarf Deposu',active:true},
+    {id:'WH-BAKIM',name:'Bakım Yedek Parça Deposu',active:true},
+    {id:'WH-WIP',name:'Üretim Ara Stok / WIP',active:true},
+    {id:'WH-KARANTINA',name:'Kalite Karantina',active:true},
+    {id:'WH-BITMIS',name:'Bitmiş Ürün Deposu',active:true},
+    {id:'WH-SEVK',name:'Sevkiyat Hazırlık Alanı',active:true}
+  ];
+  wmsSave(WMS_WH_KEY,seed); return seed;
+}
+function wmsUser(u){ return (window.currentUser)|| u || null; }
+function wmsIsAdmin(u){ try{ return !!(window.KMI_AUTH && window.KMI_AUTH.can(u,'ADMIN')); }catch(e){ return false; } }
+function wmsHasDeptAccess(u){ try{ return !!(window.KMI_ORG && window.KMI_ORG.hasAssignment(u||window.currentUser,'WAREHOUSE')); }catch(e){ return false; } }
+const WMS_CAPS = {
+  'warehouse.receive': u=>wmsIsAdmin(u)||wmsHasDeptAccess(u),
+  'warehouse.transfer': u=>wmsIsAdmin(u)||wmsHasDeptAccess(u),
+  'warehouse.reserve': u=>wmsIsAdmin(u)||wmsHasDeptAccess(u),
+  'warehouse.issue': u=>wmsIsAdmin(u)||wmsHasDeptAccess(u),
+  'warehouse.count': u=>wmsIsAdmin(u)||wmsHasDeptAccess(u),
+  'warehouse.adjust': u=>wmsIsAdmin(u), // stok düzeltme sadece ADMIN - segregation of duties
+  'warehouse.finishedgoods': u=>wmsIsAdmin(u)||wmsHasDeptAccess(u),
+  'warehouse.shippingstage': u=>wmsIsAdmin(u)||wmsHasDeptAccess(u),
+  'warehouse.admin': u=>wmsIsAdmin(u)
+};
+const _wmsOrigCan = window.KMI_AUTH && window.KMI_AUTH.can;
+if(window.KMI_AUTH){
+  window.KMI_AUTH.can = function(user, capability){
+    if(Object.prototype.hasOwnProperty.call(WMS_CAPS, capability)){
+      try{ return !!WMS_CAPS[capability](wmsUser(user)); }catch(e){ return false; }
+    }
+    return _wmsOrigCan ? _wmsOrigCan(user, capability) : false;
+  };
+}
+
+window.KMI_WMS = {
+  states: window.KMI_WMS_STATES,
+  movementTypes: window.KMI_WMS_MOVEMENT_TYPES,
+  warehouses: function(){ return wmsSeedWarehouses().filter(w=>w.active!==false); },
+  addWarehouse: function(name){
+    if(!window.KMI_AUTH.can(undefined,'warehouse.admin')) throw new Error('Depo tanımlama yetkiniz yok.');
+    if(!String(name||'').trim()) throw new Error('Depo adı gerekli.');
+    const list=wmsSeedWarehouses(); const wh={id:wmsUid('WH'),name:String(name).trim(),active:true};
+    list.push(wh); wmsSave(WMS_WH_KEY,list);
+    try{ window.KMI.event('WAREHOUSE_CREATED','Warehouse',wh.id,{name:wh.name}); }catch(e){}
+    return wh;
+  },
+  // Lokasyon: WAREHOUSE -> ZONE -> RACK -> SHELF -> BIN (madde #10)
+  locations: function(warehouseId){ return wmsLoad(WMS_LOC_KEY,[]).filter(l=>!warehouseId||l.warehouseId===warehouseId); },
+  addLocation: function(cfg){
+    if(!window.KMI_AUTH.can(undefined,'warehouse.admin')) throw new Error('Lokasyon tanımlama yetkiniz yok.');
+    if(!cfg||!cfg.warehouseId) throw new Error('Depo (warehouseId) gerekli.');
+    const list=wmsLoad(WMS_LOC_KEY,[]);
+    const loc={id:wmsUid('LOC'),warehouseId:cfg.warehouseId,zone:cfg.zone||'',rack:cfg.rack||'',shelf:cfg.shelf||'',bin:cfg.bin||'',label:cfg.label||[cfg.zone,cfg.rack,cfg.shelf,cfg.bin].filter(Boolean).join('-')};
+    list.push(loc); wmsSave(WMS_LOC_KEY,list);
+    try{ window.KMI.event('WAREHOUSE_LOCATION_CREATED','WarehouseLocation',loc.id,{warehouseId:loc.warehouseId,label:loc.label}); }catch(e){}
+    return loc;
+  },
+  // KMI-ENT-FIX: TEK kaynak - hareket defteri. Hiçbir fonksiyon stok miktarını
+  // doğrudan set ETMEZ; her değişiklik bir movement kaydı üretir (madde #13).
+  movements: function(itemId){ return wmsLoad(WMS_MOV_KEY,[]).filter(m=>!itemId||m.itemId===itemId).sort((a,b)=>new Date(b.at)-new Date(a.at)); },
+  move: function(cfg){
+    cfg=cfg||{};
+    const type=cfg.movementType;
+    if(window.KMI_WMS_MOVEMENT_TYPES.indexOf(type)===-1) throw new Error('Geçersiz hareket tipi: '+type);
+    const capByType={
+      PURCHASE_RECEIPT:'warehouse.receive', QUALITY_RELEASE:'warehouse.receive', WAREHOUSE_TRANSFER:'warehouse.transfer',
+      DEPARTMENT_ISSUE:'warehouse.issue', WO_RESERVATION:'warehouse.reserve', WO_ISSUE:'warehouse.issue', WO_RETURN:'warehouse.issue',
+      WIP_TRANSFER:'warehouse.transfer', FINISHED_GOODS_RECEIPT:'warehouse.finishedgoods', SHIPPING_STAGE:'warehouse.shippingstage',
+      SHIPMENT:'warehouse.shippingstage', SCRAP:'warehouse.adjust', ADJUSTMENT:'warehouse.adjust', COUNT_DIFFERENCE:'warehouse.count',
+      SUPPLIER_RETURN:'warehouse.transfer', CUSTOMER_RETURN:'warehouse.transfer'
+    };
+    const needCap=capByType[type]||'warehouse.transfer';
+    if(!window.KMI_AUTH.can(undefined,needCap)) throw new Error('Bu hareket için yetkiniz yok ('+needCap+').');
+    if(!cfg.itemId || !String(cfg.itemId).trim()) throw new Error('Malzeme/ürün kimliği (itemId) zorunlu - uydurulamaz.');
+    const qty=Number(cfg.quantity);
+    if(!(qty>0)) throw new Error('Miktar 0\'dan büyük olmalı.');
+    if(cfg.toState && window.KMI_WMS_STATES.indexOf(cfg.toState)===-1) throw new Error('Geçersiz hedef durum: '+cfg.toState);
+    // KMI-ENT-FIX: hareket tipine göre makul varsayılan hedef durum (madde #11 - ON HAND≠AVAILABLE≠RESERVED)
+    const DEFAULT_TO_STATE={
+      PURCHASE_RECEIPT:'AVAILABLE', QUALITY_RELEASE:'AVAILABLE', WAREHOUSE_TRANSFER:'AVAILABLE',
+      DEPARTMENT_ISSUE:'ISSUED_TO_PRODUCTION', WO_RESERVATION:'RESERVED', WO_ISSUE:'ISSUED_TO_PRODUCTION', WO_RETURN:'AVAILABLE',
+      WIP_TRANSFER:'WIP', FINISHED_GOODS_RECEIPT:'FINISHED_GOODS', SHIPPING_STAGE:'SHIPPING_STAGING',
+      SHIPMENT:'SHIPPED', SCRAP:'SCRAP', ADJUSTMENT:'AVAILABLE', COUNT_DIFFERENCE:'AVAILABLE',
+      SUPPLIER_RETURN:'AVAILABLE', CUSTOMER_RETURN:'AVAILABLE'
+    };
+    if(!cfg.toState) cfg.toState=DEFAULT_TO_STATE[type]||'AVAILABLE';
+    // Negatif stok koruması (madde #79): çıkış yönlü hareketlerde mevcut bakiye kontrolü
+    const OUT_TYPES=['DEPARTMENT_ISSUE','WO_ISSUE','WIP_TRANSFER','SHIPPING_STAGE','SHIPMENT','SCRAP','SUPPLIER_RETURN'];
+    if(OUT_TYPES.indexOf(type)!==-1 && !cfg.overrideNegative){
+      const bal=window.KMI_WMS.balance(cfg.itemId);
+      if(qty>bal.available+1e-9) throw new Error('Yetersiz kullanılabilir stok: mevcut '+bal.available+', istenen '+qty+'. (Negatif stok engellendi - madde #79)');
+    }
+    const mv={
+      id:wmsUid('MOV'), at:new Date().toISOString(), itemId:String(cfg.itemId), itemName:cfg.itemName||'',
+      lotId:cfg.lotId||null, fromWarehouseId:cfg.fromWarehouseId||null, fromLocationId:cfg.fromLocationId||null,
+      toWarehouseId:cfg.toWarehouseId||null, toLocationId:cfg.toLocationId||null, toState:cfg.toState||'AVAILABLE',
+      quantity:qty, unit:cfg.unit||'adet', movementType:type,
+      sourceEntityType:cfg.sourceEntityType||null, sourceEntityId:cfg.sourceEntityId||null,
+      personId:(window.currentUser&&window.currentUser.id)||null, personName:(window.currentUser&&window.currentUser.name)||'',
+      reason:cfg.reason||''
+    };
+    const list=wmsLoad(WMS_MOV_KEY,[]); list.push(mv); wmsSave(WMS_MOV_KEY,list);
+    try{ window.KMI.event('STOCK_MOVEMENT_CREATED','StockMovement',mv.id,{itemId:mv.itemId,type:mv.movementType,qty:mv.quantity,toState:mv.toState}); }catch(e){}
+    return mv;
+  },
+  // ON HAND ≠ AVAILABLE ≠ RESERVED (madde #11/#12) - ledger'dan hesaplanır, hiç elle yazılmaz.
+  balance: function(itemId){
+    const mvs=wmsLoad(WMS_MOV_KEY,[]).filter(m=>m.itemId===itemId);
+    let onHand=0, available=0, reserved=0, quarantine=0, wip=0, finishedGoods=0;
+    const RESTRICTED=['QUALITY_HOLD','QUARANTINE','RECEIVING','INCOMING_QUALITY'];
+    mvs.forEach(function(m){
+      if(['PURCHASE_RECEIPT','QUALITY_RELEASE','FINISHED_GOODS_RECEIPT','WO_RETURN','COUNT_DIFFERENCE','CUSTOMER_RETURN'].indexOf(m.movementType)!==-1){ onHand+=m.quantity; }
+      if(['DEPARTMENT_ISSUE','WO_ISSUE','SHIPMENT','SCRAP','SUPPLIER_RETURN'].indexOf(m.movementType)!==-1){ onHand-=m.quantity; }
+      // KMI-ENT-FIX: madde #11 - ON HAND ≠ AVAILABLE ≠ RESERVED. Her hareket kendi
+      // toState'i üzerinden TEK bir kovaya yazılır (çift sayım yok).
+      if(m.movementType==='WO_RESERVATION'){ reserved+=m.quantity; available-=m.quantity; }
+      else if(m.movementType==='WO_ISSUE'){ reserved-=m.quantity; }
+      else if(m.toState==='AVAILABLE') available+=m.quantity;
+      else if(RESTRICTED.indexOf(m.toState)!==-1) quarantine+=m.quantity;
+      else if(m.toState==='WIP') wip+=m.quantity;
+      else if(m.toState==='FINISHED_GOODS') finishedGoods+=m.quantity;
+      if(['DEPARTMENT_ISSUE','WAREHOUSE_TRANSFER'].indexOf(m.movementType)!==-1 && m.fromWarehouseId){ available-=m.quantity; }
+    });
+    available=Math.max(0,available); reserved=Math.max(0,reserved);
+    return {itemId, onHand:round2(onHand), available:round2(available), reserved:round2(reserved), quarantine:round2(quarantine), wip:round2(wip), finishedGoods:round2(finishedGoods)};
+  },
+  allItemIds: function(){ const s=new Set(); wmsLoad(WMS_MOV_KEY,[]).forEach(m=>s.add(m.itemId)); return Array.from(s); }
+};
+function round2(n){ return Math.round((Number(n)||0)*100)/100; }
+function E(v){ return String(v==null?'':v).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+// ---------------------------------------------------------------------------
+// GERÇEK EKRAN: "DEPO & STOK" - liste/bakiye/hareket geçmişi + yeni hareket formu.
+// ---------------------------------------------------------------------------
+window.kmiOpenWarehouse=function(){
+  const hasAny=['warehouse.receive','warehouse.transfer','warehouse.issue','warehouse.count','warehouse.admin'].some(c=>window.KMI_AUTH.can(undefined,c));
+  if(!hasAny){ try{toast?.('Depo & Stok ekranına erişim yetkiniz yok.','warn');}catch(e){alert('Yetki yok.');} return; }
+  document.getElementById('kmiWmsModal')?.remove();
+  const m=document.createElement('div'); m.id='kmiWmsModal'; m.className='fixed inset-0 z-[280] bg-[#07101f] text-white overflow-y-auto';
+  document.body.appendChild(m);
+  window.kmiRenderWarehouse();
+};
+window.kmiRenderWarehouse=function(){
+  const el=document.getElementById('kmiWmsModal'); if(!el) return;
+  const items=window.KMI_WMS.allItemIds();
+  const canAdmin=window.KMI_AUTH.can(undefined,'warehouse.admin');
+  const canReceive=window.KMI_AUTH.can(undefined,'warehouse.receive');
+  const whOpts=window.KMI_WMS.warehouses().map(w=>`<option value="${w.id}">${E(w.name)}</option>`).join('');
+  el.innerHTML=`<div class="max-w-5xl mx-auto p-5">
+   <div class="flex justify-between items-center mb-4"><div><div class="text-[10px] text-cyan-300 tracking-widest font-black">KMI · ENTERPRISE FOUNDATION</div><h2 class="text-2xl font-black">🏭 Depo &amp; Stok</h2><div class="text-xs text-amber-300 mt-1">Bu ledger yeni kurulmuştur: sadece bu ekrandan girilen hareketleri gösterir - eski satınalma/üretim ekranlarındaki mevcut stok kayıtlarını (henüz) içermez.</div></div>
+   <button onclick="document.getElementById('kmiWmsModal').remove()" class="bg-slate-800 px-4 py-2 rounded-xl">Kapat</button></div>
+   <div class="grid md:grid-cols-2 gap-4">
+    <div class="bg-slate-900/60 border border-slate-700 rounded-2xl p-4">
+     <h3 class="font-black mb-2">Depolar</h3>
+     <div class="space-y-1 text-sm">${window.KMI_WMS.warehouses().map(w=>`<div class="flex justify-between border-b border-slate-800 py-1"><span>${E(w.name)}</span><span class="text-slate-500 text-[10px]">${E(w.id)}</span></div>`).join('')}</div>
+     ${canAdmin?`<div class="mt-3 flex gap-2"><input id="wmsNewWhName" placeholder="Yeni depo adı" class="flex-1 bg-slate-950 border border-slate-700 rounded p-2 text-sm"><button id="wmsAddWh" class="bg-cyan-700 px-3 rounded text-sm font-bold">Ekle</button></div>`:''}
+    </div>
+    <div class="bg-slate-900/60 border border-slate-700 rounded-2xl p-4">
+     <h3 class="font-black mb-2">Malzeme Bakiyeleri (ON HAND / AVAILABLE / RESERVED)</h3>
+     ${items.length?`<div class="space-y-1 text-sm">${items.map(id=>{const b=window.KMI_WMS.balance(id);return `<div class="border-b border-slate-800 py-1"><div class="font-bold">${E(id)}</div><div class="text-[11px] text-slate-400">On Hand: ${b.onHand} · Available: ${b.available} · Reserved: ${b.reserved} · Karantina: ${b.quarantine}</div></div>`;}).join('')}</div>`:`<div class="text-slate-500 text-sm">Henüz bu ledger üzerinden hareket girilmedi.</div>`}
+    </div>
+   </div>
+   ${canReceive?`<div class="bg-slate-900/60 border border-slate-700 rounded-2xl p-4 mt-4">
+     <h3 class="font-black mb-2">Yeni Stok Hareketi</h3>
+     <div class="grid md:grid-cols-3 gap-2 text-sm">
+      <input id="wmsItemId" placeholder="Malzeme/Ürün Kodu *" class="bg-slate-950 border border-slate-700 rounded p-2">
+      <select id="wmsMovType" class="bg-slate-950 border border-slate-700 rounded p-2">${window.KMI_WMS_MOVEMENT_TYPES.map(t=>`<option value="${t}">${t}</option>`).join('')}</select>
+      <input id="wmsQty" type="number" step="0.01" placeholder="Miktar *" class="bg-slate-950 border border-slate-700 rounded p-2">
+      <select id="wmsToWh" class="bg-slate-950 border border-slate-700 rounded p-2"><option value="">Hedef depo seç...</option>${whOpts}</select>
+      <select id="wmsToState" class="bg-slate-950 border border-slate-700 rounded p-2">${window.KMI_WMS_STATES.map(s=>`<option value="${s}"${s==='AVAILABLE'?' selected':''}>${s}</option>`).join('')}</select>
+      <input id="wmsReason" placeholder="Açıklama / kaynak" class="bg-slate-950 border border-slate-700 rounded p-2">
+     </div>
+     <button id="wmsSaveMove" class="mt-3 bg-emerald-700 hover:bg-emerald-600 px-4 py-2 rounded-lg font-bold text-sm">Hareketi Kaydet</button>
+     <div id="wmsMoveErr" class="text-red-400 text-xs mt-2"></div>
+    </div>`:''}
+  </div>`;
+  if(canAdmin) document.getElementById('wmsAddWh').onclick=function(){
+    try{ window.KMI_WMS.addWarehouse(document.getElementById('wmsNewWhName').value); window.kmiRenderWarehouse(); }catch(e){ alert(e.message); }
+  };
+  if(canReceive) document.getElementById('wmsSaveMove').onclick=function(){
+    try{
+      window.KMI_WMS.move({
+        itemId: document.getElementById('wmsItemId').value,
+        movementType: document.getElementById('wmsMovType').value,
+        quantity: document.getElementById('wmsQty').value,
+        toWarehouseId: document.getElementById('wmsToWh').value||null,
+        toState: document.getElementById('wmsToState').value,
+        reason: document.getElementById('wmsReason').value
+      });
+      window.kmiRenderWarehouse();
+    }catch(e){ document.getElementById('wmsMoveErr').textContent=e.message; }
+  };
+};
+// Nav girişi - mevcut ikinci nav satırına ekleniyor (kmiFloorNavRow2 deseni,
+// #1'deki KMI LIVE / Kalite Kulesi butonlarıyla aynı, ana menü bozulmadı).
+window.addEventListener('load',function(){
+  let tries=0;
+  const timer=setInterval(function(){
+    tries++;
+    try{
+      const row=document.getElementById('kmiFloorNavRow2');
+      const hasAny=['warehouse.receive','warehouse.transfer','warehouse.issue','warehouse.count','warehouse.admin'].some(c=>{try{return window.KMI_AUTH.can(undefined,c);}catch(e){return false;}});
+      if(row && !document.getElementById('kmiWmsNavBtn') && hasAny){
+        const b=document.createElement('button'); b.id='kmiWmsNavBtn'; b.className='nav-btn px-3 py-2 rounded-md hover:bg-slate-700 text-slate-300 text-sm';
+        b.innerHTML='<i class="fa-solid fa-warehouse mr-1"></i> Depo & Stok';
+        b.onclick=function(){ window.kmiOpenWarehouse(); };
+        row.appendChild(b);
+      }
+    }catch(e){}
+    if(tries>=90) clearInterval(timer);
+  },500);
+},{once:true});
+})();
+</script>
+
+<!-- ===========================================================================
+     KMI-ACCT-FIX (2026-09-28): Ender'in "Turkey Accounting + Commercial ERP
+     Core" direktifi, ACCOUNTING PHASE A uygulaması.
+     ---------------------------------------------------------------------------
+     GAP MAP BULGUSU (kod incelemesiyle doğrulandı): Mevcut sistemde gerçek bir
+     Hesap Planı / çift taraflı kayıt (borç=alacak) YOKTU. Var olan iki parça:
+       - V.invoices/V.payments (v118, kurutlu_v118_core) - satış faturası/tahsilat,
+         7-6 alanlık minimal tek-taraflı kayıt, kalemsiz, KDV yok.
+       - D.purchases üzerindeki paidBy/paidAt/paymentMethod alanları - satınalma
+         ödemesi, ayrı dizi değil, satır-üstü alan güncellemesi.
+       - D.customers/D.suppliers'ta taxNo/paymentTerm ZATEN VAR (yeniden
+         kullanıldı, kopyalanmadı).
+     BU FAZDA YAPILAN: Hesap Planı + Muhasebe Dönemleri + KDV tanımları +
+     çift taraflı Kayıt Motoru (accounting_entries/lines, borç=alacak zorunlu) +
+     Müşteri/Tedarikçi Cari Alt Defter (bakiye SADECE kayıtlardan türetilir) +
+     mevcut V118 fatura/tahsilatını YENİDEN YAZMADAN muhasebeleştiren bir
+     LEGACY ADAPTER (idempotent - iki kere çalıştırılsa tekrar kayıt açmaz).
+     BU FAZDA YAPILMAYAN (bilinçli, Faz B+): Sales/Purchase Invoice UI'larının
+     kendisi yeniden yazılmadı (V118 ekranı olduğu gibi duruyor), 3-Way Match,
+     e-Fatura/e-Arşiv entegrasyonu, Yevmiye/Büyük Defter/Mizan raporları,
+     Kasa/Banka modülleri. Kurutlu'ya özel hesap kodları İCAT EDİLMEDİ - sadece
+     Tekdüzen Hesap Planı'nın kamuya açık standart sınıf/grup seviyesi
+     kodları (120 Alıcılar, 320 Satıcılar, 600 Yurtiçi Satışlar, 391
+     Hesaplanan KDV, 191 İndirilecek KDV gibi) varsayılan olarak yüklendi ve
+     "MUHASEBE YAPILANDIRMA KONTROLÜ" ekranında mali müşavir onayı bekliyor
+     etiketiyle işaretlendi (madde #69 - Accountant Validation Gate).
+     =========================================================================== -->
+<script>
+(function(){
+'use strict';
+function acctUid(p){ return p+'-'+Date.now().toString(36).toUpperCase()+'-'+Math.random().toString(36).slice(2,5).toUpperCase(); }
+function acctNow(){ return new Date().toISOString(); }
+function acctRound2(n){ return Math.round((Number(n)||0)*100)/100; }
+function acctE(v){ return String(v==null?'':v).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function acctLoad(k,d){ try{ const v=JSON.parse(localStorage.getItem(k)); return v==null?(d!==undefined?d:null):v; }catch(e){ return d!==undefined?d:null; } }
+function acctSave(k,v){ localStorage.setItem(k, JSON.stringify(v)); }
+
+// ---------------------------------------------------------------------------
+// A) YETKİLER — finance.* (KMI_ORG 'ACCOUNTING_FINANCE' ataması veya ADMIN)
+// ---------------------------------------------------------------------------
+function acctUser(u){ return (window.currentUser)||u||null; }
+function acctIsAdmin(u){ try{ return !!(window.KMI_AUTH && window.KMI_AUTH.can(u,'ADMIN')); }catch(e){ return false; } }
+function acctHasDeptAccess(u){ try{ return !!(window.KMI_ORG && window.KMI_ORG.hasAssignment(u||window.currentUser,'ACCOUNTING_FINANCE')); }catch(e){ return false; } }
+const ACCT_CAPS = {
+  'finance.customer.view': u=>acctIsAdmin(u)||acctHasDeptAccess(u),
+  'finance.supplier.view': u=>acctIsAdmin(u)||acctHasDeptAccess(u),
+  'finance.coa.manage': u=>acctIsAdmin(u), // hesap planı sadece ADMIN
+  'finance.period.close': u=>acctIsAdmin(u), // dönem kapama sadece ADMIN
+  'finance.gl.post': u=>acctIsAdmin(u)||acctHasDeptAccess(u),
+  'finance.invoice.sales.create': u=>acctIsAdmin(u)||acctHasDeptAccess(u),
+  'finance.collection.create': u=>acctIsAdmin(u)||acctHasDeptAccess(u),
+  'finance.invoice.purchase.create': u=>acctIsAdmin(u)||acctHasDeptAccess(u),
+  'finance.payment.create': u=>acctIsAdmin(u)||acctHasDeptAccess(u),
+  'finance.tax.manage': u=>acctIsAdmin(u),
+  'finance.legacy.sync': u=>acctIsAdmin(u)||acctHasDeptAccess(u),
+  'finance.export': u=>acctIsAdmin(u)||acctHasDeptAccess(u)
+};
+const _acctOrigCan = window.KMI_AUTH && window.KMI_AUTH.can;
+if(window.KMI_AUTH){
+  window.KMI_AUTH.can = function(user, capability){
+    if(Object.prototype.hasOwnProperty.call(ACCT_CAPS, capability)){
+      try{ return !!ACCT_CAPS[capability](acctUser(user)); }catch(e){ return false; }
+    }
+    return _acctOrigCan ? _acctOrigCan(user, capability) : false;
+  };
+}
+function acctRequire(cap){ if(!window.KMI_AUTH.can(undefined,cap)) throw new Error('Bu işlem için yetkiniz yok ('+cap+').'); }
+
+// ---------------------------------------------------------------------------
+// B) HESAP PLANI (Tekdüzen - sadece kamuya açık standart sınıf/grup kodları,
+//    Kurutlu'ya özel alt hesap İCAT EDİLMEDİ - madde #4/#69).
+// ---------------------------------------------------------------------------
+const COA_KEY='KMI_ACCT_COA_V1';
+function acctSeedCOA(){
+  const existing=acctLoad(COA_KEY,null);
+  if(existing) return existing;
+  const seed=[
+    {code:'100',name:'Kasa',type:'AKTIF',accountantApproved:false},
+    {code:'102',name:'Bankalar',type:'AKTIF',accountantApproved:false},
+    {code:'120',name:'Alıcılar (Müşteri Cari)',type:'AKTIF',accountantApproved:false},
+    {code:'153',name:'Ticari Mallar / Stok',type:'AKTIF',accountantApproved:false},
+    {code:'191',name:'İndirilecek KDV',type:'AKTIF',accountantApproved:false},
+    {code:'320',name:'Satıcılar (Tedarikçi Cari)',type:'PASIF',accountantApproved:false},
+    {code:'391',name:'Hesaplanan KDV',type:'PASIF',accountantApproved:false},
+    {code:'600',name:'Yurtiçi Satışlar',type:'GELIR',accountantApproved:false},
+    {code:'621',name:'Satılan Ticari Mallar Maliyeti',type:'GIDER',accountantApproved:false},
+    {code:'760',name:'Genel Üretim Giderleri',type:'GIDER',accountantApproved:false}
+  ];
+  acctSave(COA_KEY,seed); return seed;
+}
+window.KMI_COA = {
+  list: function(){ return acctSeedCOA(); },
+  get: function(code){ return acctSeedCOA().find(a=>a.code===code)||null; },
+  add: function(cfg){
+    acctRequire('finance.coa.manage');
+    if(!cfg||!cfg.code||!cfg.name) throw new Error('Hesap kodu ve adı zorunlu.');
+    const list=acctSeedCOA();
+    if(list.some(a=>a.code===cfg.code)) throw new Error('Bu hesap kodu zaten var: '+cfg.code);
+    const acc={code:String(cfg.code),name:String(cfg.name),type:cfg.type||'AKTIF',accountantApproved:false};
+    list.push(acc); acctSave(COA_KEY,list);
+    try{ window.KMI.event('CHART_OF_ACCOUNTS_CHANGED','Account',acc.code,{action:'ADD',name:acc.name}); }catch(e){}
+    return acc;
+  },
+  // Mali müşavir/muhasebeci onayı - madde #69 "Accountant Validation Gate"
+  approve: function(code){
+    acctRequire('finance.coa.manage');
+    const list=acctSeedCOA(); const a=list.find(x=>x.code===code); if(!a) throw new Error('Hesap bulunamadı: '+code);
+    a.accountantApproved=true; a.approvedBy=(window.currentUser&&window.currentUser.name)||''; a.approvedAt=acctNow();
+    acctSave(COA_KEY,list);
+    try{ window.KMI.event('CHART_OF_ACCOUNTS_APPROVED','Account',code,{by:a.approvedBy}); }catch(e){}
+    return a;
+  }
+};
+
+// ---------------------------------------------------------------------------
+// C) MUHASEBE DÖNEMLERİ — kapalı döneme kayıt YASAK (madde #29).
+// ---------------------------------------------------------------------------
+const PERIOD_KEY='KMI_ACCT_PERIODS_V1';
+function acctPeriodId(d){ d=d?new Date(d):new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0'); }
+function acctGetOrCreatePeriod(id){
+  const list=acctLoad(PERIOD_KEY,[]);
+  let p=list.find(x=>x.id===id);
+  if(!p){ p={id, status:'OPEN'}; list.push(p); acctSave(PERIOD_KEY,list); }
+  return p;
+}
+window.KMI_ACCOUNTING_PERIODS = {
+  list: function(){ return acctLoad(PERIOD_KEY,[]); },
+  ensure: acctGetOrCreatePeriod,
+  close: function(id){
+    acctRequire('finance.period.close');
+    const list=acctLoad(PERIOD_KEY,[]); const p=list.find(x=>x.id===id)||acctGetOrCreatePeriod(id);
+    p.status='CLOSED'; p.closedBy=(window.currentUser&&window.currentUser.name)||''; p.closedAt=acctNow();
+    acctSave(PERIOD_KEY,list.some(x=>x.id===id)?list:list.concat([p]));
+    try{ window.KMI.event('ACCOUNTING_PERIOD_CLOSED','AccountingPeriod',id,{by:p.closedBy}); }catch(e){}
+    return p;
+  },
+  reopen: function(id){
+    acctRequire('finance.period.close');
+    const list=acctLoad(PERIOD_KEY,[]); const p=list.find(x=>x.id===id); if(!p) throw new Error('Dönem bulunamadı: '+id);
+    p.status='OPEN'; p.reopenedBy=(window.currentUser&&window.currentUser.name)||''; p.reopenedAt=acctNow();
+    acctSave(PERIOD_KEY,list);
+    try{ window.KMI.event('ACCOUNTING_PERIOD_REOPENED','AccountingPeriod',id,{by:p.reopenedBy}); }catch(e){}
+    return p;
+  },
+  isOpen: function(id){ const p=acctGetOrCreatePeriod(id); return p.status==='OPEN'; }
+};
+
+// ---------------------------------------------------------------------------
+// D) KDV / VERGİ TANIMLARI — asla kod içine sabit yazılmaz (madde #24), effective-dated.
+// ---------------------------------------------------------------------------
+const TAX_KEY='KMI_ACCT_TAX_DEFS_V1';
+function acctSeedTax(){
+  const existing=acctLoad(TAX_KEY,null);
+  if(existing) return existing;
+  // Not: bu, kodun içine "sabit" yazılmış bir oran değil - yapılandırma verisi;
+  // mali müşavir onayı olmadan resmi beyan için KULLANILAMAZ (accountantApproved:false).
+  const seed=[{code:'KDV20',name:'KDV %20',rate:0.20,validFrom:'2024-07-10',validUntil:null,accountantApproved:false}];
+  acctSave(TAX_KEY,seed); return seed;
+}
+window.KMI_TAX = {
+  list: function(){ return acctSeedTax(); },
+  rateFor: function(code, atDate){
+    atDate=atDate?new Date(atDate):new Date();
+    const t=acctSeedTax().find(x=>x.code===code && new Date(x.validFrom)<=atDate && (!x.validUntil||new Date(x.validUntil)>=atDate));
+    return t?t.rate:null;
+  },
+  add: function(cfg){
+    acctRequire('finance.tax.manage');
+    if(!cfg||!cfg.code||!(cfg.rate>=0)||!cfg.validFrom) throw new Error('Vergi kodu, oran ve geçerlilik başlangıcı zorunlu.');
+    const list=acctSeedTax(); list.push({code:cfg.code,name:cfg.name||cfg.code,rate:Number(cfg.rate),validFrom:cfg.validFrom,validUntil:cfg.validUntil||null,accountantApproved:false});
+    acctSave(TAX_KEY,list);
+    try{ window.KMI.event('TAX_DEFINITION_CHANGED','TaxDefinition',cfg.code,{rate:cfg.rate}); }catch(e){}
+    return list[list.length-1];
+  }
+};
+
+// ---------------------------------------------------------------------------
+// E) ÇİFT TARAFLI KAYIT MOTORU — TOTAL DEBIT != TOTAL CREDIT olan hiçbir kayıt
+//    POSTED olamaz (madde #3/#153, kritik kural). Silme yok - sadece REVERSAL.
+// ---------------------------------------------------------------------------
+const GL_KEY='KMI_ACCT_ENTRIES_V1';
+window.KMI_GL = {
+  list: function(){ return acctLoad(GL_KEY,[]); },
+  get: function(id){ return acctLoad(GL_KEY,[]).find(e=>e.id===id)||null; },
+  // cfg: {entryDate, voucherType, description, sourceType, sourceId, lines:[{accountCode,debit,credit,customerId,supplierId,description}]}
+  post: function(cfg){
+    acctRequire('finance.gl.post');
+    cfg=cfg||{};
+    const lines=Array.isArray(cfg.lines)?cfg.lines:[];
+    if(lines.length<2) throw new Error('En az 2 satır (borç+alacak) gerekli.');
+    let totalDebit=0, totalCredit=0;
+    lines.forEach(function(l){
+      if(!l.accountCode || !window.KMI_COA.get(l.accountCode)) throw new Error('Geçersiz/tanımsız hesap kodu: '+l.accountCode);
+      totalDebit+=Number(l.debit||0); totalCredit+=Number(l.credit||0);
+    });
+    totalDebit=acctRound2(totalDebit); totalCredit=acctRound2(totalCredit);
+    // KRİTİK KURAL: Total Debit != Total Credit olan hiçbir kayıt POSTED olamaz.
+    if(totalDebit!==totalCredit) throw new Error('Borç('+totalDebit+') = Alacak('+totalCredit+') değil - kayıt POSTED edilemez.');
+    if(totalDebit===0) throw new Error('Sıfır tutarlı kayıt postalanamaz.');
+    const periodId=acctPeriodId(cfg.entryDate);
+    if(!window.KMI_ACCOUNTING_PERIODS.isOpen(periodId)) throw new Error('Dönem kapalı ('+periodId+') - bu döneme kayıt girilemez.');
+    const entry={
+      id:acctUid('JE'), entryDate:cfg.entryDate||acctNow(), voucherType:cfg.voucherType||'MAHSUP',
+      description:cfg.description||'', sourceType:cfg.sourceType||null, sourceId:cfg.sourceId||null,
+      status:'POSTED', periodId:periodId, createdBy:(window.currentUser&&window.currentUser.name)||'',
+      postedAt:acctNow(), currency:cfg.currency||'TRY',
+      lines: lines.map(function(l,ix){ return {lineId:acctUid('JEL'), accountCode:l.accountCode, debit:acctRound2(l.debit||0), credit:acctRound2(l.credit||0), customerId:l.customerId||null, supplierId:l.supplierId||null, description:l.description||''}; })
+    };
+    const list=acctLoad(GL_KEY,[]); list.push(entry); acctSave(GL_KEY,list);
+    try{ window.KMI.event('ACCOUNTING_ENTRY_POSTED','AccountingEntry',entry.id,{totalDebit,sourceType:entry.sourceType,sourceId:entry.sourceId}); }catch(e){}
+    return entry;
+  },
+  // Silme yok - ters kayıt (madde #28/#84).
+  reverse: function(entryId, reason){
+    acctRequire('finance.gl.post');
+    const orig=window.KMI_GL.get(entryId); if(!orig) throw new Error('Kayıt bulunamadı: '+entryId);
+    if(orig.status==='REVERSED') throw new Error('Bu kayıt zaten ters kayıtla kapatılmış.');
+    const rev=window.KMI_GL.post({
+      entryDate:acctNow(), voucherType:'MAHSUP', description:'TERS KAYIT: '+(reason||'')+' (orijinal: '+entryId+')',
+      sourceType:'REVERSAL', sourceId:entryId, currency:orig.currency,
+      lines: orig.lines.map(function(l){ return {accountCode:l.accountCode, debit:l.credit, credit:l.debit, customerId:l.customerId, supplierId:l.supplierId, description:'Ters: '+l.description}; })
+    });
+    const list=acctLoad(GL_KEY,[]); const o=list.find(x=>x.id===entryId); if(o){ o.status='REVERSED'; o.reversedBy=rev.id; acctSave(GL_KEY,list); }
+    try{ window.KMI.event('ACCOUNTING_ENTRY_REVERSED','AccountingEntry',entryId,{reversalId:rev.id}); }catch(e){}
+    return rev;
+  }
+};
+
+// ---------------------------------------------------------------------------
+// F) MÜŞTERİ / TEDARİKÇİ CARİ — bakiye SADECE postalanmış kayıtlardan türetilir,
+//    hiçbir yerde elle overwrite YOK (madde #36/#101).
+// ---------------------------------------------------------------------------
+window.KMI_LEDGER = {
+  // KMI-ACCT-FIX: REVERSED durumundaki orijinal kayıt deftere GİZLENMEZ (madde
+  // #84 - transaction immutability, "silme yok, ters kayıt"); ters kayıt onu
+  // AYRICA ekleyip net etkiyi sıfırlar. İkisini birden hariç tutmak/dahil etmek
+  // çift negatif etkiye yol açar - burada HER İKİSİ de deftere dahildir.
+  customerEntries: function(customerId){
+    const rows=[];
+    acctLoad(GL_KEY,[]).forEach(function(e){ e.lines.forEach(function(l){ if(l.customerId===customerId) rows.push({entryId:e.id,at:e.entryDate,description:e.description||l.description,debit:l.debit,credit:l.credit,sourceType:e.sourceType,sourceId:e.sourceId,reversed:e.status==='REVERSED'}); }); });
+    return rows.sort((a,b)=>new Date(a.at)-new Date(b.at));
+  },
+  supplierEntries: function(supplierId){
+    const rows=[];
+    acctLoad(GL_KEY,[]).forEach(function(e){ e.lines.forEach(function(l){ if(l.supplierId===supplierId) rows.push({entryId:e.id,at:e.entryDate,description:e.description||l.description,debit:l.debit,credit:l.credit,sourceType:e.sourceType,sourceId:e.sourceId,reversed:e.status==='REVERSED'}); }); });
+    return rows.sort((a,b)=>new Date(a.at)-new Date(b.at));
+  },
+  customerBalance: function(customerId){
+    const rows=window.KMI_LEDGER.customerEntries(customerId);
+    let bal=0; rows.forEach(r=>{ bal+=r.debit-r.credit; });
+    return acctRound2(bal); // pozitif = müşteri bize borçlu (alacağımız var)
+  },
+  supplierBalance: function(supplierId){
+    const rows=window.KMI_LEDGER.supplierEntries(supplierId);
+    let bal=0; rows.forEach(r=>{ bal+=r.credit-r.debit; });
+    return acctRound2(bal); // pozitif = biz tedarikçiye borçluyuz
+  },
+  // Gerçek iş olayından çift taraflı kayıt üreten yardımcılar (madde #5 Posting Engine).
+  postSalesInvoice: function(cfg){
+    acctRequire('finance.invoice.sales.create');
+    if(!cfg||!cfg.customerId) throw new Error('customerId zorunlu.');
+    const net=acctRound2(cfg.netAmount||0); const vat=acctRound2(cfg.vatAmount||0); const gross=acctRound2(net+vat);
+    if(!(gross>0)) throw new Error('Tutar 0\'dan büyük olmalı.');
+    return window.KMI_GL.post({
+      entryDate:cfg.entryDate, voucherType:'SATIŞ FATURASI', description:cfg.description||('Satış Faturası - '+cfg.customerId),
+      sourceType:cfg.sourceType||'SALES_INVOICE', sourceId:cfg.sourceId||null, currency:cfg.currency||'TRY',
+      lines:[
+        {accountCode:'120', debit:gross, credit:0, customerId:cfg.customerId, description:'Alıcılar'},
+        {accountCode:'600', debit:0, credit:net, description:'Yurtiçi Satışlar'},
+        {accountCode:'391', debit:0, credit:vat, description:'Hesaplanan KDV'}
+      ].filter(l=>l.debit>0||l.credit>0)
+    });
+  },
+  postCustomerCollection: function(cfg){
+    acctRequire('finance.collection.create');
+    if(!cfg||!cfg.customerId) throw new Error('customerId zorunlu.');
+    const amt=acctRound2(cfg.amount||0); if(!(amt>0)) throw new Error('Tutar 0\'dan büyük olmalı.');
+    return window.KMI_GL.post({
+      entryDate:cfg.entryDate, voucherType:'TAHSİL', description:cfg.description||('Tahsilat - '+cfg.customerId),
+      sourceType:cfg.sourceType||'COLLECTION', sourceId:cfg.sourceId||null, currency:cfg.currency||'TRY',
+      lines:[
+        {accountCode:'102', debit:amt, credit:0, description:'Banka'},
+        {accountCode:'120', debit:0, credit:amt, customerId:cfg.customerId, description:'Alıcılar'}
+      ]
+    });
+  },
+  postPurchaseInvoice: function(cfg){
+    acctRequire('finance.invoice.purchase.create');
+    if(!cfg||!cfg.supplierId) throw new Error('supplierId zorunlu.');
+    const net=acctRound2(cfg.netAmount||0); const vat=acctRound2(cfg.vatAmount||0); const gross=acctRound2(net+vat);
+    if(!(gross>0)) throw new Error('Tutar 0\'dan büyük olmalı.');
+    return window.KMI_GL.post({
+      entryDate:cfg.entryDate, voucherType:'ALIŞ FATURASI', description:cfg.description||('Alış Faturası - '+cfg.supplierId),
+      sourceType:cfg.sourceType||'PURCHASE_INVOICE', sourceId:cfg.sourceId||null, currency:cfg.currency||'TRY',
+      lines:[
+        {accountCode:'153', debit:net, credit:0, description:'Ticari Mallar/Stok'},
+        {accountCode:'191', debit:vat, credit:0, description:'İndirilecek KDV'},
+        {accountCode:'320', debit:0, credit:gross, supplierId:cfg.supplierId, description:'Satıcılar'}
+      ].filter(l=>l.debit>0||l.credit>0)
+    });
+  },
+  postSupplierPayment: function(cfg){
+    acctRequire('finance.payment.create');
+    if(!cfg||!cfg.supplierId) throw new Error('supplierId zorunlu.');
+    const amt=acctRound2(cfg.amount||0); if(!(amt>0)) throw new Error('Tutar 0\'dan büyük olmalı.');
+    return window.KMI_GL.post({
+      entryDate:cfg.entryDate, voucherType:'TEDİYE', description:cfg.description||('Ödeme - '+cfg.supplierId),
+      sourceType:cfg.sourceType||'PAYMENT', sourceId:cfg.sourceId||null, currency:cfg.currency||'TRY',
+      lines:[
+        {accountCode:'320', debit:amt, credit:0, supplierId:cfg.supplierId, description:'Satıcılar'},
+        {accountCode:'102', debit:0, credit:amt, description:'Banka'}
+      ]
+    });
+  }
+};
+
+// ---------------------------------------------------------------------------
+// G) LEGACY ADAPTER — V118'in mevcut fatura/tahsilatını YENİDEN YAZMADAN
+//    muhasebeleştirir. İdempotent: her V.invoice/V.payment kaydı en fazla BİR
+//    kez GL'ye aktarılır (kayıt üzerine _acctEntryId damgası basılır).
+// ---------------------------------------------------------------------------
+window.KMI_ACCT_ADAPTER = {
+  syncFromV118: function(){
+    acctRequire('finance.legacy.sync');
+    let converted=0, skipped=0, errors=[];
+    try{
+      const KEY='kurutlu_v118_core';
+      const V=JSON.parse(localStorage.getItem(KEY)||'{}');
+      V.invoices=Array.isArray(V.invoices)?V.invoices:[];
+      V.payments=Array.isArray(V.payments)?V.payments:[];
+      V.invoices.forEach(function(inv){
+        if(inv._acctEntryId){ skipped++; return; } // idempotent - zaten muhasebeleşmiş
+        try{
+          const e=window.KMI_LEDGER.postSalesInvoice({customerId:inv.customerId, netAmount:inv.amount, vatAmount:0, currency:inv.currency, entryDate:inv.createdAt, sourceType:'V118_INVOICE', sourceId:inv.id, description:'Legacy V118 Fatura Aktarımı - '+inv.id+' (KDV hesaplanmadı: legacy kayıtta KDV kırılımı yok)'});
+          inv._acctEntryId=e.id; converted++;
+        }catch(err){ errors.push('Fatura '+inv.id+': '+err.message); }
+      });
+      V.payments.forEach(function(pay){
+        if(pay._acctEntryId){ skipped++; return; }
+        try{
+          const inv=V.invoices.find(x=>x.id===pay.invoiceId);
+          if(!inv){ errors.push('Ödeme '+pay.id+': bağlı fatura bulunamadı, atlandı.'); return; }
+          const e=window.KMI_LEDGER.postCustomerCollection({customerId:inv.customerId, amount:pay.amount, currency:pay.currency, entryDate:pay.at, sourceType:'V118_PAYMENT', sourceId:pay.id, description:'Legacy V118 Tahsilat Aktarımı - '+pay.id});
+          pay._acctEntryId=e.id; converted++;
+        }catch(err){ errors.push('Ödeme '+pay.id+': '+err.message); }
+      });
+      localStorage.setItem(KEY, JSON.stringify(V));
+    }catch(e){ errors.push('Genel hata: '+e.message); }
+    try{ window.KMI.event('LEGACY_ACCOUNTING_SYNC','V118Sync',null,{converted,skipped,errorCount:errors.length}); }catch(e){}
+    return {converted, skipped, errors};
+  }
+};
+
+// ---------------------------------------------------------------------------
+// H) GERÇEK EKRAN: "MUHASEBE & FİNANS" - Hesap Planı / Dönemler / Cari Ekstre /
+//    Manuel Fiş Girişi / Legacy Senkron.
+// ---------------------------------------------------------------------------
+window.kmiOpenAccounting=function(){
+  const hasAny=['finance.customer.view','finance.supplier.view','finance.gl.post','finance.coa.manage'].some(c=>window.KMI_AUTH.can(undefined,c));
+  if(!hasAny){ try{toast?.('Muhasebe & Finans ekranına erişim yetkiniz yok.','warn');}catch(e){alert('Yetki yok.');} return; }
+  document.getElementById('kmiAcctModal')?.remove();
+  const m=document.createElement('div'); m.id='kmiAcctModal'; m.className='fixed inset-0 z-[280] bg-[#07101f] text-white overflow-y-auto';
+  document.body.appendChild(m);
+  window.kmiRenderAccounting();
+};
+window.kmiRenderAccounting=function(){
+  const el=document.getElementById('kmiAcctModal'); if(!el) return;
+  const canPost=window.KMI_AUTH.can(undefined,'finance.gl.post');
+  const canSync=window.KMI_AUTH.can(undefined,'finance.legacy.sync');
+  const canClosePeriod=window.KMI_AUTH.can(undefined,'finance.period.close');
+  const curPeriod=acctPeriodId();
+  window.KMI_ACCOUNTING_PERIODS.ensure(curPeriod);
+  const custOpts=(function(){ try{ return (window.D&&window.D.customers)||[]; }catch(e){ return []; } })();
+  el.innerHTML=`<div class="max-w-6xl mx-auto p-5">
+   <div class="flex justify-between items-center mb-4"><div><div class="text-[10px] text-cyan-300 tracking-widest font-black">KMI · MUHASEBE PHASE A</div><h2 class="text-2xl font-black">📒 Muhasebe &amp; Finans</h2><div class="text-xs text-amber-300 mt-1">Hesap Planı ve KDV oranları mali müşavir onayı bekliyor - resmi beyan için kullanılamaz. Legacy V118 fatura/tahsilatları henüz muhasebeleştirilmemiş olabilir, aşağıdan senkronize edin.</div></div>
+   <button onclick="document.getElementById('kmiAcctModal').remove()" class="bg-slate-800 px-4 py-2 rounded-xl">Kapat</button></div>
+   <div class="grid md:grid-cols-3 gap-4">
+    <div class="bg-slate-900/60 border border-slate-700 rounded-2xl p-4">
+     <h3 class="font-black mb-2">Hesap Planı</h3>
+     <div class="space-y-1 text-xs max-h-48 overflow-y-auto">${window.KMI_COA.list().map(a=>`<div class="flex justify-between border-b border-slate-800 py-1"><span>${acctE(a.code)} - ${acctE(a.name)}</span><span class="${a.accountantApproved?'text-emerald-400':'text-amber-400'}">${a.accountantApproved?'Onaylı':'Onay Bekliyor'}</span></div>`).join('')}</div>
+    </div>
+    <div class="bg-slate-900/60 border border-slate-700 rounded-2xl p-4">
+     <h3 class="font-black mb-2">Dönem: ${acctE(curPeriod)}</h3>
+     <div class="text-sm">Durum: <b class="${window.KMI_ACCOUNTING_PERIODS.isOpen(curPeriod)?'text-emerald-400':'text-red-400'}">${window.KMI_ACCOUNTING_PERIODS.isOpen(curPeriod)?'AÇIK':'KAPALI'}</b></div>
+     ${canClosePeriod?`<button id="acctClosePeriod" class="mt-2 bg-red-800 hover:bg-red-700 px-3 py-2 rounded-lg text-xs font-bold">${window.KMI_ACCOUNTING_PERIODS.isOpen(curPeriod)?'Dönemi Kapat':'Dönemi Yeniden Aç'}</button>`:''}
+     ${canSync?`<div class="mt-4 pt-4 border-t border-slate-800"><button id="acctSyncV118" class="bg-cyan-700 hover:bg-cyan-600 px-3 py-2 rounded-lg text-xs font-bold w-full">Legacy V118 Fatura/Tahsilat Senkronu</button><div id="acctSyncOut" class="text-[11px] text-slate-400 mt-2"></div></div>`:''}
+    </div>
+    <div class="bg-slate-900/60 border border-slate-700 rounded-2xl p-4">
+     <h3 class="font-black mb-2">Cari Ekstre (Müşteri)</h3>
+     <select id="acctCustSel" class="w-full bg-slate-950 border border-slate-700 rounded p-2 text-sm mb-2"><option value="">Müşteri seç...</option>${custOpts.map(c=>`<option value="${acctE(c.id)}">${acctE(c.legalName||c.name)}</option>`).join('')}</select>
+     <div id="acctCustOut" class="text-xs text-slate-400"></div>
+    </div>
+   </div>
+   ${canPost?`<div class="bg-slate-900/60 border border-slate-700 rounded-2xl p-4 mt-4">
+     <h3 class="font-black mb-2">Manuel Muhasebe Fişi (Borç = Alacak zorunlu)</h3>
+     <div id="acctLines">
+       <div class="grid grid-cols-4 gap-2 mb-1 acct-line"><input class="acctAcc bg-slate-950 border border-slate-700 rounded p-2 text-xs" placeholder="Hesap Kodu"><input class="acctDebit bg-slate-950 border border-slate-700 rounded p-2 text-xs" type="number" placeholder="Borç"><input class="acctCredit bg-slate-950 border border-slate-700 rounded p-2 text-xs" type="number" placeholder="Alacak"><input class="acctDesc bg-slate-950 border border-slate-700 rounded p-2 text-xs" placeholder="Açıklama"></div>
+       <div class="grid grid-cols-4 gap-2 mb-1 acct-line"><input class="acctAcc bg-slate-950 border border-slate-700 rounded p-2 text-xs" placeholder="Hesap Kodu"><input class="acctDebit bg-slate-950 border border-slate-700 rounded p-2 text-xs" type="number" placeholder="Borç"><input class="acctCredit bg-slate-950 border border-slate-700 rounded p-2 text-xs" type="number" placeholder="Alacak"><input class="acctDesc bg-slate-950 border border-slate-700 rounded p-2 text-xs" placeholder="Açıklama"></div>
+     </div>
+     <input id="acctVoucherDesc" placeholder="Fiş açıklaması" class="w-full bg-slate-950 border border-slate-700 rounded p-2 text-sm mt-2">
+     <button id="acctPostVoucher" class="mt-3 bg-emerald-700 hover:bg-emerald-600 px-4 py-2 rounded-lg font-bold text-sm">Fişi Postala</button>
+     <div id="acctPostErr" class="text-red-400 text-xs mt-2"></div>
+   </div>`:''}
+  </div>`;
+  if(canClosePeriod) document.getElementById('acctClosePeriod').onclick=function(){
+    try{ if(window.KMI_ACCOUNTING_PERIODS.isOpen(curPeriod)) window.KMI_ACCOUNTING_PERIODS.close(curPeriod); else window.KMI_ACCOUNTING_PERIODS.reopen(curPeriod); window.kmiRenderAccounting(); }catch(e){ alert(e.message); }
+  };
+  if(canSync) document.getElementById('acctSyncV118').onclick=function(){
+    try{ const r=window.KMI_ACCT_ADAPTER.syncFromV118(); document.getElementById('acctSyncOut').textContent=r.converted+' kayıt muhasebeleştirildi, '+r.skipped+' zaten mevcuttu'+(r.errors.length?', '+r.errors.length+' hata (bkz. konsol)':''); if(r.errors.length) console.warn(r.errors); }catch(e){ document.getElementById('acctSyncOut').textContent='Hata: '+e.message; }
+  };
+  document.getElementById('acctCustSel').onchange=function(){
+    const id=this.value; if(!id){ document.getElementById('acctCustOut').innerHTML=''; return; }
+    const rows=window.KMI_LEDGER.customerEntries(id); const bal=window.KMI_LEDGER.customerBalance(id);
+    document.getElementById('acctCustOut').innerHTML='<div class="font-bold mb-1">Bakiye: '+bal+' TRY</div>'+rows.map(r=>`<div class="border-b border-slate-800 py-1">${new Date(r.at).toLocaleDateString('tr-TR')} · ${acctE(r.description)} · B:${r.debit} A:${r.credit}</div>`).join('');
+  };
+  if(canPost) document.getElementById('acctPostVoucher').onclick=function(){
+    try{
+      const lines=Array.from(document.querySelectorAll('.acct-line')).map(row=>({
+        accountCode: row.querySelector('.acctAcc').value.trim(),
+        debit: Number(row.querySelector('.acctDebit').value||0),
+        credit: Number(row.querySelector('.acctCredit').value||0),
+        description: row.querySelector('.acctDesc').value.trim()
+      })).filter(l=>l.accountCode);
+      window.KMI_GL.post({description:document.getElementById('acctVoucherDesc').value, lines});
+      window.kmiRenderAccounting();
+    }catch(e){ document.getElementById('acctPostErr').textContent=e.message; }
+  };
+};
+window.addEventListener('load',function(){
+  let tries=0;
+  const timer=setInterval(function(){
+    tries++;
+    try{
+      const row=document.getElementById('kmiFloorNavRow2');
+      const hasAny=['finance.customer.view','finance.supplier.view','finance.gl.post','finance.coa.manage'].some(c=>{try{return window.KMI_AUTH.can(undefined,c);}catch(e){return false;}});
+      if(row && !document.getElementById('kmiAcctNavBtn') && hasAny){
+        const b=document.createElement('button'); b.id='kmiAcctNavBtn'; b.className='nav-btn px-3 py-2 rounded-md hover:bg-slate-700 text-slate-300 text-sm';
+        b.innerHTML='<i class="fa-solid fa-book mr-1"></i> Muhasebe & Finans (Yeni)';
+        b.onclick=function(){ window.kmiOpenAccounting(); };
+        row.appendChild(b);
+      }
+    }catch(e){}
+    if(tries>=90) clearInterval(timer);
+  },500);
+},{once:true});
+})();
+</script>
+
+<!-- ===========================================================================
+     KMI-REP-FIX (2026-09-28): Ender'in "Reporting Intelligence" direktifi,
+     REPORTING PHASE 0 + PHASE 1 uygulaması.
+     ---------------------------------------------------------------------------
+     GAP MAP BULGUSU (kod incelemesiyle doğrulandı - Explore ajanı ile gerçek
+     kod okunarak): Mevcut sistemde her rapor ekranı (declaration/quality/cost/
+     manager-report vb.) kendi HTML/CSV şablonunu ve kendi veri filtrelemesini
+     ayrı ayrı içeriyordu; ortak bir Report Definition / Registry / immutable
+     Snapshot / RPT numarası / Revizyon / Source Lineage / Report Inbox kavramı
+     YOKTU (doğrudan arama ile doğrulandı, varsayılmadı). Buna karşılık
+     window.KMI.event (Event Engine), window.KMI_CALC (Hesaplama Motoru,
+     CANNOT_CALCULATE/HESAPLANAMIYOR disiplini dahil), window.kmiTaskCreate
+     (Görev Motoru) ve window.KMI_AUTH.can / window.KMI_ORG (Yetki + Departman
+     Atama) zaten gerçek ve sağlamdı - bu faz bunları YENİDEN İCAT ETMEDEN
+     kullanıyor.
+     BU FAZDA YAPILAN: window.KMI_REPORTING - Report Definition kaydı (kim
+     hangi departman için ne tanımlıyor), immutable Report Snapshot (RPT-YYYY-...
+     numarası + otomatik artan Revizyon + her metrik için Source Lineage +
+     Data Completeness), tek merkezi yazdırma fonksiyonu (departman başına ayrı
+     PDF/print mantığı YOK - hepsi window.KMI_REPORTING.printSnapshot() üzerinden),
+     Report Inbox (bir rapora kişi atama, isterse window.kmiTaskCreate ile
+     inceleme görevi açma), reporting.* yetki alanı (mevcut CAPS-wrap deseniyle,
+     ADMIN veya ilgili departman ataması).
+     BU FAZDA YAPILMAYAN (bilinçli, Faz B+, "asla uydurma" ilkesi gereği):
+     Metrikler bu fazda ELLE girilir (kaynak "MANUAL" olarak işaretlenir) -
+     her departmanın gerçek KMI_CALC fonksiyonlarına otomatik bağlanması
+     (örn. Üretim OEE'sinin otomatik olarak bir Report Definition'a
+     bağlanması) YAPILMADI; bunu şimdiden otomatikleştirmek, hangi
+     KMI_CALC fonksiyonunun hangi rapora doğru şekilde eşleneceğini
+     doğrulamadan yapılırsa yanlış/uydurma veri riski doğurur. Report
+     Definition/Snapshot İSKELETİ bilerek önce kuruldu; departman bazlı
+     gerçek otomatik metrik bağlama Faz B'de, her departman ayrı ayrı
+     doğrulanarak yapılmalı.
+     =========================================================================== -->
+<script>
+(function(){
+'use strict';
+function rpE(v){ return String(v==null?'':v).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function rpNow(){ return new Date().toISOString(); }
+function rpLoad(k,d){ try{ const v=JSON.parse(localStorage.getItem(k)); return v==null?(d!==undefined?d:null):v; }catch(e){ return d!==undefined?d:null; } }
+function rpSave(k,v){ localStorage.setItem(k, JSON.stringify(v)); }
+let __rpSeq=0;
+function rpGenId(prefix){
+  __rpSeq=(__rpSeq+1)%46656; // 36^3 - aynı milisaniyede id çakışmasını önlemek için sayaç (Task ID hatasından ders alındı)
+  return prefix+'-'+new Date().getFullYear()+'-'+Date.now().toString(36).toUpperCase()+'-'+__rpSeq.toString(36).toUpperCase().padStart(3,'0')+Math.random().toString(36).slice(2,4).toUpperCase();
+}
+
+// ---------------------------------------------------------------------------
+// A) YETKİLER — reporting.* (KMI_ORG departman ataması veya ADMIN; ayrıca her
+//    fonksiyon içinde İLGİLİ departmana özel ek kontrol yapılır - örn. Üretim
+//    sorumlusu sadece Üretim'in rapor tanımı için snapshot üretebilir).
+// ---------------------------------------------------------------------------
+function rpUser(u){ return (window.currentUser)||u||null; }
+function rpIsAdmin(u){ try{ return !!(window.KMI_AUTH && window.KMI_AUTH.can(u,'ADMIN')); }catch(e){ return false; } }
+function rpHasDeptAccess(u,deptId){ try{ return !!(window.KMI_ORG && window.KMI_ORG.hasAssignment(u||window.currentUser, deptId)); }catch(e){ return false; } }
+function rpHasAnyDeptAccess(u){ try{ return (window.KMI_DEPARTMENTS||[]).some(function(d){ return rpHasDeptAccess(u,d.id); }); }catch(e){ return false; } }
+const RPT_CAPS = {
+  'reporting.definitions.manage': u=>rpIsAdmin(u), // rapor tanımı oluşturma sadece ADMIN
+  'reporting.generate': u=>rpIsAdmin(u)||rpHasAnyDeptAccess(u),
+  'reporting.view': u=>rpIsAdmin(u)||rpHasAnyDeptAccess(u),
+  'reporting.assign': u=>rpIsAdmin(u)||rpHasAnyDeptAccess(u),
+  'reporting.export': u=>rpIsAdmin(u)||rpHasAnyDeptAccess(u),
+  'reporting.admin': u=>rpIsAdmin(u)
+};
+const _rpOrigCan = window.KMI_AUTH && window.KMI_AUTH.can;
+if(window.KMI_AUTH){
+  window.KMI_AUTH.can = function(user, capability){
+    if(Object.prototype.hasOwnProperty.call(RPT_CAPS, capability)){
+      try{ return !!RPT_CAPS[capability](rpUser(user)); }catch(e){ return false; }
+    }
+    return _rpOrigCan ? _rpOrigCan(user, capability) : false;
+  };
+}
+function rpRequire(cap){ if(!window.KMI_AUTH.can(undefined,cap)) throw new Error('Bu işlem için yetkiniz yok ('+cap+').'); }
+function rpRequireDept(u,deptId){ if(!(rpIsAdmin(u)||rpHasDeptAccess(u,deptId))) throw new Error('Bu departmanın raporları için yetkiniz yok.'); }
+
+// ---------------------------------------------------------------------------
+// B) REPORT DEFINITION REGISTRY
+// ---------------------------------------------------------------------------
+const DEF_KEY='KMI_REPORTING_DEFINITIONS_V1';
+function rpDefs(){ return rpLoad(DEF_KEY,[]); }
+function rpSaveDefs(a){ rpSave(DEF_KEY,a); }
+function rpAddDefinition(data){
+  data=data||{};
+  rpRequire('reporting.definitions.manage');
+  const name=String(data.name||'').trim();
+  if(!name) throw new Error('Rapor tanımı adı zorunlu.');
+  if(!data.departmentId || !(window.KMI_DEPARTMENTS||[]).some(d=>d.id===data.departmentId)) throw new Error('Geçerli bir departman seçilmeli.');
+  const rec={
+    id: rpGenId('RPTDEF'),
+    name: name,
+    departmentId: data.departmentId,
+    description: String(data.description||'').trim(),
+    createdBy: (window.currentUser&&window.currentUser.name)||'system',
+    createdAt: rpNow(),
+    active: true
+  };
+  const all=rpDefs(); all.push(rec); rpSaveDefs(all);
+  try{ window.KMI.event('REPORT_DEFINITION_CREATED','REPORT_DEFINITION',rec.id,{name:rec.name,departmentId:rec.departmentId}); }catch(e){}
+  return rec;
+}
+function rpGetDefinition(id){ return rpDefs().find(d=>d.id===id)||null; }
+function rpListDefinitions(u){
+  u=rpUser(u);
+  const defs=rpDefs();
+  if(rpIsAdmin(u)) return defs;
+  return defs.filter(d=>rpHasDeptAccess(u,d.departmentId));
+}
+
+// ---------------------------------------------------------------------------
+// C) IMMUTABLE REPORT SNAPSHOT (RPT numarası + Revizyon + Source Lineage +
+//    Data Completeness) - hiçbir snapshot silinmez veya düzenlenmez, sadece
+//    yeni bir Revizyon olarak yeniden üretilir.
+// ---------------------------------------------------------------------------
+const SNAP_KEY='KMI_REPORTING_SNAPSHOTS_V1';
+function rpSnaps(){ return rpLoad(SNAP_KEY,[]); }
+function rpSaveSnaps(a){ rpSave(SNAP_KEY,a); }
+function rpGenerateSnapshot(data){
+  data=data||{};
+  const def=rpGetDefinition(data.definitionId);
+  if(!def) throw new Error('Rapor tanımı bulunamadı.');
+  if(!def.active) throw new Error('Bu rapor tanımı pasif durumda.');
+  const u=rpUser();
+  rpRequire('reporting.generate');
+  rpRequireDept(u, def.departmentId);
+  const metricsIn=Array.isArray(data.metrics)?data.metrics:[];
+  if(!metricsIn.length) throw new Error('En az bir metrik girilmeli (veri yoksa HESAPLANAMIYOR olarak işaretleyin - asla tahmini değer girmeyin).');
+  const metrics=metricsIn.map(function(m){
+    const cannot = m.status==='CANNOT_CALCULATE' || m.value==null || m.value==='';
+    return {
+      label: String(m.label||'').trim()||'Metrik',
+      value: cannot? null : m.value,
+      status: cannot?'CANNOT_CALCULATE':'OK',
+      reason: cannot? String(m.reason||'Veri girilmedi/kaynaktan alınamadı') : '',
+      sourceEngine: String(m.sourceEngine||'MANUAL'),
+      sourceFunction: String(m.sourceFunction||'-')
+    };
+  });
+  const missing=metrics.filter(m=>m.status==='CANNOT_CALCULATE').length;
+  const dataCompleteness = missing===0? {status:'COMPLETE',missingCount:0} : missing===metrics.length? {status:'CANNOT_CALCULATE',missingCount:missing} : {status:'PARTIAL',missingCount:missing};
+  const prior=rpSnaps().filter(s=>s.definitionId===def.id);
+  const revision = prior.length? Math.max.apply(null,prior.map(s=>s.revision))+1 : 1;
+  const priorLatest = prior.length? prior.slice().sort((a,b)=>b.revision-a.revision)[0] : null;
+  const snap={
+    id: rpGenId('RPT'),
+    definitionId: def.id,
+    definitionName: def.name,
+    departmentId: def.departmentId,
+    revision: revision,
+    generatedAt: rpNow(),
+    generatedBy: (u&&u.name)||'system',
+    metrics: metrics,
+    dataCompleteness: dataCompleteness,
+    status: 'FINAL',
+    supersedes: priorLatest? priorLatest.id : null
+  };
+  const all=rpSnaps(); all.push(snap); rpSaveSnaps(all);
+  try{ window.KMI.event('REPORT_SNAPSHOT_GENERATED','REPORT_SNAPSHOT',snap.id,{definitionId:def.id,revision:revision,dataCompleteness:dataCompleteness.status}); }catch(e){}
+  return snap;
+}
+function rpGetSnapshot(id){ return rpSnaps().find(s=>s.id===id)||null; }
+function rpListSnapshots(definitionId,u){
+  u=rpUser(u);
+  let rows=rpSnaps();
+  if(definitionId) rows=rows.filter(s=>s.definitionId===definitionId);
+  if(!rpIsAdmin(u)) rows=rows.filter(s=>rpHasDeptAccess(u,s.departmentId));
+  return rows.sort((a,b)=>new Date(b.generatedAt)-new Date(a.generatedAt));
+}
+function rpLatestSnapshot(definitionId,u){ const rows=rpListSnapshots(definitionId,u); return rows.length?rows[0]:null; }
+
+// ---------------------------------------------------------------------------
+// D) REPORT INBOX - bir kişiye rapor atama, isterse window.kmiTaskCreate ile
+//    inceleme görevi (ayrı bir görev/atama mekanizması İCAT EDİLMEDİ).
+// ---------------------------------------------------------------------------
+const INBOX_KEY='KMI_REPORTING_INBOX_V1';
+function rpInboxAll(){ return rpLoad(INBOX_KEY,[]); }
+function rpSaveInbox(a){ rpSave(INBOX_KEY,a); }
+function rpAssignToInbox(data){
+  data=data||{};
+  const snap=rpGetSnapshot(data.snapshotId);
+  if(!snap) throw new Error('Rapor anlık görüntüsü bulunamadı.');
+  const u=rpUser();
+  rpRequire('reporting.assign');
+  rpRequireDept(u, snap.departmentId);
+  if(!data.personId) throw new Error('Atanacak kişi seçilmeli.');
+  const entry={
+    id: rpGenId('RPTINB'),
+    snapshotId: snap.id,
+    definitionId: snap.definitionId,
+    assignedTo: Number(data.personId),
+    assignedBy: (u&&u.name)||'system',
+    assignedAt: rpNow(),
+    read: false,
+    taskId: null
+  };
+  if(data.requireReview){
+    try{
+      const task=window.kmiTaskCreate({
+        title: 'Rapor İncelemesi: '+snap.definitionName+' ('+snap.id+')',
+        description: snap.id+' numaralı, '+snap.revision+'. revizyon rapor anlık görüntüsünü inceleyip onaylayın.',
+        assigneeId: Number(data.personId),
+        dueAt: data.dueAt || new Date(Date.now()+3*86400000).toISOString(),
+        approvalRequired: true,
+        links: {reportSnapshotId: snap.id}
+      });
+      entry.taskId = task.id;
+    }catch(e){ entry.taskError = e.message; } // görev açılamasa bile atama kaydı sessizce yutulmaz, işaretlenir
+  }
+  const all=rpInboxAll(); all.push(entry); rpSaveInbox(all);
+  try{ window.KMI.event('REPORT_ASSIGNED','REPORT_SNAPSHOT',snap.id,{assignedTo:entry.assignedTo,requireReview:!!data.requireReview}); }catch(e){}
+  return entry;
+}
+function rpMyInbox(personId){
+  personId = Number(personId!=null?personId:(window.currentUser&&window.currentUser.id));
+  return rpInboxAll().filter(e=>Number(e.assignedTo)===personId).map(function(e){
+    return Object.assign({}, e, {snapshot: rpGetSnapshot(e.snapshotId)});
+  }).sort((a,b)=>new Date(b.assignedAt)-new Date(a.assignedAt));
+}
+function rpMarkRead(inboxId){
+  const all=rpInboxAll(); const row=all.find(e=>e.id===inboxId); if(!row) return null;
+  row.read=true; row.readAt=rpNow(); rpSaveInbox(all);
+  try{ window.KMI.event('REPORT_INBOX_READ','REPORT_SNAPSHOT',row.snapshotId,{by:(window.currentUser&&window.currentUser.name)||'-'}); }catch(e){}
+  return row;
+}
+
+// ---------------------------------------------------------------------------
+// E) TEK MERKEZİ YAZDIRMA - departman başına ayrı PDF/print mantığı yok.
+// ---------------------------------------------------------------------------
+function rpPrintSnapshot(id){
+  rpRequire('reporting.export');
+  const snap=rpGetSnapshot(id); if(!snap) throw new Error('Rapor bulunamadı.');
+  const rowsHtml=snap.metrics.map(function(m){
+    const val = m.status==='CANNOT_CALCULATE' ? '<span style="color:#b45309;font-weight:bold">HESAPLANAMIYOR</span>' : rpE(m.value);
+    return '<tr><td>'+rpE(m.label)+'</td><td>'+val+'</td><td>'+rpE(m.sourceEngine)+' / '+rpE(m.sourceFunction)+'</td><td>'+(m.status==='CANNOT_CALCULATE'?rpE(m.reason):'-')+'</td></tr>';
+  }).join('');
+  const w=window.open('','_blank');
+  w.document.write('<html><head><title>'+rpE(snap.id)+'</title></head><body style="font-family:Arial;padding:28px;color:#111">'
+    +'<h2>KURUTLU CNC · '+rpE(snap.definitionName)+'</h2>'
+    +'<div style="color:#666;font-size:12px">Rapor No: <b>'+rpE(snap.id)+'</b> · Revizyon: <b>'+snap.revision+'</b>'+(snap.supersedes?' (önceki: '+rpE(snap.supersedes)+')':'')+' · Oluşturan: '+rpE(snap.generatedBy)+' · '+new Date(snap.generatedAt).toLocaleString('tr-TR')+'</div>'
+    +'<div style="margin-top:6px;font-size:12px">Veri Bütünlüğü: <b>'+rpE(snap.dataCompleteness.status)+'</b>'+(snap.dataCompleteness.missingCount?' ('+snap.dataCompleteness.missingCount+' metrik hesaplanamadı)':'')+'</div>'
+    +'<table border="1" cellspacing="0" cellpadding="6" style="border-collapse:collapse;width:100%;margin-top:16px"><tr><th>Metrik</th><th>Değer</th><th>Kaynak</th><th>Not</th></tr>'+rowsHtml+'</table>'
+    +(typeof kmiPrintStampBlockHtml==='function'?kmiPrintStampBlockHtml():'')
+    +'<script>setTimeout(()=>window.print(),400)<\/script></body></html>');
+  w.document.close();
+  try{ window.KMI.event('REPORT_EXPORTED','REPORT_SNAPSHOT',snap.id,{by:(window.currentUser&&window.currentUser.name)||'-'}); }catch(e){}
+}
+
+window.KMI_REPORTING = {
+  addDefinition: rpAddDefinition,
+  getDefinition: rpGetDefinition,
+  listDefinitions: rpListDefinitions,
+  generateSnapshot: rpGenerateSnapshot,
+  getSnapshot: rpGetSnapshot,
+  listSnapshots: rpListSnapshots,
+  latestSnapshot: rpLatestSnapshot,
+  assignToInbox: rpAssignToInbox,
+  myInbox: rpMyInbox,
+  markRead: rpMarkRead,
+  printSnapshot: rpPrintSnapshot
+};
+
+// ---------------------------------------------------------------------------
+// F) GERÇEK EKRAN: "RAPORLAMA" - Rapor Tanımları / Anlık Görüntü Geçmişi /
+//    Gelen Kutusu. (Ayrı bir "demo Raporlar" ekranı değil - tüm işlemler
+//    yukarıdaki gerçek window.KMI_REPORTING API'si üzerinden yapılır.)
+// ---------------------------------------------------------------------------
+let __rpSelectedDefId=null;
+window.kmiOpenReporting=function(){
+  if(!window.KMI_AUTH.can(undefined,'reporting.view')){ try{window.kmiToast('Raporlama ekranına erişim yetkiniz yok.','warn');}catch(e){alert('Yetki yok.');} return; }
+  document.getElementById('kmiRepModal')?.remove();
+  const m=document.createElement('div'); m.id='kmiRepModal'; m.className='fixed inset-0 z-[280] bg-[#07101f] text-white overflow-y-auto';
+  document.body.appendChild(m);
+  window.kmiRenderReporting();
+};
+window.kmiRepSelectDef=function(id){ __rpSelectedDefId=id; window.kmiRenderReporting(); };
+window.kmiRepAddDefinition=function(){
+  try{
+    rpAddDefinition({
+      name: document.getElementById('rpNewDefName').value,
+      departmentId: document.getElementById('rpNewDefDept').value,
+      description: document.getElementById('rpNewDefDesc').value
+    });
+    window.kmiRenderReporting();
+  }catch(e){ document.getElementById('rpDefErr').textContent=e.message; }
+};
+window.kmiRepAddMetricRow=function(){
+  const wrap=document.getElementById('rpMetricRows'); if(!wrap) return;
+  const row=document.createElement('div'); row.className='grid grid-cols-5 gap-2 mb-1 rp-metric-row';
+  row.innerHTML='<input class="rpMLabel bg-slate-950 border border-slate-700 rounded p-2 text-xs" placeholder="Metrik adı">'
+    +'<input class="rpMValue bg-slate-950 border border-slate-700 rounded p-2 text-xs" placeholder="Değer (boşsa HESAPLANAMIYOR)">'
+    +'<select class="rpMSource bg-slate-950 border border-slate-700 rounded p-2 text-xs"><option value="MANUAL">Elle Girildi</option><option value="KMI_CALC">Hesaplama Motoru</option><option value="KMI_ORG">Organizasyon</option></select>'
+    +'<input class="rpMFn bg-slate-950 border border-slate-700 rounded p-2 text-xs" placeholder="Kaynak fonksiyon/açıklama">'
+    +'<input class="rpMReason bg-slate-950 border border-slate-700 rounded p-2 text-xs" placeholder="HESAPLANAMIYOR ise neden">';
+  wrap.appendChild(row);
+};
+window.kmiRepGenerateSnapshot=function(){
+  try{
+    const rows=Array.from(document.querySelectorAll('.rp-metric-row')).map(r=>({
+      label: r.querySelector('.rpMLabel').value.trim(),
+      value: r.querySelector('.rpMValue').value.trim(),
+      sourceEngine: r.querySelector('.rpMSource').value,
+      sourceFunction: r.querySelector('.rpMFn').value.trim(),
+      reason: r.querySelector('.rpMReason').value.trim()
+    })).filter(m=>m.label);
+    rpGenerateSnapshot({definitionId:__rpSelectedDefId, metrics:rows});
+    window.kmiRenderReporting();
+  }catch(e){ document.getElementById('rpSnapErr').textContent=e.message; }
+};
+window.kmiRepPrint=function(id){ try{ rpPrintSnapshot(id); }catch(e){ try{window.kmiToast(e.message,'warn');}catch(x){alert(e.message);} } };
+window.kmiRepAssign=function(snapshotId){
+  const personId=prompt('Atanacak personel ID:'); if(!personId) return;
+  const requireReview=confirm('İnceleme görevi de açılsın mı? (Tamam=Evet)');
+  try{ rpAssignToInbox({snapshotId, personId, requireReview}); window.kmiRenderReporting(); try{window.kmiToast('Rapor Gelen Kutusu\'na atandı.');}catch(e){} }catch(e){ try{window.kmiToast(e.message,'warn');}catch(x){alert(e.message);} }
+};
+window.kmiRepMarkRead=function(inboxId){ try{ rpMarkRead(inboxId); window.kmiRenderReporting(); }catch(e){} };
+window.kmiRenderReporting=function(){
+  const el=document.getElementById('kmiRepModal'); if(!el) return;
+  const canManageDefs=window.KMI_AUTH.can(undefined,'reporting.definitions.manage');
+  const canGenerate=window.KMI_AUTH.can(undefined,'reporting.generate');
+  const canAssign=window.KMI_AUTH.can(undefined,'reporting.assign');
+  const canExport=window.KMI_AUTH.can(undefined,'reporting.export');
+  const defs=rpListDefinitions();
+  if(!__rpSelectedDefId && defs.length) __rpSelectedDefId=defs[0].id;
+  const selDef=__rpSelectedDefId?rpGetDefinition(__rpSelectedDefId):null;
+  const snaps=selDef?rpListSnapshots(selDef.id):[];
+  const myInbox=rpMyInbox();
+  const deptOpts=(window.KMI_DEPARTMENTS||[]).map(d=>'<option value="'+rpE(d.id)+'">'+rpE(d.name)+'</option>').join('');
+  el.innerHTML=`<div class="max-w-6xl mx-auto p-5">
+   <div class="flex justify-between items-center mb-4"><div><div class="text-[10px] text-cyan-300 tracking-widest font-black">KMI · REPORTING INTELLIGENCE FAZ 0+1</div><h2 class="text-2xl font-black">📊 Raporlama</h2><div class="text-xs text-amber-300 mt-1">Bu fazda metrikler elle girilir ve kaynağı işaretlenir (MANUAL); departman bazlı otomatik Hesaplama Motoru bağlantısı sonraki fazda yapılacak. Hiçbir değer tahmin edilmez - veri yoksa HESAPLANAMIYOR olarak kaydedilir.</div></div>
+   <button onclick="document.getElementById('kmiRepModal').remove()" class="bg-slate-800 px-4 py-2 rounded-xl">Kapat</button></div>
+   <div class="grid md:grid-cols-3 gap-4">
+    <div class="bg-slate-900/60 border border-slate-700 rounded-2xl p-4">
+     <h3 class="font-black mb-2">Rapor Tanımları</h3>
+     <div class="space-y-1 text-xs max-h-56 overflow-y-auto mb-3">${defs.map(d=>`<div onclick="window.kmiRepSelectDef('${d.id}')" class="cursor-pointer border-b border-slate-800 py-1 ${d.id===__rpSelectedDefId?'text-cyan-300 font-bold':''}">${rpE(d.name)} <span class="text-slate-500">(${rpE((window.KMI_DEPARTMENTS||[]).find(x=>x.id===d.departmentId)?.name||d.departmentId)})</span></div>`).join('')||'<div class="text-slate-500">Henüz rapor tanımı yok.</div>'}</div>
+     ${canManageDefs?`<div class="border-t border-slate-800 pt-3">
+       <input id="rpNewDefName" placeholder="Rapor adı" class="w-full bg-slate-950 border border-slate-700 rounded p-2 text-xs mb-1">
+       <select id="rpNewDefDept" class="w-full bg-slate-950 border border-slate-700 rounded p-2 text-xs mb-1"><option value="">Departman seç...</option>${deptOpts}</select>
+       <input id="rpNewDefDesc" placeholder="Açıklama (opsiyonel)" class="w-full bg-slate-950 border border-slate-700 rounded p-2 text-xs mb-1">
+       <button onclick="window.kmiRepAddDefinition()" class="w-full bg-emerald-700 hover:bg-emerald-600 px-3 py-2 rounded-lg text-xs font-bold">Yeni Rapor Tanımı Ekle</button>
+       <div id="rpDefErr" class="text-red-400 text-xs mt-1"></div>
+     </div>`:''}
+    </div>
+    <div class="bg-slate-900/60 border border-slate-700 rounded-2xl p-4">
+     <h3 class="font-black mb-2">${selDef?rpE(selDef.name)+' - Anlık Görüntü Geçmişi':'Bir rapor tanımı seçin'}</h3>
+     <div class="space-y-1 text-xs max-h-56 overflow-y-auto mb-3">${snaps.map(s=>`<div class="border-b border-slate-800 py-1"><b>${rpE(s.id)}</b> · Rev.${s.revision} · <span class="${s.dataCompleteness.status==='COMPLETE'?'text-emerald-400':s.dataCompleteness.status==='PARTIAL'?'text-amber-400':'text-red-400'}">${rpE(s.dataCompleteness.status)}</span> · ${new Date(s.generatedAt).toLocaleString('tr-TR')}
+       ${canExport?` · <button onclick="window.kmiRepPrint('${s.id}')" class="underline text-cyan-300">Yazdır</button>`:''}
+       ${canAssign?` · <button onclick="window.kmiRepAssign('${s.id}')" class="underline text-cyan-300">Gelen Kutusuna Ata</button>`:''}
+      </div>`).join('')||'<div class="text-slate-500">Henüz anlık görüntü yok.</div>'}</div>
+     ${selDef&&canGenerate?`<div class="border-t border-slate-800 pt-3">
+       <div id="rpMetricRows"></div>
+       <button onclick="window.kmiRepAddMetricRow()" class="text-xs underline text-cyan-300 mt-1">+ Metrik satırı ekle</button>
+       <button onclick="window.kmiRepGenerateSnapshot()" class="w-full mt-2 bg-cyan-700 hover:bg-cyan-600 px-3 py-2 rounded-lg text-xs font-bold">Yeni Anlık Görüntü (Snapshot) Oluştur</button>
+       <div id="rpSnapErr" class="text-red-400 text-xs mt-1"></div>
+     </div>`:''}
+    </div>
+    <div class="bg-slate-900/60 border border-slate-700 rounded-2xl p-4">
+     <h3 class="font-black mb-2">Gelen Kutum</h3>
+     <div class="space-y-1 text-xs max-h-72 overflow-y-auto">${myInbox.map(e=>`<div class="border-b border-slate-800 py-1 ${e.read?'text-slate-500':'text-white font-bold'}">${rpE(e.snapshot?e.snapshot.definitionName:e.definitionId)} · ${rpE(e.snapshotId)}${e.taskId?' · Görev: '+rpE(e.taskId):''}${!e.read?` · <button onclick="window.kmiRepMarkRead('${e.id}')" class="underline text-cyan-300">Okundu işaretle</button>`:''}</div>`).join('')||'<div class="text-slate-500">Gelen kutunuz boş.</div>'}</div>
+    </div>
+   </div>
+  </div>`;
+  if(selDef&&canGenerate){ const wrap=document.getElementById('rpMetricRows'); if(wrap&&!wrap.children.length) window.kmiRepAddMetricRow(); }
+};
+window.addEventListener('load',function(){
+  let tries=0;
+  const timer=setInterval(function(){
+    tries++;
+    try{
+      const row=document.getElementById('kmiFloorNavRow2');
+      const hasAny=window.KMI_AUTH.can(undefined,'reporting.view');
+      if(row && !document.getElementById('kmiRepNavBtn') && hasAny){
+        const b=document.createElement('button'); b.id='kmiRepNavBtn'; b.className='nav-btn px-3 py-2 rounded-md hover:bg-slate-700 text-slate-300 text-sm';
+        b.innerHTML='<i class="fa-solid fa-chart-line mr-1"></i> Raporlama (Yeni)';
+        b.onclick=function(){ window.kmiOpenReporting(); };
+        row.appendChild(b);
+      }
+    }catch(e){}
+    if(tries>=90) clearInterval(timer);
+  },500);
+},{once:true});
+})();
+</script>
+
+<!-- ===========================================================================
+     KMI-PULSE-FIX (2026-09-28): Ender'in "PULSE: Critical Alert + Escalation +
+     Incident Response" direktifi, PULSE PHASE 0 + PHASE 1 uygulaması.
+     ---------------------------------------------------------------------------
+     GAP MAP BULGUSU (gerçek kod, Explore ajanıyla doğrulandı): Eşik/kritiklik
+     kavramı dağınık halde zaten vardı (V35 makine sağlığı puanı, iş emri
+     gecikme boyama, NCR durumları) ama HİÇBİRİ arka planda proaktif taranmıyordu
+     - sadece ekran açıldığında hesaplanıyordu. Eskalasyon (süresi geçerse
+     başkasına ilet) hiçbir yerde yoktu. window.KMI_ORG.deputy(deptId) gerçek ve
+     dolu bir mekanizmaydı ama hiçbir zamanlayıcıya bağlı değildi. Gerçek bir
+     "Incident" (şiddet seviyeli, ack/eskalasyon durumlu) varlığı yoktu; en
+     yakını V35 KURUTLU_V35_MAINT_ORDERS (sadece OPEN/CLOSED, ayrı bir kavram).
+     BU FAZDA YAPILAN: window.KMI_PULSE - Alert Rule kaydı (eşikler config,
+     asla sabit kod değil), periyodik tarama motoru (mevcut hiçbir setInterval
+     ile çakışmıyor - yeni bir tanesi, sadece veri tarıyor), Incident varlığı
+     (severity + OPEN→ACKNOWLEDGED→ESCALATED→CLOSED durum modeli + zaman
+     çizelgesi), zaman aşımına bağlı eskalasyon (KMI_ORG.current→deputy
+     zincirini reuse eder), Alarm'a özel Acknowledge aksiyonu (task
+     COMPLETE'ten ayrı), pulse.* yetki alanı (mevcut CAPS-wrap deseni).
+     Bu fazda İKİ somut, gerçek veriye dayalı kural tipi bağlandı:
+     TASK_OVERDUE (KMI_TASKS_V1192'deki gerçek dueAt) ve
+     MACHINE_FAULT_CRITICAL (KURUTLU_V35_MAINT_ORDERS'daki gerçek CRITICAL
+     arıza kayıtları) - alarm spam'i önlemek için aynı kural+varlık için
+     tekrar tekrar incident açılmıyor (idempotent).
+     BU FAZDA YAPILMAYAN (bilinçli, Faz B+): Kapasite/hedef/maliyet riski gibi
+     Master Program'ın ileri fazlarında kurulacak motorlara bağlı kural tipleri
+     henüz eklenmedi (o motorlar henüz yok); eklendiklerinde aynı Alert Rule
+     Registry'ye yeni "sourceType" olarak takılacaklar - PULSE'ın kendisi
+     yeniden yazılmayacak.
+     =========================================================================== -->
+<script>
+(function(){
+'use strict';
+function puE(v){ return String(v==null?'':v).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function puNow(){ return new Date().toISOString(); }
+function puLoad(k,d){ try{ const v=JSON.parse(localStorage.getItem(k)); return v==null?(d!==undefined?d:null):v; }catch(e){ return d!==undefined?d:null; } }
+function puSave(k,v){ localStorage.setItem(k, JSON.stringify(v)); }
+let __puSeq=0;
+function puGenId(prefix){
+  __puSeq=(__puSeq+1)%46656;
+  return prefix+'-'+new Date().getFullYear()+'-'+Date.now().toString(36).toUpperCase()+'-'+__puSeq.toString(36).toUpperCase().padStart(3,'0')+Math.random().toString(36).slice(2,4).toUpperCase();
+}
+
+// ---------------------------------------------------------------------------
+// A) YETKİLER — pulse.*
+// ---------------------------------------------------------------------------
+function puUser(u){ return (window.currentUser)||u||null; }
+function puIsAdmin(u){ try{ return !!(window.KMI_AUTH && window.KMI_AUTH.can(u,'ADMIN')); }catch(e){ return false; } }
+function puHasDeptAccess(u,deptId){ try{ return !!(window.KMI_ORG && window.KMI_ORG.hasAssignment(u||window.currentUser, deptId)); }catch(e){ return false; } }
+function puHasAnyDeptAccess(u){ try{ return (window.KMI_DEPARTMENTS||[]).some(function(d){ return puHasDeptAccess(u,d.id); }); }catch(e){ return false; } }
+const PULSE_CAPS = {
+  'pulse.rules.manage': u=>puIsAdmin(u), // eşik/kural tanımı sadece ADMIN (madde 91 - sabit kod yok, config var)
+  'pulse.view': u=>puIsAdmin(u)||puHasAnyDeptAccess(u),
+  'pulse.acknowledge': u=>puIsAdmin(u)||puHasAnyDeptAccess(u),
+  'pulse.close': u=>puIsAdmin(u)||puHasAnyDeptAccess(u),
+  'pulse.admin': u=>puIsAdmin(u)
+};
+const _puOrigCan = window.KMI_AUTH && window.KMI_AUTH.can;
+if(window.KMI_AUTH){
+  window.KMI_AUTH.can = function(user, capability){
+    if(Object.prototype.hasOwnProperty.call(PULSE_CAPS, capability)){
+      try{ return !!PULSE_CAPS[capability](puUser(user)); }catch(e){ return false; }
+    }
+    return _puOrigCan ? _puOrigCan(user, capability) : false;
+  };
+}
+function puRequire(cap){ if(!window.KMI_AUTH.can(undefined,cap)) throw new Error('Bu işlem için yetkiniz yok ('+cap+').'); }
+function puRequireDept(u,deptId){ if(!(puIsAdmin(u)||!deptId||puHasDeptAccess(u,deptId))) throw new Error('Bu departmanın PULSE kayıtları için yetkiniz yok.'); }
+
+// ---------------------------------------------------------------------------
+// B) ALERT RULE REGISTRY - eşikler her zaman config, asla sabit kod (madde 91)
+// ---------------------------------------------------------------------------
+const RULE_KEY='KMI_PULSE_RULES_V1';
+function puRules(){ return puLoad(RULE_KEY,null) || puSeedRules(); }
+function puSaveRules(a){ puSave(RULE_KEY,a); }
+function puSeedRules(){
+  const seed=[
+    {id:puGenId('PULSERULE'), name:'Görev Süresi Aşımı', sourceType:'TASK_OVERDUE', departmentId:null, severity:'HIGH', graceMinutes:0, escalationMinutes:120, active:true, createdBy:'system', createdAt:puNow()},
+    {id:puGenId('PULSERULE'), name:'Kritik Makine Arızası Açık Kalıyor', sourceType:'MACHINE_FAULT_CRITICAL', departmentId:'MAINTENANCE', severity:'CRITICAL', graceMinutes:15, escalationMinutes:60, active:true, createdBy:'system', createdAt:puNow()}
+  ];
+  puSaveRules(seed); return seed;
+}
+function puAddRule(data){
+  data=data||{};
+  puRequire('pulse.rules.manage');
+  const name=String(data.name||'').trim();
+  if(!name) throw new Error('Kural adı zorunlu.');
+  const sourceType=String(data.sourceType||'').trim();
+  if(!['TASK_OVERDUE','MACHINE_FAULT_CRITICAL','MANUAL'].includes(sourceType)) throw new Error('Geçersiz kural kaynağı.');
+  const rec={
+    id: puGenId('PULSERULE'),
+    name: name,
+    sourceType: sourceType,
+    departmentId: data.departmentId||null,
+    severity: ['CRITICAL','HIGH','NORMAL'].includes(data.severity)?data.severity:'NORMAL',
+    graceMinutes: data.graceMinutes!=null?Number(data.graceMinutes):0,
+    escalationMinutes: data.escalationMinutes!=null?Number(data.escalationMinutes):60,
+    active: true,
+    createdBy: (window.currentUser&&window.currentUser.name)||'system',
+    createdAt: puNow()
+  };
+  const all=puRules(); all.push(rec); puSaveRules(all);
+  try{ window.KMI.event('PULSE_RULE_CREATED','PULSE_RULE',rec.id,{name:rec.name,sourceType:rec.sourceType}); }catch(e){}
+  return rec;
+}
+function puListRules(){ return puRules().filter(r=>r.active); }
+
+// ---------------------------------------------------------------------------
+// C) INCIDENT (severity + OPEN→ACKNOWLEDGED→ESCALATED→CLOSED + zaman çizelgesi)
+// ---------------------------------------------------------------------------
+const INC_KEY='KMI_PULSE_INCIDENTS_V1';
+function puIncidents(){ return puLoad(INC_KEY,[]); }
+function puSaveIncidents(a){ puSave(INC_KEY,a); }
+function puFindOpenIncident(ruleId, entityId){
+  return puIncidents().find(i=>i.ruleId===ruleId && i.entityId===entityId && ['OPEN','ACKNOWLEDGED','ESCALATED'].includes(i.status)) || null;
+}
+function puOpenIncident(rule, entityType, entityId, title, extra){
+  if(puFindOpenIncident(rule.id, entityId)) return null; // alarm spam yok - zaten açık
+  const rec={
+    id: puGenId('INC'),
+    ruleId: rule.id,
+    ruleName: rule.name,
+    departmentId: rule.departmentId,
+    severity: rule.severity,
+    entityType: entityType,
+    entityId: entityId,
+    title: title,
+    detail: extra||{},
+    status: 'OPEN',
+    openedAt: puNow(),
+    acknowledgedBy: null, acknowledgedAt: null,
+    escalatedTo: null, escalatedAt: null,
+    closedBy: null, closedAt: null, resolution: null,
+    timeline: [{at:puNow(), type:'OPENED', by:'system', note:title}]
+  };
+  const all=puIncidents(); all.push(rec); puSaveIncidents(all);
+  try{ window.KMI.event('PULSE_INCIDENT_CREATED','PULSE_INCIDENT',rec.id,{ruleId:rule.id,severity:rule.severity,entityType,entityId}); }catch(e){}
+  try{ if(rule.severity==='CRITICAL') window.kmiToast('KRİTİK PULSE: '+title,'warn'); }catch(e){}
+  return rec;
+}
+function puGetIncident(id){ return puIncidents().find(i=>i.id===id)||null; }
+function puListIncidents(u){
+  u=puUser(u);
+  let rows=puIncidents();
+  if(!puIsAdmin(u)) rows=rows.filter(i=>!i.departmentId||puHasDeptAccess(u,i.departmentId));
+  return rows.sort((a,b)=>new Date(b.openedAt)-new Date(a.openedAt));
+}
+function puAcknowledge(incidentId){
+  const inc=puGetIncident(incidentId); if(!inc) throw new Error('Incident bulunamadı.');
+  const u=puUser(); puRequire('pulse.acknowledge'); puRequireDept(u, inc.departmentId);
+  if(inc.status==='CLOSED') throw new Error('Kapanmış incident onaylanamaz.');
+  const all=puIncidents(); const row=all.find(i=>i.id===incidentId);
+  row.status='ACKNOWLEDGED'; row.acknowledgedBy=(u&&u.name)||'system'; row.acknowledgedAt=puNow();
+  row.timeline.push({at:puNow(), type:'ACKNOWLEDGED', by:row.acknowledgedBy, note:'Görüldü / üzerinde çalışılıyor'});
+  puSaveIncidents(all);
+  try{ window.KMI.event('PULSE_INCIDENT_ACKNOWLEDGED','PULSE_INCIDENT',incidentId,{by:row.acknowledgedBy}); }catch(e){}
+  return row;
+}
+function puClose(incidentId, resolution){
+  const inc=puGetIncident(incidentId); if(!inc) throw new Error('Incident bulunamadı.');
+  const u=puUser(); puRequire('pulse.close'); puRequireDept(u, inc.departmentId);
+  if(!String(resolution||'').trim()) throw new Error('Kapatma açıklaması (çözüm) zorunlu.');
+  const all=puIncidents(); const row=all.find(i=>i.id===incidentId);
+  row.status='CLOSED'; row.closedBy=(u&&u.name)||'system'; row.closedAt=puNow(); row.resolution=String(resolution).trim();
+  row.timeline.push({at:puNow(), type:'CLOSED', by:row.closedBy, note:row.resolution});
+  puSaveIncidents(all);
+  try{ window.KMI.event('PULSE_INCIDENT_CLOSED','PULSE_INCIDENT',incidentId,{by:row.closedBy}); }catch(e){}
+  return row;
+}
+function puEscalate(incidentId){
+  const inc=puGetIncident(incidentId); if(!inc) return null;
+  if(!['OPEN'].includes(inc.status)) return null; // sadece hâlâ görülmemiş (OPEN) olanlar eskalasyona gider
+  let target=null;
+  try{
+    if(inc.departmentId && window.KMI_ORG){
+      const primary=window.KMI_ORG.current(inc.departmentId);
+      const dep=window.KMI_ORG.deputy(inc.departmentId);
+      target = dep || primary || null; // birincil zaten X dk'dır tepki vermedi -> vekile ilet, yoksa birincile
+    }
+  }catch(e){}
+  const all=puIncidents(); const row=all.find(i=>i.id===incidentId);
+  row.status='ESCALATED'; row.escalatedTo=target?(target.personId||target.name||null):null; row.escalatedAt=puNow();
+  row.timeline.push({at:puNow(), type:'ESCALATED', by:'system', note: target? ('Eskale edildi: '+(target.personName||target.name||target.personId)) : 'Eskale edilecek sorumlu bulunamadı - ATANMADI'});
+  puSaveIncidents(all);
+  try{ window.KMI.event('PULSE_INCIDENT_ESCALATED','PULSE_INCIDENT',incidentId,{to:row.escalatedTo}); }catch(e){}
+  if(target && target.personId && typeof window.kmiTaskCreate==='function'){
+    try{
+      window.kmiTaskCreate({
+        title:'PULSE ESKALASYON: '+row.title,
+        description:row.ruleName+' kuralı '+row.escalationMinutesUsed+' dakikadır görülmedi, size eskale edildi. Incident: '+row.id,
+        assigneeId:Number(target.personId),
+        dueAt:new Date(Date.now()+60*60000).toISOString(),
+        priority:'CRITICAL',
+        links:{pulseIncidentId:row.id}
+      });
+    }catch(e){}
+  }
+  return row;
+}
+
+// ---------------------------------------------------------------------------
+// D) PERİYODİK TARAMA MOTORU - gerçek veriyi (task dueAt, V35 CRITICAL arıza)
+//    proaktif tarar; mevcut hiçbir setInterval ile çakışmaz (Gap Map ile
+//    doğrulandı - böyle bir tarayıcı yoktu).
+// ---------------------------------------------------------------------------
+function puEvalTaskOverdue(rule){
+  let list=[]; try{ list=(typeof kmiTasksRaw==='function')?kmiTasksRaw():JSON.parse(localStorage.getItem('KMI_TASKS_V1192')||'[]'); }catch(e){ list=[]; }
+  const now=Date.now();
+  list.filter(t=>t && t.dueAt && !['COMPLETED','CANCELLED'].includes(t.status)).forEach(function(t){
+    const graceMs=(rule.graceMinutes||0)*60000;
+    if(new Date(t.dueAt).getTime()+graceMs < now){
+      puOpenIncident(rule, 'TASK', t.id, 'Görev süresi geçti: '+(t.title||t.id), {dueAt:t.dueAt, assigneeId:t.assigneeId});
+    }
+  });
+}
+function puEvalMachineFaultCritical(rule){
+  let orders=[]; try{ orders=JSON.parse(localStorage.getItem('KURUTLU_V35_MAINT_ORDERS')||'[]'); }catch(e){ orders=[]; }
+  const now=Date.now(); const graceMs=(rule.graceMinutes||0)*60000;
+  orders.filter(o=>o && o.status==='OPEN' && o.priority==='CRITICAL').forEach(function(o){
+    if(new Date(o.openedAt).getTime()+graceMs < now){
+      puOpenIncident(rule, 'MAINTENANCE_ORDER', o.id, 'Kritik arıza açık: '+(o.machineName||o.machineId||o.id), {machineId:o.machineId, symptom:o.symptom});
+    }
+  });
+}
+function puRunScan(){
+  puListRules().forEach(function(rule){
+    try{
+      if(rule.sourceType==='TASK_OVERDUE') puEvalTaskOverdue(rule);
+      else if(rule.sourceType==='MACHINE_FAULT_CRITICAL') puEvalMachineFaultCritical(rule);
+      // MANUAL kuralların otomatik taraması yok - kişi elle incident açar (Faz B+)
+    }catch(e){ /* bir kural patlarsa diğerlerini engellemesin */ }
+  });
+  // Eskalasyon: escalationMinutes'i geçmiş, hâlâ OPEN olan incident'ları eskale et.
+  const rulesById={}; puRules().forEach(r=>rulesById[r.id]=r);
+  const now=Date.now();
+  puIncidents().filter(i=>i.status==='OPEN').forEach(function(i){
+    const rule=rulesById[i.ruleId]; if(!rule) return;
+    const escMinutes = rule.escalationMinutes!=null?rule.escalationMinutes:60;
+    const escMs = escMinutes*60000;
+    if(new Date(i.openedAt).getTime()+escMs <= now){ i.escalationMinutesUsed=escMinutes; puEscalate(i.id); }
+  });
+}
+
+window.KMI_PULSE = {
+  addRule: puAddRule,
+  listRules: puListRules,
+  openIncident: function(entityType,entityId,title,severity,departmentId,extra){ // MANUAL / diğer motorlar için genel giriş noktası
+    puRequire('pulse.rules.manage');
+    const manualRule={id:'MANUAL', name:'Elle Açıldı', departmentId:departmentId||null, severity:severity||'NORMAL'};
+    return puOpenIncident(manualRule, entityType, entityId, title, extra);
+  },
+  getIncident: puGetIncident,
+  listIncidents: puListIncidents,
+  acknowledge: puAcknowledge,
+  close: puClose,
+  escalate: puEscalate,
+  runScan: puRunScan
+};
+
+// ---------------------------------------------------------------------------
+// E) GERÇEK EKRAN: "PULSE KONTROL MERKEZİ"
+// ---------------------------------------------------------------------------
+window.kmiOpenPulse=function(){
+  if(!window.KMI_AUTH.can(undefined,'pulse.view')){ try{window.kmiToast('PULSE ekranına erişim yetkiniz yok.','warn');}catch(e){alert('Yetki yok.');} return; }
+  document.getElementById('kmiPulseModal')?.remove();
+  const m=document.createElement('div'); m.id='kmiPulseModal'; m.className='fixed inset-0 z-[280] bg-[#07101f] text-white overflow-y-auto';
+  document.body.appendChild(m);
+  window.kmiRenderPulse();
+};
+window.kmiPulseAck=function(id){ try{ puAcknowledge(id); window.kmiRenderPulse(); }catch(e){ try{window.kmiToast(e.message,'warn');}catch(x){alert(e.message);} } };
+window.kmiPulseClose=function(id){ const res=prompt('Çözüm / kapatma açıklaması:'); if(!res) return; try{ puClose(id,res); window.kmiRenderPulse(); }catch(e){ try{window.kmiToast(e.message,'warn');}catch(x){alert(e.message);} } };
+window.kmiRenderPulse=function(){
+  const el=document.getElementById('kmiPulseModal'); if(!el) return;
+  const canAck=window.KMI_AUTH.can(undefined,'pulse.acknowledge');
+  const canClose=window.KMI_AUTH.can(undefined,'pulse.close');
+  const canManageRules=window.KMI_AUTH.can(undefined,'pulse.rules.manage');
+  const incidents=puListIncidents();
+  const open=incidents.filter(i=>i.status!=='CLOSED');
+  const closed=incidents.filter(i=>i.status==='CLOSED').slice(0,20);
+  const sevColor=s=>s==='CRITICAL'?'text-red-400':s==='HIGH'?'text-amber-400':'text-slate-300';
+  el.innerHTML=`<div class="max-w-6xl mx-auto p-5">
+   <div class="flex justify-between items-center mb-4"><div><div class="text-[10px] text-cyan-300 tracking-widest font-black">KMI · PULSE FAZ 0+1</div><h2 class="text-2xl font-black">🚨 PULSE Kontrol Merkezi</h2><div class="text-xs text-slate-400 mt-1">Görev süresi aşımı ve kritik makine arızaları otomatik taranıyor. Eşikler (grace/eskalasyon süresi) kural bazında yapılandırılabilir, sabit kod değildir.</div></div>
+   <button onclick="document.getElementById('kmiPulseModal').remove()" class="bg-slate-800 px-4 py-2 rounded-xl">Kapat</button></div>
+   <div class="bg-slate-900/60 border border-slate-700 rounded-2xl p-4 mb-4">
+    <h3 class="font-black mb-2">Açık Incident'lar (${open.length})</h3>
+    <div class="space-y-2 text-xs max-h-96 overflow-y-auto">${open.map(i=>`<div class="border border-slate-800 rounded-lg p-2">
+      <div class="flex justify-between"><span class="font-bold ${sevColor(i.severity)}">${puE(i.severity)} · ${puE(i.title)}</span><span class="text-slate-500">${puE(i.status)}</span></div>
+      <div class="text-slate-500">${puE(i.id)} · Açılış: ${new Date(i.openedAt).toLocaleString('tr-TR')}${i.escalatedTo?' · Eskale: '+puE(i.escalatedTo):''}</div>
+      <div class="mt-1">${canAck&&i.status==='OPEN'?`<button onclick="window.kmiPulseAck('${i.id}')" class="underline text-cyan-300 mr-3">Onayla (Ack)</button>`:''}${canClose&&i.status!=='CLOSED'?`<button onclick="window.kmiPulseClose('${i.id}')" class="underline text-emerald-300">Kapat</button>`:''}</div>
+    </div>`).join('')||'<div class="text-slate-500">Açık incident yok.</div>'}</div>
+   </div>
+   <div class="grid md:grid-cols-2 gap-4">
+    <div class="bg-slate-900/60 border border-slate-700 rounded-2xl p-4">
+     <h3 class="font-black mb-2">Kapatılmış (son 20)</h3>
+     <div class="space-y-1 text-xs max-h-56 overflow-y-auto">${closed.map(i=>`<div class="border-b border-slate-800 py-1 text-slate-500">${puE(i.title)} · ${puE(i.resolution||'')} · ${new Date(i.closedAt).toLocaleDateString('tr-TR')}</div>`).join('')||'<div class="text-slate-500">Yok.</div>'}</div>
+    </div>
+    <div class="bg-slate-900/60 border border-slate-700 rounded-2xl p-4">
+     <h3 class="font-black mb-2">Alert Kuralları</h3>
+     <div class="space-y-1 text-xs max-h-40 overflow-y-auto mb-2">${puListRules().map(r=>`<div class="border-b border-slate-800 py-1">${puE(r.name)} · ${puE(r.sourceType)} · Grace:${r.graceMinutes}dk · Eskalasyon:${r.escalationMinutes}dk</div>`).join('')}</div>
+     ${canManageRules?'<div class="text-slate-500 text-[11px]">Yeni kural tipleri Master Program\'ın ileri fazlarında (kapasite/hedef/maliyet motorları kurulunca) eklenecek.</div>':''}
+    </div>
+   </div>
+  </div>`;
+};
+window.addEventListener('load',function(){
+  puListRules(); // ilk açılışta seed kuralları oluştursun
+  if(!window.__kmiPulseScanTimer){ window.__kmiPulseScanTimer=setInterval(function(){ try{ puRunScan(); }catch(e){} }, 30000); try{ puRunScan(); }catch(e){} }
+  let tries=0;
+  const timer=setInterval(function(){
+    tries++;
+    try{
+      const row=document.getElementById('kmiFloorNavRow2');
+      const hasAny=window.KMI_AUTH.can(undefined,'pulse.view');
+      if(row && !document.getElementById('kmiPulseNavBtn') && hasAny){
+        const b=document.createElement('button'); b.id='kmiPulseNavBtn'; b.className='nav-btn px-3 py-2 rounded-md hover:bg-slate-700 text-slate-300 text-sm';
+        b.innerHTML='<i class="fa-solid fa-triangle-exclamation mr-1"></i> PULSE (Yeni)';
+        b.onclick=function(){ window.kmiOpenPulse(); };
+        row.appendChild(b);
+      }
+    }catch(e){}
+    if(tries>=90) clearInterval(timer);
+  },500);
+},{once:true});
+})();
+</script>
+
+<!-- ===========================================================================
+     KMI-MASTER-PROGRAM-FAZ1 (2026-09-28): "Digital Factory Intelligence Master
+     Program" direktifi (5d1e7016), FAZ 0 (Stabilize+Gap Map, ayrı MD dokümanı
+     olarak teslim edildi) tamamlandıktan sonra FAZ 1: CANONICAL DOMAIN +
+     DIGITAL THREAD.
+     ---------------------------------------------------------------------------
+     GAP MAP BULGUSU (Explore ajanıyla gerçek kod okunarak doğrulandı): Customer/
+     Product/Order zaten TEK kanonik kaynaktan geliyor (window.D / kurutluV61MasterData)
+     - iyi haber. Ama hiçbir ekran/servis bu ilişkiyi Sipariş→Ürün→İş Emri→Makine→
+     Kalite→Sevkiyat→Fatura zincirinde TEK YERDEN çözmüyor - her ekran kendi
+     .find()/.filter() sorgusunu tekrar yazıyor (V118'in kendi product()/customer()
+     helper'ları, yeni FAZ motorunun kendi ieProducts()/ieJobs()'u, vb - aynı
+     join mantığı en az 3 yerde tekrarlanmış). Ayrıca jobOrders (İş Emri) satır
+     düzeyinde customer'ı SERBEST METİN olarak tutuyor (D.customers'a FK değil),
+     bu da zincirde gerçek bir kopukluk. WorkOrder modeli de İKİ PARALEL biçimde
+     var: yerel jobOrders (string status) ve Supabase work_orders (enum status) -
+     bu faz ikisini BİRLEŞTİRMEYE ÇALIŞMIYOR (büyük patlama riski, Faz B+),
+     sadece hangi kaynaktan geldiğini şeffaf şekilde raporluyor.
+     BU FAZDA YAPILAN: window.KMI_DIGITAL_THREAD - salt-okunur, hiçbir yeni veri
+     deposu YOK, hiçbir mevcut veriyi kopyalamıyor - sadece zaten var olan
+     window.D / jobOrders / window.V118_STATE üzerinde TEK MERKEZİ join/traversal
+     sağlıyor: resolveOrder(), resolveWorkOrder(), resolveLot() (geriye dönük
+     genealoji) ve threadCompleteness() (madde 65 gereği: sadece yüzde değil,
+     EKSİK BAĞLANTILARI listeler - örn. "Ürün bağlantısı yok", "Fatura yok").
+     BU FAZDA YAPILMAYAN (bilinçli, Faz B+): jobOrders'daki serbest-metin
+     customer alanının D.customers'a FK'lenmesi (canlı sistemde binlerce eski
+     kayıt var, geriye dönük migrasyon ayrı ve dikkatli bir iş); yerel jobOrders
+     ile Supabase work_orders şemasının birleştirilmesi; Box/Shipment/Invoice
+     için ayrı kanonik varlıklar (henüz yok - Faz 2/3'te ele alınacak).
+     =========================================================================== -->
+<script>
+(function(){
+'use strict';
+function dtE(v){ return String(v==null?'':v).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+// ---------------------------------------------------------------------------
+// A) YETKİLER — digitalthread.view (salt-okunur, çapraz-fonksiyon görünürlük;
+//    mevcut CAPS-wrap deseniyle aynı: ADMIN veya herhangi bir departman ataması)
+// ---------------------------------------------------------------------------
+function dtUser(u){ return (window.currentUser)||u||null; }
+function dtIsAdmin(u){ try{ return !!(window.KMI_AUTH && window.KMI_AUTH.can(u,'ADMIN')); }catch(e){ return false; } }
+function dtHasAnyDeptAccess(u){ try{ return (window.KMI_DEPARTMENTS||[]).some(function(d){ return window.KMI_ORG && window.KMI_ORG.hasAssignment(u||window.currentUser, d.id); }); }catch(e){ return false; } }
+const DT_CAPS = { 'digitalthread.view': u=>dtIsAdmin(u)||dtHasAnyDeptAccess(u) };
+const _dtOrigCan = window.KMI_AUTH && window.KMI_AUTH.can;
+if(window.KMI_AUTH){
+  window.KMI_AUTH.can = function(user, capability){
+    if(Object.prototype.hasOwnProperty.call(DT_CAPS, capability)){
+      try{ return !!DT_CAPS[capability](dtUser(user)); }catch(e){ return false; }
+    }
+    return _dtOrigCan ? _dtOrigCan(user, capability) : false;
+  };
+}
+function dtRequire(){ if(!window.KMI_AUTH.can(undefined,'digitalthread.view')) throw new Error('Digital Thread görünümü için yetkiniz yok.'); }
+
+// ---------------------------------------------------------------------------
+// B) MEVCUT KAYNAKLARI OKUYAN YARDIMCI FONKSİYONLAR - hiçbiri veri kopyalamaz,
+//    her çağrıda canlı kaynaktan (window.D, jobOrders, V118_STATE) okur.
+// ---------------------------------------------------------------------------
+function dtD(){ return window.D || window.KMI_MASTER_DATA || {}; }
+function dtV118(){ try{ return window.V118_STATE || JSON.parse(localStorage.getItem('kurutlu_v118_core')||'{}'); }catch(e){ return {}; } }
+function dtJobOrders(){ try{ return (typeof jobOrders!=='undefined'&&Array.isArray(jobOrders))?jobOrders:JSON.parse(localStorage.getItem('jobOrders')||'[]'); }catch(e){ return []; } }
+function dtProductById(id){ return (dtD().products||[]).find(p=>String(p.id)===String(id))||null; }
+function dtCustomerById(id){ return (dtD().customers||[]).find(c=>String(c.id)===String(id))||null; }
+function dtLotById(id){ return (dtD().lots||[]).find(l=>String(l.id)===String(id))||null; }
+function dtOrderById(id){ const orders=dtV118().orders||(dtD().orders||[]); return orders.find(o=>String(o.id)===String(id)||o.customerPO===id)||null; }
+
+// ---------------------------------------------------------------------------
+// C) resolveOrder - Sipariş → Ürün → Müşteri → İş Emirleri → LOT'lar → Fatura
+// ---------------------------------------------------------------------------
+function dtResolveOrder(orderId){
+  dtRequire();
+  const missing=[];
+  const order=dtOrderById(orderId);
+  if(!order){ return {order:null, found:false, missingLinks:['SİPARİŞ BULUNAMADI: '+orderId]}; }
+  const lineProductIds=Array.isArray(order.lines)?order.lines.map(l=>l.productId).filter(Boolean):[];
+  const product = order.product? dtProductById(order.product) : (lineProductIds[0]? dtProductById(lineProductIds[0]) : null);
+  if(!product) missing.push('ÜRÜN BAĞLANTISI YOK (order.product / lines[].productId eksik veya D.products içinde bulunamadı)');
+  const customer = order.customerId? dtCustomerById(order.customerId) : (order.customer? dtCustomerById(order.customer):null);
+  if(!customer) missing.push('MÜŞTERİ BAĞLANTISI YOK (order.customerId/customer eksik veya D.customers içinde bulunamadı)');
+  const relatedJobOrders = dtJobOrders().filter(jo=>jo.orderId===order.id || (product && jo.productId===product.id));
+  if(!relatedJobOrders.length) missing.push('İŞ EMRİ BAĞLANTISI YOK (hiçbir jobOrder bu siparişe/ürüne referans vermiyor)');
+  const lots = relatedJobOrders.map(jo=>jo.materialLotId?dtLotById(jo.materialLotId):null).filter(Boolean);
+  if(relatedJobOrders.length && !lots.length) missing.push('MALZEME LOT BAĞLANTISI YOK (ilgili iş emirlerinde materialLotId eksik)');
+  const invoices=(dtV118().invoices||[]).filter(inv=>inv.orderId===order.id);
+  if(!invoices.length) missing.push('FATURA BAĞLANTISI YOK (V118 invoices içinde bu siparişe ait kayıt yok)');
+  return { order, found:true, product, customer, workOrders:relatedJobOrders, lots, invoices, missingLinks:missing, completeness: missing.length===0?'TAM':(missing.length>=3?'ZAYIF':'KISMİ') };
+}
+
+// ---------------------------------------------------------------------------
+// D) resolveWorkOrder - İş Emri → Ürün → Müşteri → Makine → LOT
+// ---------------------------------------------------------------------------
+function dtResolveWorkOrder(jobOrderId){
+  dtRequire();
+  const missing=[];
+  const jo=dtJobOrders().find(x=>String(x.id)===String(jobOrderId));
+  if(!jo){ return {workOrder:null, found:false, missingLinks:['İŞ EMRİ BULUNAMADI: '+jobOrderId]}; }
+  const product = jo.productId? dtProductById(jo.productId) : null;
+  if(!product) missing.push('ÜRÜN BAĞLANTISI YOK (jobOrder.productId eksik - "item" sadece serbest metin: '+dtE(jo.item||'-')+')');
+  const customer = product && product.customer? dtCustomerById(product.customer) : null;
+  if(!customer) missing.push('MÜŞTERİ BAĞLANTISI YOK (ürün üzerinden çözülemedi - jobOrder.client serbest metin: '+dtE(jo.client||'-')+')');
+  const machineCode = String(jo.machine||'').split(' - ')[0].trim();
+  const machine=(Array.isArray(window.MACHINES_LIST)?window.MACHINES_LIST:[]).find(m=>m.code===machineCode)||null;
+  if(!machine) missing.push('MAKİNE BAĞLANTISI YOK (jobOrder.machine metninden eşleşen bir MACHINES_LIST kaydı bulunamadı)');
+  const lot = jo.materialLotId? dtLotById(jo.materialLotId) : null;
+  if(!lot) missing.push('MALZEME LOT BAĞLANTISI YOK (jobOrder.materialLotId eksik)');
+  return { workOrder:jo, found:true, product, customer, machine, lot, missingLinks:missing, completeness: missing.length===0?'TAM':(missing.length>=3?'ZAYIF':'KISMİ') };
+}
+
+// ---------------------------------------------------------------------------
+// E) resolveLot - geriye dönük genealoji: LOT → hangi iş emirleri/ürünler etkilendi
+// ---------------------------------------------------------------------------
+function dtResolveLot(lotId){
+  dtRequire();
+  const lot=dtLotById(lotId);
+  if(!lot){ return {lot:null, found:false, missingLinks:['LOT BULUNAMADI: '+lotId]}; }
+  const affectedWorkOrders=dtJobOrders().filter(jo=>jo.materialLotId===lotId);
+  const affectedProductIds=[...new Set(affectedWorkOrders.map(jo=>jo.productId).filter(Boolean))];
+  const affectedProducts=affectedProductIds.map(dtProductById).filter(Boolean);
+  return { lot, found:true, affectedWorkOrders, affectedProducts, affectedShipments:[], missingLinks:['KUTU/SEVKİYAT GENEALOJİSİ HENÜZ YOK (Box/Shipment kanonik varlığı Faz 2/3\'te kurulacak - madde 10)'] };
+}
+
+window.KMI_DIGITAL_THREAD = {
+  resolveOrder: dtResolveOrder,
+  resolveWorkOrder: dtResolveWorkOrder,
+  resolveLot: dtResolveLot
+};
+
+// ---------------------------------------------------------------------------
+// F) GERÇEK EKRAN: "DIGITAL THREAD GÖRÜNTÜLEYİCİ"
+// ---------------------------------------------------------------------------
+window.kmiOpenDigitalThread=function(){
+  if(!window.KMI_AUTH.can(undefined,'digitalthread.view')){ try{window.kmiToast('Digital Thread ekranına erişim yetkiniz yok.','warn');}catch(e){alert('Yetki yok.');} return; }
+  document.getElementById('kmiDtModal')?.remove();
+  const m=document.createElement('div'); m.id='kmiDtModal'; m.className='fixed inset-0 z-[280] bg-[#07101f] text-white overflow-y-auto';
+  document.body.appendChild(m);
+  window.kmiRenderDigitalThread();
+};
+window.kmiDtLookup=function(){
+  const type=document.getElementById('dtType').value, id=document.getElementById('dtId').value.trim();
+  if(!id) return;
+  let res;
+  try{
+    if(type==='order') res=dtResolveOrder(id);
+    else if(type==='wo') res=dtResolveWorkOrder(id);
+    else res=dtResolveLot(id);
+  }catch(e){ document.getElementById('dtOut').innerHTML='<div class="text-red-400">'+dtE(e.message)+'</div>'; return; }
+  const out=document.getElementById('dtOut');
+  if(!res.found){ out.innerHTML='<div class="text-amber-400">'+res.missingLinks.map(dtE).join('<br>')+'</div>'; return; }
+  out.innerHTML='<div class="mb-2">'+(res.completeness?('<b>Zincir Bütünlüğü: </b><span class="'+(res.completeness==='TAM'?'text-emerald-400':res.completeness==='KISMİ'?'text-amber-400':'text-red-400')+'">'+res.completeness+'</span>'):'')+'</div>'
+    +'<pre class="text-[11px] bg-slate-950 border border-slate-800 rounded p-3 overflow-x-auto">'+dtE(JSON.stringify(res,null,2))+'</pre>'
+    +(res.missingLinks&&res.missingLinks.length?'<div class="mt-2 text-amber-400 text-xs"><b>Eksik Bağlantılar:</b><br>'+res.missingLinks.map(dtE).join('<br>')+'</div>':'');
+};
+window.kmiRenderDigitalThread=function(){
+  const el=document.getElementById('kmiDtModal'); if(!el) return;
+  el.innerHTML=`<div class="max-w-4xl mx-auto p-5">
+   <div class="flex justify-between items-center mb-4"><div><div class="text-[10px] text-cyan-300 tracking-widest font-black">KMI · MASTER PROGRAM FAZ 1</div><h2 class="text-2xl font-black">🕸️ Digital Thread Görüntüleyici</h2><div class="text-xs text-slate-400 mt-1">Mevcut verileri (Sipariş/Ürün/Müşteri/İş Emri/LOT) tek yerden zincirler - yeni veri üretmez, sadece mevcut bağlantıları gösterir ve EKSİK olanları açıkça işaretler.</div></div>
+   <button onclick="document.getElementById('kmiDtModal').remove()" class="bg-slate-800 px-4 py-2 rounded-xl">Kapat</button></div>
+   <div class="bg-slate-900/60 border border-slate-700 rounded-2xl p-4">
+    <div class="flex gap-2 mb-3">
+     <select id="dtType" class="bg-slate-950 border border-slate-700 rounded p-2 text-sm"><option value="order">Sipariş ID</option><option value="wo">İş Emri ID</option><option value="lot">Malzeme LOT ID</option></select>
+     <input id="dtId" placeholder="ID gir..." class="flex-1 bg-slate-950 border border-slate-700 rounded p-2 text-sm">
+     <button onclick="window.kmiDtLookup()" class="bg-cyan-700 hover:bg-cyan-600 px-4 py-2 rounded-lg text-sm font-bold">Zinciri Göster</button>
+    </div>
+    <div id="dtOut" class="text-xs"></div>
+   </div>
+  </div>`;
+};
+window.addEventListener('load',function(){
+  let tries=0;
+  const timer=setInterval(function(){
+    tries++;
+    try{
+      const row=document.getElementById('kmiFloorNavRow2');
+      const hasAny=window.KMI_AUTH.can(undefined,'digitalthread.view');
+      if(row && !document.getElementById('kmiDtNavBtn') && hasAny){
+        const b=document.createElement('button'); b.id='kmiDtNavBtn'; b.className='nav-btn px-3 py-2 rounded-md hover:bg-slate-700 text-slate-300 text-sm';
+        b.innerHTML='<i class="fa-solid fa-diagram-project mr-1"></i> Digital Thread (Yeni)';
+        b.onclick=function(){ window.kmiOpenDigitalThread(); };
+        row.appendChild(b);
+      }
+    }catch(e){}
+    if(tries>=90) clearInterval(timer);
+  },500);
+},{once:true});
+})();
+</script>
+
+<!-- ===========================================================================
+     KMI-PILOT-FIX (2026-09-28): "KMI — Factory Deployment, Validation & Academy
+     Master Program" direktifi (90acddd6) - Ender'in bu direktifi ÖNCEKİ Master
+     Program'ı (yeni motor/özellik inşası) AÇIKÇA DURDURUP önce stabilizasyon +
+     pilot doğrulamayı istedi ("STOP treating KMI as a feature-development
+     project", "FREEZE FEATURE EXPANSION"). Bu blok FAZ 2'yi uygular: PILOT
+     MANAGER + SYSTEM HEALTH + ISSUE REPORTER. Bilinçli olarak "başka bir görev
+     sistemi kurma" (madde 34) kuralına uyularak, sorun bildirimleri kendi
+     hafif kayıt yapısında sınıflandırılır ama takip aksiyonu mevcut
+     window.kmiTaskCreate (Action Engine) üzerinden açılır - ayrı bir görev
+     motoru İCAT EDİLMEDİ. Golden Thread / Pilot Cell / Shadow Mode gibi GERÇEK
+     fabrika/operatör/makine gerektiren fazlar bu turda YAPILMADI - direktifin
+     kendi kuralı gereği ("You cannot fabricate their completion in code")
+     bunlar SAHA DOĞRULAMASI BEKLİYOR olarak işaretlenmiştir, Ender ve
+     fabrikadaki ekip gerçek bir iş emriyle çalıştırmadan PASS denemez.
+     =========================================================================== -->
+<script>
+(function(){
+'use strict';
+function pmE(v){ return String(v==null?'':v).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function pmNow(){ return new Date().toISOString(); }
+function pmLoad(k,d){ try{ const v=JSON.parse(localStorage.getItem(k)); return v==null?(d!==undefined?d:null):v; }catch(e){ return d!==undefined?d:null; } }
+function pmSave(k,v){ localStorage.setItem(k, JSON.stringify(v)); }
+let __pmSeq=0;
+function pmGenId(prefix){ __pmSeq=(__pmSeq+1)%46656; return prefix+'-'+new Date().getFullYear()+'-'+Date.now().toString(36).toUpperCase()+'-'+__pmSeq.toString(36).toUpperCase().padStart(3,'0')+Math.random().toString(36).slice(2,4).toUpperCase(); }
+
+// ---------------------------------------------------------------------------
+// A) YETKİLER — pilot.*
+// ---------------------------------------------------------------------------
+function pmUser(u){ return (window.currentUser)||u||null; }
+function pmIsAdmin(u){ try{ return !!(window.KMI_AUTH && window.KMI_AUTH.can(u,'ADMIN')); }catch(e){ return false; } }
+function pmHasAnyDeptAccess(u){ try{ return (window.KMI_DEPARTMENTS||[]).some(function(d){ return window.KMI_ORG && window.KMI_ORG.hasAssignment(u||window.currentUser, d.id); }); }catch(e){ return false; } }
+const PILOT_CAPS = {
+  'pilot.admin': u=>pmIsAdmin(u), // pilot kapsamı/config sadece ADMIN
+  'pilot.view': u=>pmIsAdmin(u)||pmHasAnyDeptAccess(u),
+  'pilot.issue.manage': u=>pmIsAdmin(u)||pmHasAnyDeptAccess(u), // önceliklendirme/durum değişikliği
+  'pilot.issue.report': u=>!!pmUser(u) // herkes sorun bildirebilir - giriş yapmış olmak yeterli
+};
+const _pmOrigCan = window.KMI_AUTH && window.KMI_AUTH.can;
+if(window.KMI_AUTH){
+  window.KMI_AUTH.can = function(user, capability){
+    if(Object.prototype.hasOwnProperty.call(PILOT_CAPS, capability)){
+      try{ return !!PILOT_CAPS[capability](pmUser(user)); }catch(e){ return false; }
+    }
+    return _pmOrigCan ? _pmOrigCan(user, capability) : false;
+  };
+}
+function pmRequire(cap){ if(!window.KMI_AUTH.can(undefined,cap)) throw new Error('Bu işlem için yetkiniz yok ('+cap+').'); }
+
+// ---------------------------------------------------------------------------
+// B) PILOT SCOPE CONFIG - "günün ilk gününde tüm fabrikayı pilot sanma" (madde 12)
+// ---------------------------------------------------------------------------
+const CFG_KEY='KMI_PILOT_CONFIG_V1';
+function pmDefaultConfig(){
+  return { version:'KMI Pilot 1.0.0', startDate:null, currentPhase:'FAZ 0 - BASELINE FREEZE',
+    scope:{ machineIds:[], operatorIds:[], qualityPersonIds:[], productIds:[], departmentIds:[], shifts:[], woTypes:[], dateFrom:null, dateTo:null } };
+}
+function pmGetConfig(){ return pmLoad(CFG_KEY,null) || (function(){ const d=pmDefaultConfig(); pmSave(CFG_KEY,d); return d; })(); }
+function pmSetConfig(patch){
+  pmRequire('pilot.admin');
+  const cur=pmGetConfig();
+  const next=Object.assign({}, cur, patch||{}, {scope:Object.assign({}, cur.scope, (patch&&patch.scope)||{})});
+  pmSave(CFG_KEY, next);
+  try{ window.KMI.event('PILOT_CONFIG_UPDATED','PILOT_CONFIG','SINGLETON',{phase:next.currentPhase}); }catch(e){}
+  return next;
+}
+
+// ---------------------------------------------------------------------------
+// C) FIELD ISSUE REPORTER - "SORUN BİLDİR" - kendi hafif kaydı, ama takip
+//    aksiyonu mevcut kmiTaskCreate (Action Engine) üzerinden açılır (madde 34:
+//    başka bir görev sistemi kurma).
+// ---------------------------------------------------------------------------
+const ISSUE_KEY='KMI_PILOT_ISSUES_V1';
+function pmIssues(){ return pmLoad(ISSUE_KEY,[]); }
+function pmSaveIssues(a){ pmSave(ISSUE_KEY,a); }
+const ISSUE_CLASSES=['BUG','DATA','UX','TRAINING','PROCESS','INTEGRATION','PERMISSION','PERFORMANCE','HARDWARE_NETWORK'];
+const ISSUE_PRIORITIES=['P0','P1','P2','P3','P4'];
+function pmReportIssue(data){
+  data=data||{};
+  pmRequire('pilot.issue.report');
+  const u=pmUser();
+  const desc=String(data.description||'').trim();
+  if(!desc) throw new Error('Sorun açıklaması zorunlu.');
+  const rec={
+    id: pmGenId('ISSUE'),
+    reportedBy: (u&&u.name)||'system',
+    reportedById: u&&u.id,
+    reportedAt: pmNow(),
+    appVersion: pmGetConfig().version,
+    role: (u&&u.role)||null,
+    department: (u&&u.dept)||null,
+    screen: String(data.screen||document.title||'-'),
+    module: String(data.module||'-'),
+    woId: data.woId||null,
+    machineId: data.machineId||null,
+    description: desc,
+    classification: ISSUE_CLASSES.includes(data.classification)?data.classification:'BUG',
+    priority: ISSUE_PRIORITIES.includes(data.priority)?data.priority:'P2',
+    status: 'OPEN',
+    taskId: null
+  };
+  if(typeof window.kmiTaskCreate==='function'){
+    try{
+      const task=window.kmiTaskCreate({
+        title:'PILOT SORUN: '+rec.classification+' - '+desc.slice(0,60),
+        description:'Bildiren: '+rec.reportedBy+' ('+(rec.role||'-')+', '+(rec.department||'-')+')\nEkran: '+rec.screen+'\n\n'+desc,
+        assigneeId: (u&&u.id)||null,
+        dueAt: new Date(Date.now()+ (rec.priority==='P0'?4:rec.priority==='P1'?24:72)*3600000).toISOString(),
+        priority: rec.priority==='P0'?'CRITICAL':(rec.priority==='P1'?'HIGH':'NORMAL'),
+        links:{pilotIssueId:rec.id}
+      });
+      rec.taskId=task.id;
+    }catch(e){ rec.taskError=e.message; }
+  }
+  const all=pmIssues(); all.push(rec); pmSaveIssues(all);
+  try{ window.KMI.event('PILOT_ISSUE_REPORTED','PILOT_ISSUE',rec.id,{classification:rec.classification,priority:rec.priority}); }catch(e){}
+  return rec;
+}
+function pmListIssues(){ pmRequire('pilot.view'); return pmIssues().sort((a,b)=>new Date(b.reportedAt)-new Date(a.reportedAt)); }
+function pmSetIssueStatus(id,status,priority){
+  pmRequire('pilot.issue.manage');
+  const all=pmIssues(); const row=all.find(i=>i.id===id); if(!row) throw new Error('Sorun bulunamadı.');
+  if(status) row.status=status;
+  if(priority && ISSUE_PRIORITIES.includes(priority)) row.priority=priority;
+  pmSaveIssues(all);
+  try{ window.KMI.event('PILOT_ISSUE_UPDATED','PILOT_ISSUE',id,{status:row.status,priority:row.priority}); }catch(e){}
+  return row;
+}
+function pmOpenBlockerCounts(){
+  const open=pmIssues().filter(i=>!['RESOLVED','CLOSED'].includes(i.status));
+  return { p0:open.filter(i=>i.priority==='P0').length, p1:open.filter(i=>i.priority==='P1').length, p2:open.filter(i=>i.priority==='P2').length, total:open.length };
+}
+
+// ---------------------------------------------------------------------------
+// D) GO-LIVE GATE (madde 80) - ölçülebilir, "iyi görünüyor" değil.
+// ---------------------------------------------------------------------------
+function pmGoLiveGate(){
+  const counts=pmOpenBlockerCounts();
+  const gates=[
+    {name:'Açık P0 = 0', pass: counts.p0===0, detail: counts.p0+' açık P0'},
+    {name:'Açık P1 = 0', pass: counts.p1===0, detail: counts.p1+' açık P1'},
+    {name:'Regresyon Testleri', pass: null, detail: 'SAHA DOĞRULAMASI BEKLİYOR - otomatik regresyon paketi ayrı çalıştırılıp buraya işlenmeli (Faz 1)'},
+    {name:'Golden Thread (gerçek WO)', pass: null, detail: 'SAHA DOĞRULAMASI BEKLİYOR - gerçek makine/operatör/iş emri ile yapılmadan PASS edilemez'},
+    {name:'Rollback test edildi', pass: null, detail: 'SAHA DOĞRULAMASI BEKLİYOR'}
+  ];
+  const allKnownPass = gates.every(g=>g.pass!==false);
+  return { gates, status: gates.some(g=>g.pass===false)?'BLOKE': gates.some(g=>g.pass===null)?'SAHA DOĞRULAMASI BEKLİYOR':'HAZIR' };
+}
+
+window.KMI_PILOT = {
+  getConfig: pmGetConfig,
+  setConfig: pmSetConfig,
+  reportIssue: pmReportIssue,
+  listIssues: pmListIssues,
+  setIssueStatus: pmSetIssueStatus,
+  openBlockerCounts: pmOpenBlockerCounts,
+  goLiveGate: pmGoLiveGate
+};
+
+// ---------------------------------------------------------------------------
+// E) GERÇEK EKRANLAR: "PILOT MANAGER" + "SORUN BİLDİR"
+// ---------------------------------------------------------------------------
+window.kmiOpenPilotManager=function(){
+  if(!window.KMI_AUTH.can(undefined,'pilot.view')){ try{window.kmiToast('Pilot Manager için yetkiniz yok.','warn');}catch(e){alert('Yetki yok.');} return; }
+  document.getElementById('kmiPilotModal')?.remove();
+  const m=document.createElement('div'); m.id='kmiPilotModal'; m.className='fixed inset-0 z-[280] bg-[#07101f] text-white overflow-y-auto';
+  document.body.appendChild(m);
+  window.kmiRenderPilotManager();
+};
+window.kmiPilotSetIssue=function(id,status){ try{ pmSetIssueStatus(id,status); window.kmiRenderPilotManager(); }catch(e){ try{window.kmiToast(e.message,'warn');}catch(x){alert(e.message);} } };
+window.kmiRenderPilotManager=function(){
+  const el=document.getElementById('kmiPilotModal'); if(!el) return;
+  const cfg=pmGetConfig();
+  const canManage=window.KMI_AUTH.can(undefined,'pilot.issue.manage');
+  const issues=pmListIssues().slice(0,30);
+  const counts=pmOpenBlockerCounts();
+  const gate=pmGoLiveGate();
+  const gateColor=gate.status==='HAZIR'?'text-emerald-400':gate.status==='BLOKE'?'text-red-400':'text-amber-400';
+  el.innerHTML=`<div class="max-w-6xl mx-auto p-5">
+   <div class="flex justify-between items-center mb-4"><div><div class="text-[10px] text-cyan-300 tracking-widest font-black">KMI · FACTORY DEPLOYMENT FAZ 2</div><h2 class="text-2xl font-black">🏭 Pilot Manager</h2><div class="text-xs text-slate-400 mt-1">${pmE(cfg.version)} · ${pmE(cfg.currentPhase)}</div></div>
+   <button onclick="document.getElementById('kmiPilotModal').remove()" class="bg-slate-800 px-4 py-2 rounded-xl">Kapat</button></div>
+   <div class="grid md:grid-cols-4 gap-3 mb-4">
+    <div class="bg-slate-900/60 border border-slate-700 rounded-2xl p-3"><div class="text-[10px] text-slate-400">AÇIK P0</div><div class="text-2xl font-black ${counts.p0>0?'text-red-400':'text-emerald-400'}">${counts.p0}</div></div>
+    <div class="bg-slate-900/60 border border-slate-700 rounded-2xl p-3"><div class="text-[10px] text-slate-400">AÇIK P1</div><div class="text-2xl font-black ${counts.p1>0?'text-amber-400':'text-emerald-400'}">${counts.p1}</div></div>
+    <div class="bg-slate-900/60 border border-slate-700 rounded-2xl p-3"><div class="text-[10px] text-slate-400">TOPLAM AÇIK SORUN</div><div class="text-2xl font-black">${counts.total}</div></div>
+    <div class="bg-slate-900/60 border border-slate-700 rounded-2xl p-3"><div class="text-[10px] text-slate-400">GO-LIVE GATE</div><div class="text-lg font-black ${gateColor}">${pmE(gate.status)}</div></div>
+   </div>
+   <div class="bg-slate-900/60 border border-slate-700 rounded-2xl p-4 mb-4">
+    <h3 class="font-black mb-2">Go-Live Gate Detayı</h3>
+    <div class="space-y-1 text-xs">${gate.gates.map(g=>`<div>${g.pass===true?'✅':g.pass===false?'❌':'🟡'} <b>${pmE(g.name)}</b> - ${pmE(g.detail)}</div>`).join('')}</div>
+   </div>
+   <div class="bg-slate-900/60 border border-slate-700 rounded-2xl p-4">
+    <h3 class="font-black mb-2">Son Sorun Bildirimleri</h3>
+    <div class="space-y-1 text-xs max-h-72 overflow-y-auto">${issues.map(i=>`<div class="border-b border-slate-800 py-1 flex justify-between"><span><b class="${i.priority==='P0'?'text-red-400':i.priority==='P1'?'text-amber-400':''}">${pmE(i.priority)}</b> · ${pmE(i.classification)} · ${pmE(i.description.slice(0,80))} · ${pmE(i.status)}</span>${canManage&&i.status==='OPEN'?`<span><button onclick="window.kmiPilotSetIssue('${i.id}','IN_PROGRESS')" class="underline text-cyan-300 mr-2">İşleme Al</button><button onclick="window.kmiPilotSetIssue('${i.id}','RESOLVED')" class="underline text-emerald-300">Çözüldü</button></span>`:''}</div>`).join('')||'<div class="text-slate-500">Henüz sorun bildirilmedi.</div>'}</div>
+   </div>
+  </div>`;
+};
+window.kmiOpenIssueReporter=function(){
+  if(!window.KMI_AUTH.can(undefined,'pilot.issue.report')){ try{window.kmiToast('Sorun bildirmek için giriş yapmalısınız.','warn');}catch(e){} return; }
+  document.getElementById('kmiIssueModal')?.remove();
+  const m=document.createElement('div'); m.id='kmiIssueModal'; m.className='fixed inset-0 z-[290] bg-black/70 flex items-center justify-center';
+  m.innerHTML=`<div class="bg-slate-900 border border-slate-700 rounded-2xl p-5 w-full max-w-md text-white">
+   <h3 class="font-black mb-3">🐞 Sorun Bildir</h3>
+   <select id="issueClass" class="w-full bg-slate-950 border border-slate-700 rounded p-2 text-sm mb-2">${ISSUE_CLASSES.map(c=>'<option value="'+c+'">'+c+'</option>').join('')}</select>
+   <select id="issuePriority" class="w-full bg-slate-950 border border-slate-700 rounded p-2 text-sm mb-2">${ISSUE_PRIORITIES.map(p=>'<option value="'+p+'"'+(p==='P2'?' selected':'')+'>'+p+'</option>').join('')}</select>
+   <textarea id="issueDesc" placeholder="Ne oldu? Kısaca açıklayın..." class="w-full bg-slate-950 border border-slate-700 rounded p-2 text-sm mb-2" rows="4"></textarea>
+   <div id="issueErr" class="text-red-400 text-xs mb-2"></div>
+   <div class="flex gap-2"><button onclick="document.getElementById('kmiIssueModal').remove()" class="flex-1 bg-slate-800 px-3 py-2 rounded-lg text-sm">Vazgeç</button><button onclick="window.kmiIssueSubmit()" class="flex-1 bg-cyan-700 hover:bg-cyan-600 px-3 py-2 rounded-lg text-sm font-bold">Gönder</button></div>
+  </div>`;
+  document.body.appendChild(m);
+};
+window.kmiIssueSubmit=function(){
+  try{
+    pmReportIssue({ classification:document.getElementById('issueClass').value, priority:document.getElementById('issuePriority').value, description:document.getElementById('issueDesc').value, screen:document.title });
+    document.getElementById('kmiIssueModal').remove();
+    try{window.kmiToast('Sorun bildirildi, teşekkürler.');}catch(e){}
+  }catch(e){ document.getElementById('issueErr').textContent=e.message; }
+};
+window.addEventListener('load',function(){
+  pmGetConfig();
+  let tries=0;
+  const timer=setInterval(function(){
+    tries++;
+    try{
+      const row=document.getElementById('kmiFloorNavRow2');
+      if(row && !document.getElementById('kmiPilotNavBtn') && window.KMI_AUTH.can(undefined,'pilot.view')){
+        const b=document.createElement('button'); b.id='kmiPilotNavBtn'; b.className='nav-btn px-3 py-2 rounded-md hover:bg-slate-700 text-slate-300 text-sm';
+        b.innerHTML='<i class="fa-solid fa-flask mr-1"></i> Pilot Manager (Yeni)';
+        b.onclick=function(){ window.kmiOpenPilotManager(); };
+        row.appendChild(b);
+      }
+      if(row && !document.getElementById('kmiIssueNavBtn') && window.KMI_AUTH.can(undefined,'pilot.issue.report')){
+        const b2=document.createElement('button'); b2.id='kmiIssueNavBtn'; b2.className='nav-btn px-3 py-2 rounded-md hover:bg-slate-700 text-slate-300 text-sm';
+        b2.innerHTML='<i class="fa-solid fa-bug mr-1"></i> Sorun Bildir';
+        b2.onclick=function(){ window.kmiOpenIssueReporter(); };
+        row.appendChild(b2);
+      }
+    }catch(e){}
+    if(tries>=90) clearInterval(timer);
+  },500);
+},{once:true});
+})();
+</script>
+
+<!-- ===========================================================================
+     KMI-ACADEMY-FIX (2026-09-28): Factory Deployment Master Program (90acddd6)
+     FAZ 3 (Eğitim Modu + Veri İzolasyonu) + FAZ 4 (KMI Academy Temeli).
+     ---------------------------------------------------------------------------
+     TASARIM KARARI (veri izolasyonu, madde 68-69): Gerçek KMI ekranlarını
+     "eğitim modunda" çalıştırıp aradan üretim/envanter/kalite/maliyet/PULSE
+     yazma çağrılarını ayıklamaya çalışmak, bu tek-dosya mimaride onlarca farklı
+     motora (KMI_WMS, KMI_GL, KMI.event, kmiTaskCreate, vb.) dokunmayı ve her
+     birinde "eğitim mi gerçek mi" ayrımı eklemeyi gerektirir - bu, direktifin
+     kendisinin yasakladığı türden riskli bir "büyük patlama" değişikliğidir.
+     Bunun yerine BAĞIMSIZ bir eğitim alanı (KMI_TRAINING) kuruldu: kendi
+     bellek-içi/localStorage alanında çalışır, gerçek motorların HİÇBİRİNİ
+     ÇAĞIRMAZ - dolayısıyla üretim/envanter/kalite/maliyet/OEE/Puantaj/
+     Reporting/PULSE/Muhasebe/KMI LIVE'a karışma İMKANSIZ (kod düzeyinde
+     garanti, "izolasyon testi" ile doğrulanmadı çünkü mimari olarak ayrı).
+     Tamamlanma kayıtları (KMI_TRAINING_COMPLETIONS_V1) sadece eğitim
+     ilerlemesini tutar, iş verisi değildir.
+     =========================================================================== -->
+<script>
+(function(){
+'use strict';
+function trE(v){ return String(v==null?'':v).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function trNow(){ return new Date().toISOString(); }
+function trLoad(k,d){ try{ const v=JSON.parse(localStorage.getItem(k)); return v==null?(d!==undefined?d:null):v; }catch(e){ return d!==undefined?d:null; } }
+function trSave(k,v){ localStorage.setItem(k, JSON.stringify(v)); }
+function trUser(u){ return (window.currentUser)||u||null; }
+function trIsAdmin(u){ try{ return !!(window.KMI_AUTH && window.KMI_AUTH.can(u,'ADMIN')); }catch(e){ return false; } }
+function trHasAnyDeptAccess(u){ try{ return (window.KMI_DEPARTMENTS||[]).some(function(d){ return window.KMI_ORG && window.KMI_ORG.hasAssignment(u||window.currentUser, d.id); }); }catch(e){ return false; } }
+const TRAIN_CAPS = {
+  'training.access': u=>!!trUser(u), // giriş yapmış herkes eğitim alabilir
+  'training.admin': u=>trIsAdmin(u)||trHasAnyDeptAccess(u) // tamamlanma raporunu görebilir
+};
+const _trOrigCan = window.KMI_AUTH && window.KMI_AUTH.can;
+if(window.KMI_AUTH){
+  window.KMI_AUTH.can = function(user, capability){
+    if(Object.prototype.hasOwnProperty.call(TRAIN_CAPS, capability)){
+      try{ return !!TRAIN_CAPS[capability](trUser(user)); }catch(e){ return false; }
+    }
+    return _trOrigCan ? _trOrigCan(user, capability) : false;
+  };
+}
+
+// ---------------------------------------------------------------------------
+// A) KMI ACADEMY - rol bazlı, kısa, görsel eğitim izleri (madde 47).
+//    İçerik statik/salt-okunur - her rol için "NE ZAMAN/NE YAPMALIYIM/5 ADIM/
+//    NE YAPMAMALIYIM/HATA OLURSA/GERÇEK ÖRNEK" standart formatı (madde 61).
+// ---------------------------------------------------------------------------
+const ACADEMY_TRACKS = [
+  {id:'KMI-00', title:'KMI NEDİR?', forRole:null, steps:[
+    {when:'Her zaman - ilk gün.', what:'KMI neden var, gerçek zamanlı kayıt neden önemli, sorun olursa ne yapılır.', doNot:'Bilgiyi daha sonra elle girmek için not almayın - o an KMI\'ye girin.', onError:'Sorun Bildir butonunu kullanın.', example:'Bir parça bitirildiğinde hemen FINISH yapılır, gün sonuna bırakılmaz.'}
+  ]},
+  {id:'KMI-01', title:'OPERATÖR', forRole:'OPERATOR', steps:[
+    {when:'Vardiya başında ve her iş emri değişiminde.', what:'İş Emrini seç, Makineyi doğrula, Malzeme LOT\'unu okut, START yap.', doNot:'Kârlılık, maaş, müşteri fiyatı gibi bilgilerle ilgilenmeyin - bunlar operatör ekranında yok.', onError:'START/FINISH çalışmazsa Sorun Bildir, iş emrini kağıda not almayın.', example:'LOT okutulmadan üretim başlatılamaz - bu kasıtlıdır, izlenebilirlik için gereklidir.'}
+  ]},
+  {id:'KMI-02', title:'KALİTE', forRole:'QUALITY', steps:[
+    {when:'Her kalite kuyruğuna düşen iş emrinde.', what:'Kuyruğu al, Kontrol Planına göre ölç, PASS/HOLD/NCR kararı ver, gerekirse Rework/Final Release.', doNot:'Kanıt eklemeden PASS vermeyin.', onError:'Sevkiyat bloklu kalıyorsa Sorun Bildir.', example:'Ölçüm toleransı dışıysa HOLD + NCR açılır, sevkiyat otomatik bloklanır.'}
+  ]},
+  {id:'KMI-03', title:'ÜRETİM SORUMLUSU', forRole:'MANAGEMENT', steps:[
+    {when:'Vardiya boyunca ve el değişiminde.', what:'Fabrika Şimdi, Plan vs Gerçek, Darboğaz, Kayıp, Hazırlık, PULSE, Aksiyonlar.', doNot:'Sadece buton yerlerini öğrenmeyin - KMI ile YÖNETMEYİ öğrenin.', onError:'PULSE eskale ederse görmezden gelmeyin.', example:'Bir makinede kritik arıza PULSE\'a düşer, eskale olmadan önce görülüp sahiplenilmelidir.'}
+  ]},
+  {id:'KMI-04', title:'SATINALMA', forRole:'PURCHASING', steps:[
+    {when:'Net gereksinim veya malzeme riski oluştuğunda.', what:'Talep, Net Gereksinim, Tedarikçi, PO, Teyit, Beklenen Teslimat.', doNot:'Gelen malzemeyi kalite durumu kontrol etmeden depoya geçirmeyin.', onError:'Teslimat gecikirse PULSE/Sorun Bildir.', example:'PO onaylanınca üretim hazırlığı otomatik güncellenir.'}
+  ]},
+  {id:'KMI-05', title:'DEPO', forRole:'WAREHOUSE', steps:[
+    {when:'Her mal kabul/sevk/transfer işleminde.', what:'Kabul, LOT, Gelen Kalite, Müsait/Rezerve, Çıkış, İade.', doNot:'Miktarı elle üzerine yazmayın - her değişiklik bir Stok Hareketi olmalı.', onError:'Negatif stok engeli çıkarsa gerçek sayımı kontrol edin, Sorun Bildir.', example:'ON HAND, AVAILABLE ve RESERVED üçü de farklı sayılardır.'}
+  ]},
+  {id:'KMI-06', title:'SEVKİYAT', forRole:'SHIPPING', steps:[
+    {when:'Sevkiyata hazır ürün olduğunda.', what:'Sevkiyat Hazırlığı, Kalite Serbest Belgesi, Paketleme, Yükleme, Sevkiyat Onayı.', doNot:'Kalite serbest belgesi olmadan sevk etmeyin.', onError:'Blok varsa nedenini kontrol edin, Sorun Bildir.', example:'Kalite HOLD varken sevkiyat sistem tarafından engellenir.'}
+  ]},
+  {id:'KMI-07', title:'BAKIM', forRole:'MAINTENANCE', steps:[
+    {when:'Arıza bildirimi geldiğinde veya PM zamanı geldiğinde.', what:'Arızayı sahiplen, müdahale et, nedeni gir, üretime iade et, doğrula.', doNot:'Kapatmadan önce kök nedeni boş bırakmayın.', onError:'PULSE eskale ederse vekil devreye girer.', example:'Kritik arıza PULSE\'a düşer, X dakika içinde görülmezse vekile eskale olur.'}
+  ]},
+  {id:'KMI-08', title:'TAKIM YÖNETİMİ', forRole:'TOOLING', steps:[
+    {when:'Takım değişiminde/kırılmasında.', what:'Takım kimliği, müsaitlik, preset, makineye atama, takım olayı, ömür takibi.', doNot:'Takım kırılmasını kayıt etmeden yeni takım takmayın.', onError:'Sorun Bildir.', example:'Takım ömrü, üretilen parça sayısına göre otomatik takip edilir.'}
+  ]},
+  {id:'KMI-09', title:'MUHASEBE / FİNANS', forRole:'ACCOUNTING_FINANCE', steps:[
+    {when:'Fatura/tahsilat/ödeme işlemlerinde.', what:'Faturalanabilir Sevkiyat, Fatura, Cari, Tahsilat/Ödeme, Muhasebe Kaydı.', doNot:'Borç=Alacak olmayan kayıt postalamayın (sistem zaten engeller).', onError:'Denk gelmeyen kayıt reddedilir, Sorun Bildir.', example:'Her ters kayıt orijinali SİLMEZ, sadece REVERSED işaretler - denetim izi korunur.'}
+  ]},
+  {id:'KMI-10', title:'YÖNETİM', forRole:'GENERAL_MANAGEMENT', steps:[
+    {when:'Günlük/haftalık/aylık gözden geçirmede.', what:'Fabrika Şimdi, Aylık Hedef, Kapasite, Darboğaz, Maliyet Sapması, PULSE, Raporlama, Next Best Action.', doNot:'Bir sayıyı kaynağını (Tanım→Kaynak→Hesaplama→Kanıt) sormadan kullanmayın.', onError:'HESAPLANAMIYOR görüyorsanız veri eksikliği vardır, veri uydurulmaz.', example:'Control Tower KPI ile Report Snapshot KPI her zaman aynı sayıyı gösterir - ayrı formül yoktur.'}
+  ]},
+  {id:'KMI-11', title:'SOFTWARE & IT / SİSTEM YÖNETİMİ', forRole:'SOFTWARE_IT', steps:[
+    {when:'Sürekli, özellikle release ve olay anında.', what:'Mimari, Yetkilendirme, Event/Calculation Engine, PULSE, Reporting, Loglar, Backup/Rollback.', doNot:'Teknik admin yetkisiyle ticari/finansal veriye otomatik erişim varsaymayın.', onError:'P0/P1 önceliklidir, Pilot Manager\'da takip edilir.', example:'Her release Git commit + rollback noktasıyla kayıt altına alınır.'}
+  ]}
+];
+function acUser(u){ return trUser(u); }
+function acRoleOf(u){ return (u&&(u.trainingRole||u.role))||null; }
+function acVisibleTracks(u){
+  u=acUser(u);
+  const isMgmt = u && (u.role==='ADMIN'||u.role==='MANAGEMENT');
+  return ACADEMY_TRACKS.filter(t=> t.forRole===null || isMgmt || acRoleOf(u)===t.forRole || (window.KMI_ORG&&t.forRole&&window.KMI_ORG.hasAssignment(u,t.forRole)) );
+}
+
+// ---------------------------------------------------------------------------
+// B) EĞİTİM MODU - izole alan, gerçek motorlara HİÇ dokunmaz.
+// ---------------------------------------------------------------------------
+const TRAIN_STATE_KEY='KMI_TRAINING_ACTIVE_V1';
+const TRAIN_COMPLETIONS_KEY='KMI_TRAINING_COMPLETIONS_V1';
+const TRAIN_SCENARIOS = {
+  OPERATOR_BASIC: {title:'Operatör Temel', steps:['İş Emrini Başlat (simülasyon)','2 adet Hurda gir (simülasyon)','Takım kırıldı - Yardım İste (simülasyon)','İşi Bitir (simülasyon)','Kaliteye Gönder (simülasyon)']},
+  QUALITY_BASIC: {title:'Kalite Temel', steps:['İşi Al (simülasyon)','Ölçüm Kaydet (simülasyon)','HOLD Oluştur (simülasyon)','HOLD Çöz (simülasyon)','Serbest Bırak (simülasyon)']},
+  WAREHOUSE_BASIC: {title:'Depo Temel', steps:['LOT Kabul Et (simülasyon)','Kalite Durumu Ata (simülasyon)','Rezerve Et (simülasyon)','Çıkış Yap (simülasyon)','İade Al (simülasyon)']}
+};
+function trIsActive(){ return !!(trLoad(TRAIN_STATE_KEY,{active:false})||{}).active; }
+function trEnter(){
+  if(!window.KMI_AUTH.can(undefined,'training.access')) throw new Error('Eğitim modu için giriş yapmalısınız.');
+  trSave(TRAIN_STATE_KEY, {active:true, by:(window.currentUser&&window.currentUser.name)||'-', at:trNow()});
+  try{ window.KMI.event('TRAINING_MODE_ENTERED','TRAINING',(window.currentUser&&window.currentUser.id)||'anon',{}); }catch(e){}
+}
+function trExit(){ trSave(TRAIN_STATE_KEY,{active:false}); try{ window.KMI.event('TRAINING_MODE_EXITED','TRAINING',(window.currentUser&&window.currentUser.id)||'anon',{}); }catch(e){} }
+function trCompletions(){ return trLoad(TRAIN_COMPLETIONS_KEY,[]); }
+function trRecordCompletion(scenarioId){
+  const u=trUser();
+  if(!window.KMI_AUTH.can(undefined,'training.access')) throw new Error('Yetkiniz yok.');
+  const rec={ id:'TRC-'+Date.now().toString(36).toUpperCase(), personId:(u&&u.id)||null, personName:(u&&u.name)||'-', scenarioId, completedAt:trNow() };
+  const all=trCompletions(); all.push(rec); trSave(TRAIN_COMPLETIONS_KEY, all);
+  try{ window.KMI.event('TRAINING_SCENARIO_COMPLETED','TRAINING',rec.id,{scenarioId}); }catch(e){}
+  return rec;
+}
+function trCompletionSummary(){
+  if(!window.KMI_AUTH.can(undefined,'training.admin')) throw new Error('Yetkiniz yok.');
+  const all=trCompletions();
+  const byPerson={};
+  all.forEach(function(c){ byPerson[c.personId]=byPerson[c.personId]||{personName:c.personName, scenarios:new Set()}; byPerson[c.personId].scenarios.add(c.scenarioId); });
+  return Object.keys(byPerson).map(pid=>({personId:pid, personName:byPerson[pid].personName, completedCount:byPerson[pid].scenarios.size, total:Object.keys(TRAIN_SCENARIOS).length}));
+}
+
+window.KMI_TRAINING = {
+  isActive: trIsActive, enter: trEnter, exit: trExit,
+  scenarios: TRAIN_SCENARIOS, recordCompletion: trRecordCompletion, completionSummary: trCompletionSummary,
+  academyTracks: ()=>acVisibleTracks(), allAcademyTracks: ()=>ACADEMY_TRACKS
+};
+
+// ---------------------------------------------------------------------------
+// C) GERÇEK EKRANLAR: "EĞİTİM MODU / KMI ACADEMY" + daima görünür banner
+// ---------------------------------------------------------------------------
+let __trScenarioId=null, __trStepIdx=0;
+window.kmiOpenAcademy=function(){
+  if(!window.KMI_AUTH.can(undefined,'training.access')){ try{window.kmiToast('Eğitim için giriş yapmalısınız.','warn');}catch(e){} return; }
+  document.getElementById('kmiAcademyModal')?.remove();
+  const m=document.createElement('div'); m.id='kmiAcademyModal'; m.className='fixed inset-0 z-[280] bg-[#07101f] text-white overflow-y-auto';
+  document.body.appendChild(m);
+  __trScenarioId=null; __trStepIdx=0;
+  window.kmiRenderAcademy();
+};
+window.kmiTrToggle=function(){ if(trIsActive()) trExit(); else trEnter(); window.kmiRenderAcademy(); window.kmiTrPaintBanner(); };
+window.kmiTrStartScenario=function(id){ __trScenarioId=id; __trStepIdx=0; window.kmiRenderAcademy(); };
+window.kmiTrNextStep=function(){
+  const sc=TRAIN_SCENARIOS[__trScenarioId]; if(!sc) return;
+  if(__trStepIdx < sc.steps.length-1){ __trStepIdx++; } else { trRecordCompletion(__trScenarioId); __trScenarioId=null; __trStepIdx=0; try{window.kmiToast('Senaryo tamamlandı - eğitim kaydı işlendi.');}catch(e){} }
+  window.kmiRenderAcademy();
+};
+window.kmiRenderAcademy=function(){
+  const el=document.getElementById('kmiAcademyModal'); if(!el) return;
+  const active=trIsActive();
+  const tracks=acVisibleTracks();
+  let body='';
+  if(__trScenarioId){
+    const sc=TRAIN_SCENARIOS[__trScenarioId];
+    body=`<div class="bg-slate-900/60 border border-slate-700 rounded-2xl p-4">
+      <h3 class="font-black mb-2">${trE(sc.title)} - Adım ${__trStepIdx+1}/${sc.steps.length}</h3>
+      <div class="text-lg mb-4">${trE(sc.steps[__trStepIdx])}</div>
+      <button onclick="window.kmiTrNextStep()" class="bg-cyan-700 hover:bg-cyan-600 px-4 py-2 rounded-lg text-sm font-bold">${__trStepIdx<sc.steps.length-1?'Tamamladım, Sonraki Adım':'Tamamladım, Senaryoyu Bitir'}</button>
+    </div>`;
+  } else {
+    body=`<div class="grid md:grid-cols-2 gap-4">
+     <div class="bg-slate-900/60 border border-slate-700 rounded-2xl p-4">
+      <h3 class="font-black mb-2">Uygulamalı Senaryolar (izole, gerçek veri oluşturmaz)</h3>
+      <div class="space-y-2 text-sm">${Object.keys(TRAIN_SCENARIOS).map(k=>`<button onclick="window.kmiTrStartScenario('${k}')" class="w-full text-left bg-slate-800 hover:bg-slate-700 rounded-lg px-3 py-2">${trE(TRAIN_SCENARIOS[k].title)}</button>`).join('')}</div>
+     </div>
+     <div class="bg-slate-900/60 border border-slate-700 rounded-2xl p-4">
+      <h3 class="font-black mb-2">KMI Academy - Rolünüze Uygun Eğitimler</h3>
+      <div class="space-y-3 text-xs max-h-80 overflow-y-auto">${tracks.map(t=>`<div class="border-b border-slate-800 pb-2"><b class="text-cyan-300">${trE(t.id)} · ${trE(t.title)}</b>${t.steps.map(s=>`<div class="mt-1"><b>Ne zaman?</b> ${trE(s.when)}<br><b>Ne yapmalıyım?</b> ${trE(s.what)}<br><b>Ne yapmamalıyım?</b> ${trE(s.doNot)}<br><b>Hata olursa?</b> ${trE(s.onError)}<br><b>Örnek:</b> ${trE(s.example)}</div>`).join('')}</div>`).join('')}</div>
+     </div>
+    </div>`;
+  }
+  el.innerHTML=`<div class="max-w-5xl mx-auto p-5">
+   <div class="flex justify-between items-center mb-4"><div><div class="text-[10px] text-cyan-300 tracking-widest font-black">KMI · FACTORY DEPLOYMENT FAZ 3+4</div><h2 class="text-2xl font-black">🎓 KMI Academy / Eğitim Modu</h2></div>
+   <div class="flex gap-2"><button onclick="window.kmiTrToggle()" class="${active?'bg-amber-700 hover:bg-amber-600':'bg-slate-800 hover:bg-slate-700'} px-4 py-2 rounded-xl text-sm font-bold">${active?'Eğitim Modundan Çık':'Eğitim Moduna Gir'}</button><button onclick="document.getElementById('kmiAcademyModal').remove()" class="bg-slate-800 px-4 py-2 rounded-xl">Kapat</button></div></div>
+   ${active?'<div class="bg-amber-900/40 border border-amber-600 text-amber-200 rounded-xl p-2 text-center font-black mb-4">EĞİTİM MODU AKTİF - GERÇEK VERİ OLUŞTURMAZ</div>':''}
+   ${body}
+  </div>`;
+};
+window.kmiTrPaintBanner=function(){
+  document.getElementById('kmiTrBanner')?.remove();
+  if(!trIsActive()) return;
+  const b=document.createElement('div'); b.id='kmiTrBanner';
+  b.style.cssText='position:fixed;top:0;left:0;right:0;z-index:9999;background:#b45309;color:#fff;text-align:center;font-weight:900;font-size:12px;padding:4px;';
+  b.textContent='EĞİTİM MODU AKTİF - GERÇEK VERİ OLUŞTURMAZ';
+  document.body.appendChild(b);
+};
+window.addEventListener('load',function(){
+  window.kmiTrPaintBanner();
+  let tries=0;
+  const timer=setInterval(function(){
+    tries++;
+    try{
+      const row=document.getElementById('kmiFloorNavRow2');
+      if(row && !document.getElementById('kmiAcademyNavBtn') && window.KMI_AUTH.can(undefined,'training.access')){
+        const b=document.createElement('button'); b.id='kmiAcademyNavBtn'; b.className='nav-btn px-3 py-2 rounded-md hover:bg-slate-700 text-slate-300 text-sm';
+        b.innerHTML='<i class="fa-solid fa-graduation-cap mr-1"></i> KMI Academy';
+        b.onclick=function(){ window.kmiOpenAcademy(); };
+        row.appendChild(b);
+      }
+    }catch(e){}
+    if(tries>=90) clearInterval(timer);
+  },500);
+},{once:true});
+})();
+</script>
+
 </body>
 </html>
