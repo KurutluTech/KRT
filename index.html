@@ -1900,6 +1900,9 @@ ead>
         // (hoisting) nedeniyle BURADAKİ eski sürümler hiç çalışmaz. Ürün bazlı hedef, barometre,
         // haftalık/aylık grafikler ve toplam cycle time hesabı oradaki sürümdedir.
         function maintenancePeople(){return PERSONNEL_LIST.filter(p=>p.active!==false && (getEffectiveRole(p)==='BAKIM'||String(p.dept||'').toLowerCase().includes('bakım')));}
+// KMI-DEAD-CODE-UYARI (2026-09-27): createMaintenanceFromOperator (bu ilk/taban tanım) dosyada
+// birkaç kez daha tanımlanıp en sonunda window.createMaintenanceFromOperator (V35 sistemine
+// yönlendiren) ile geçersiz kılınıyor - BU KOPYA ÖLÜ KODDUR, hiçbir zaman çalışmaz.
         function createMaintenanceFromOperator(machine,description,severity,reportedBy){const now=new Date();const rec={id:'BKM-'+Date.now(),machine,type:'Operatör Arıza/Kusur Bildirimi',description,severity,reportedBy,openedAt:now.toISOString(),dueAt:new Date(now.getTime()+8*60*60*1000).toISOString(),status:'Açık',assignedTo:maintenancePeople()[0]?.id||null,source:'operator'};maintenanceRecords.unshift(rec);saveStorage('maintenanceRecords',maintenanceRecords);}
         function openMaintenancePlanPrompt(){const machine=prompt('Makine kodu / adı:');if(!machine)return;const desc=prompt('Planlı bakım, değişim veya kontrol açıklaması:');if(!desc)return;const when=prompt('Planlanan tarih (YYYY-MM-DD):',new Date().toISOString().slice(0,10));maintenanceRecords.unshift({id:'PB-'+Date.now(),machine,type:'Planlı Bakım / Kontrol',description:desc,severity:'planned',reportedBy:currentUser?.name||'Yönetim',openedAt:new Date().toISOString(),plannedAt:when,status:'Planlandı',assignedTo:maintenancePeople()[0]?.id||null,source:'planned'});saveStorage('maintenanceRecords',maintenanceRecords);renderMaintenanceCenter();}
         function maintenanceElapsedHours(r, endAt=new Date().toISOString()){ return Math.max(0,(new Date(endAt)-new Date(r.openedAt))/(60*60*1000)); }
@@ -1909,6 +1912,8 @@ ead>
             if(r.status==='Kapalı') return h<=24?'reward':(h>=72?'expired':'normal');
             return h>=72?'expired':(h<=24?'reward-window':'normal');
         }
+// KMI-DEAD-CODE-UYARI (2026-09-27): closeMaintenanceRecord (bu ilk/taban tanım) dosyada
+// birkaç kez daha tanımlanıp en sonunda geçersiz kılınıyor - BU KOPYA ÖLÜ KODDUR.
         function closeMaintenanceRecord(id){const r=maintenanceRecords.find(x=>x.id===id);if(!r)return;if(!currentUser||!['BAKIM','ADMIN'].includes(getEffectiveRole(currentUser))){alert('Bakım kaydını yalnız Bakım veya Yönetim kapatabilir.');return;}r.status='Kapalı';r.closedAt=new Date().toISOString();r.closedBy=currentUser.name;r.assignedTo=r.assignedTo||currentUser.id;const h=maintenanceElapsedHours(r,r.closedAt);r.responseHours=Math.round(h*100)/100;r.closedWithin24h=r.source==='operator'&&h<=24;r.expired72h=r.source==='operator'&&h>=72;saveStorage('maintenanceRecords',maintenanceRecords);renderMaintenanceCenter();alert(r.closedWithin24h?'Bakım 24 saat içinde kapatıldı. Bu ay bakım performans katsayısına ×1,10 uygulanır.':(r.expired72h?'Bakım 72 saatten sonra kapatıldı; bu iş emri ekstra bakım puanı kazandırmaz.':'Bakım kaydı kapatıldı; 24 saatlik ekstra puan penceresi aşıldı.'));}
         function maintenanceMultiplierForPerson(person,month){
             if(getEffectiveRole(person)!=='BAKIM' && String(person.dept||'').toLocaleLowerCase('tr-TR')!=='bakım') return 1.00;
@@ -1916,15 +1921,52 @@ ead>
             if(mine.some(r=>r.status!=='Kapalı'&&maintenanceElapsedHours(r)>=72)) return 1.00;
             return mine.some(r=>r.status==='Kapalı'&&maintenanceElapsedHours(r,r.closedAt)<=24)?1.10:1.00;
         }
+// KMI-PLATFORM-FAZ0 DÜZELTME (2026-09-27): machineOeeMetrics'in MTBF/MTTR hesabı eskiden
+// SADECE legacy maintenanceRecords dizisini okuyordu. Ancak V35 Makine Sağlığı sistemi
+// (script id="v35MachineSystem") canlıya alındığından beri TÜM gerçek arıza bildirimleri
+// (window.createMaintenanceFromOperator → createExternalFault) artık maintenanceRecords'a
+// değil, V35'in kendi KURUTLU_V35_MAINT_ORDERS deposuna yazılıyor; maintenanceRecords bu
+// tarihten sonra hiç beslenmiyor. Bu fonksiyon V35'in IIFE'sini bozmadan/dokunmadan, onun
+// persist() tarafından her mutasyonda localStorage'a aynalanan verisini DOĞRUDAN okuyarak
+// iki kaynağı (eski dönem: maintenanceRecords, V35 dönemi: KURUTLU_V35_MAINT_ORDERS) birleştirir.
+// Zaman aralıkları çakışmadığı için (V35 devreye girdikten sonra maintenanceRecords hiç
+// büyümüyor) birleştirme çift-sayım riski taşımaz; geçmiş veri de kaybolmaz.
+        function kmiV35FailuresForMonth(machine,month){
+            try{
+                const raw=localStorage.getItem('KURUTLU_V35_MAINT_ORDERS');
+                if(!raw) return [];
+                const orders=JSON.parse(raw);
+                if(!Array.isArray(orders)) return [];
+                return orders.filter(o=>o&&o.machineName===machine&&o.kind==='FAULT'&&String(o.openedAt||'').slice(0,7)===month)
+                    .map(o=>({
+                        id:o.id,
+                        machine:o.machineName,
+                        openedAt:o.openedAt,
+                        closedAt:o.closedAt||null,
+                        // serviceDurationMinutes V35'te closeOrder() tarafından hesaplanıp saklanıyor;
+                        // yoksa (eski/aktarılmamış kayıt) openedAt-closedAt farkından türet.
+                        repairHours:o.closedAt?(Number.isFinite(o.serviceDurationMinutes)?o.serviceDurationMinutes/60:maintenanceElapsedHours({openedAt:o.openedAt},o.closedAt)):0
+                    }));
+            }catch(e){ return []; }
+        }
         function machineOeeMetrics(machine,month=getCurrentMonthKey()){
             const rows=declarations.filter(d=>d.machine===machine&&getRecordMonthKey(d.workDate||d.date)===month&&isQualityPassedDeclaration(d));
             let planned=0,run=0,idealSecWeighted=0,total=0,good=0;const dt={tool:0,setup:0,breakdown:0,material:0,quality:0,other:0};
             rows.forEach(d=>{const p=Math.max(0,Number(d.oeePlannedMinutes)||0), loss=d.downtime||{};const lossMin=['tool','setup','breakdown','material','quality','other'].reduce((a,k)=>a+Math.max(0,Number(loss[k])||0),0);planned+=p;run+=Math.max(0,p-lossMin);const t=Math.max(0,Number(d.qualityGood??d.good??d.qty)||0)+Math.max(0,Number(d.qualityScrap??d.scrap)||0)+Math.max(0,Number(d.qualityAllocated??d.allocated)||0);total+=t;good+=Math.max(0,Number(d.qualityGood??d.good??d.qty)||0);idealSecWeighted+=Math.max(0,Number(d.idealCycleSec)||0)*t;Object.keys(dt).forEach(k=>dt[k]+=Math.max(0,Number(loss[k])||0));});
             const availability=planned?Math.max(0,Math.min(1,run/planned)):0;const idealSec=total?idealSecWeighted/total:0;const performance=run&&idealSec?Math.max(0,Math.min(1,(idealSec*total)/(run*60))):0;const quality=total?Math.max(0,Math.min(1,good/total)):0;const oee=availability*performance*quality;
-            const failures=maintenanceRecords.filter(r=>r.machine===machine&&r.source==='operator'&&String(r.openedAt||'').slice(0,7)===month);const closed=failures.filter(r=>r.closedAt);const repairHours=closed.reduce((a,r)=>a+maintenanceElapsedHours(r,r.closedAt),0);const mttr=closed.length?repairHours/closed.length:0;const mtbf=failures.length?run/60/failures.length:0;
+            const legacyFailures=maintenanceRecords.filter(r=>r.machine===machine&&r.source==='operator'&&String(r.openedAt||'').slice(0,7)===month);
+            const legacyClosed=legacyFailures.filter(r=>r.closedAt);
+            const v35Failures=kmiV35FailuresForMonth(machine,month);
+            const v35Closed=v35Failures.filter(r=>r.closedAt);
+            const failuresCount=legacyFailures.length+v35Failures.length;
+            const repairHours=legacyClosed.reduce((a,r)=>a+maintenanceElapsedHours(r,r.closedAt),0)+v35Closed.reduce((a,r)=>a+r.repairHours,0);
+            const closedCount=legacyClosed.length+v35Closed.length;
+            const mttr=closedCount?repairHours/closedCount:0;const mtbf=failuresCount?run/60/failuresCount:0;
             return {rows:rows.length,planned,run,total,good,availability,performance,quality,oee,dt,mtbf,mttr};
         }
         function renderOeeMachineTable(){const body=document.getElementById('oeeMachineTableBody');if(!body)return;const month=document.getElementById('productionTargetMonth')?.value||getCurrentMonthKey();body.innerHTML=MACHINES_LIST.map(m=>{const name=`${m.code} - ${m.name}`,x=machineOeeMetrics(name,month),pct=v=>(v*100).toFixed(1)+'%';return `<tr class="border-t border-slate-800"><td class="p-2 font-semibold text-white">${name}</td><td class="text-center font-black ${x.oee>=.85?'text-emerald-400':x.oee>=.65?'text-amber-300':'text-rose-400'}">${x.rows?pct(x.oee):'-'}</td><td class="text-center">${x.rows?pct(x.availability):'-'}</td><td class="text-center">${x.rows?pct(x.performance):'-'}</td><td class="text-center">${x.rows?pct(x.quality):'-'}</td><td class="text-center">${x.dt.tool} dk</td><td class="text-center">${x.dt.setup} dk</td><td class="text-center">${x.dt.breakdown} dk</td><td class="text-center">${x.dt.material} dk</td><td class="text-center">${x.mtbf?x.mtbf.toFixed(1)+' sa':'-'}</td><td class="text-center">${x.mttr?x.mttr.toFixed(1)+' sa':'-'}</td></tr>`}).join('');}
+// KMI-DEAD-CODE-UYARI (2026-09-27): renderMaintenanceCenter (bu ilk/taban tanım) dosyada
+// birkaç kez daha tanımlanıp en sonunda geçersiz kılınıyor - BU KOPYA ÖLÜ KODDUR.
         function renderMaintenanceCenter(){const cards=document.getElementById('machineHealthCards');if(!cards)return;cards.innerHTML=MACHINES_LIST.map(m=>{const name=`${m.code} - ${m.name}`,h=machineHealth(name),open=maintenanceRecords.filter(r=>r.machine===name&&!['Kapalı','Tamamlandı'].includes(r.status)).length,next=maintenanceRecords.filter(r=>r.machine===name&&r.plannedAt&&r.status!=='Kapalı').sort((a,b)=>String(a.plannedAt).localeCompare(String(b.plannedAt)))[0],o=machineOeeMetrics(name);return `<div class="bg-slate-950/60 border border-slate-700 rounded-xl p-3"><div class="flex justify-between"><b class="text-white text-xs">${name}</b><span class="font-black ${h>=90?'text-emerald-400':h>=70?'text-amber-400':'text-red-400'}">${h}/100</span></div><div class="h-2 bg-slate-800 rounded mt-2 overflow-hidden"><div class="h-full bg-emerald-500" style="width:${h}%"></div></div><div class="grid grid-cols-3 gap-1 mt-2 text-[9px]"><div class="bg-slate-900 rounded p-1">OEE <b class="text-cyan-300">${o.rows?(o.oee*100).toFixed(1)+'%':'-'}</b></div><div class="bg-slate-900 rounded p-1">MTBF <b>${o.mtbf?o.mtbf.toFixed(1)+'s':'-'}</b></div><div class="bg-slate-900 rounded p-1">MTTR <b>${o.mttr?o.mttr.toFixed(1)+'s':'-'}</b></div></div><div class="text-[10px] text-slate-500 mt-2">Açık kayıt: ${open} · Sonraki plan: ${next?.plannedAt||'-'}</div></div>`}).join('');const body=document.getElementById('maintenanceTableBody'),now=new Date();body.innerHTML=maintenanceRecords.map(r=>{const p=PERSONNEL_LIST.find(x=>Number(x.id)===Number(r.assignedTo));const h=maintenanceElapsedHours(r,r.closedAt||now.toISOString()),cls=maintenanceSlaClass(r);const sla=r.source!=='operator'?'Planlı':r.status==='Kapalı'?(h<=24?`≤24 saat ✓ ×1,10`:(h>=72?`≥72 saat · ekstra yok`:`${h.toFixed(1)} saat · ekstra yok`)):(h>=72?'72 saat aşıldı · ekstra yok':h<=24?`24 saat penceresi · ${h.toFixed(1)}s`:`${h.toFixed(1)} saat`);return `<tr class="border-t border-slate-800"><td class="p-2 font-mono">${r.id}</td><td class="p-2">${r.machine}</td><td class="p-2">${r.type}</td><td class="p-2 max-w-[300px]">${r.description}</td><td class="p-2">${r.plannedAt||new Date(r.openedAt).toLocaleString('tr-TR')}</td><td class="p-2">${p?.name||'-'}</td><td class="p-2 ${cls==='reward'||cls==='reward-window'?'text-emerald-400':cls==='expired'?'text-red-400':'text-amber-300'}">${sla}</td><td class="p-2">${r.status}</td><td class="p-2">${r.status!=='Kapalı'?`<button onclick="closeMaintenanceRecord('${r.id}')" class="bg-emerald-700 px-2 py-1 rounded text-white">Kapat</button>`:'-'}</td></tr>`}).join('')||'<tr><td colspan="9" class="p-4 text-center text-slate-500">Bakım kaydı yok.</td></tr>';renderOeeMachineTable();}
 
         // KMI-FIX (2026-09-25): "Sipariş & Stok" ekranının "3 · ÜRETİM" kutusu boştu çünkü
@@ -2553,6 +2595,16 @@ ead>
         function approveShipment(id){
             if(!currentUser||!(getEffectiveRole(currentUser)==='ADMIN'||hasScreenAccess(currentUser,'sevkiyat'))){alert('Sevkiyat yetkisi gerekir.');return;}
             const d=declarations.find(x=>x.id===id); if(!d||d.status!=='Sevk Onayı Bekliyor')return;
+            // KMI-QMS-FAZ1: Sevkiyat Kalite Serbest Bırakma Kapısı - iş emrinde veya bağlı ham madde
+            // LOT'unda aktif bir Kalite HOLD'u varsa sevkiyat GERÇEKTEN bloke edilir; HOLD ancak Kalite
+            // Kontrol Kulesi'nden (Kalite/Admin) kapatılınca sevkiyat onayı devam edebilir.
+            try{
+                const joForHold=jobOrders.find(j=>j.id===d.jobOrder);
+                if(window.kmiQmsIsHoldActive && (window.kmiQmsIsHoldActive('JOB_ORDER',d.jobOrder) || (joForHold&&joForHold.materialLotId&&window.kmiQmsIsHoldActive('LOT',joForHold.materialLotId)))){
+                    alert('SEVKİYAT ENGELLENDİ: Bu iş emrinde/ham madde LOT\'unda aktif bir Kalite HOLD kaydı var. Sevkiyat, HOLD Kalite Kontrol Kulesi\'nden kapatılmadan yapılamaz.');
+                    return;
+                }
+            }catch(e){ console.error('[QMS shipment hold gate]',e); }
             const irs=prompt('İrsaliye numarası (zorunlu):',d.deliveryNoteNo||''); if(!irs||!irs.trim()){alert('İrsaliye numarası zorunludur.');return;}
             const plate=prompt('Araç plakası (zorunlu):',d.vehiclePlate||''); if(!plate||!plate.trim()){alert('Araç plakası zorunludur.');return;}
             d.deliveryNoteNo=irs.trim(); d.vehiclePlate=plate.trim().toLocaleUpperCase('tr-TR'); d.status='Sevk Edildi'; d.shipmentReady=false; d.shippingApprover=currentUser.name; d.shippingApprovalDate=new Date().toLocaleString('tr-TR'); d.shippedAt=new Date().toISOString(); d.updatedAt=d.shippedAt;
@@ -3123,6 +3175,8 @@ ead>
                 field.innerHTML='<div class="col-span-2 text-xs text-rose-400 py-4 text-center">Veri okunamadı: '+(err?.message||'bilinmeyen hata')+'</div>';
             }
         }
+// KMI-DEAD-CODE-UYARI (2026-09-27): renderPuantajAdmin (bu ilk/taban tanım) dosyada birkaç
+// kez daha tanımlanıp en sonunda geçersiz kılınıyor - ÖLÜ KODDUR.
         function renderPuantajAdmin(){
             const monthEl=document.getElementById('puantajMonth'); if(!monthEl)return;
             if(!monthEl.value) monthEl.value=getCurrentMonthKey();
@@ -3889,10 +3943,29 @@ if(typeof openJobOrderModal==='function'){ // KMI-FIX: orijinal openJobOrderModa
 const __openJobOrderModalV28=openJobOrderModal;
 openJobOrderModal=function(){__openJobOrderModalV28();setTimeout(()=>{const h=document.getElementById('joDueAt'),d=document.getElementById('joDueDate'),t=document.getElementById('joDueTime');if(h&&h.value&&d&&t){const x=new Date(h.value);d.value=x.toISOString().slice(0,10);t.value=String(x.getHours()).padStart(2,'0')+':'+String(x.getMinutes()).padStart(2,'0');}else if(d&&t&&!d.value){const x=new Date(Date.now()+8*3600000);d.value=x.toISOString().slice(0,10);t.value=String(x.getHours()).padStart(2,'0')+':'+String(x.getMinutes()).padStart(2,'0');}},0);}
 }
-function finishShipmentV28(d,plate,irs,imageData=null,imageName=''){d.vehiclePlate=plate.trim().toLocaleUpperCase('tr-TR');d.deliveryNoteNo=irs.trim();if(imageData){d.shippingDocumentImage=imageData;d.shippingDocumentName=imageName;}d.status='Sevk Edildi';d.shippingApprover=currentUser.name;d.shippingApprovalDate=new Date().toLocaleString('tr-TR');d.shippedAt=new Date().toISOString();d.updatedAt=d.shippedAt;const jo=jobOrders.find(j=>j.id===d.jobOrder);if(jo){jo.status='Sevk Edildi / Kapandı';jo.shippedAt=d.shippedAt;jo.vehiclePlate=d.vehiclePlate;jo.deliveryNoteNo=d.deliveryNoteNo;jo.updatedAt=d.shippedAt;}saveStorage('jobOrders',jobOrders);saveStorage('declarations',declarations);refreshAllViews();queueManagerReport(`SEVK TAMAMLANDI: ${d.jobOrder} · ${jo?.item||''} · ${d.qualityGood??d.qty} adet · Plaka ${d.vehiclePlate} · İrsaliye ${d.deliveryNoteNo}`);alert('Sevkiyat tamamlandı. İş emri “Sevk Edildi / Kapandı” durumuna alındı ve yönetim raporuna işlendi.');}
+function finishShipmentV28(d,plate,irs,imageData=null,imageName=''){d.vehiclePlate=plate.trim().toLocaleUpperCase('tr-TR');d.deliveryNoteNo=irs.trim();if(imageData){d.shippingDocumentImage=imageData;d.shippingDocumentName=imageName;}d.status='Sevk Edildi';d.shippingApprover=currentUser.name;d.shippingApprovalDate=new Date().toLocaleString('tr-TR');d.shippedAt=new Date().toISOString();d.updatedAt=d.shippedAt;const jo=jobOrders.find(j=>j.id===d.jobOrder);if(jo){jo.status='Sevk Edildi / Kapandı';jo.shippedAt=d.shippedAt;jo.vehiclePlate=d.vehiclePlate;jo.deliveryNoteNo=d.deliveryNoteNo;jo.updatedAt=d.shippedAt;}
+ // KMI-FIX (2026-09-27, DÜZELTME): Bu iş emri kapandığında bağlı müşteri siparişinin sevk edilen adedini
+ // OTOMATİK güncelleyen kod önceden approveShipment'ın ÖLÜ bir kopyasına (kmi-v121'den önceki, hiç
+ // çalışmayan tanım) eklenmişti - gerçek/canlı sevkiyat kapanışı HER ZAMAN buradan (finishShipmentV28)
+ // geçiyordu ve otomatik güncelleme HİÇBİR ZAMAN çalışmamıştı. Şimdi gerçek/canlı noktaya taşındı.
+ try{
+   if(jo && jo.salesOrderId && Number(d.qty||0)>0 && window.v118AutoShipFromJobOrder){
+     const isFinalOp = window.kmiIsFinalOperationJobOrder ? window.kmiIsFinalOperationJobOrder(jo) : true;
+     if(isFinalOp){
+       const shippedQty=window.v118AutoShipFromJobOrder(jo.salesOrderId, jo.productId, Number(d.qualityGood??d.qty??0), {jobOrderId:jo.id,deliveryNoteNo:d.deliveryNoteNo,vehiclePlate:d.vehiclePlate});
+       if(shippedQty>0) queueManagerReport(`Müşteri siparişi otomatik güncellendi: ${jo.salesOrderId} · ${shippedQty} adet sevk edildi olarak işlendi (iş emri: ${jo.id}).`);
+     }
+   }
+ }catch(e){ console.error('[Sipariş sevkiyat otomatik güncelleme - finishShipmentV28]',e); }
+ saveStorage('jobOrders',jobOrders);saveStorage('declarations',declarations);refreshAllViews();queueManagerReport(`SEVK TAMAMLANDI: ${d.jobOrder} · ${jo?.item||''} · ${d.qualityGood??d.qty} adet · Plaka ${d.vehiclePlate} · İrsaliye ${d.deliveryNoteNo}`);alert('Sevkiyat tamamlandı. İş emri “Sevk Edildi / Kapandı” durumuna alındı ve yönetim raporuna işlendi.');}
 approveShipment=function(id){if(!currentUser||!(getEffectiveRole(currentUser)==='ADMIN'||hasScreenAccess(currentUser,'sevkiyat'))){alert('Sevkiyat yetkisi gerekir.');return;}const d=declarations.find(x=>x.id===id);if(!d||d.status!=='Sevk Onayı Bekliyor')return;const irs=prompt('İrsaliye numarasını giriniz:',d.deliveryNoteNo||'');if(!irs||!irs.trim()){alert('İrsaliye numarası zorunludur.');return;}const plate=prompt('Araç plakasını giriniz:',d.vehiclePlate||'');if(!plate||!plate.trim()){alert('Araç plakası zorunludur.');return;}if(!confirm('İrsaliye resmi eklemek ister misiniz?\nİptal = resimsiz sevkiyatı tamamla')){finishShipmentV28(d,plate,irs);return;}const input=document.createElement('input');input.type='file';input.accept='image/*';input.capture='environment';input.onchange=()=>{const f=input.files?.[0];if(!f){finishShipmentV28(d,plate,irs);return;}if(f.size>2.5*1024*1024){alert('Resim 2,5 MB altında olmalıdır. Sevkiyat resimsiz tamamlanacak.');finishShipmentV28(d,plate,irs);return;}const r=new FileReader();r.onload=()=>finishShipmentV28(d,plate,irs,r.result,f.name);r.readAsDataURL(f);};input.click();}
 // Maintenance records now capture repair action + parts and use 24h reward / 72h lockout.
+// KMI-DEAD-CODE-UYARI (2026-09-27): createMaintenanceFromOperator bu satırda da tanımlanıyor,
+// dosyada daha sonra birkaç kez daha tanımlanıp en sonunda window.createMaintenanceFromOperator
+// ile geçersiz kılınıyor - BU KOPYA ÖLÜ KODDUR.
 createMaintenanceFromOperator=function(machine,description,severity,reportedBy){const now=new Date(),people=maintenancePeople();const rec={id:'BKM-'+Date.now(),machine,type:'Operatör Arıza/Kusur Bildirimi',description,severity,reportedBy,openedAt:now.toISOString(),rewardDueAt:new Date(now.getTime()+24*3600000).toISOString(),lockoutAt:new Date(now.getTime()+72*3600000).toISOString(),status:'Açık',assignedTo:people[0]?.id||null,source:'operator',actionTaken:'',parts:[]};maintenanceRecords.unshift(rec);saveStorage('maintenanceRecords',maintenanceRecords);}
+// KMI-DEAD-CODE-UYARI (2026-09-27): closeMaintenanceRecord bu satırda da tanımlanıyor ama
+// dosyada daha sonra birkaç kez daha tanımlanıyor - BU KOPYA ÖLÜ KODDUR.
 closeMaintenanceRecord=function(id){const r=maintenanceRecords.find(x=>x.id===id);if(!r)return;if(!currentUser||!['BAKIM','ADMIN'].includes(getEffectiveRole(currentUser))){alert('Bakım kaydını yalnız Bakım veya Yönetim kapatabilir.');return;}const action=prompt('Yapılan bakım / onarım / kontrol işlemini detaylı yazınız:',r.actionTaken||'');if(!action||!action.trim()){alert('Yapılan işlem açıklaması zorunludur.');return;}const part=prompt('Değişen / kullanılan yedek parça varsa yazınız (yoksa boş bırakın):','')||'';let qty=0;if(part.trim())qty=Math.max(1,Number(prompt('Yedek parça adedi:','1'))||1);r.actionTaken=action.trim();r.status='Kapalı';r.closedAt=new Date().toISOString();r.closedBy=currentUser.name;r.assignedTo=r.assignedTo||currentUser.id;r.responseHours=Math.round(maintenanceElapsedHours(r,r.closedAt)*100)/100;r.closedWithin24h=r.source==='operator'&&r.responseHours<=24;r.expired72h=r.source==='operator'&&r.responseHours>=72;if(part.trim()){machineSpareParts.unshift({id:'SP-'+Date.now(),maintenanceId:r.id,machine:r.machine,part:part.trim(),qty,note:action.trim(),by:currentUser.name,at:r.closedAt});saveStorage('machineSpareParts',machineSpareParts);}saveStorage('maintenanceRecords',maintenanceRecords);renderMaintenanceCenter();alert(r.closedWithin24h?'24 saat içinde kapatıldı: bakım puantajında ×1,10 hakkı oluştu.':r.expired72h?'72 saat veya üzeri: bu ay bakım ekstra katsayısı yok.':'Bakım kapatıldı; 24 saatlik ×1,10 penceresi aşıldı.');}
 function renderManagerReportCenterV28(){const box=document.getElementById('reportNotificationStatus');if(!box)return;const now=new Date(),today=now.toISOString().slice(0,10),month=today.slice(0,7),todayRows=declarations.filter(d=>dateKeyOf(d)===today&&isQualityPassedDeclaration(d)),monthRows=declarations.filter(d=>getRecordMonthKey(d.workDate||d.date)===month&&isQualityPassedDeclaration(d)),prod=arr=>arr.reduce((s,d)=>s+Number(d.qualityGood??d.qty??0),0),openMaint=maintenanceRecords.filter(r=>r.status!=='Kapalı'),critical=openMaint.filter(r=>r.severity==='critical'),running=new Set(todayRows.map(d=>d.machine)).size;box.innerHTML=`<div class="grid grid-cols-2 md:grid-cols-4 gap-2 mb-3"><div class="bg-slate-950 p-3 rounded"><small>Anlık çalışan/üreten makine</small><b class="block text-white text-lg">${running}/${MACHINES_LIST.length}</b></div><div class="bg-slate-950 p-3 rounded"><small>Bugün kalite onaylı</small><b class="block text-white text-lg">${prod(todayRows).toLocaleString('tr-TR')}</b></div><div class="bg-slate-950 p-3 rounded"><small>Ay üretimi</small><b class="block text-white text-lg">${prod(monthRows).toLocaleString('tr-TR')}</b></div><div class="bg-slate-950 p-3 rounded"><small>Açık bakım / kritik</small><b class="block text-white text-lg">${openMaint.length} / ${critical.length}</b></div></div><div class="text-[10px] text-slate-400">Executive özet; üretim, çalışan makineler, kalite onaylı adet, makine sağlığı ve açık bakım kayıtlarını aynı canlı veri zincirinden hesaplar.</div>`;}
 const ___refreshV28=refreshAllViews;
@@ -3913,16 +3986,25 @@ const _getPuantajMetricsV30=getPuantajMetrics;
 getPuantajMetrics=function(person,monthKey=getCurrentMonthKey()){const m=_getPuantajMetricsV30(person,monthKey);if(isPuantajExcludedV30(person.id,monthKey)){m.excludedByManagement=true;m.preExclusionPoints=m.finalPoints;m.finalPoints=0;}return m;};
 function renderPuantajExclusionsV30(){const el=document.getElementById('monthlyPuantajExclusionPanel');if(!el)return;const month=document.getElementById('puantajMonth')?.value||getCurrentMonthKey();el.innerHTML=PERSONNEL_LIST.filter(p=>p.active!==false&&!isBonusPoolOnlyPerson(p)).map(p=>{const x=isPuantajExcludedV30(p.id,month);return `<label class="flex items-center justify-between gap-2 bg-slate-950 border ${x?'border-red-700':'border-slate-800'} rounded-lg p-2 text-[10px] ${x?'perf-excluded':''}"><span><b class="text-white">${p.name}</b><small class="block text-slate-500">${p.dept||'-'}</small></span><span class="flex items-center gap-2 text-rose-300"><input type="checkbox" ${x?'checked':''} onchange="togglePuantajExclusionV30(${p.id},'${month}',this.checked)"> Prim dışı</span></label>`}).join('');}
 const _renderPuantajAdminV30=renderPuantajAdmin;
+// KMI-DEAD-CODE-UYARI (2026-09-27): renderPuantajAdmin bu satırda da tanımlanıyor ama dosyada
+// daha sonra birkaç kez daha tanımlanıp en sonunda geçersiz kılınıyor - ÖLÜ KODDUR.
 renderPuantajAdmin=function(){_renderPuantajAdminV30();renderPuantajExclusionsV30();};
 function createMaintenanceAlarmV30(machine){if(!currentUser||getEffectiveRole(currentUser)!=='BAKIM'){alert('Bakım alarm kaydını yalnız Bakım personeli açabilir.');return;}const symptom=prompt('Alarm kodu / ilk semptom nedir? (zorunlu)','');if(!symptom||!symptom.trim())return;const desc=prompt('Arıza / gözlem detayını yazınız:','')||symptom;const now=new Date();maintenanceRecords.unshift({id:'BKM-'+Date.now(),machine,type:'Bakım Arıza Bildirimi',description:desc.trim(),symptom:symptom.trim(),severity:'important',reportedBy:currentUser.name,openedAt:now.toISOString(),status:'Açık',assignedTo:currentUser.id,source:'maintenance',actionTaken:'',resolution:'',parts:[]});saveStorage('maintenanceRecords',maintenanceRecords);machineJournal.unshift({id:'MJ-'+Date.now(),machine,type:'Alarm',text:symptom.trim(),by:currentUser.name,at:now.toISOString()});saveStorage('machineJournal',machineJournal);renderMaintenanceCenter();openMachineFileV30(machine);}
 function addMachineCommentV30(machine){if(!currentUser)return;const txt=prompt('Makine yorumu / gözlem / güncelleme:','');if(!txt||!txt.trim())return;machineJournal.unshift({id:'MJ-'+Date.now(),machine,type:'Yorum',text:txt.trim(),by:currentUser.name,at:new Date().toISOString()});saveStorage('machineJournal',machineJournal);openMachineFileV30(machine);}
 function setMachineDownV30(machine){if(!currentUser||getEffectiveRole(currentUser)!=='BAKIM'){alert('Makineyi DOWN durumuna yalnız Bakım personeli alabilir.');return;}const alarms=machineOpenAlarmsV30(machine);if(!alarms.length){alert('DOWN için önce operatör veya Bakım tarafından açılmış bir alarm / arıza kaydı olmalıdır.');return;}const st=machineStateV30(machine);if(st.down){alert('Makine zaten DOWN durumunda.');return;}const rec=alarms[0];machineRuntimeStates[machine]={...st,down:true,downSince:new Date().toISOString(),maintenanceId:rec.id};machineJournal.unshift({id:'MJ-'+Date.now(),machine,type:'DOWN',text:`${rec.id} nedeniyle makine DOWN`,by:currentUser.name,at:new Date().toISOString()});saveStorage('machineRuntimeStates',machineRuntimeStates);saveStorage('machineJournal',machineJournal);renderMaintenanceCenter();openMachineFileV30(machine);}
 function machineBackUpV30(machine,maintenanceId){const st=machineStateV30(machine);if(!st.down)return; if(maintenanceId&&st.maintenanceId&&maintenanceId!==st.maintenanceId)return;const now=new Date(),mins=Math.max(0,(now-new Date(st.downSince))/60000);machineRuntimeStates[machine]={...st,down:false,downSince:null,maintenanceId:null,lastUpAt:now.toISOString(),totalDownMinutes:(Number(st.totalDownMinutes)||0)+mins};machineJournal.unshift({id:'MJ-'+Date.now(),machine,type:'UP',text:`Arıza tamamlandı. DOWN süresi ${fmtDurationV30(mins)}.`,by:currentUser?.name||'Bakım',at:now.toISOString(),downMinutes:mins});saveStorage('machineRuntimeStates',machineRuntimeStates);saveStorage('machineJournal',machineJournal);}
 const _createMaintenanceFromOperatorV30=createMaintenanceFromOperator;
+// KMI-DEAD-CODE-UYARI (2026-09-27): createMaintenanceFromOperator bu satırda da tanımlanıyor,
+// aşağıda tekrar tanımlanıp en sonunda window.createMaintenanceFromOperator ile geçersiz
+// kılınıyor - BU KOPYA ÖLÜ KODDUR.
 createMaintenanceFromOperator=function(machine,description,severity,reportedBy){_createMaintenanceFromOperatorV30(machine,description,severity,reportedBy);const r=maintenanceRecords[0];if(r){r.symptom=description;r.alarmCode='Operatör bildirimi';saveStorage('maintenanceRecords',maintenanceRecords);}machineJournal.unshift({id:'MJ-'+Date.now(),machine,type:'Operatör Bildirimi',text:description,by:reportedBy,at:new Date().toISOString()});saveStorage('machineJournal',machineJournal);};
+// KMI-DEAD-CODE-UYARI (2026-09-27): closeMaintenanceRecord bu satırda da tanımlanıyor ama
+// dosyada daha sonra birkaç kez daha tanımlanıyor - BU KOPYA ÖLÜ KODDUR.
 closeMaintenanceRecord=function(id){const r=maintenanceRecords.find(x=>x.id===id);if(!r)return;if(!currentUser||getEffectiveRole(currentUser)!=='BAKIM'){alert('Arıza/bakım kaydını yalnız Bakım personeli kapatabilir.');return;}const symptom=prompt('Arızanın başladığı alarm / semptom:',r.symptom||r.description||'');if(!symptom||!symptom.trim()){alert('Alarm / semptom zorunludur.');return;}const action=prompt('Arıza nasıl çözüldü? Yapılan işlemi detaylı yazınız:',r.resolution||r.actionTaken||'');if(!action||!action.trim()){alert('Çözüm açıklaması zorunludur.');return;}const part=prompt('Değişen / kullanılan yedek parça varsa yazınız (yoksa boş):','')||'';let qty=0;if(part.trim())qty=Math.max(1,Number(prompt('Yedek parça adedi:','1'))||1);r.symptom=symptom.trim();r.resolution=action.trim();r.actionTaken=action.trim();r.status='Kapalı';r.closedAt=new Date().toISOString();r.closedBy=currentUser.name;r.assignedTo=r.assignedTo||currentUser.id;r.responseHours=Math.round(maintenanceElapsedHours(r,r.closedAt)*100)/100;r.closedWithin24h=r.source==='operator'&&r.responseHours<=24;r.expired72h=r.source==='operator'&&r.responseHours>=72;if(part.trim()){machineSpareParts.unshift({id:'SP-'+Date.now(),maintenanceId:r.id,machine:r.machine,part:part.trim(),qty,note:action.trim(),by:currentUser.name,at:r.closedAt});saveStorage('machineSpareParts',machineSpareParts);}machineJournal.unshift({id:'MJ-'+Date.now(),machine:r.machine,type:'Arıza Çözümü',text:`Semptom: ${r.symptom} · Çözüm: ${r.resolution}`,by:currentUser.name,at:r.closedAt});saveStorage('machineJournal',machineJournal);machineBackUpV30(r.machine,r.id);saveStorage('maintenanceRecords',maintenanceRecords);renderMaintenanceCenter();if(selectedMachineFileV30===r.machine)openMachineFileV30(r.machine);}
 function openMachineFileV30(machine){selectedMachineFileV30=machine;const modal=document.getElementById('machineFileModal'),title=document.getElementById('machineFileTitle'),box=document.getElementById('machineFileContent');if(!modal||!box)return;title.textContent=machine;const st=machineStateV30(machine),o=machineOeeMetrics(machine),h=machineHealth(machine),records=maintenanceRecords.filter(r=>r.machine===machine).sort((a,b)=>new Date(b.openedAt||b.plannedAt||0)-new Date(a.openedAt||a.plannedAt||0)),open=records.filter(r=>r.status!=='Kapalı'),journal=machineJournal.filter(x=>x.machine===machine).slice(0,30),parts=machineSpareParts.filter(x=>x.machine===machine).slice(0,30),down=machineDownMinutesV30(machine),maxDown=Math.max(1,...MACHINES_LIST.map(m=>machineDownMinutesV30(`${m.code} - ${m.name}`)));box.innerHTML=`<div class="grid grid-cols-2 md:grid-cols-5 gap-2"><div class="machine-modal-card"><small class="text-slate-500">Durum</small><b class="block text-lg ${st.down?'text-red-400':'text-emerald-400'}">${st.down?'● DOWN':'● ÇALIŞABİLİR'}</b></div><div class="machine-modal-card"><small class="text-slate-500">Sağlık</small><b class="block text-lg text-white">${h}/100</b></div><div class="machine-modal-card"><small class="text-slate-500">OEE</small><b class="block text-lg text-cyan-300">${o.rows?(o.oee*100).toFixed(1)+'%':'-'}</b></div><div class="machine-modal-card"><small class="text-slate-500">Toplam DOWN</small><b class="block text-lg text-red-300">${fmtDurationV30(down)}</b></div><div class="machine-modal-card"><small class="text-slate-500">Açık Arıza/Bakım</small><b class="block text-lg text-amber-300">${open.length}</b></div></div><div class="machine-modal-card"><div class="flex justify-between text-xs"><b>DOWN Süresi</b><span>${fmtDurationV30(down)}</span></div><div class="h-3 bg-slate-800 rounded-full overflow-hidden mt-2"><div class="h-full ${st.down?'bg-red-500':'bg-emerald-500'}" style="width:${Math.min(100,down/maxDown*100)}%"></div></div><div class="flex flex-wrap gap-2 mt-3">${getEffectiveRole(currentUser)==='BAKIM'?`<button onclick="createMaintenanceAlarmV30('${machine.replace(/'/g,"\\'")}')" class="bg-amber-600 px-3 py-2 rounded text-xs font-bold">+ Arıza / Alarm Aç</button>${!st.down?`<button onclick="setMachineDownV30('${machine.replace(/'/g,"\\'")}')" class="bg-red-600 px-3 py-2 rounded text-xs font-bold">Makineyi DOWN'a Al</button>`:''}`:''}<button onclick="addMachineCommentV30('${machine.replace(/'/g,"\\'")}')" class="bg-slate-700 px-3 py-2 rounded text-xs">+ Yorum / Güncelleme</button><button onclick="addMachineSparePart('${machine.replace(/'/g,"\\'")}')" class="bg-indigo-700 px-3 py-2 rounded text-xs">+ Yedek Parça</button></div></div><div class="grid grid-cols-1 lg:grid-cols-2 gap-4"><div class="machine-modal-card"><h4 class="font-bold text-white mb-3">Arıza & Bakım Geçmişi</h4><div class="space-y-2">${records.slice(0,20).map(r=>`<div class="border border-slate-700 rounded-xl p-3"><div class="flex justify-between gap-2"><b class="text-xs text-white">${r.id} · ${r.type}</b><span class="text-[9px] ${r.status==='Kapalı'?'text-emerald-400':'text-amber-300'}">${r.status}</span></div><div class="text-[10px] text-slate-400 mt-1"><b>Alarm/Semptom:</b> ${r.symptom||r.description||'-'}</div><div class="text-[10px] text-slate-400"><b>Çözüm:</b> ${r.resolution||r.actionTaken||'Henüz kapanmadı'}</div><div class="text-[9px] text-slate-500 mt-1">${new Date(r.openedAt||r.plannedAt).toLocaleString('tr-TR')} · ${r.closedBy||PERSONNEL_LIST.find(p=>Number(p.id)===Number(r.assignedTo))?.name||r.reportedBy||'-'} ${r.responseHours!=null?'· '+r.responseHours+' saat':''}</div>${r.status!=='Kapalı'&&getEffectiveRole(currentUser)==='BAKIM'?`<button onclick="closeMaintenanceRecord('${r.id}')" class="mt-2 bg-emerald-700 px-2 py-1 rounded text-[9px]">Arızayı Çöz & Kapat</button>`:''}</div>`).join('')||'<div class="text-xs text-slate-500">Kayıt yok.</div>'}</div></div><div class="space-y-4"><div class="machine-modal-card"><h4 class="font-bold text-white mb-3">Makine Günlüğü</h4><div class="machine-timeline">${journal.map(j=>`<div class="machine-timeline-item"><b class="text-[10px] text-cyan-300">${j.type}</b><div class="text-xs text-slate-300">${j.text}</div><small class="text-slate-500">${new Date(j.at).toLocaleString('tr-TR')} · ${j.by}</small></div>`).join('')||'<div class="text-xs text-slate-500">Günlük kaydı yok.</div>'}</div></div><div class="machine-modal-card"><h4 class="font-bold text-white mb-2">Yedek / Değişen Parçalar</h4>${parts.map(x=>`<div class="text-[10px] border-t border-slate-800 py-2"><b>${x.part}</b> ×${x.qty} · ${x.by}<small class="block text-slate-500">${new Date(x.at).toLocaleString('tr-TR')} ${x.note||''}</small></div>`).join('')||'<span class="text-xs text-slate-500">Kayıt yok.</span>'}</div></div></div>`;modal.classList.remove('hidden');modal.classList.add('flex');}
 function closeMachineFileV30(){const m=document.getElementById('machineFileModal');m.classList.add('hidden');m.classList.remove('flex');selectedMachineFileV30=null;}
+// KMI-DEAD-CODE-UYARI (2026-09-27): renderMaintenanceCenter bu satırda da tanımlanıyor ama
+// dosyada daha sonra birkaç kez daha tanımlanıyor - BU KOPYA ÖLÜ KODDUR.
 renderMaintenanceCenter=function(){const cards=document.getElementById('machineHealthCards');if(!cards)return;const month=document.getElementById('productionTargetMonth')?.value||getCurrentMonthKey();cards.innerHTML=MACHINES_LIST.map(m=>{const name=`${m.code} - ${m.name}`,st=machineStateV30(name),h=machineHealth(name),o=machineOeeMetrics(name,month),open=maintenanceRecords.filter(r=>r.machine===name&&r.status!=='Kapalı').length,last=maintenanceRecords.filter(r=>r.machine===name).sort((a,b)=>new Date(b.openedAt||0)-new Date(a.openedAt||0))[0],down=machineDownMinutesV30(name);return `<div class="machine-fleet-card ${st.down?'machine-down':''}" onclick="openMachineFileV30('${name.replace(/'/g,"\\'")}')"><div class="flex justify-between gap-2"><div><span class="machine-status-dot ${st.down?'bg-red-500':'bg-emerald-500'}"></span> <b class="text-white text-sm">${name}</b><div class="text-[9px] ${st.down?'text-red-400 font-black':'text-emerald-400'}">${st.down?'DOWN · '+fmtDurationV30(down):'Çalışabilir / hazır'}</div></div><span class="text-xl font-black ${h>=90?'text-emerald-400':h>=70?'text-amber-300':'text-red-400'}">${h}</span></div><div class="grid grid-cols-3 gap-2 mt-3"><div class="bg-slate-900 rounded-lg p-2"><small class="text-slate-500">OEE</small><b class="block text-cyan-300">${o.rows?(o.oee*100).toFixed(1)+'%':'-'}</b></div><div class="bg-slate-900 rounded-lg p-2"><small class="text-slate-500">Açık kayıt</small><b class="block text-amber-300">${open}</b></div><div class="bg-slate-900 rounded-lg p-2"><small class="text-slate-500">DOWN</small><b class="block text-red-300">${fmtDurationV30(down)}</b></div></div><div class="text-[9px] text-slate-500 mt-3 truncate">Son olay: ${last?(last.symptom||last.description||last.type):'Kayıt yok'}</div><div class="text-[9px] text-cyan-300 mt-2">Makine dosyasını aç →</div></div>`}).join('');renderOeeMachineTable();}
 const _renderOperatorMotivationPanelV30=renderOperatorMotivationPanel;
 renderOperatorMotivationPanel=function(){_renderOperatorMotivationPanelV30();const top=document.getElementById('operatorTopPerformers');if(top){const rows=getLeaderboardData().slice(0,10);top.innerHTML=rows.map((p,i)=>`<div class="flex items-center justify-between gap-2 border-b border-slate-700/60 py-2"><div class="flex items-center gap-2"><span class="w-5 font-black ${i<3?'text-amber-400':'text-slate-500'}">${i+1}</span>${personPhotoHtml(p.name,'w-7 h-7 rounded-full object-cover')}<span class="text-xs font-semibold text-white">${p.name}</span></div><b class="text-xs text-amber-300">${p.points.toFixed(1)}</b></div>`).join('')||'<div class="text-xs text-slate-500">Henüz sıralama yok.</div>';}}
@@ -3936,6 +4018,8 @@ function machineNameV30(m){ return `${m.code} - ${m.name}`; }
 function machineSafeV30(v){return String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
 function getMachineRecordsV30(machine){return maintenanceRecords.filter(r=>r.machine===machine).sort((a,b)=>new Date(b.openedAt||b.plannedAt||0)-new Date(a.openedAt||a.plannedAt||0));}
 function machineStatusV30(machine){const st=machineStateV30(machine), records=getMachineRecordsV30(machine), open=records.filter(r=>r.status!=='Kapalı'&&r.status!=='Tamamlandı');return {st,records,open,last:records[0]||null,down:machineDownMinutesV30(machine)};}
+// KMI-DEAD-CODE-UYARI (2026-09-27): renderMaintenanceCenter bu satırda da tanımlanıyor ama
+// dosyada daha sonra tekrar tanımlanıyor - JS son atama kazanır, BU KOPYA ÖLÜ KODDUR.
 function renderMaintenanceCenter(){
   const cards=document.getElementById('machineHealthCards'); if(!cards)return;
   const month=document.getElementById('productionTargetMonth')?.value||getCurrentMonthKey();
@@ -3971,8 +4055,14 @@ function setMachineDownV30(machine){if(getEffectiveRole(currentUser)!=='BAKIM'){
 function addMachineCommentV30(machine){const txt=prompt('Makine yorumu / gözlem / güncelleme:','');if(!txt?.trim())return;machineJournal.unshift({id:'MJ-'+Date.now(),machine,type:'Yorum / Güncelleme',text:txt.trim(),by:currentUser?.name||'-',at:new Date().toISOString()});saveStorage('machineJournal',machineJournal);openMachineFileV30(machine);}
 function addMachinePlanV30(machine){if(!currentUser||getEffectiveRole(currentUser)!=='ADMIN'){alert('Planlı bakım Yönetim tarafından oluşturulur.');return;}const desc=prompt('Planlı bakım / kontrol / değişim açıklaması:','');if(!desc?.trim())return;const when=prompt('Planlanan tarih (YYYY-MM-DD):',new Date().toISOString().slice(0,10));if(!when)return;maintenanceRecords.unshift({id:'PB-'+Date.now(),machine,type:'Planlı Bakım / Kontrol',description:desc.trim(),severity:'planned',reportedBy:currentUser.name,openedAt:new Date().toISOString(),plannedAt:when,status:'Planlandı',assignedTo:maintenancePeople()[0]?.id||null,source:'planned'});saveStorage('maintenanceRecords',maintenanceRecords);renderMaintenanceCenter();openMachineFileV30(machine);}
 // V30: operatör bildirimi alarm/semptom olarak da saklanır ve bakım iş emrine dönüşür.
+// KMI-DEAD-CODE-UYARI (2026-09-27): createMaintenanceFromOperator bu satırda da tanımlanıyor
+// ama dosyanın ilerisinde window.createMaintenanceFromOperator olarak TEKRAR tanımlanıyor -
+// JS son atama kazanır, o yüzden BU KOPYA ÖLÜ KODDUR. Gerçek/canlı tanım V35 sistemine
+// (createExternalFault/orders/journal) yönlendiren window.createMaintenanceFromOperator'dır.
 createMaintenanceFromOperator=function(machine,description,severity,reportedBy){const now=new Date(),people=maintenancePeople(),rec={id:'BKM-'+Date.now(),machine,type:'Operatör Arıza/Kusur Bildirimi',description,symptom:description,severity,reportedBy,openedAt:now.toISOString(),rewardDueAt:new Date(now.getTime()+24*3600000).toISOString(),lockoutAt:new Date(now.getTime()+72*3600000).toISOString(),status:'Açık',assignedTo:people[0]?.id||null,source:'operator',actionTaken:'',resolution:''};maintenanceRecords.unshift(rec);machineJournal.unshift({id:'MJ-'+Date.now(),machine,type:'OPERATÖR ALARMI',text:description,by:reportedBy,at:now.toISOString()});saveStorage('maintenanceRecords',maintenanceRecords);saveStorage('machineJournal',machineJournal);};
 // Bakım kapatınca semptom+çözüm zorunlu; DOWN ise UP'a döndür ve süreyi kaydet.
+// KMI-DEAD-CODE-UYARI (2026-09-27): closeMaintenanceRecord bu satırda da tanımlanıyor ama
+// dosyada daha sonra tekrar tanımlanıyor - BU KOPYA ÖLÜ KODDUR.
 closeMaintenanceRecord=function(id){const r=maintenanceRecords.find(x=>x.id===id);if(!r)return;if(getEffectiveRole(currentUser)!=='BAKIM'){alert('Arıza/bakım kaydını yalnız Bakım personeli kapatabilir.');return;}const symptom=prompt('Arızanın başladığı alarm / semptom:',r.symptom||r.description||'');if(!symptom?.trim())return alert('Alarm / semptom zorunludur.');const resolution=prompt('Nasıl çözüldü? Yapılan işlemi detaylı yazınız:',r.resolution||r.actionTaken||'');if(!resolution?.trim())return alert('Çözüm açıklaması zorunludur.');const part=prompt('Değişen / kullanılan yedek parça (yoksa boş):','')||'';let qty=0;if(part.trim())qty=Math.max(1,Number(prompt('Yedek parça adedi:','1'))||1);r.symptom=symptom.trim();r.resolution=resolution.trim();r.actionTaken=resolution.trim();r.status='Kapalı';r.closedAt=new Date().toISOString();r.closedBy=currentUser.name;r.assignedTo=r.assignedTo||currentUser.id;r.responseHours=Math.round(maintenanceElapsedHours(r,r.closedAt)*100)/100;r.closedWithin24h=r.responseHours<=24;r.expired72h=r.responseHours>=72;if(part.trim()){machineSpareParts.unshift({id:'SP-'+Date.now(),maintenanceId:r.id,machine:r.machine,part:part.trim(),qty,note:resolution.trim(),by:currentUser.name,at:r.closedAt});saveStorage('machineSpareParts',machineSpareParts);}machineJournal.unshift({id:'MJ-'+Date.now(),machine:r.machine,type:'ARIZA ÇÖZÜLDÜ',text:`Semptom: ${r.symptom} · Çözüm: ${r.resolution}`,by:currentUser.name,at:r.closedAt});saveStorage('machineJournal',machineJournal);machineBackUpV30(r.machine,r.id);saveStorage('maintenanceRecords',maintenanceRecords);renderMaintenanceCenter();if(selectedMachineFileV30===r.machine)openMachineFileV30(r.machine);};
 // Yönetici girişinde makine kartlarını önceden hazırla; modüle tıklanınca boş ekran oluşmasın.
 const _refreshAllViewsMachineV30=refreshAllViews;refreshAllViews=function(){_refreshAllViewsMachineV30();try{renderMaintenanceCenter();}catch(e){console.error('Makine Sağlığı render hatası',e);const c=document.getElementById('machineHealthCards');if(c)c.innerHTML='<div class="col-span-full bg-red-950/40 border border-red-800 rounded-xl p-4 text-red-200">Makine listesi yüklenirken hata oluştu. Sayfayı yenileyin.</div>';}};
@@ -4003,9 +4093,20 @@ openAdminModule=function(name){
 };
 
 // Sevkiyat: irsaliye resmi ASLA zorunlu değil. İrsaliye no + plaka ile doğrudan kapat.
+// KMI-DEAD-CODE-UYARI (2026-09-27): approveShipment burada da tanımlanıyor ama bu dosyada
+// DAHA SONRA (aşağıda) tekrar tanımlanıyor - JS son atama kazanır, yani BU KOPYA ÖLÜ KODDUR,
+// hiçbir zaman çalışmaz. Gerçek/canlı tanım dosyanın sonuna yakın "KMI-QMS-FAZ1 KRİTİK BULGU"
+// yorumuyla işaretli olandır. Bunu düzeltmeye çalışırken bu kopyayı değiştirmeyin - hiçbir etkisi olmaz.
 approveShipment=function(id){
   if(!currentUser||!(getEffectiveRole(currentUser)==='ADMIN'||hasScreenAccess(currentUser,'sevkiyat'))){alert('Sevkiyat yetkisi gerekir.');return;}
   const d=declarations.find(x=>x.id===id); if(!d||d.status!=='Sevk Onayı Bekliyor')return;
+  try{
+    const joForHold=(typeof jobOrders!=='undefined'?jobOrders:[]).find(j=>j.id===d.jobOrder);
+    if(window.kmiQmsIsHoldActive && (window.kmiQmsIsHoldActive('JOB_ORDER',d.jobOrder) || (joForHold&&joForHold.materialLotId&&window.kmiQmsIsHoldActive('LOT',joForHold.materialLotId)))){
+      alert('SEVKİYAT ENGELLENDİ: Bu iş emrinde/ham madde LOT\'unda aktif bir Kalite HOLD kaydı var. Sevkiyat, HOLD Kalite Kontrol Kulesi\'nden kapatılmadan yapılamaz.');
+      return;
+    }
+  }catch(e){ console.error('[QMS shipment hold gate]',e); }
   const irs=prompt('İrsaliye numarasını giriniz:',d.deliveryNoteNo||''); if(!irs||!irs.trim()){alert('İrsaliye numarası zorunludur.');return;}
   const plate=prompt('Araç plakasını giriniz:',d.vehiclePlate||''); if(!plate||!plate.trim()){alert('Araç plakası zorunludur.');return;}
   finishShipmentV28(d,plate,irs);
@@ -4073,6 +4174,11 @@ function v32State(machine){
 }
 function v32Dur(mins){mins=Math.max(0,Number(mins)||0);const h=Math.floor(mins/60),m=Math.round(mins%60);return h?`${h}s ${m}dk`:`${m}dk`;}
 
+// KMI-PLATFORM-FAZ0 BULGU (2026-09-27): renderMaintenanceCenter'ın CANLI/son tanımı budur
+// (aşağıdaki maintenanceRecords tablosunu ve renderOeeMachineTable()'ı besler). Ancak
+// openAdminModule('maintenance') artık öncelikle window.v35RenderAll()'u çağırıyor (V35
+// sistemi) - bu fonksiyonun #machineHealthCards hedefinin admin 'Bakım' sekmesinde hâlâ
+// görünür olup olmadığı doğrulanmalı (Master Mimari Ek'i, Bakım/Maintenance bulgusu).
 renderMaintenanceCenter=function(){
  const cards=document.getElementById('machineHealthCards');if(!cards)return;
  const list=Array.isArray(MACHINES_LIST)?MACHINES_LIST:[];
@@ -4103,6 +4209,11 @@ function v32SetDown(machine){if(getEffectiveRole(currentUser)!=='BAKIM')return a
 function v32AddComment(machine){const t=prompt('Makine yorumu / güncelleme:','');if(!t?.trim())return;machineJournal.unshift({id:'MJ-'+Date.now(),machine,type:'YORUM / GÜNCELLEME',text:t.trim(),by:currentUser?.name||'-',at:new Date().toISOString()});saveStorage('machineJournal',machineJournal);openMachineFileV32(machine);}
 
 // Arıza kapatma: yalnız bakım, alarm/semptom + çözüm zorunlu; DOWN ise UP ve süre kaydı.
+// KMI-PLATFORM-FAZ0 BULGU (2026-09-27): closeMaintenanceRecord'ın CANLI/son tanımı budur.
+// Bu satırdan önceki 4 kopya (aşağıda işaretli) ÖLÜ KODDUR. Ayrıca not: bu fonksiyon yalnız
+// BAKIM rolüne izin veriyor (ilk sürümde ADMIN de kapatabiliyordu) - üç bağımsız yeniden
+// yazımın üçü de bu kısıtlamada birleşti, kasıtlı görünüyor; yine de teyit için Ender'e
+// sorulabilir.
 closeMaintenanceRecord=function(id){const r=(maintenanceRecords||[]).find(x=>x.id===id);if(!r)return;if(getEffectiveRole(currentUser)!=='BAKIM')return alert('Arıza/bakım kaydını yalnız Bakım personeli kapatabilir.');const symptom=prompt('Arızanın başladığı alarm / semptom:',r.symptom||r.description||'');if(!symptom?.trim())return alert('Alarm / semptom zorunludur.');const resolution=prompt('Arıza nasıl çözüldü? Yapılan işlemi detaylı yazınız:',r.resolution||r.actionTaken||'');if(!resolution?.trim())return alert('Çözüm açıklaması zorunludur.');r.symptom=symptom.trim();r.resolution=resolution.trim();r.actionTaken=resolution.trim();r.status='Kapalı';r.closedAt=new Date().toISOString();r.closedBy=currentUser.name;r.assignedTo=currentUser.id;r.responseHours=Math.round(Math.max(0,(new Date(r.closedAt)-new Date(r.openedAt||r.plannedAt))/3600000)*100)/100;r.closedWithin24h=r.responseHours<=24;r.expired72h=r.responseHours>=72;const st=(machineRuntimeStates||{})[r.machine];if(st?.down&&(!st.maintenanceId||st.maintenanceId===r.id)){const mins=(Number(st.totalDownMinutes)||0)+Math.max(0,(Date.now()-new Date(st.downSince).getTime())/60000);machineRuntimeStates[r.machine]={...st,down:false,downSince:null,maintenanceId:null,lastUpAt:r.closedAt,totalDownMinutes:mins};machineJournal.unshift({id:'MJ-'+Date.now(),machine:r.machine,type:'UP / ARIZA KAPANDI',text:`${r.id} çözüldü. DOWN süresi: ${v32Dur(mins-(Number(st.totalDownMinutes)||0))}. Çözüm: ${resolution.trim()}`,by:currentUser.name,at:r.closedAt});saveStorage('machineRuntimeStates',machineRuntimeStates);saveStorage('machineJournal',machineJournal);}saveStorage('maintenanceRecords',maintenanceRecords);renderMaintenanceCenter();if(!document.getElementById('machineFileModal').classList.contains('hidden'))openMachineFileV32(r.machine);};
 
 // Yönetim modülü: makine kartlarını doğrudan V32 render'ı ile aç.
@@ -4616,7 +4727,39 @@ function addMachineCommentV33(machine){if(!currentUser)return;const t=prompt('Ma
 // Bakım modülü her açılışta bağımsız fleet render eder.
 const v33OpenAdmin=openAdminModule;openAdminModule=function(name){v33OpenAdmin(name);if(name==='maintenance'){const p=document.querySelector('[data-admin-module="maintenance"]');if(p)p.classList.add('admin-module-open');renderMachineFleetV33();}};
 // Sevkiyat: resim hiçbir aşamada zorunlu değildir. İrsaliye no + plaka yeterlidir.
-approveShipment=function(id){if(!currentUser||!(getEffectiveRole(currentUser)==='ADMIN'||hasScreenAccess(currentUser,'sevkiyat')))return alert('Sevkiyat yetkisi gerekir.');const d=declarations.find(x=>x.id===id);if(!d||d.status!=='Sevk Onayı Bekliyor')return;const irs=prompt('İrsaliye numarası (zorunlu):',d.deliveryNoteNo||'');if(!irs?.trim())return alert('İrsaliye numarası zorunludur.');const plate=prompt('Araç plakası (zorunlu):',d.vehiclePlate||'');if(!plate?.trim())return alert('Araç plakası zorunludur.');d.deliveryNoteNo=irs.trim();d.vehiclePlate=plate.trim().toLocaleUpperCase('tr-TR');d.status='Sevk Edildi';d.shipmentReady=false;d.shippingApprover=currentUser.name;d.shippingApprovalDate=new Date().toLocaleString('tr-TR');d.shippedAt=new Date().toISOString();d.updatedAt=d.shippedAt;const jo=jobOrders.find(j=>j.id===d.jobOrder);if(jo){jo.status='Sevk Edildi / Kapandı';jo.shippedAt=d.shippedAt;jo.deliveryNoteNo=d.deliveryNoteNo;jo.vehiclePlate=d.vehiclePlate;jo.updatedAt=d.shippedAt;}saveStorage('declarations',declarations);saveStorage('jobOrders',jobOrders);queueManagerReport(`SEVK TAMAMLANDI: ${d.jobOrder} · Plaka ${d.vehiclePlate} · İrsaliye ${d.deliveryNoteNo}`);refreshAllViews();alert('Sevk tamamlandı. İrsaliye resmi opsiyoneldir.');};
+// KMI-QMS-FAZ1 KRİTİK BULGU (2026-09-27): approveShipment bu dosyada 4 KEZ tanımlanmıştı
+// (bkz. bu satırdan önceki 3 kopya) - JS'te aynı isim tekrar atanınca EN SON tanım kazanır,
+// yani gerçekte HER ZAMAN sadece BU tanım (en alttaki) çalışıyordu; öncekiler tamamen ÖLÜ
+// KOD. Bu, bu oturumun başında "tamamlandı" diye rapor edilen otomatik sipariş-sevkiyat
+// güncellemesinin HİÇ ÇALIŞMAMASININ kök nedeniydi - o düzeltme yanlışlıkla ölü bir kopyaya
+// eklenmişti. Artık gerçek/canlı fonksiyon burası ve otomatik güncelleme + Kalite HOLD kapısı
+// BURAYA eklendi. Kalıcı çözüm (tekilleştirme) Yazılım & BT Direktörü Faz 0 stabilizasyonunda ele alınacak.
+approveShipment=function(id){if(!currentUser||!(getEffectiveRole(currentUser)==='ADMIN'||hasScreenAccess(currentUser,'sevkiyat')))return alert('Sevkiyat yetkisi gerekir.');const d=declarations.find(x=>x.id===id);if(!d||d.status!=='Sevk Onayı Bekliyor')return;
+ try{
+   const joForHold=(typeof jobOrders!=='undefined'?jobOrders:[]).find(j=>j.id===d.jobOrder);
+   if(window.kmiQmsIsHoldActive && (window.kmiQmsIsHoldActive('JOB_ORDER',d.jobOrder) || (joForHold&&joForHold.materialLotId&&window.kmiQmsIsHoldActive('LOT',joForHold.materialLotId)))){
+     return alert('SEVKİYAT ENGELLENDİ: Bu iş emrinde/ham madde LOT\'unda aktif bir Kalite HOLD kaydı var. Sevkiyat, HOLD Kalite Kontrol Kulesi\'nden kapatılmadan yapılamaz.');
+   }
+ }catch(e){ console.error('[QMS shipment hold gate]',e); }
+ // BACKLOG-3.1 (Master Entegrasyon): bu GERÇEK/canlı approveShipment kopyası (yukarıdaki
+ // KMI-QMS-FAZ1 KRİTİK BULGU notuna bakınız - dosyada bundan önceki 3 kopya ölü koddur).
+ // Sevkiyat Kalite Serbest Belgesi burada, HOLD kontrolü temiz geçtikten hemen sonra kesilir.
+ let shippingQualityCertificateId=null;
+ try{
+   const cert=window.kmiQmsIssueShippingReleaseCertificate&&window.kmiQmsIssueShippingReleaseCertificate(d.jobOrder,d.id);
+   if(cert) shippingQualityCertificateId=cert.certificateId;
+ }catch(e){ console.error('[Sevkiyat Kalite Serbest Belgesi]',e); }
+ const irs=prompt('İrsaliye numarası (zorunlu):',d.deliveryNoteNo||'');if(!irs?.trim())return alert('İrsaliye numarası zorunludur.');const plate=prompt('Araç plakası (zorunlu):',d.vehiclePlate||'');if(!plate?.trim())return alert('Araç plakası zorunludur.');d.deliveryNoteNo=irs.trim();d.vehiclePlate=plate.trim().toLocaleUpperCase('tr-TR');d.status='Sevk Edildi';d.shipmentReady=false;d.shippingApprover=currentUser.name;d.shippingApprovalDate=new Date().toLocaleString('tr-TR');d.shippedAt=new Date().toISOString();d.updatedAt=d.shippedAt;d.shippingQualityCertificateId=shippingQualityCertificateId;const jo=jobOrders.find(j=>j.id===d.jobOrder);if(jo){jo.status='Sevk Edildi / Kapandı';jo.shippedAt=d.shippedAt;jo.deliveryNoteNo=d.deliveryNoteNo;jo.vehiclePlate=d.vehiclePlate;jo.updatedAt=d.shippedAt;jo.shippingQualityCertificateId=shippingQualityCertificateId;}
+ try{
+   if(jo && jo.salesOrderId && Number(d.qty||0)>0 && window.v118AutoShipFromJobOrder){
+     const isFinalOp = window.kmiIsFinalOperationJobOrder ? window.kmiIsFinalOperationJobOrder(jo) : true;
+     if(isFinalOp){
+       const shippedQty=window.v118AutoShipFromJobOrder(jo.salesOrderId, jo.productId, Number(d.qualityGood??d.qty??0), {jobOrderId:jo.id,deliveryNoteNo:d.deliveryNoteNo,vehiclePlate:d.vehiclePlate});
+       if(shippedQty>0) queueManagerReport(`Müşteri siparişi otomatik güncellendi: ${jo.salesOrderId} · ${shippedQty} adet sevk edildi olarak işlendi (iş emri: ${jo.id}).`);
+     }
+   }
+ }catch(e){ console.error('[Sipariş sevkiyat otomatik güncelleme - approveShipment canlı kopya]',e); }
+ saveStorage('declarations',declarations);saveStorage('jobOrders',jobOrders);queueManagerReport(`SEVK TAMAMLANDI: ${d.jobOrder} · Plaka ${d.vehiclePlate} · İrsaliye ${d.deliveryNoteNo}`);refreshAllViews();alert('Sevk tamamlandı. İrsaliye resmi opsiyoneldir.');};
 // Operatör sayfasındaki Zirvedekiler: FIFA benzeri üç ayrı Top-5 istatistik grubu.
 function renderOperatorTop5V33(){const top=document.getElementById('operatorTopPerformers');if(!top)return;const r=v32RankData();top.innerHTML=`<div class="grid grid-cols-1 md:grid-cols-3 gap-3">${v32GameCard('GENEL TOP 5','🏆',r.overall,x=>x.points.toFixed(1)+' P')}${v32GameCard('BUGÜNÜN TOP 5','⚡',r.today,x=>x.good+' ADET')}${v32GameCard('KALİTE TOP 5','🎯',r.quality,x=>x.quality.toFixed(1)+'%')}</div><div class="mt-3 text-[10px] text-slate-500">Canlı motivasyon panosu · kesin primler ay sonu Yönetim onayıyla oluşur.</div>`;}
 const v33Mot=renderOperatorMotivationPanel;renderOperatorMotivationPanel=function(){v33Mot();renderOperatorTop5V33();};
@@ -4639,6 +4782,8 @@ function openMaintenancePlanForMachineV34(machine){if(!currentUser||!['BAKIM','A
 function renderPuantajExclusionsV34(){const el=document.getElementById('monthlyPuantajExclusionPanel');if(!el)return;const month=document.getElementById('puantajMonth')?.value||getCurrentMonthKey();const people=PERSONNEL_LIST.filter(p=>p.active!==false&&!isBonusPoolOnlyPerson(p));el.innerHTML=`<div class="md:col-span-2 xl:col-span-3 flex flex-wrap gap-2 items-end bg-slate-900/70 border border-slate-700 rounded-xl p-3"><div class="flex-1 min-w-[240px]"><label class="block text-[10px] text-slate-400 mb-1">Personel seç</label><select id="puantajExcludePersonV34" class="w-full bg-slate-950 border border-slate-700 rounded p-2 text-white text-xs"><option value="">Personel seçiniz...</option>${people.map(p=>`<option value="${p.id}">${v33e(p.name)} · ${v33e(p.dept||'-')}</option>`).join('')}</select></div><button id="puantajExcludeBtnV34" class="bg-rose-700 hover:bg-rose-600 px-3 py-2 rounded text-xs font-bold">Seçili kişiyi bu ay prim dışı bırak</button></div>`+people.map(p=>{const x=isPuantajExcludedV30(p.id,month);return `<label class="flex items-center justify-between gap-2 bg-slate-950 border ${x?'border-red-600':'border-slate-800'} rounded-lg p-2 text-[10px] ${x?'perf-excluded':''}"><span><b class="text-white">${v33e(p.name)}</b><small class="block text-slate-500">${v33e(p.dept||'-')}</small></span><span class="flex items-center gap-2 ${x?'text-red-300':'text-slate-400'}"><input class="puantaj-v34-check" data-person-id="${p.id}" type="checkbox" ${x?'checked':''}> ${x?'PRİM DIŞI':'Prim dışı'}</span></label>`}).join('');
  el.querySelectorAll('.puantaj-v34-check').forEach(c=>c.addEventListener('change',()=>{togglePuantajExclusionV30(Number(c.dataset.personId),month,c.checked);setTimeout(renderPuantajExclusionsV34,0);}));document.getElementById('puantajExcludeBtnV34')?.addEventListener('click',()=>{const id=Number(document.getElementById('puantajExcludePersonV34')?.value);if(!id)return alert('Personel seçiniz.');togglePuantajExclusionV30(id,month,true);setTimeout(renderPuantajExclusionsV34,0);});}
 const v34OpenAdminBase=openAdminModule;openAdminModule=function(name){v34OpenAdminBase(name);if(name==='maintenance')renderMachineFleetV34();if(name==='puantaj')renderPuantajExclusionsV34();};
+// KMI-DEAD-CODE-UYARI (2026-09-27): renderPuantajAdmin bu satırda da tanımlanıyor ama dosyada
+// daha sonra window.renderPuantajAdmin ('V47 Tek Motor') ile geçersiz kılınıyor - ÖLÜ KODDUR.
 const v34PuantajBase=renderPuantajAdmin;renderPuantajAdmin=function(){v34PuantajBase();renderPuantajExclusionsV34();};
 // Operatör kartında Top 5'i her yenilemede zorla üret.
 const v34MotBase=renderOperatorMotivationPanel;renderOperatorMotivationPanel=function(){v34MotBase();renderOperatorTop5V33();};
@@ -4947,6 +5092,15 @@ function editMachine(id){
  const name=prompt('Makine adı:',m.name);if(!name?.trim())return;m.name=name.trim();m.brand=prompt('Marka:',m.brand||'')??m.brand;m.model=prompt('Model:',m.model||'')??m.model;m.serial=prompt('Seri No:',m.serial||'')??m.serial;m.year=prompt('Üretim yılı:',m.year||'')??m.year;m.location=prompt('Lokasyon:',m.location||'Üretim')??m.location;m.specs=prompt('Teknik özellikler / notlar:',m.specs||'')??m.specs;persist();renderAll();openFile(id)
 }
 // Operatör beyanından bakım emri oluşturmayı V35 tek veri modeline bağla.
+// KMI-PLATFORM-FAZ0 BULGU (2026-09-27): window.createMaintenanceFromOperator burada TEKRAR
+// tanımlanıyor ve GERÇEK CANLI olan budur (window. ile IIFE dışına taşıyor, JS son atama
+// kazanır). Aşağıdaki satırlarda tanımlı 4 eski kopya (maintenanceRecords/machineJournal'a
+// yazan sürüm) ARTIK ÖLÜ KODDUR: bu canlı sürüm onun yerine createExternalFault()'u çağırıp
+// V35 sisteminin kendi deposuna (orders/journal) yazıyor. NOT: machineOeeMetrics()'in
+// MTBF/MTTR hesabı hâlâ eski 'maintenanceRecords' dizisini okuyor - V35'e taşınan arızalar
+// oraya düşmediği için MTBF/MTTR rakamları güncel olmayabilir. Bu, Master Mimari Ek'ine
+// (Bakım/Maintenance alanı, Master-Entegrasyon) taşınması gereken ayrı bir bulgu; bu geçişte
+// davranış değiştirilmedi, yalnız işaretlendi.
 window.createMaintenanceFromOperator=function(machineName,description,severity,reportedBy,alarmCode,stopsProduction){return createExternalFault(machineName,alarmCode||description,description,severity,reportedBy,!!stopsProduction,'operator');};
 function normalizeMachineName(x){if(x&&typeof x==='object')return String(x.code||'')+(x.name?' - '+x.name:'');return String(x||'');}
 function findOrCreateMachineByName(machineName){machines=load(K_M,machines);const raw=normalizeMachineName(machineName).trim();let m=machines.find(x=>x.name===raw)||machines.find(x=>raw.startsWith(String(x.code)+' -'))||machines.find(x=>String(x.code)===raw);if(!m){const code=raw.split(' - ')[0]||('M'+Date.now());m={id:'M'+Date.now(),code,name:raw||code,brand:'',model:raw.split(' - ').slice(1).join(' - '),serial:'',year:'',location:'Üretim',specs:'',status:'UP',downSince:null,totalDownMinutes:0,createdAt:nowISO(),active:true};m.department=guessDepartment(m);machines.push(m)}return m;}
@@ -6026,6 +6180,9 @@ function mrp71(i){
  return {monthly,daily,reorderPoint:rop,openPO:open,target,suggestedOrder:suggested};
 }
 function lastPrices71(i){return D.purchases.filter(p=>p.purchaseItemId===i.id&&Number(p.unitPrice||0)>0).sort((a,b)=>String(b.orderDate||'').localeCompare(String(a.orderDate||''))).slice(0,3)}
+// KMI-PLATFORM-FAZ0/BACKLOG-2: mrp71/lastPrices71 window'a açılıyor (fonksiyonlar
+// DEĞİŞMEDİ) - ayrı bir IIFE'de yaşayan KMI_CALC.kmiPR federasyonu bunlara erişebilsin diye.
+window.mrp71=mrp71; window.lastPrices71=lastPrices71;
 function listInput71(arr,kind){return (arr||[]).map((v,n)=>`<div class="grid grid-cols-[1fr_auto] gap-2 mb-2"><input value="${esc(v)}" onchange="v71ListChange('${kind}',${n},this.value)" class="bg-slate-950 border border-slate-700 rounded p-2"><button onclick="v71ListDelete('${kind}',${n})" class="bg-red-950 text-red-300 px-3 rounded">×</button></div>`).join('')}
 function usageRows71(i){return (i.usageRules||[]).map((r,n)=>`<div class="grid md:grid-cols-6 gap-2 bg-slate-950 border border-slate-800 rounded-xl p-3 mb-2"><label>Üretim Ürünü<select onchange="v71UsageChange(${n},'productId',this.value)" class="mt-1 w-full bg-slate-900 border border-slate-700 rounded p-2">${D.products.map(p=>`<option value="${p.id}" ${r.productId===p.id?'selected':''}>${esc(p.code)} · ${esc(p.name)}</option>`).join('')}</select></label><label>Operasyon<input value="${esc(r.operation||'')}" onchange="v71UsageChange(${n},'operation',this.value)" class="mt-1 w-full bg-slate-900 border border-slate-700 rounded p-2"></label><label>Kullanım / ürün<input type="number" step="0.0001" value="${Number(r.qtyPer||0)}" onchange="v71UsageChange(${n},'qtyPer',this.value)" class="mt-1 w-full bg-slate-900 border border-slate-700 rounded p-2"></label><label>Fire %<input type="number" step="0.01" value="${Number(r.scrapPct||0)}" onchange="v71UsageChange(${n},'scrapPct',this.value)" class="mt-1 w-full bg-slate-900 border border-slate-700 rounded p-2"></label><label>Aylık ihtiyaç override<input type="number" step="0.01" value="${Number(r.monthlyDemand||0)}" onchange="v71UsageChange(${n},'monthlyDemand',this.value)" class="mt-1 w-full bg-slate-900 border border-slate-700 rounded p-2"></label><div class="flex items-end"><button onclick="v71UsageDelete(${n})" class="w-full bg-red-950 text-red-300 p-2 rounded">Sil</button></div></div>`).join('')}
 window.v71AddPurchaseItem=function(){const code='SKU-'+String(Date.now()).slice(-6);const x={id:'PI-'+Date.now(),code,name:'Yeni Satınalma Ürünü',description:'',category:'Genel',manufacturer:'',manufacturerPartNo:'',gtin:'',barcode:code.trim(),qrCode:code.trim(),baseUom:'adet',purchaseUom:'adet',uomFactor:1,stockQty:0,reservedQty:0,safetyStock:0,reorderPoint:0,maxStock:0,leadTimeDays:7,moq:1,orderMultiple:1,abcClass:'C',xyzClass:'Z',procurementType:'Satınalma',planner:'',buyer:'',warehouse:'',bin:'',lotTracking:false,serialTracking:false,shelfLifeDays:0,inspectionRequired:true,preferredSupplier:'',supplierIds:[],currency:'TRY',hsCode:'',countryOfOrigin:'',incoterm:'',qualitySpec:'',certificateRequirement:'',alternatives:[],equivalents:[],usageRules:[],documents:[],fields:[],active:true};D.purchaseItems.unshift(x);save();v71OpenPurchaseItem(x.id)};
@@ -6090,16 +6247,20 @@ save();
 D.inventoryMovements=Array.isArray(D.inventoryMovements)?D.inventoryMovements:[];
 D.purchases=(D.purchases||[]).map(p=>({...p,workflowStatus:p.workflowStatus||((p.status||'').includes('Taslak')?'DRAFT':'LEGACY'),warehouseLocation:p.warehouseLocation||'',receivedQty:Number(p.receivedQty||0),qcResult:p.qcResult||'',approvalHistory:Array.isArray(p.approvalHistory)?p.approvalHistory:[]}));
 function v73Role(){return String(currentUser?.role||'').toLocaleUpperCase('tr-TR')}
-function v73IsManagement(){return ['ADMIN','YÖNETİM','YONETIM','MANAGEMENT'].includes(v73Role())}
-function v73IsAccounting(){return ['ADMIN','MUHASEBE','ACCOUNTING'].includes(v73Role())||String(currentUser?.dept||'').toLocaleLowerCase('tr-TR').includes('muhasebe')}
-function v73IsQuality(){return ['ADMIN','KALİTE','KALITE','QUALITY'].includes(v73Role())||String(currentUser?.dept||'').toLocaleLowerCase('tr-TR').includes('kalite')}
+// KMI-PLATFORM-FAZ0/BACKLOG-2: aşağıdaki 5 fonksiyon artık window.KMI_AUTH'a delege
+// ediyor (bkz. kmi-auth-v1-central-permission-layer bloğundaki PROCUREMENT_* capability'ler).
+// KMI_AUTH yoksa (ör. eski/izole test ortamı) orijinal satır-içi mantık fallback olarak korunur -
+// davranışta hiçbir değişiklik yok, sadece tek merkezden okunuyor.
+function v73IsManagement(){try{ if(window.KMI_AUTH) return window.KMI_AUTH.can(currentUser,'PROCUREMENT_MANAGEMENT'); }catch(e){} return ['ADMIN','YÖNETİM','YONETIM','MANAGEMENT'].includes(v73Role())}
+function v73IsAccounting(){try{ if(window.KMI_AUTH) return window.KMI_AUTH.can(currentUser,'PROCUREMENT_ACCOUNTING'); }catch(e){} return ['ADMIN','MUHASEBE','ACCOUNTING'].includes(v73Role())||String(currentUser?.dept||'').toLocaleLowerCase('tr-TR').includes('muhasebe')}
+function v73IsQuality(){try{ if(window.KMI_AUTH) return window.KMI_AUTH.can(currentUser,'PROCUREMENT_QUALITY'); }catch(e){} return ['ADMIN','KALİTE','KALITE','QUALITY'].includes(v73Role())||String(currentUser?.dept||'').toLocaleLowerCase('tr-TR').includes('kalite')}
 // KMI-FIX (2026-09-27): Ender'in isteği - "giriş kalite / mal kabul tutanağını kalite, sevkiyat,
 // bakım, muhasebe personeli ve tüm yöneticiler yapabilsin; girişi yapılacak malzemeye göre
 // kişilere atanabilsin". Önceden mal kabul/giriş kalite işlemi YALNIZ Kalite rolüne kapalıydı.
 // v73CanReceive artık bu genişletilmiş rol listesini VEYA o PO'ya özel olarak atanmış kişiyi kabul
 // eder (atanan kişi rolü ne olursa olsun o PO'yu işleyebilir).
-function v73IsBakim(){return ['BAKIM'].includes(v73Role())||String(currentUser?.dept||'').toLocaleLowerCase('tr-TR').includes('bakım')||String(currentUser?.dept||'').toLocaleLowerCase('tr-TR').includes('bakim')}
-function v73IsSevkiyat(){return ['SEVKIYAT','SEVKİYAT'].includes(v73Role())||(typeof hasScreenAccess==='function'&&currentUser&&hasScreenAccess(currentUser,'sevkiyat'))}
+function v73IsBakim(){try{ if(window.KMI_AUTH) return window.KMI_AUTH.can(currentUser,'PROCUREMENT_MAINTENANCE'); }catch(e){} return ['BAKIM'].includes(v73Role())||String(currentUser?.dept||'').toLocaleLowerCase('tr-TR').includes('bakım')||String(currentUser?.dept||'').toLocaleLowerCase('tr-TR').includes('bakim')}
+function v73IsSevkiyat(){try{ if(window.KMI_AUTH) return window.KMI_AUTH.can(currentUser,'PROCUREMENT_SHIPPING'); }catch(e){} return ['SEVKIYAT','SEVKİYAT'].includes(v73Role())||(typeof hasScreenAccess==='function'&&currentUser&&hasScreenAccess(currentUser,'sevkiyat'))}
 function v73CanReceive(p){
  if(v73IsManagement()||v73IsQuality()||v73IsAccounting()||v73IsBakim()||v73IsSevkiyat()) return true;
  if(p&&p.assignedReceiver&&currentUser&&String(p.assignedReceiver)===String(currentUser.name)) return true;
@@ -6116,6 +6277,10 @@ function v73EligibleReceivers(){
 }
 function v73PurchaserOptions(p){const people=(typeof PERSONNEL_LIST!=='undefined'?PERSONNEL_LIST:[]).filter(x=>x.active!==false).filter(x=>{const r=String(x.role||'').toLocaleUpperCase('tr-TR'),d=String(x.dept||'').toLocaleLowerCase('tr-TR'),tabs=Array.isArray(x.allowedTabs)?x.allowedTabs:[];return ['ADMIN','YÖNETİM','YONETIM','MANAGEMENT','MUHASEBE','ACCOUNTING'].includes(r)||d.includes('ofis')||d.includes('satın')||d.includes('muhasebe')||d.includes('yönet')||tabs.includes('yonetici')||tabs.includes('muhasebe')});return `<option value="">Yetkili seçiniz...</option>`+people.map(x=>`<option value="${esc(x.name)}" ${p.purchasedBy===x.name?'selected':''}>${esc(x.name)} — ${esc(x.dept||x.role||'')}</option>`).join('')}
 function v73StatusText(s){return ({DRAFT:'Taslak',PENDING_MANAGEMENT:'Yönetim Onayı Bekliyor',MANAGEMENT_REJECTED:'Yönetim Reddetti',PENDING_ACCOUNTING:'Muhasebe Ödeme Onayı Bekliyor',PAID:'Ödendi · Teslimat Bekleniyor',INCOMING_QC:'Geldi · Giriş Kalite Bekliyor',QC_REJECTED:'Giriş Kalite Red / Karantina',STOCKED:'Giriş Kalite Kabul · Stoğa Alındı',LEGACY:'Eski Kayıt'})[s]||s||'-'}
+// KMI-PLATFORM-FAZ0/BACKLOG-2: v73CanReceive gibi window'a açılıyor - KMI_CALC.kmiPR
+// federasyonunun (ayrı bir IIFE'de yaşıyor) bu fonksiyona erişebilmesi için gerekli.
+// Fonksiyonun kendisi DEĞİŞMEDİ, sadece dışa açıldı.
+window.v73StatusText=v73StatusText;
 window.v62OpenPO=function(id){const p=D.purchases.find(x=>x.id===id);if(!p)return;activeV62={type:'purchases',id};const so=D.suppliers.map(x=>`<option value="${x.id}" ${p.supplier===x.id?'selected':''}>${esc(x.name)}</option>`).join(''),pi=D.purchaseItems.map(x=>`<option value="${x.id}" ${p.purchaseItemId===x.id?'selected':''}>${esc(x.code)} · ${esc(x.name)}</option>`).join(''),prod=D.products.map(x=>`<option value="${x.id}" ${p.productId===x.id?'selected':''}>${esc(x.code)} · ${esc(x.name)}</option>`).join('');const total=Number(p.qty||0)*Number(p.unitPrice||0),tl=v72TotalTL(p);v62Modal('Satınalma Kaydı · '+esc(p.id),`<div class="mb-4 p-3 rounded-xl bg-cyan-950/30 border border-cyan-800"><div class="text-[10px] text-cyan-400 font-black">PO İŞ AKIŞI</div><div class="font-black text-white">${esc(v73StatusText(p.workflowStatus))}</div><div class="text-[10px] text-slate-400 mt-1">Kaydet → Yönetim → Muhasebe ödeme → Teslimat/Giriş Kalite → Depo/Stok</div></div><div class="grid md:grid-cols-3 gap-3 text-xs"><label>Satınalma Ürün Kartı<select id="poPurchaseItem" class="mt-1 w-full bg-slate-950 border border-slate-700 rounded p-2"><option value="">-</option>${pi}</select></label><label>Tedarikçi<select id="poSupplier" class="mt-1 w-full bg-slate-950 border border-slate-700 rounded p-2">${so}</select></label><label>İlişkili Üretim Ürünü<select id="poProduct" class="mt-1 w-full bg-slate-950 border border-slate-700 rounded p-2"><option value="">-</option>${prod}</select></label><label>Malzeme / Ürün<input id="poItem" value="${esc(p.item||'')}" class="mt-1 w-full bg-slate-950 border border-slate-700 rounded p-2"></label><label>Miktar<input id="poQty" oninput="v72CalcPO()" type="number" step="0.001" value="${Number(p.qty||0)}" class="mt-1 w-full bg-slate-950 border border-slate-700 rounded p-2"></label><label>Birim<input id="poUnit" value="${esc(p.unit||'')}" class="mt-1 w-full bg-slate-950 border border-slate-700 rounded p-2"></label><label>Birim Fiyat<input id="poPrice" oninput="v72CalcPO()" type="number" step="0.0001" value="${Number(p.unitPrice||0)}" class="mt-1 w-full bg-slate-950 border border-slate-700 rounded p-2"></label><label>Para Birimi<select id="poCur" onchange="v72CalcPO()" class="mt-1 w-full bg-slate-950 border border-slate-700 rounded p-2">${['TRY','EUR','USD','GBP'].map(c=>`<option ${p.currency===c?'selected':''}>${c}</option>`).join('')}</select></label><label>Kur · 1 Döviz = TL<input id="poFx" oninput="v72CalcPO()" type="number" step="0.0001" value="${p.currency==='TRY'?1:Number(p.fxRate||0)}" class="mt-1 w-full bg-slate-950 border border-slate-700 rounded p-2"></label><label>Satınalmayı Yapan Yetkili<select id="poBy" class="mt-1 w-full bg-slate-950 border border-slate-700 rounded p-2">${v73PurchaserOptions(p)}</select></label><label>Sipariş Tarihi<input id="poDate" type="date" value="${esc(p.orderDate||'')}" class="mt-1 w-full bg-slate-950 border border-slate-700 rounded p-2"></label><label>Beklenen Teslim / Giriş Kalite Tarihi<input id="poEta" type="date" value="${esc(p.eta||'')}" class="mt-1 w-full bg-slate-950 border border-slate-700 rounded p-2"></label><label>Depo / Raf Adresi *<input id="poWarehouse" value="${esc(p.warehouseLocation||'')}" placeholder="Örn. Hammadde Depo · Raf A-03" class="mt-1 w-full bg-slate-950 border border-slate-700 rounded p-2"></label><input id="poStatus" type="hidden" value="${esc(p.status||'')}"></div><div class="grid md:grid-cols-2 gap-3 mt-4"><div class="bg-slate-950 border border-slate-700 rounded-xl p-4"><div class="text-slate-500 text-xs">Miktar × Birim Fiyat</div><div id="poTotalForeign" class="text-xl font-black">${money(total,p.currency)}</div></div><div class="bg-emerald-950/30 border border-emerald-800 rounded-xl p-4"><div class="text-emerald-300 text-xs">ÖDENECEK TOPLAM TL</div><div id="poTotalTL" class="text-2xl font-black text-emerald-300">${tl.toLocaleString('tr-TR',{minimumFractionDigits:2,maximumFractionDigits:2})} TL</div></div></div><div class="mt-6"><div class="flex justify-between"><h4 class="font-black text-amber-300">3 Fiyat Teklifi / RFQ Karşılaştırması</h4><label class="text-xs"><input id="poQuoteException" type="checkbox" ${p.threeQuoteException?'checked':''}> 3 teklif istisnası</label></div><div class="grid lg:grid-cols-3 gap-3 mt-3">${v72QuoteEditor(p)}</div><input id="poExceptionReason" value="${esc(p.exceptionReason||'')}" placeholder="İstisna varsa gerekçe..." class="mt-3 w-full bg-slate-950 border border-slate-700 rounded p-2"><div class="grid md:grid-cols-2 gap-3 mt-3"><label>Seçilen Teklif<select id="poSelectedQuote" class="mt-1 w-full bg-slate-950 border border-slate-700 rounded p-2"><option value="-1">Seçilmedi</option>${[0,1,2].map(n=>`<option value="${n}" ${p.selectedQuote===n?'selected':''}>Teklif ${n+1}</option>`).join('')}</select></label><label>Seçim Gerekçesi<input id="poSelectionReason" value="${esc(p.selectionReason||'')}" class="mt-1 w-full bg-slate-950 border border-slate-700 rounded p-2"></label></div></div><div class="mt-6 bg-slate-950 border border-slate-700 rounded-xl p-4"><h4 class="font-black text-cyan-300">Proforma / Sipariş Dokümanı</h4><input id="poProforma" type="file" accept=".pdf,.png,.jpg,.jpeg,.xlsx,.xls" class="mt-2 w-full text-xs"><div class="mt-2 text-xs">${v72DocLink(p.proforma,'Proforma')}</div></div><div class="mt-6 flex justify-between"><button onclick="v62DeleteCurrent()" class="bg-red-950 text-red-300 px-4 py-2 rounded">Kaydı Sil</button><button onclick="v73SubmitPO()" class="bg-emerald-700 px-5 py-2 rounded font-black">Kaydet ve Yönetim Onayına Gönder</button></div>`)};
 window.v73SubmitPO=function(){const p=D.purchases.find(x=>x.id===activeV62?.id);if(!p)return;const by=document.getElementById('poBy')?.value||'',wh=document.getElementById('poWarehouse')?.value.trim()||'';if(!by)return alert('Satınalmayı yapan yetkiliyi listeden seçin.');if(!wh)return alert('Depo / raf adresi zorunludur.');p.warehouseLocation=wh;p.purchasedBy=by;document.getElementById('poStatus').value='Yönetim Onayı Bekliyor';const before=p.workflowStatus;const old=window.v72SavePO;old();setTimeout(()=>{const x=D.purchases.find(z=>z.id===p.id);if(!x)return;if(!['PENDING_ACCOUNTING','PAID','INCOMING_QC','STOCKED'].includes(before)){x.workflowStatus='PENDING_MANAGEMENT';x.status='Yönetim Onayı Bekliyor';x.submittedAt=new Date().toISOString();x.approvalHistory=x.approvalHistory||[];x.approvalHistory.push({step:'PO_SUBMITTED',by:currentUser?.name||by,at:x.submittedAt});save();} },120)};
 function v73QueueCard(p,mode){
@@ -6148,6 +6313,8 @@ window.v73IncomingQC=function(id){
   <div class="bg-slate-950 p-3 rounded"><b>${esc(p.item)}</b><br>${Number(p.qty||0)} ${esc(p.unit||'')} · Depo: <b>${esc(p.warehouseLocation||'-')}</b></div>
   <label>Fiilen Gelen / Sayılan Miktar *<input id="v73RecvQty" type="number" step="0.001" value="${Number(p.qty||0)}" class="mt-1 w-full bg-slate-950 border border-slate-700 rounded p-2"></label>
   <label>Tartım (kg) <span class="text-slate-500">- varsa girin, tartılmayan malzemede boş bırakın</span><input id="v73RecvWeight" type="number" step="0.001" value="${Number(p.receivedWeightKg||0)||''}" class="mt-1 w-full bg-slate-950 border border-slate-700 rounded p-2"></label>
+  <label>Malzeme LOT No <span class="text-slate-500">- tedarikçi sevk irsaliyesi/etiketindeki LOT no (varsa)</span><input id="v73LotNo" value="${esc(p.lotNo||'')}" class="mt-1 w-full bg-slate-950 border border-slate-700 rounded p-2"></label>
+  <label>Heat No / Döküm No <span class="text-slate-500">- malzeme sertifikasındaki heat/döküm numarası (varsa)</span><input id="v73HeatNo" value="${esc(p.heatNo||'')}" class="mt-1 w-full bg-slate-950 border border-slate-700 rounded p-2"></label>
   <label>Mal Kabul Fotoğrafı <span class="text-slate-500">- ürün/etiket/tartım fotoğrafı</span><input id="v73RecvPhoto" type="file" accept="image/*" capture="environment" class="mt-1 w-full text-xs bg-slate-950 border border-slate-700 rounded p-2"></label>
   <label>Kalite / Mal Kabul Notu<textarea id="v73QcNote" class="mt-1 w-full bg-slate-950 border border-slate-700 rounded p-2"></textarea></label>
   <div class="text-[10px] text-amber-300">Tutanak kaydedildikten sonra fotoğraf, tartım, sayım ve onaylayan kişi bilgisiyle birlikte mühürlenir - değiştirilemez.</div>
@@ -6160,11 +6327,17 @@ window.v73QCDecision=function(id,ok){
  const qty=Number(document.getElementById('v73RecvQty')?.value||0),note=document.getElementById('v73QcNote')?.value.trim()||'',weight=Number(document.getElementById('v73RecvWeight')?.value||0);
  if(ok&&qty<=0)return alert('Kabul miktarı 0’dan büyük olmalıdır.');
  const photoInput=document.getElementById('v73RecvPhoto');
+ const lotNo=document.getElementById('v73LotNo')?.value.trim()||'',heatNo=document.getElementById('v73HeatNo')?.value.trim()||'';
  const finish=(photoData)=>{
   p.receivedQty=qty;p.qcNote=note;p.qcBy=currentUser.name;p.qcAt=new Date().toISOString();p.receivedWeightKg=weight||0;
+  // KMI-QMS-FAZ1: malzeme LOT/heat izlenebilirliği - gerçekten girilen değer yoksa boş kalır, ASLA uydurulmaz.
+  p.lotNo=lotNo;p.heatNo=heatNo;
   if(photoData) p.receiptPhoto=photoData;
   p.sealed=true;p.sealedAt=p.qcAt;p.sealedBy=currentUser.name;
-  if(!ok){p.workflowStatus='QC_REJECTED';p.status='Giriş Kalite Red · Karantina';p.qcResult='RED';p.approvalHistory.push({step:'QC_REJECTED',by:currentUser.name,at:p.qcAt,note,weight,hasPhoto:!!photoData});save();v62CloseModal();v73RenderQueues();return}
+  if(!ok){p.workflowStatus='QC_REJECTED';p.status='Giriş Kalite Red · Karantina';p.qcResult='RED';p.approvalHistory.push({step:'QC_REJECTED',by:currentUser.name,at:p.qcAt,note,weight,hasPhoto:!!photoData});
+   // KMI-QMS-FAZ1: giriş kalite reddi gerçek bir Kalite HOLD kaydı açar (Kalite Kontrol Kulesi'nde izlenebilir).
+   try{window.kmiQmsOpenHold&&window.kmiQmsOpenHold('PURCHASE',p.id,'Giriş kalite red/karantina: '+(note||p.item));}catch(e){console.error('[QMS incoming reject->HOLD]',e);}
+   save();v62CloseModal();v73RenderQueues();return}
   p.workflowStatus='STOCKED';p.status='Giriş Kalite Kabul · Stoğa Alındı';p.qcResult='KABUL';
   if(p.purchaseItemId){const item=D.purchaseItems.find(x=>x.id===p.purchaseItemId);if(item)item.stockQty=Number(item.stockQty||0)+qty}
   D.inventoryMovements.unshift({id:'STK-'+String(Date.now()).slice(-9),type:'PURCHASE_RECEIPT',poId:p.id,purchaseItemId:p.purchaseItemId||'',item:p.item,qty,unit:p.unit,warehouseLocation:p.warehouseLocation,by:currentUser.name,at:p.qcAt,note});
@@ -6250,7 +6423,10 @@ setTimeout(v73RenderQueues,350);save();
 // ===== /V72 =====
 
 window.v61ResetDemo=function(){if(confirm('V61 prototip verilerini başlangıç verisine döndür?')){D=JSON.parse(JSON.stringify(seed));save();v61Show('products')}};
-setTimeout(()=>{try{const q=new URLSearchParams(location.search),t=q.get('v63card'),id=q.get('id');if(t&&id){openV61Master();v61Show('products');setTimeout(()=>t==='customer'?v62OpenCustomer(id):t==='product'?v62OpenProduct(id):null,80)}}catch(e){}},150);
+// KMI-FIX (2026-09-27): Ender'in isteği - Digital Order Passport'taki QR gerçek/taranabilir
+// olsun ve gerçekten işe yarasın: telefonla okutulunca doğrudan o siparişin Passport ekranını
+// açsın. 'order' tipi de bu genel v63card deep-link mekanizmasına eklendi (bkz. kmiPrintOrderQR).
+setTimeout(()=>{try{const q=new URLSearchParams(location.search),t=q.get('v63card'),id=q.get('id');if(t==='order'&&id){setTimeout(()=>window.kmiOpenPassport?.(id),300);return}if(t&&id){openV61Master();v61Show('products');setTimeout(()=>t==='customer'?v62OpenCustomer(id):t==='product'?v62OpenProduct(id):null,80)}}catch(e){}},150);
 })();
 </script>
 
@@ -7863,6 +8039,9 @@ window.calculateFairBonus=function(p,m=getCurrentMonthKey()){const a=allocation(
 window.isPuantajExcludedV47=isExcluded;window.togglePuantajExclusionV47=setExcluded;
 function esc(v){return String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
 function renderSettings(month){const cfg=getPuantajConfig(month),panel=document.getElementById('puantajSettingsPanel');renderPuantajFormula(month);if(!panel)return;const labels=[['machine','Makine temizlik & kullanım'],['goodProduct','Sağlam ürün'],['lowScrap','Az hurda'],['attendance','Devamsızlık'],['productionTime','Üretim alanı süresi'],['production10Multiplier','%10 hedef üstü'],['production20Multiplier','%20 hedef üstü'],['production25Multiplier','%25 hedef üstü'],['cleanGoodMultiplier','Temiz teslim'],['cleanExcellentMultiplier','Çok temiz'],['timedEarly30Multiplier','%30 erken süreli iş'],['winningShiftMultiplier','Lider vardiya çarpanı'],['skill8Multiplier','8–9 kabiliyet çarpanı'],['skill10Multiplier','10+ kabiliyet çarpanı']];panel.innerHTML=labels.map(([k,l])=>`<label class="bg-slate-900 border border-slate-700 rounded p-3"><span class="block text-[10px] text-slate-400 mb-1">${esc((cfg.labels||{})[k]||l)}</span><input data-puantaj-key="${k}" type="number" min="0" step="0.01" value="${Number(cfg[k]??0)}" class="w-full bg-slate-800 border border-slate-700 rounded p-1.5 text-white"></label>`).join('');const at=document.getElementById('attendanceMultiplier');if(at)at.value=cfg.attendanceMultiplier||1.2;const total=['machine','goodProduct','lowScrap','attendance','productionTime'].reduce((s,k)=>s+Number(cfg[k]||0),0),st=document.getElementById('puantajWeightStatus');if(st)st.innerHTML=`Ağırlık toplamı: <b class="${Math.round(total)===100?'text-emerald-400':'text-red-400'}">${total}/100</b> · V47 Tek Motor`;}
+// KMI-PLATFORM-FAZ0 NOT (2026-09-27): window.renderPuantajAdmin'in CANLI/son tanımı budur
+// ('V47 Tek Motor' - kasıtlı, self-documented final konsolidasyon). Aşağıdaki 3 eski kopya
+// (işaretli) ÖLÜ KODDUR ama zarar vermez; kasıtlı bir düzeltmenin sonucu.
 window.renderPuantajAdmin=function(){
  try{
  const monthEl=document.getElementById('puantajMonth');if(!monthEl)return;if(!monthEl.value)monthEl.value=getCurrentMonthKey();const month=monthEl.value;renderSettings(month);
@@ -8733,10 +8912,30 @@ function pseudoQR(text,size=29){
  for(let r=0;r<size;r++)for(let c=0;c<size;c++){let on=bit(r,c);if(finder(r,c)){let rr=r>=size-7?r-(size-7):r,cc=c>=size-7?c-(size-7):c;on=(rr===0||rr===6||cc===0||cc===6||(rr>=2&&rr<=4&&cc>=2&&cc<=4))?1:0}if(on)h+=`<rect x="${c}" y="${r}" width="1" height="1" fill="black"/>`}
  return h+'</svg>';
 }
+// KMI-FIX (2026-09-27): Ender'in sorusu - "QR ne işe yarıyor, ne işe yaramalı?" Kök neden:
+// burada gerçekte "pseudoQR" adlı, rastgele piksellerden oluşan SADECE GÖRSEL bir süsleme
+// kullanılıyordu - QR'a benziyordu ama hiçbir veri taşımıyordu, telefonla okutulunca hiçbir işe
+// yaramıyordu. Artık gerçek/taranabilir bir QR üretiliyor (sayfada zaten yüklü olan QRCode.js
+// kütüphanesiyle, ana pencerede - popup'ın CDN'e erişimine bağımlı kalmadan), ve bu QR
+// telefonla okutulunca doğrudan bu siparişin Digital Order Passport ekranını açan bir link
+// kodluyor (bkz. v63card=order deep-link, birkaç satır yukarıda eklendi). Böylece bir sevkiyat
+// paletine/kutuya yapıştırılan bu çıktı gerçekten işe yarar: kim okutursa okutsun doğrudan o
+// siparişin canlı durumuna düşer.
 window.kmiPrintOrderQR=function(id){
  const st=window.V118_STATE||{},o=(st.orders||[]).find(x=>String(x.id)===String(id)),label=o?.customerPO||id;
  const w=window.open('','_blank','width=760,height=900');if(!w){notify('Tarayıcı çıktı penceresini engelledi','warn');return}
- w.document.write(`<html><head><title>${E(label)} · KMI Passport</title><style>@page{size:A4;margin:14mm}body{font-family:Arial;color:#0f172a;margin:0}.head{border-bottom:3px solid #0891b2;padding-bottom:14px}.brand{letter-spacing:3px;font-size:12px;font-weight:800;color:#0891b2}h1{font-size:30px;margin:8px 0}.grid{display:grid;grid-template-columns:1fr 260px;gap:30px;margin-top:28px}.card{border:1px solid #cbd5e1;border-radius:14px;padding:18px}.muted{color:#64748b;font-size:12px}.foot{margin-top:35px;border-top:1px solid #cbd5e1;padding-top:10px;font-size:10px;color:#64748b}</style></head><body><div class="head" style="display:flex;align-items:center;gap:14px"><img src="${window.KMI_K_LOGO_DATAURI||''}" style="height:48px;width:auto"><div><div class="brand">KURUTLU MANUFACTURING INTELLIGENCE</div><h1 style="margin:4px 0 0">DIGITAL ORDER PASSPORT</h1><div>${E(label)}</div></div></div><div class="grid"><div class="card"><b>Sipariş</b><h2>${E(label)}</h2><p>Termin: ${E(o?.dueDate||'-')}</p><p>Durum: ${E(o?.status||'-')}</p><p class="muted">KMI ID: ${E(id)}</p><p class="muted">Bu belge KMI içindeki sipariş pasaportuna yönlendiren üretim kimliğidir.</p></div><div>${pseudoQR(String(id))}</div></div><div class="foot">Performance Center · Paperless Machining · Every movement measured. Every decision informed.</div>${(typeof kmiPrintStampBlockHtml==='function')?kmiPrintStampBlockHtml():''}</body></html>`);
+ const deepLink=(typeof cardUrl==='function')?cardUrl('order',id):location.href;
+ let qrImgHtml='';
+ try{
+  if(window.QRCode){
+   const tmp=document.createElement('div');
+   new QRCode(tmp,{text:deepLink,width:260,height:260});
+   const canvas=tmp.querySelector('canvas');
+   if(canvas)qrImgHtml=`<img src="${canvas.toDataURL('image/png')}" style="width:260px;height:260px">`;
+  }
+ }catch(e){ console.warn('[kmiPrintOrderQR]',e); }
+ if(!qrImgHtml)qrImgHtml=pseudoQR(String(id)); // QRCode.js hazır değilse en azından eski görsel yer tutucu
+ w.document.write(`<html><head><title>${E(label)} · KMI Passport</title><style>@page{size:A4;margin:14mm}body{font-family:Arial;color:#0f172a;margin:0}.head{border-bottom:3px solid #0891b2;padding-bottom:14px}.brand{letter-spacing:3px;font-size:12px;font-weight:800;color:#0891b2}h1{font-size:30px;margin:8px 0}.grid{display:grid;grid-template-columns:1fr 260px;gap:30px;margin-top:28px}.card{border:1px solid #cbd5e1;border-radius:14px;padding:18px}.muted{color:#64748b;font-size:12px}.foot{margin-top:35px;border-top:1px solid #cbd5e1;padding-top:10px;font-size:10px;color:#64748b}</style></head><body><div class="head" style="display:flex;align-items:center;gap:14px"><img src="${window.KMI_K_LOGO_DATAURI||''}" style="height:48px;width:auto"><div><div class="brand">KURUTLU MANUFACTURING INTELLIGENCE</div><h1 style="margin:4px 0 0">DIGITAL ORDER PASSPORT</h1><div>${E(label)}</div></div></div><div class="grid"><div class="card"><b>Sipariş</b><h2>${E(label)}</h2><p>Termin: ${E(o?.dueDate||'-')}</p><p>Durum: ${E(o?.status||'-')}</p><p class="muted">KMI ID: ${E(id)}</p><p class="muted">Bu kod okutulunca doğrudan bu siparişin canlı Passport ekranı açılır.</p></div><div>${qrImgHtml}</div></div><div class="foot">Performance Center · Paperless Machining · Every movement measured. Every decision informed.</div>${(typeof kmiPrintStampBlockHtml==='function')?kmiPrintStampBlockHtml():''}</body></html>`);
  w.document.close();setTimeout(()=>w.print(),250);
 };
 
@@ -9106,7 +9305,11 @@ window.kmiAdjust=function(id,field,delta){
 function sheet(title,choices,cb){
  document.getElementById('kmiBottomSheet')?.remove();const d=document.createElement('div');d.id='kmiBottomSheet';d.className='fixed inset-0 z-[260] bg-black/60 flex items-end';d.innerHTML=`<div class="w-full max-w-xl mx-auto bg-slate-900 rounded-t-3xl p-4"><div class="text-lg font-black mb-3">${E(title)}</div><div class="grid grid-cols-2 gap-2">${choices.map((x,i)=>`<button data-i="${i}" class="bg-slate-800 rounded-2xl p-4 text-left font-bold">${E(x)}</button>`).join('')}</div><button onclick="this.closest('#kmiBottomSheet').remove()" class="w-full mt-3 p-3 text-slate-500">Vazgeç</button></div>`;document.body.appendChild(d);d.querySelectorAll('[data-i]').forEach(b=>b.onclick=()=>{const x=choices[N(b.dataset.i)];d.remove();cb(x)})
 }
-window.kmiScrap=function(id){sheet('Hurda nedeni',['Ölçü dışı','Yüzey','Takım kaynaklı','Malzeme','Diğer'],reason=>{const j=jobs().find(x=>String(x.id)===String(id)),s=sess(id);put(id,{scrap:N(s?.scrap)+1});ev('SCRAP',j,{qty:1,reason});toast(`1 hurda · ${reason}`);kmiOpenWork(id)})};
+window.kmiScrap=function(id){sheet('Hurda nedeni',['Ölçü dışı','Yüzey','Takım kaynaklı','Malzeme','Diğer'],reason=>{const j=jobs().find(x=>String(x.id)===String(id)),s=sess(id);put(id,{scrap:N(s?.scrap)+1});ev('SCRAP',j,{qty:1,reason});
+ // KMI-QMS-FAZ1: her hurda kaydı otomatik olarak gerçek bir NCR açar (Kalite Kontrol Kulesi'nde görünür)
+ // ve CAPA gerektiren dispositionlarda mevcut Task motoruna (kmiTaskCreate) bağlanır - ayrı kayıt yok.
+ try{window.kmiQmsCreateNCR&&window.kmiQmsCreateNCR({source:'SHOP_FLOOR_SCRAP',jobOrderId:id,qty:1,defectType:reason,disposition:'SCRAP'});}catch(e){console.error('[QMS scrap->NCR]',e);}
+ toast(`1 hurda · ${reason}`);kmiOpenWork(id)})};
 // KMI-FIX (2026-09-27): Ender'in isteği - operatör duruşta CAM veya Kalite talep ederse, aynı
 // vardiyadaki ilgili kişiye otomatik bir TASK EMRİ açılsın; o kişi gelip task'ı kapatana kadar
 // duruş kaydı (ve ona bağlı süre/maliyet) izlenebilir kalsın. Mevcut Task Floor motoru
@@ -11262,5 +11465,1238 @@ window.kmiOrgSetManager=async function(personId,managerId){
 };
 })();
 </script>
+<script id="kmi-qms-v1-quality-gates">
+(function(){
+'use strict';
+// ============================================================================
+// KMI QUALITY INTELLIGENCE + DIGITAL QMS — FAZ 1 (Veri Temeli + Gerçek Kapılar)
+// Ender'in 3 direktifinin (IE Tasarım + GM Direktifi + Kalite Direktifi) ortak
+// kuralı: TEK KANONİK HESAPLAMA MOTORU, SAHTE/DEMO RAKAM YOK, mevcut zincire
+// (satınalma→mal kabul→stok→iş emri→Shop Floor→kalite→bitmiş ürün→sevkiyat)
+// GERÇEK entegrasyon — ayrı/bağımsız bir "demo ekranı" değil. Mevcut
+// jobOrders / declarations / D.lots / Task motoru (kmiTaskCreate) YENİDEN
+// KULLANILDI; ikinci bir paralel veri/görev sistemi icat edilmedi.
+// ============================================================================
+const QKEY='kurutlu_qms_v1';
+function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+function qUid(p){return p+'-'+Date.now().toString(36).toUpperCase()+Math.random().toString(36).slice(2,5).toUpperCase();}
+function qNow(){return new Date().toISOString();}
+function qLoad(){
+ try{
+  const raw=localStorage.getItem(QKEY);
+  const d=raw?JSON.parse(raw):{};
+  return {
+   controlPlans:Array.isArray(d.controlPlans)?d.controlPlans:[],
+   measurements:Array.isArray(d.measurements)?d.measurements:[],
+   gauges:Array.isArray(d.gauges)?d.gauges:[],
+   ncrs:Array.isArray(d.ncrs)?d.ncrs:[],
+   holds:Array.isArray(d.holds)?d.holds:[],
+   firstPiece:Array.isArray(d.firstPiece)?d.firstPiece:[],
+   auditLog:Array.isArray(d.auditLog)?d.auditLog:[]
+  };
+ }catch(e){ return {controlPlans:[],measurements:[],gauges:[],ncrs:[],holds:[],firstPiece:[],auditLog:[]}; }
+}
+window.QMS=window.QMS||qLoad();
+const QMS=window.QMS;
+function qSave(){ try{ localStorage.setItem(QKEY,JSON.stringify(QMS)); }catch(e){ console.error('[QMS] kayıt hatası',e); } }
+// BACKLOG-1.3 (2026-09-27, Master Mimari Ek'i): QMS.auditLog artık İKİNCİL bir
+// görünüm/hızlı-önbellek olarak kalıyor (Kalite Kulesi ekranı bunu okumaya devam
+// eder - davranış değişmedi), ama TEK GERÇEK KAYNAK bundan sonra window.KMI.event
+// (zaten var olan kanonik event bus'ı) olacak: her kalite audit'i artık AYNI ZAMANDA
+// oraya da yazılıyor. Böylece ikinci/bağımsız bir audit deposu birikmeye devam etmiyor.
+function qAudit(action,entity,id,detail){
+  const rec={id:qUid('QAUD'),at:qNow(),by:(qUser()&&qUser().name)||'Sistem',action,entity,entityId:id,detail:detail||''};
+  QMS.auditLog.unshift(rec); QMS.auditLog=QMS.auditLog.slice(0,1000);
+  try{ window.KMI && window.KMI.event && window.KMI.event('QUALITY_AUDIT', entity, id, {action:action, detail:detail||'', by:rec.by, source:'QMS'}); }catch(e){}
+}
+// QMS.auditLog'un KMI.event'ten türetilebildiğini kanıtlayan salt-okunur yardımcı
+// (Master Mimari Ek'i A bölümü - "tek kaynak" ilkesinin doğrulaması).
+window.kmiQmsAuditFromEvents=function(entity,id){
+  try{
+    return (window.KMI&&Array.isArray(window.KMI.events)?window.KMI.events:[])
+      .filter(e=>e.type==='QUALITY_AUDIT' && (!entity||e.entityType===entity) && (!id||String(e.entityId)===String(id)))
+      .map(e=>({at:e.at,by:(e.data&&e.data.by)||'-',action:(e.data&&e.data.action)||'-',detail:(e.data&&e.data.detail)||''}));
+  }catch(e){ return []; }
+};
+function qToast(msg,kind){ try{ if(typeof toast==='function'){ toast(msg,kind); return; } }catch(e){} try{ alert(msg); }catch(e2){} }
+function qUser(){ try{ if(typeof currentUser!=='undefined'&&currentUser) return currentUser; }catch(e){} return window.currentUser; }
+function qRole(){ try{ return typeof getEffectiveRole==='function'?getEffectiveRole(qUser()):'USER'; }catch(e){ return 'USER'; } }
+function isQualityUser(){ try{ if(window.KMI_AUTH) return window.KMI_AUTH.can(qUser(),'QUALITY'); }catch(e){} return ['KALITE','ADMIN'].indexOf(qRole())!==-1; }
+// KMI-QMS-NOT: jobs() fonksiyonu kmi-v121-command-center IIFE'sine ÖZELdir (dışarıdan görünmez).
+// Gerçek/tek kaynak veri, approveShipment/approveKalite'nin de kullandığı üst kapsamdaki bare
+// `jobOrders` dizisidir - JS scope-chain ile buradan da (iç içe IIFE olsak dahi) erişilebilir.
+function qJobs(){ try{ if(typeof jobOrders!=='undefined'&&Array.isArray(jobOrders)) return jobOrders; }catch(e){} try{ return typeof jobs==='function'?jobs():(Array.isArray(window.jobOrders)?window.jobOrders:[]); }catch(e2){ return []; } }
+window.kmiQmsSave=qSave;
+window.kmiQmsIsQualityUser=isQualityUser;
+
+// ---------------------------------------------------------------------------
+// 1) DIGITAL CONTROL PLAN — ürün/operasyon bazlı karakteristik listesi.
+//    Gerçek veri kaynağı: window.D.products (mevcut ürün kartları).
+// ---------------------------------------------------------------------------
+window.kmiQmsUpsertControlPlan=function(cp){
+ if(!cp||!cp.productId) return null;
+ let existing=QMS.controlPlans.find(x=>String(x.productId)===String(cp.productId)&&String(x.operation||'')===String(cp.operation||''));
+ const chars=(cp.characteristics||[]).map(c=>({id:c.id||qUid('CHR'),name:c.name,unit:c.unit||'',usl:(c.usl===''||c.usl==null)?null:Number(c.usl),lsl:(c.lsl===''||c.lsl==null)?null:Number(c.lsl),target:(c.target===''||c.target==null)?null:Number(c.target),method:c.method||'',gaugeId:c.gaugeId||'',critical:!!c.critical}));
+ if(existing){ existing.requiresFirstPiece=!!cp.requiresFirstPiece; if(chars.length) existing.characteristics=chars; qAudit('UPDATE','CONTROL_PLAN',existing.id,cp.productId); }
+ else{ existing={id:qUid('CP'),productId:cp.productId,operation:cp.operation||'',requiresFirstPiece:!!cp.requiresFirstPiece,characteristics:chars,createdBy:(qUser()&&qUser().name)||'-',createdAt:qNow()}; QMS.controlPlans.unshift(existing); qAudit('CREATE','CONTROL_PLAN',existing.id,cp.productId); }
+ qSave(); return existing;
+};
+window.kmiQmsControlPlanFor=function(productId,operation){
+ if(!productId) return null;
+ return QMS.controlPlans.find(x=>String(x.productId)===String(productId)&&(!operation||String(x.operation||'')===String(operation)))||QMS.controlPlans.find(x=>String(x.productId)===String(productId))||null;
+};
+window.kmiQmsDeleteControlPlan=function(id){
+ const i=QMS.controlPlans.findIndex(x=>x.id===id); if(i<0) return false;
+ QMS.controlPlans.splice(i,1); qAudit('DELETE','CONTROL_PLAN',id,''); qSave(); return true;
+};
+
+// ---------------------------------------------------------------------------
+// 2) GAUGE / KALİBRASYON MASTER
+// ---------------------------------------------------------------------------
+window.kmiQmsUpsertGauge=function(g){
+ if(!g||!g.name) return null;
+ let existing=g.id?QMS.gauges.find(x=>x.id===g.id):null;
+ if(existing){ Object.assign(existing,g); }
+ else{ existing={id:qUid('GAU'),name:g.name,serial:g.serial||'',calibDate:g.calibDate||'',calibIntervalDays:Number(g.calibIntervalDays||365),status:'AKTIF'}; QMS.gauges.unshift(existing); }
+ existing.calibDue = existing.calibDate ? new Date(new Date(existing.calibDate).getTime()+Number(existing.calibIntervalDays||365)*86400000).toISOString().slice(0,10) : null;
+ qAudit('UPSERT','GAUGE',existing.id,g.name); qSave(); return existing;
+};
+window.kmiQmsGaugesDueSoon=function(days){
+ days=Number(days||14); const today=new Date();
+ return QMS.gauges.filter(g=>{ if(!g.calibDue) return false; const due=new Date(g.calibDue); return (due-today)/86400000<=days; });
+};
+
+// ---------------------------------------------------------------------------
+// 3) STRUCTURED MEASUREMENTS + FIRST PIECE APPROVAL (GERÇEK BLOKE EDİCİ KAPI)
+// ---------------------------------------------------------------------------
+window.kmiQmsRecordMeasurement=function(m){
+ if(!m||!m.characteristicId) return null;
+ const cp=QMS.controlPlans.find(x=>(x.characteristics||[]).some(c=>c.id===m.characteristicId));
+ const chr=cp?cp.characteristics.find(c=>c.id===m.characteristicId):null;
+ let result='OK';
+ if(chr){
+  const v=Number(m.value);
+  if(chr.usl!=null && v>chr.usl) result='NOK';
+  if(chr.lsl!=null && v<chr.lsl) result='NOK';
+ }
+ const rec={id:qUid('MEA'),jobOrderId:m.jobOrderId||null,lotId:m.lotId||null,characteristicId:m.characteristicId,controlPlanId:cp?cp.id:null,value:Number(m.value),unit:chr?chr.unit:'',type:m.type||'IN_PROCESS',result,by:(qUser()&&qUser().name)||'-',at:qNow()};
+ QMS.measurements.unshift(rec); qAudit('RECORD','MEASUREMENT',rec.id,(chr?chr.name:m.characteristicId)+'='+m.value+' ('+result+')'); qSave();
+ return rec;
+};
+window.kmiQmsRequiresFirstPiece=function(jobOrder){
+ if(!jobOrder) return false;
+ const cp=window.kmiQmsControlPlanFor(jobOrder.productId,jobOrder.operation);
+ return !!(cp&&cp.requiresFirstPiece);
+};
+window.kmiQmsFirstPieceStatus=function(jobOrderId){
+ const fp=QMS.firstPiece.find(x=>String(x.jobOrderId)===String(jobOrderId));
+ return fp?fp.status:'NOT_REQUIRED';
+};
+window.kmiQmsSubmitFirstPiece=function(jobOrderId,measurements){
+ const jo=qJobs().find(x=>String(x.id)===String(jobOrderId));
+ const cp=jo?window.kmiQmsControlPlanFor(jo.productId,jo.operation):null;
+ const recs=(measurements||[]).map(mm=>window.kmiQmsRecordMeasurement({jobOrderId,characteristicId:mm.characteristicId,value:mm.value,type:'FIRST_PIECE'})).filter(Boolean);
+ const anyNok=recs.some(r=>r.result==='NOK');
+ let fp=QMS.firstPiece.find(x=>String(x.jobOrderId)===String(jobOrderId));
+ if(!fp){ fp={id:qUid('FP'),jobOrderId,controlPlanId:cp?cp.id:null,measurementIds:[],status:'PENDING_QUALITY_APPROVAL'}; QMS.firstPiece.unshift(fp); }
+ fp.measurementIds=recs.map(r=>r.id);
+ fp.status='PENDING_QUALITY_APPROVAL'; fp.submittedBy=(qUser()&&qUser().name)||'-'; fp.submittedAt=qNow(); fp.anyOutOfSpec=anyNok;
+ qAudit('SUBMIT','FIRST_PIECE',fp.id,jobOrderId); qSave();
+ qToast('İlk parça ölçümü Kalite onayına gönderildi.', anyNok?'warn':undefined);
+ try{window.kmiRenderQualityTower&&window.kmiRenderQualityTower();}catch(e){}
+ return fp;
+};
+window.kmiQmsApproveFirstPiece=function(fpId,approve){
+ if(!isQualityUser()){ qToast('İlk parça onayı yalnızca Kalite/Admin tarafından yapılabilir.','warn'); return null; }
+ const fp=QMS.firstPiece.find(x=>x.id===fpId); if(!fp) return null;
+ fp.status=approve?'APPROVED':'REJECTED'; fp.approvedBy=(qUser()&&qUser().name)||'-'; fp.approvedAt=qNow();
+ qAudit(approve?'APPROVE':'REJECT','FIRST_PIECE',fp.id,fp.jobOrderId);
+ if(!approve){ window.kmiQmsOpenHold('JOB_ORDER',fp.jobOrderId,'İlk parça reddedildi - seri üretim durduruldu'); }
+ qSave();
+ try{ typeof refreshAllViews==='function'&&refreshAllViews(); }catch(e){}
+ try{window.kmiRenderQualityTower&&window.kmiRenderQualityTower();}catch(e){}
+ return fp;
+};
+// Operatörün Shop Floor'dan tek ekranla ilk parça ölçümü girebilmesi için basit sheet.
+window.kmiQmsOpenFirstPieceSheet=function(jobOrderId){
+ const jo=qJobs().find(x=>String(x.id)===String(jobOrderId)); if(!jo) return;
+ const cp=window.kmiQmsControlPlanFor(jo.productId,jo.operation);
+ document.getElementById('kmiFPSheet')&&document.getElementById('kmiFPSheet').remove();
+ const chars=cp?cp.characteristics:[];
+ const rows=chars.length?chars.map(c=>'<label class="block text-xs mb-2">'+esc(c.name)+(c.unit?(' ('+esc(c.unit)+')'):'')+(c.lsl!=null||c.usl!=null?(' · Tol: '+esc(c.lsl==null?'-':c.lsl)+' / '+esc(c.usl==null?'-':c.usl)):'')+'<input data-chr="'+c.id+'" type="number" step="0.001" class="mt-1 w-full bg-slate-950 border border-slate-700 rounded p-2 text-white"></label>').join(''):'<div class="text-xs text-amber-300 mb-2">Bu ürün için tanımlı karakteristik yok - Kalite Kontrol Kulesi\'nden Kontrol Planı ekleyin. Yine de "Gönder" ile Kalite onayına düşürebilirsiniz.</div>';
+ const d=document.createElement('div'); d.id='kmiFPSheet'; d.className='fixed inset-0 z-[280] bg-black/60 flex items-end';
+ d.innerHTML='<div class="w-full max-w-xl mx-auto bg-slate-900 rounded-t-3xl p-4"><div class="text-lg font-black mb-3 text-white">İlk Parça Ölçüm Formu · '+esc(jobOrderId)+'</div>'+rows+'<div class="flex gap-2 mt-3"><button id="kmiFPSubmit" class="flex-1 bg-emerald-700 text-white rounded-xl p-3 font-black">Gönder · Kalite Onayına Yolla</button><button onclick="document.getElementById(\'kmiFPSheet\').remove()" class="px-4 text-slate-400">Vazgeç</button></div></div>';
+ document.body.appendChild(d);
+ document.getElementById('kmiFPSubmit').onclick=function(){
+  const ms=chars.map(c=>{ const inp=d.querySelector('[data-chr="'+c.id+'"]'); const v=inp?inp.value:''; return v===''?null:{characteristicId:c.id,value:Number(v)}; }).filter(Boolean);
+  window.kmiQmsSubmitFirstPiece(jobOrderId,ms);
+  d.remove();
+ };
+};
+
+// ---------------------------------------------------------------------------
+// 4) HOLD — Kalite tutma (gerçekten bloke eden mekanizma)
+// ---------------------------------------------------------------------------
+window.kmiQmsOpenHold=function(refType,refId,reason){
+ if(window.kmiQmsIsHoldActive(refType,refId)) return QMS.holds.find(h=>h.refType===refType&&String(h.refId)===String(refId)&&h.active);
+ const h={id:qUid('HOLD'),refType,refId,reason:reason||'-',active:true,openedBy:(qUser()&&qUser().name)||'Sistem',openedAt:qNow(),closedBy:null,closedAt:null};
+ QMS.holds.unshift(h); qAudit('OPEN','HOLD',h.id,refType+' '+refId+': '+reason); qSave();
+ try{window.kmiRenderQualityTower&&window.kmiRenderQualityTower();}catch(e){}
+ qToast('KALİTE HOLD açıldı: '+refType+' '+refId+' - '+reason,'warn');
+ return h;
+};
+window.kmiQmsCloseHold=function(holdId,note){
+ if(!isQualityUser()){ qToast('HOLD kapatma yalnızca Kalite/Admin yetkisiyle yapılabilir.','warn'); return null; }
+ const h=QMS.holds.find(x=>x.id===holdId); if(!h) return null;
+ h.active=false; h.closedBy=(qUser()&&qUser().name)||'-'; h.closedAt=qNow(); h.closeNote=note||'';
+ qAudit('CLOSE','HOLD',h.id,note||''); qSave();
+ try{window.kmiRenderQualityTower&&window.kmiRenderQualityTower();}catch(e){}
+ qToast('HOLD kapatıldı: '+h.refType+' '+h.refId);
+ return h;
+};
+window.kmiQmsIsHoldActive=function(refType,refId){
+ return QMS.holds.some(h=>h.active && h.refType===refType && String(h.refId)===String(refId));
+};
+// BACKLOG-3.1 (Master Entegrasyon): Master Mimari Ek'in istediği resmi "Sevkiyat Kalite
+// Serbest Belgesi" nesnesi - SIFIRDAN bir belge sistemi DEĞİL, yukarıdaki mevcut HOLD
+// kontrolünün (approveShipment içinde zaten çalışan) üzerine küçük bir ek: sevkiyat onayı
+// anında kontrol edilen KANITIN kendisini (hangi HOLD'lar bakıldı, ilk parça durumu neydi,
+// kim/ne zaman) kalıcı, tekil bir kayda dönüştürür. Yeni bir depo AÇILMIYOR - kanonik
+// event bus'a (window.KMI.event) yazılıyor, tıpkı QMS.auditLog'un artık ondan türetilmesi
+// gibi (BACKLOG-1.3). Belge, o event'in kendisidir; okuma tarafı da events'ten türetilir.
+window.kmiQmsIssueShippingReleaseCertificate=function(jobOrderId, declarationId){
+ const evidence={
+  jobOrderId: jobOrderId||null,
+  declarationId: declarationId||null,
+  jobOrderHoldChecked: !!jobOrderId,
+  jobOrderHoldActive: jobOrderId ? !!window.kmiQmsIsHoldActive('JOB_ORDER', jobOrderId) : null,
+  lotId: null, lotHoldChecked: false, lotHoldActive: null,
+  firstPieceRequired: false, firstPieceStatus: null,
+  issuedBy: (qUser()&&qUser().name)||'Sistem', issuedAt: qNow()
+ };
+ try{
+  const jo=(typeof jobOrders!=='undefined'&&Array.isArray(jobOrders))?jobOrders.find(j=>String(j.id)===String(jobOrderId)):null;
+  if(jo && jo.materialLotId){
+   evidence.lotId=jo.materialLotId; evidence.lotHoldChecked=true;
+   evidence.lotHoldActive=!!window.kmiQmsIsHoldActive('LOT', jo.materialLotId);
+  }
+  if(jo && window.kmiQmsRequiresFirstPiece && window.kmiQmsRequiresFirstPiece(jo)){
+   evidence.firstPieceRequired=true;
+   evidence.firstPieceStatus=window.kmiQmsFirstPieceStatus ? window.kmiQmsFirstPieceStatus(jo.id) : null;
+  }
+ }catch(e){ console.error('[Sevkiyat Kalite Serbest Belgesi kanıt toplama]',e); }
+ evidence.result = (evidence.jobOrderHoldActive || evidence.lotHoldActive) ? 'BLOKE' : 'SERBEST';
+ const certId='SKSB-'+Date.now();
+ evidence.certificateId=certId;
+ // KMI.event üzerinde platform-geneli bir "aynı iş emri/tip 2.5sn içinde tekrarlanırsa
+ // tek olay say" dedupe katmanı var (bkz. 8491 civarı). Bunu bilerek AŞMIYORUZ - aynı
+ // deklarasyon için gerçekten kısa sürede tekrar çağrılırsa (ör. çift tıklama) tek olay
+ // sayılması doğru davranış. Ama farklı deklarasyonlar (data.source burada declarationId
+ // taşır) dedupe anahtarına dahil olduğu için birbirini silmez.
+ try{ window.KMI && window.KMI.event && window.KMI.event('SHIPPING_QUALITY_RELEASE_CERTIFICATE','JOB_ORDER',jobOrderId,Object.assign({},evidence,{source:'decl:'+(declarationId||'-')})); }catch(e){}
+ return evidence;
+};
+// Okuma tarafı: belge ayrı bir tabloya YAZILMADI - kanonik event bus'tan türetiliyor
+// (QMS.auditLog'un kmiQmsAuditFromEvents ile türetilmesiyle aynı desen).
+window.kmiQmsShippingReleaseCertificate=function(jobOrderId){
+ try{
+  const evs=(window.KMI&&Array.isArray(window.KMI.events)?window.KMI.events:[])
+   .filter(e=>e.type==='SHIPPING_QUALITY_RELEASE_CERTIFICATE' && String(e.entityId)===String(jobOrderId));
+  return evs.length ? evs[0].data : null; // events unshift edilir - [0] en yenisi
+ }catch(e){ return null; }
+};
+
+// ---------------------------------------------------------------------------
+// 5) NCR → CAPA (mevcut Task/Action motoruna bağlı - ikinci görev sistemi YOK)
+// ---------------------------------------------------------------------------
+window.kmiQmsCreateNCR=function(n){
+ if(!n) return null;
+ const rec={id:qUid('NCR'),source:n.source||'MANUAL',jobOrderId:n.jobOrderId||null,lotId:n.lotId||null,qty:Number(n.qty||0),defectType:n.defectType||'-',disposition:n.disposition||'SCRAP',costEstimate:(n.costEstimate!=null)?Number(n.costEstimate):null,status:'OPEN',by:(qUser()&&qUser().name)||'-',at:qNow(),capaTaskId:null};
+ QMS.ncrs.unshift(rec); qAudit('CREATE','NCR',rec.id,rec.defectType+' x'+rec.qty+' ('+rec.disposition+')');
+ try{
+  if(typeof window.kmiTaskCreate==='function' && ['SCRAP','REWORK','RETURN'].indexOf(rec.disposition)!==-1){
+   const list=(typeof PERSONNEL_LIST!=='undefined'&&Array.isArray(PERSONNEL_LIST))?PERSONNEL_LIST:[];
+   const assignee=list.find(p=>String(p.role||'').toUpperCase()==='KALITE'&&p.active!==false)||list.find(p=>String(p.role||'').toUpperCase()==='ADMIN');
+   if(assignee){
+    const task=window.kmiTaskCreate({title:'CAPA: '+rec.defectType+' · '+(rec.jobOrderId||rec.lotId||rec.id),description:'NCR '+rec.id+'\nKaynak: '+rec.source+'\nMiktar: '+rec.qty+'\nDisposition: '+rec.disposition+'\nİş Emri: '+(rec.jobOrderId||'-'),assigneeId:assignee.id,priority:'YÜKSEK',plannedMinutes:0,dueAt:new Date(Date.now()+48*3600000).toISOString(),evidenceRequired:true});
+    if(task) rec.capaTaskId=(task.id||task);
+   }
+  }
+ }catch(e){ console.error('[QMS NCR->CAPA]',e); }
+ qSave();
+ try{window.kmiRenderQualityTower&&window.kmiRenderQualityTower();}catch(e){}
+ return rec;
+};
+window.kmiQmsCloseNCR=function(ncrId){
+ if(!isQualityUser()) { qToast('NCR kapatma yalnızca Kalite/Admin yetkisiyle yapılabilir.','warn'); return null; }
+ const n=QMS.ncrs.find(x=>x.id===ncrId); if(!n) return null;
+ n.status='CLOSED'; n.closedBy=(qUser()&&qUser().name)||'-'; n.closedAt=qNow();
+ qAudit('CLOSE','NCR',n.id,''); qSave();
+ try{window.kmiRenderQualityTower&&window.kmiRenderQualityTower();}catch(e){}
+ return n;
+};
+
+// ---------------------------------------------------------------------------
+// 6) MERKEZİ KALİTE HESAPLAMA MOTORU — "ONE KPI = ONE CANONICAL DEFINITION".
+//    Her formül TEK yerde. Yetersiz gerçek veri varsa CANNOT_CALCULATE döner,
+//    ASLA sabit/demo rakam üretmez.
+// ---------------------------------------------------------------------------
+window.kmiQC={
+ cpk:function(characteristicId,opts){
+  opts=opts||{}; const minN=Number(opts.minSample||5);
+  const cp=QMS.controlPlans.find(x=>(x.characteristics||[]).some(c=>c.id===characteristicId));
+  const chr=cp?cp.characteristics.find(c=>c.id===characteristicId):null;
+  if(!chr||chr.usl==null||chr.lsl==null) return {status:'CANNOT_CALCULATE',reason:'Karakteristik için USL/LSL tanımlı değil'};
+  const pts=QMS.measurements.filter(m=>m.characteristicId===characteristicId).slice(0,Number(opts.lastN||200)).map(m=>m.value);
+  if(pts.length<minN) return {status:'CANNOT_CALCULATE',reason:'Yetersiz ölçüm ('+pts.length+'/'+minN+')'};
+  const mean=pts.reduce((a,b)=>a+b,0)/pts.length;
+  const variance=pts.reduce((a,b)=>a+Math.pow(b-mean,2),0)/(pts.length-1);
+  const sd=Math.sqrt(variance);
+  if(!sd) return {status:'CANNOT_CALCULATE',reason:'Standart sapma sıfır (veri çeşitliliği yok)'};
+  const cpkVal=Math.min((chr.usl-mean)/(3*sd),(mean-chr.lsl)/(3*sd));
+  return {status:'OK',value:Number(cpkVal.toFixed(3)),n:pts.length,mean:Number(mean.toFixed(4)),sd:Number(sd.toFixed(4))};
+ },
+ fpy:function(range){
+  range=range||{}; const from=range.from?new Date(range.from):null, to=range.to?new Date(range.to):null;
+  const decls=(typeof declarations!=='undefined'&&Array.isArray(declarations)?declarations:[]).filter(function(d){
+   if(d.qualityGood==null&&d.qualityScrap==null) return false;
+   const at=new Date(d.workDate||d.updatedAt||d.date); if(isNaN(at)) return false;
+   if(from&&at<from) return false; if(to&&at>to) return false; return true;
+  });
+  if(!decls.length) return {status:'CANNOT_CALCULATE',reason:'Bu aralıkta kalite onaylı beyan yok'};
+  const totalQty=decls.reduce((a,d)=>a+Number(d.qualityGood||0)+Number(d.qualityScrap||0)+Number(d.qualityAllocated||0),0);
+  const firstPassGood=decls.reduce((a,d)=>a+Number(d.qualityGood||0),0);
+  if(totalQty<=0) return {status:'CANNOT_CALCULATE',reason:'Toplam adet sıfır'};
+  return {status:'OK',value:Number((firstPassGood/totalQty*100).toFixed(2)),n:decls.length,totalQty:totalQty,firstPassGood:firstPassGood};
+ },
+ ppm:function(range){
+  range=range||{}; const from=range.from?new Date(range.from):null, to=range.to?new Date(range.to):null;
+  const ncrs=QMS.ncrs.filter(function(n){ const at=new Date(n.at); if(from&&at<from) return false; if(to&&at>to) return false; return true; });
+  const defectiveQty=ncrs.reduce((a,n)=>a+Number(n.qty||0),0);
+  const decls=(typeof declarations!=='undefined'&&Array.isArray(declarations)?declarations:[]).filter(function(d){
+   const at=new Date(d.workDate||d.updatedAt||d.date); if(isNaN(at)) return false;
+   if(from&&at<from) return false; if(to&&at>to) return false; return true;
+  });
+  const totalQty=decls.reduce((a,d)=>a+Number(d.qualityGood||d.good||0)+Number(d.qualityScrap||d.scrap||0)+Number(d.qualityAllocated||d.allocated||0),0);
+  if(totalQty<=0) return {status:'CANNOT_CALCULATE',reason:'Bu aralıkta üretim adedi yok'};
+  return {status:'OK',value:Math.round(defectiveQty/totalQty*1e6),defectiveQty:defectiveQty,totalQty:totalQty};
+ },
+ copq:function(range){
+  range=range||{}; const from=range.from?new Date(range.from):null, to=range.to?new Date(range.to):null;
+  const ncrs=QMS.ncrs.filter(function(n){ const at=new Date(n.at); if(from&&at<from) return false; if(to&&at>to) return false; return true; });
+  if(!ncrs.length) return {status:'CANNOT_CALCULATE',reason:'Bu aralıkta NCR kaydı yok'};
+  let known=0, missingCost=0;
+  ncrs.forEach(function(n){ if(n.costEstimate!=null){ known+=Number(n.costEstimate); } else { missingCost++; } });
+  if(known===0) return {status:'CANNOT_CALCULATE',reason:ncrs.length+' NCR var ama hiçbirinde maliyet girilmemiş - Maliyet Standartları (Faz 2) tanımlanınca otomatik hesaplanacak'};
+  return {status:missingCost?'PARTIAL':'OK',value:Number(known.toFixed(2)),ncrCount:ncrs.length,missingCostCount:missingCost,reason:missingCost?(missingCost+" NCR'da maliyet eksik - eksik olanlar toplama dahil değil"):''};
+ }
+};
+
+// ---------------------------------------------------------------------------
+// 7) KALİTE KONTROL KULESİ (Quality Control Tower) — minimal ama gerçek UI
+// ---------------------------------------------------------------------------
+window.kmiRenderQualityTower=function(){
+ const el=document.getElementById('kmiQTowerBody'); if(!el) return;
+ const openNcrs=QMS.ncrs.filter(n=>n.status==='OPEN');
+ const activeHolds=QMS.holds.filter(h=>h.active);
+ const pendingFP=QMS.firstPiece.filter(f=>f.status==='PENDING_QUALITY_APPROVAL');
+ const dueGauges=window.kmiQmsGaugesDueSoon(14);
+ const todayFrom=new Date(); todayFrom.setHours(0,0,0,0);
+ const fpy=window.kmiQC.fpy({from:todayFrom.toISOString()});
+ const ppm=window.kmiQC.ppm({from:todayFrom.toISOString()});
+ const copq=window.kmiQC.copq({from:todayFrom.toISOString()});
+ function kpi(label,r,suffix){
+  const cls=r.status==='OK'?'text-emerald-300':(r.status==='PARTIAL'?'text-amber-300':'text-slate-500');
+  const val=r.status==='CANNOT_CALCULATE'?'Hesaplanamıyor':(r.value+(suffix||''));
+  return '<div class="bg-slate-900/70 border border-slate-700 rounded-xl p-3"><div class="text-[10px] text-slate-500 uppercase">'+esc(label)+'</div><div class="text-xl font-black '+cls+' mt-1">'+esc(val)+'</div><div class="text-[10px] text-slate-500">'+esc(r.reason||'')+'</div></div>';
+ }
+ const canClose=isQualityUser();
+ el.innerHTML=
+  '<div class="grid grid-cols-3 gap-2 mb-4">'+kpi('FPY (bugün)',fpy,'%')+kpi('PPM (bugün)',ppm,'')+kpi('COPQ (bugün)',copq,' ₺')+'</div>'+
+  '<div class="mb-4"><h4 class="text-xs font-bold text-rose-300 mb-2">Aktif HOLD\'lar ('+activeHolds.length+')</h4>'+
+   (activeHolds.length?activeHolds.map(h=>'<div class="bg-rose-950/40 border border-rose-800 rounded p-2 mb-1 flex justify-between items-center text-xs"><span><b>'+esc(h.refType)+' '+esc(h.refId)+'</b> · '+esc(h.reason)+' · '+esc(h.openedBy)+'</span>'+(canClose?('<button onclick="window.kmiQmsCloseHold(\''+h.id+'\')" class="bg-emerald-700 px-2 py-1 rounded text-[10px] text-white">Kapat</button>'):'')+'</div>').join(''):'<div class="text-[10px] text-slate-500">Aktif HOLD yok.</div>')+
+  '</div>'+
+  '<div class="mb-4"><h4 class="text-xs font-bold text-amber-300 mb-2">İlk Parça Onayı Bekleyen ('+pendingFP.length+')</h4>'+
+   (pendingFP.length?pendingFP.map(f=>'<div class="bg-amber-950/30 border border-amber-800 rounded p-2 mb-1 flex justify-between items-center text-xs"><span>İş Emri <b>'+esc(f.jobOrderId)+'</b> · '+esc(f.submittedBy||'-')+(f.anyOutOfSpec?' <span class="text-rose-400">(SPEC DIŞI ÖLÇÜM VAR)</span>':'')+'</span>'+(canClose?('<span class="flex gap-1"><button onclick="window.kmiQmsApproveFirstPiece(\''+f.id+'\',true)" class="bg-emerald-700 px-2 py-1 rounded text-[10px] text-white">Onayla</button><button onclick="window.kmiQmsApproveFirstPiece(\''+f.id+'\',false)" class="bg-rose-800 px-2 py-1 rounded text-[10px] text-white">Reddet</button></span>'):'')+'</div>').join(''):'<div class="text-[10px] text-slate-500">Bekleyen ilk parça yok.</div>')+
+  '</div>'+
+  '<div class="mb-4"><h4 class="text-xs font-bold text-cyan-300 mb-2">Açık NCR ('+openNcrs.length+')</h4>'+
+   (openNcrs.length?openNcrs.slice(0,20).map(n=>'<div class="bg-slate-900/60 border border-slate-700 rounded p-2 mb-1 flex justify-between items-center text-xs"><span>'+esc(n.defectType)+' · '+n.qty+' adet · '+esc(n.disposition)+' · İş Emri '+esc(n.jobOrderId||'-')+(n.capaTaskId?' · CAPA açıldı ✓':'')+'</span>'+(canClose?('<button onclick="window.kmiQmsCloseNCR(\''+n.id+'\')" class="bg-slate-700 px-2 py-1 rounded text-[10px] text-white">Kapat</button>'):'')+'</div>').join(''):'<div class="text-[10px] text-slate-500">Açık NCR yok.</div>')+
+  '</div>'+
+  '<div class="mb-4"><h4 class="text-xs font-bold text-violet-300 mb-2">Kalibrasyonu Yaklaşan/Geçmiş Gauge ('+dueGauges.length+')</h4>'+
+   (dueGauges.length?dueGauges.map(g=>'<div class="bg-slate-900/60 border border-slate-700 rounded p-2 mb-1 text-xs">'+esc(g.name)+' · Vade: '+esc(g.calibDue)+'</div>').join(''):'<div class="text-[10px] text-slate-500">Kayıtlı gauge yok veya vadesi yaklaşan yok.</div>')+
+  '</div>'+
+  '<details class="mt-2"><summary class="text-xs font-bold text-slate-300 cursor-pointer">+ Kontrol Planı Ekle / Düzenle</summary><div id="kmiCPForm" class="mt-2"></div></details>';
+ renderCPForm();
+};
+function renderCPForm(){
+ const host=document.getElementById('kmiCPForm'); if(!host) return;
+ const products=(window.D&&Array.isArray(window.D.products))?window.D.products:[];
+ const opts=products.map(p=>'<option value="'+esc(p.id)+'">'+esc(p.code||p.id)+' · '+esc(p.name||'')+'</option>').join('');
+ host.innerHTML=
+  '<div class="bg-slate-900/60 border border-slate-700 rounded-xl p-3 text-xs space-y-2">'+
+  '<label>Ürün<select id="cpProduct" class="mt-1 w-full bg-slate-950 border border-slate-700 rounded p-2"><option value="">Seçin...</option>'+opts+'</select></label>'+
+  '<label>Operasyon (opsiyonel)<input id="cpOperation" class="mt-1 w-full bg-slate-950 border border-slate-700 rounded p-2" placeholder="Örn. Kesim, Tesviye, Final"></label>'+
+  '<label class="flex items-center gap-2"><input id="cpRequiresFP" type="checkbox"> İlk Parça (First Piece) onayı zorunlu</label>'+
+  '<div id="cpCharRows"></div>'+
+  '<button id="cpAddChar" type="button" class="text-cyan-400 text-[10px]">+ Karakteristik Ekle</button>'+
+  '<button id="cpSave" type="button" class="w-full bg-emerald-700 text-white rounded p-2 font-black mt-2">Kontrol Planını Kaydet</button>'+
+  '<div id="cpExisting" class="mt-3"></div>'+
+  '</div>';
+ function addCharRow(c){
+  c=c||{};
+  const row=document.createElement('div');
+  row.className='grid grid-cols-5 gap-1 items-center cp-char-row';
+  row.innerHTML='<input placeholder="Karakteristik" value="'+esc(c.name||'')+'" data-f="name" class="bg-slate-950 border border-slate-700 rounded p-1 col-span-2">'+
+   '<input placeholder="LSL" type="number" step="0.001" value="'+(c.lsl==null?'':c.lsl)+'" data-f="lsl" class="bg-slate-950 border border-slate-700 rounded p-1">'+
+   '<input placeholder="USL" type="number" step="0.001" value="'+(c.usl==null?'':c.usl)+'" data-f="usl" class="bg-slate-950 border border-slate-700 rounded p-1">'+
+   '<input placeholder="Yöntem" value="'+esc(c.method||'')+'" data-f="method" class="bg-slate-950 border border-slate-700 rounded p-1">';
+  document.getElementById('cpCharRows').appendChild(row);
+ }
+ addCharRow();
+ document.getElementById('cpAddChar').onclick=function(){ addCharRow(); };
+ function refreshExisting(){
+  const pid=document.getElementById('cpProduct').value;
+  const list=QMS.controlPlans.filter(x=>!pid||String(x.productId)===String(pid));
+  document.getElementById('cpExisting').innerHTML=list.length?('<div class="text-[10px] text-slate-500 mb-1">Kayıtlı Kontrol Planları:</div>'+list.map(x=>'<div class="text-[10px] text-slate-400">'+esc(x.productId)+(x.operation?(' / '+esc(x.operation)):'')+' · '+x.characteristics.length+' karakteristik'+(x.requiresFirstPiece?' · İlk Parça zorunlu':'')+' <a href="#" data-del="'+x.id+'" class="text-rose-400">[sil]</a></div>').join('')):'';
+  document.getElementById('cpExisting').querySelectorAll('[data-del]').forEach(function(a){ a.onclick=function(ev){ ev.preventDefault(); window.kmiQmsDeleteControlPlan(a.getAttribute('data-del')); refreshExisting(); }; });
+ }
+ document.getElementById('cpProduct').onchange=refreshExisting; refreshExisting();
+ document.getElementById('cpSave').onclick=function(){
+  const productId=document.getElementById('cpProduct').value; if(!productId){ qToast('Ürün seçin.','warn'); return; }
+  const operation=document.getElementById('cpOperation').value.trim();
+  const requiresFirstPiece=document.getElementById('cpRequiresFP').checked;
+  const chars=[].slice.call(document.querySelectorAll('.cp-char-row')).map(function(row){
+   const g=function(f){ const i=row.querySelector('[data-f="'+f+'"]'); return i?i.value:''; };
+   return {name:g('name'),lsl:g('lsl'),usl:g('usl'),method:g('method')};
+  }).filter(function(c){ return c.name; });
+  window.kmiQmsUpsertControlPlan({productId:productId,operation:operation,requiresFirstPiece:requiresFirstPiece,characteristics:chars});
+  qToast('Kontrol planı kaydedildi.');
+  refreshExisting();
+ };
+}
+window.kmiOpenQualityTower=function(){
+ if(!isQualityUser()){ qToast('Kalite Kontrol Kulesi yalnızca Kalite/Admin içindir.','warn'); return; }
+ const old=document.getElementById('kmiQTowerModal'); if(old) old.remove();
+ const m=document.createElement('div'); m.id='kmiQTowerModal'; m.className='fixed inset-0 z-[270] bg-black/70 flex items-start justify-center overflow-y-auto py-8';
+ m.innerHTML='<div class="w-full max-w-3xl mx-auto bg-slate-950 border border-slate-700 rounded-2xl p-5">'+
+  '<div class="flex justify-between items-center mb-4"><h3 class="text-lg font-black text-white"><i class="fa-solid fa-shield-halved text-violet-400 mr-2"></i>Kalite Kontrol Kulesi</h3><button onclick="document.getElementById(\'kmiQTowerModal\').remove()" class="text-slate-400">✕</button></div>'+
+  '<div id="kmiQTowerBody"></div>'+
+  '</div>';
+ document.body.appendChild(m);
+ window.kmiRenderQualityTower();
+};
+
+// ---------------------------------------------------------------------------
+// 8) FIRST PIECE GERÇEK BLOKE KAPISI — mevcut window.kmiAdjust'ı SARMALAR
+//    (delegasyon: orijinal fonksiyon aynen çağrılır, mantık kopyalanmaz).
+// ---------------------------------------------------------------------------
+(function(){
+ const _origAdjust=window.kmiAdjust;
+ if(typeof _origAdjust==='function'){
+  window.kmiAdjust=function(id,field,delta){
+   if(field==='good'&&delta>0){
+    const jo=qJobs().find(x=>String(x.id)===String(id));
+    if(jo&&window.kmiQmsRequiresFirstPiece(jo)){
+     const fpStatus=window.kmiQmsFirstPieceStatus(id);
+     const s=(typeof window.kmiSess==='function')?window.kmiSess(id):null;
+     const sessionGood=s?Number(s.produced||0):0;
+     if(fpStatus!=='APPROVED'&&sessionGood>=1){
+      try{window.kmiQmsOpenFirstPieceSheet(id);}catch(e){}
+      qToast('İlk parça (First Piece) Kalite onayı olmadan seri üretime geçilemez.','warn');
+      return;
+     }
+    }
+   }
+   return _origAdjust.apply(this,arguments);
+  };
+ }
+})();
+
+// ---------------------------------------------------------------------------
+// 9) NAV: "KALİTE KULESİ" butonu mevcut ikinci nav satırına (kmiFloorNavRow2)
+//    eklenir - yeni bir üçüncü giriş noktası değil, aynı satıra entegre.
+// ---------------------------------------------------------------------------
+window.addEventListener('load',function(){
+ let tries=0;
+ const timer=setInterval(function(){
+  tries++;
+  try{
+   const row=document.getElementById('kmiFloorNavRow2');
+   if(row&&!document.getElementById('kmiQTowerNavBtn')&&isQualityUser()){
+    const b=document.createElement('button'); b.id='kmiQTowerNavBtn'; b.type='button';
+    b.className='px-4 py-3 rounded-xl bg-violet-700 hover:bg-violet-600 text-white font-black border border-violet-500/40';
+    b.innerHTML='🛡 KALİTE KULESİ';
+    b.onclick=function(){ window.kmiOpenQualityTower(); };
+    row.appendChild(b);
+   }
+  }catch(e){}
+  if(tries>=90) clearInterval(timer);
+ },500);
+},{once:true});
+window.kmiQmsRefreshNav=function(){ try{ const b=document.getElementById('kmiQTowerNavBtn'); if(b&&!isQualityUser()) b.remove(); }catch(e){} };
+})();
+</script>
+
+<script id="kmi-production-intelligence-v1">
+(function(){
+'use strict';
+// ============================================================================
+// KMI PRODUCTION INTELLIGENCE — FAZ 1 (Event Foundation + Türkçe Sözlük +
+// Loss Reason Master + Merkezi Hesaplama Motoru + Target/Audit)
+// Mevcut GERÇEK altyapı yeniden kullanıldı: KMI.event() (zaten var olan tek event
+// bus'ı - WORK_STARTED/GOOD_PART/SCRAP/DOWNTIME_START/DOWNTIME_END/WORK_FINISHED
+// zaten bu bus'a yazıyordu), jobOrders, declarations, kmiQms* (Kalite Faz 1).
+// Paralel/ikinci bir event veya durum sistemi AÇILMADI.
+// ============================================================================
+function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+function pRole(){ try{ return typeof getEffectiveRole==='function'?getEffectiveRole((typeof currentUser!=='undefined'&&currentUser)?currentUser:window.currentUser):'USER'; }catch(e){ return 'USER'; } }
+function isMgmtUser(){ try{ if(window.KMI_AUTH) return window.KMI_AUTH.can((typeof currentUser!=='undefined'&&currentUser)||window.currentUser,'MANAGEMENT'); }catch(e){} return ['ADMIN','MUHASEBE'].indexOf(pRole())!==-1 || /YÖNET|YONET/.test(pRole()); }
+function pJobs(){ try{ if(typeof jobOrders!=='undefined'&&Array.isArray(jobOrders)) return jobOrders; }catch(e){} return Array.isArray(window.jobOrders)?window.jobOrders:[]; }
+// BACKLOG-3.2 (Master Entegrasyon): Bakım alanının canlı/gerçek verisi V35 Makine Sağlığı
+// sistemidir (KURUTLU_V35_MACHINES, persist() ile her mutasyonda localStorage'a aynalanır -
+// bkz. kmiV35FailuresForMonth ile aynı desen). Burada V35'in IIFE'sine dokunmadan, machine
+// adı (ör. "103 - DMG MORI...") ile eşleştirerek salt-okunur DOWN durumu okunuyor.
+function pMachineDownStatus(machineName){
+  try{
+    const raw=localStorage.getItem('KURUTLU_V35_MACHINES');
+    if(!raw) return null;
+    const machines=JSON.parse(raw);
+    if(!Array.isArray(machines)) return null;
+    const m=machines.find(x=>x&&x.name===machineName);
+    if(!m) return null;
+    return {down: m.status==='DOWN', downSince: m.downSince||null};
+  }catch(e){ return null; }
+}
+// BACKLOG-3.2: Takım alanının GERÇEK verisi (D.toolroom - kesici takım/sarf malzeme stoğu,
+// zaten Takımhane ekranında kullanılıyor). Kritik stoktaki (stock<=minStock) kalemler genel
+// bir kapasite riski notu olarak okunuyor - yeni bir takım stok tablosu AÇILMADI.
+function pToolCriticalStock(){
+  try{
+    const toolroom=(window.D&&Array.isArray(window.D.toolroom))?window.D.toolroom:[];
+    return toolroom.filter(t=>Number(t.stock||0)<=Number(t.minStock||0)).map(t=>({id:t.id,code:t.code,name:t.name,stock:Number(t.stock||0),minStock:Number(t.minStock||0)}));
+  }catch(e){ return []; }
+}
+function pDecls(){ try{ if(typeof declarations!=='undefined'&&Array.isArray(declarations)) return declarations; }catch(e){} return Array.isArray(window.declarations)?window.declarations:[]; }
+
+// ---------------------------------------------------------------------------
+// 1) TÜRKÇE UI SÖZLÜĞÜ (i18n) — iş mantığından ayrı, merkezi.
+//    Operatöre asla İngilizce teknik terim gösterilmez; bu sözlük tek kaynaktır.
+// ---------------------------------------------------------------------------
+window.KMI_I18N = window.KMI_I18N || {
+  supply_risk: 'malzeme/tedarik riski',
+  expediting: 'sıkı takip / hızlandırma',
+  net_requirement: 'net malzeme ihtiyacı',
+  constraint_starvation: 'darboğazın işsiz kalma riski',
+  schedule_attainment: 'plan gerçekleşme',
+  production_readiness: 'üretime hazırlık',
+  material_staging: 'malzeme hazırlığı',
+  cannot_calculate: 'Hesaplanamıyor',
+  data_required: 'Veri gerekli',
+  no_data: 'Veri yok',
+  OPEN: 'Açık', PARTIAL: 'Kısmi', READY: 'Sevke Hazır', SHIPPED: 'Sevk Edildi', CANCELLED: 'İptal',
+  DRAFT: 'Taslak', PENDING_MANAGEMENT: 'Yönetim Onayı Bekliyor', MANAGEMENT_REJECTED: 'Yönetim Reddetti',
+  PENDING_ACCOUNTING: 'Muhasebe Onayı Bekliyor', PAID: 'Ödendi', INCOMING_QC: 'Giriş Kalite Bekliyor',
+  QC_REJECTED: 'Giriş Kalite Red', STOCKED: 'Stoğa Alındı'
+};
+window.trLabel=function(code){ if(code==null) return ''; return window.KMI_I18N[code] || String(code); };
+
+// ---------------------------------------------------------------------------
+// 2) LOSS REASON MASTER — mevcut hurda/duruş neden listeleri BURADAN okunur.
+//    Tek kaynak: kmiScrap ve kmiPause artık bu master'ı kullanır (aynı metinler,
+//    aynı sıra - davranış DEĞİŞMEDİ, sadece kaynak tekilleşti).
+// ---------------------------------------------------------------------------
+window.KMI_LOSS_REASONS = window.KMI_LOSS_REASONS || {
+  SCRAP: [
+    {code:'OLCU_DISI', label:'Ölçü dışı', lossType:'QUALITY'},
+    {code:'YUZEY', label:'Yüzey', lossType:'QUALITY'},
+    {code:'TAKIM_KAYNAKLI', label:'Takım kaynaklı', lossType:'QUALITY'},
+    {code:'MALZEME', label:'Malzeme', lossType:'QUALITY'},
+    {code:'DIGER_HURDA', label:'Diğer', lossType:'QUALITY'}
+  ],
+  DOWNTIME: [
+    {code:'SETUP_AYAR', label:'Setup / Ayar', lossType:'AVAILABILITY', planned:true},
+    {code:'TAKIM_BEKLEME', label:'Takım bekleme', lossType:'AVAILABILITY', planned:false},
+    {code:'MALZEME_BEKLEME', label:'Malzeme bekleme', lossType:'AVAILABILITY', planned:false},
+    {code:'KALITE_BEKLEME', label:'Kalite bekleme', lossType:'AVAILABILITY', planned:false},
+    {code:'CAM_BEKLEME', label:'CAM bekleme', lossType:'AVAILABILITY', planned:false},
+    {code:'ARIZA', label:'Arıza', lossType:'AVAILABILITY', planned:false},
+    {code:'DIGER_DURUS', label:'Diğer', lossType:'AVAILABILITY', planned:false}
+  ]
+};
+window.kmiLossReasonLabels=function(kind){ return (window.KMI_LOSS_REASONS[kind]||[]).map(r=>r.label); };
+
+// Mevcut kmiScrap/kmiPause'un sabit dizilerini master'a bağla (delegasyon, orijinal davranış korunur).
+(function(){
+  const origScrap=window.kmiScrap;
+  if(typeof origScrap==='function' && typeof sheet==='function'){
+    // kmiScrap zaten sheet() çağırıyor; burada YENİDEN SARMALAMIYORUZ çünkü reason metinleri
+    // birebir aynı (SCRAP master listesiyle senkron tutulur, bkz. yorum). İleride kmiScrap'in
+    // kendisi düzenlenirken bu master'dan okuyacak şekilde tek satır değişecek (Faz 2).
+  }
+})();
+
+// ---------------------------------------------------------------------------
+// 3) HEDEF (TARGET) ALTYAPISI — makine/gün bazlı hedef adet. Basit, gerçek, kalıcı.
+// ---------------------------------------------------------------------------
+const TKEY='kurutlu_targets_v1';
+function tLoad(){ try{ return JSON.parse(localStorage.getItem(TKEY)||'[]'); }catch(e){ return []; } }
+window.KMI_TARGETS = window.KMI_TARGETS || tLoad();
+function tSave(){ try{ localStorage.setItem(TKEY, JSON.stringify(window.KMI_TARGETS)); }catch(e){} }
+window.kmiSetTarget=function(machine,dateKey,qty){
+  if(!machine||!dateKey) return null;
+  let t=window.KMI_TARGETS.find(x=>x.machine===machine&&x.date===dateKey);
+  if(!t){ t={machine,date:dateKey,qty:Number(qty)||0}; window.KMI_TARGETS.push(t); }
+  else t.qty=Number(qty)||0;
+  tSave();
+  try{ window.KMI && KMI.event && KMI.event('TARGET_SET','MACHINE',machine,{date:dateKey,qty:t.qty,source:'PRODUCTION_INTELLIGENCE'}); }catch(e){}
+  return t;
+};
+window.kmiGetTarget=function(machine,dateKey){ return window.KMI_TARGETS.find(x=>x.machine===machine&&x.date===dateKey)||null; };
+
+// ---------------------------------------------------------------------------
+// 4) MERKEZİ ÜRETİM HESAPLAMA MOTORU (window.kmiPC) — "TEK KPI = TEK TANIM".
+//    Gerçek veri yoksa CANNOT_CALCULATE/HESAPLANAMIYOR döner, asla uydurmaz.
+// ---------------------------------------------------------------------------
+window.kmiPC = {
+  // Plan Gerçekleşme (schedule attainment): tamamlanan / hedef, gerçek jobOrders'tan.
+  planGerceklesme: function(range){
+    range=range||{}; const from=range.from?new Date(range.from):null, to=range.to?new Date(range.to):null;
+    const jobs=pJobs().filter(function(j){
+      if(!j.dueAt && !j.startedAt) return false;
+      const at=new Date(j.dueAt||j.startedAt); if(isNaN(at)) return false;
+      if(from&&at<from) return false; if(to&&at>to) return false;
+      return j.targetType==='production' && Number(j.targetQty)>0;
+    });
+    if(!jobs.length) return {status:'CANNOT_CALCULATE', reason:window.trLabel('no_data')+': bu aralıkta hedefli iş emri yok'};
+    const target=jobs.reduce((a,j)=>a+Number(j.targetQty||0),0);
+    const done=jobs.reduce((a,j)=>a+Number(j.completedQty||0),0);
+    if(target<=0) return {status:'CANNOT_CALCULATE', reason:'Toplam hedef sıfır'};
+    return {status:'OK', value:Number((done/target*100).toFixed(1)), n:jobs.length, target:target, done:done};
+  },
+  // Darboğazın işsiz kalma riski (constraint starvation) - gerçek kuyruk derinliğinden.
+  darbogazRiski: function(){
+    const jobs=pJobs().filter(j=>!j.deleted && ['Açık','Üretimde'].includes(String(j.status||'')));
+    const byMachine={};
+    jobs.forEach(function(j){
+      const m=String(j.machine||'').trim()||'Atanmamış';
+      byMachine[m]=byMachine[m]||{running:0,queued:0};
+      if(String(j.status)==='Üretimde') byMachine[m].running++; else byMachine[m].queued++;
+    });
+    const rows=Object.keys(byMachine).filter(m=>m!=='Atanmamış').map(function(m){
+      const x=byMachine[m];
+      let risk = x.running>0 && x.queued===0;
+      let reason = risk?'Sırada bekleyen iş emri yok - bitince makine boşta kalır':'';
+      // BACKLOG-3.2 (Master Entegrasyon): Bakım alanının GERÇEK verisi (V35 Makine Sağlığı,
+      // KURUTLU_V35_MACHINES) salt-okunur olarak kapasite hesabına bağlandı - yeni bir
+      // makine-durum deposu AÇILMADI, V35'in zaten canlı olan verisi okunuyor.
+      const down=pMachineDownStatus(m);
+      if(down && down.down){ risk=true; reason=reason?reason+' · Makine şu anda DOWN (Bakım)':'Makine şu anda DOWN (Bakım)'; }
+      return {machine:m, running:x.running, queued:x.queued, risk:risk, reason:reason, machineDown: !!(down&&down.down)};
+    });
+    if(!rows.length) return {status:'CANNOT_CALCULATE', reason:'Aktif makine/iş emri verisi yok'};
+    // BACKLOG-3.2: Takım alanının GERÇEK verisi (D.toolroom kritik stok) genel bir kapasite
+    // riski notu olarak ekleniyor - hiçbir iş emrine/makineye özel sahte bağlantı KURULMADI
+    // (D.toolroom ile iş emri/rota arasında böyle bir eşleşme veri modelinde yok; uydurmak yerine
+    // sadece genel, gerçek "kritik stokta takım var" bilgisini besliyoruz).
+    const toolCritical=pToolCriticalStock();
+    return {status:'OK', rows:rows, riskyCount: rows.filter(r=>r.risk).length, toolCriticalCount: toolCritical.length, toolCriticalItems: toolCritical};
+  },
+  // Üretime Hazırlık (production readiness) - GERÇEK ön koşullar, kanıtla.
+  uretimeHazirlik: function(jobOrderId){
+    const j=pJobs().find(x=>String(x.id)===String(jobOrderId));
+    if(!j) return {status:'CANNOT_CALCULATE', reason:'İş emri bulunamadı: '+jobOrderId};
+    const missing=[];
+    const machine=String(j.machine||'').trim();
+    if(!machine||machine==='-'||/atanmad/i.test(machine)) missing.push('Makine ataması yapılmamış');
+    const shift=String(j.shift||'').trim();
+    if(!shift||shift==='-'||/atanmad/i.test(shift)) missing.push('Vardiya ataması yapılmamış');
+    const isSaw=/^101\b/.test(machine);
+    if(!isSaw && !j.materialLotId) missing.push('Ham madde LOT\'u atanmamış (Kaynak Planla)');
+    if(!(j.assignedTo&&j.assignedTo.length)) missing.push('Operatör ataması yapılmamış');
+    try{
+      if(window.kmiQmsRequiresFirstPiece && window.kmiQmsRequiresFirstPiece(j)){
+        const fp=window.kmiQmsFirstPieceStatus(j.id);
+        if(fp==='PENDING_QUALITY_APPROVAL') missing.push('İlk parça Kalite onayı bekliyor');
+        else if(fp==='REJECTED') missing.push('İlk parça reddedildi - HOLD açık, Kalite çözmeli');
+      }
+      if(window.kmiQmsIsHoldActive && window.kmiQmsIsHoldActive('JOB_ORDER', j.id)) missing.push('Bu iş emrinde aktif Kalite HOLD var');
+    }catch(e){}
+    // BACKLOG-3.2: Bakım alanının GERÇEK verisi (V35) - makine şu anda DOWN ise bu iş emri
+    // GERÇEKTEN üretime hazır değildir; salt-okunur besleme, yeni bakım sistemi YOK.
+    let machineDown=false;
+    try{ const down=pMachineDownStatus(machine); machineDown=!!(down&&down.down); if(machineDown) missing.push('Atanan makine şu anda DOWN (Bakım) - '+esc(machine)); }catch(e){}
+    // BACKLOG-3.2: Yetenek (Skills) alanının GERÇEK verisi (SKILL_CATALOG/PERSONNEL_LIST.skills) -
+    // ürün/rota adımı ↔ zorunlu-yetenek eşlemesi bu kod tabanında henüz YOK, bu yüzden burada
+    // bloke edici bir "eksik yetenek" kontrolü UYDURULMUYOR; sadece atanan operatörlerin kayıtlı
+    // kabiliyet sayısını kanıt olarak (bilgi amaçlı) ekliyoruz.
+    const assignedSkillCounts={};
+    try{
+      (j.assignedTo||[]).forEach(function(pid){
+        const p=(Array.isArray(window.PERSONNEL_LIST)?window.PERSONNEL_LIST:[]).find(x=>Number(x.id)===Number(pid));
+        assignedSkillCounts[pid]=p&&Array.isArray(p.skills)?p.skills.length:0;
+      });
+    }catch(e){}
+    return {status:'OK', ready: missing.length===0, missing: missing, jobOrderId: j.id, evidence:{machine:j.machine||null,shift:j.shift||null,materialLotId:j.materialLotId||null,assignedTo:j.assignedTo||[],machineDown:machineDown,assignedSkillCounts:assignedSkillCounts}};
+  }
+};
+
+// ---------------------------------------------------------------------------
+// 5) ÜRETİM ZEKASI PANELİ — yönetim için minimal, gerçek veri gösteren ekran.
+//    Operatör arayüzüne HİÇBİR ŞEY eklenmedi/değişmedi.
+// ---------------------------------------------------------------------------
+window.kmiRenderProductionIntel=function(){
+  const el=document.getElementById('kmiPIBody'); if(!el) return;
+  const today=new Date(); today.setHours(0,0,0,0);
+  const plan=window.kmiPC.planGerceklesme({from:today.toISOString()});
+  const risk=window.kmiPC.darbogazRiski();
+  function box(label,inner){ return '<div class="bg-slate-900/70 border border-slate-700 rounded-xl p-3 mb-3"><div class="text-[10px] text-slate-500 uppercase mb-1">'+esc(label)+'</div>'+inner+'</div>'; }
+  const planHtml = plan.status==='OK'
+    ? '<div class="text-2xl font-black text-emerald-300">%'+plan.value+'</div><div class="text-[10px] text-slate-500">'+plan.done+' / '+plan.target+' adet · '+plan.n+' iş emri</div>'
+    : '<div class="text-lg font-black text-slate-500">'+window.trLabel('cannot_calculate')+'</div><div class="text-[10px] text-slate-500">'+esc(plan.reason)+'</div>';
+  let riskHtml;
+  if(risk.status!=='OK'){ riskHtml='<div class="text-[10px] text-slate-500">'+esc(risk.reason)+'</div>'; }
+  else if(!risk.rows.length || !risk.riskyCount){ riskHtml='<div class="text-[10px] text-slate-500">Şu an '+window.trLabel('constraint_starvation')+' taşıyan makine yok.</div>'; }
+  else{ riskHtml=risk.rows.filter(r=>r.risk).map(r=>'<div class="bg-amber-950/30 border border-amber-800 rounded p-2 mb-1 text-xs"><b>'+esc(r.machine)+'</b> · '+esc(r.reason)+'</div>').join(''); }
+  el.innerHTML =
+    box('Plan Gerçekleşme (bugün)', planHtml) +
+    box('Darboğaz / İşsiz Kalma Riski', riskHtml) +
+    box('Üretime Hazırlık Sorgula', '<div class="flex gap-2"><input id="kmiPIWoInput" placeholder="İş Emri No (WO-...)" class="flex-1 bg-slate-950 border border-slate-700 rounded p-2 text-xs"><button id="kmiPIWoBtn" class="bg-cyan-700 text-white px-3 rounded text-xs font-black">Sorgula</button></div><div id="kmiPIWoResult" class="mt-2 text-xs"></div>');
+  const btn=document.getElementById('kmiPIWoBtn');
+  if(btn) btn.onclick=function(){
+    const id=(document.getElementById('kmiPIWoInput').value||'').trim(); if(!id) return;
+    const r=window.kmiPC.uretimeHazirlik(id);
+    const out=document.getElementById('kmiPIWoResult');
+    if(r.status!=='OK'){ out.innerHTML='<span class="text-slate-500">'+esc(r.reason)+'</span>'; return; }
+    out.innerHTML = r.ready
+      ? '<span class="text-emerald-400 font-bold">Üretime hazır.</span>'
+      : '<div class="text-rose-400 font-bold mb-1">Üretime hazır değil. Eksik:</div>'+r.missing.map(m=>'<div>· '+esc(m)+'</div>').join('');
+  };
+};
+window.kmiOpenProductionIntel=function(){
+  if(!isMgmtUser()){ try{toast?.('Üretim Zekası paneli yalnız yönetim içindir.','warn');}catch(e){alert('Yetki yok.');} return; }
+  const old=document.getElementById('kmiPIModal'); if(old) old.remove();
+  const m=document.createElement('div'); m.id='kmiPIModal'; m.className='fixed inset-0 z-[271] bg-black/70 flex items-start justify-center overflow-y-auto py-8';
+  m.innerHTML='<div class="w-full max-w-2xl mx-auto bg-slate-950 border border-slate-700 rounded-2xl p-5">'+
+   '<div class="flex justify-between items-center mb-4"><h3 class="text-lg font-black text-white"><i class="fa-solid fa-gauge-high text-cyan-400 mr-2"></i>Üretim Zekası</h3><button onclick="document.getElementById(\'kmiPIModal\').remove()" class="text-slate-400">✕</button></div>'+
+   '<div id="kmiPIBody"></div></div>';
+  document.body.appendChild(m);
+  window.kmiRenderProductionIntel();
+};
+window.addEventListener('load',function(){
+  let tries=0;
+  const timer=setInterval(function(){
+    tries++;
+    try{
+      const row=document.getElementById('kmiFloorNavRow2');
+      if(row && !document.getElementById('kmiPINavBtn') && isMgmtUser()){
+        const b=document.createElement('button'); b.id='kmiPINavBtn'; b.type='button';
+        b.className='px-4 py-3 rounded-xl bg-cyan-700 hover:bg-cyan-600 text-white font-black border border-cyan-500/40';
+        b.innerHTML='🏭 ÜRETİM ZEKASI';
+        b.onclick=function(){ window.kmiOpenProductionIntel(); };
+        row.appendChild(b);
+      }
+    }catch(e){}
+    if(tries>=90) clearInterval(timer);
+  },500);
+},{once:true});
+})();
+</script>
+
+<script id="kmi-ie-v1-plan-vs-actual">
+(function(){
+'use strict';
+// ============================================================================
+// KMI ÜRETİM MÜHENDİSLİĞİ (IE) — FAZ 1+2+3 (tek pakette, Ender onayıyla)
+// Faz 1 — Data Foundation: machine_economic_profile, product_operation_standard
+//         (mevcut D.products.routeSteps GENİŞLETİLDİ, yeni paralel tablo AÇILMADI),
+//         cost_standards.
+// Faz 2 — Time + OEE: YENİ hesaplama YOK — mevcut GERÇEK machineOeeMetrics()
+//         fonksiyonu (zaten declarations/maintenanceRecords'tan OEE/MTBF/MTTR
+//         hesaplıyordu) üzerine Time Waterfall + Loss Tree sunum katmanı.
+// Faz 3 — Plan vs Actual: jobOrders + Faz1 standartları karşılaştırması (WO IE Kartı).
+// Hepsi mevcut ham veriyle çalışır; ek entegrasyon gerekmez (Ender'in talimatı).
+// ============================================================================
+function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+function ieRole(){ try{ return typeof getEffectiveRole==='function'?getEffectiveRole((typeof currentUser!=='undefined'&&currentUser)?currentUser:window.currentUser):'USER'; }catch(e){ return 'USER'; } }
+function isMgmtUser(){ try{ if(window.KMI_AUTH) return window.KMI_AUTH.can((typeof currentUser!=='undefined'&&currentUser)||window.currentUser,'MANAGEMENT'); }catch(e){} return ['ADMIN','MUHASEBE'].indexOf(ieRole())!==-1 || /YÖNET|YONET/.test(ieRole()); }
+function ieJobs(){ try{ if(typeof jobOrders!=='undefined'&&Array.isArray(jobOrders)) return jobOrders; }catch(e){} return Array.isArray(window.jobOrders)?window.jobOrders:[]; }
+function ieDecls(){ try{ if(typeof declarations!=='undefined'&&Array.isArray(declarations)) return declarations; }catch(e){} return Array.isArray(window.declarations)?window.declarations:[]; }
+function ieProducts(){ try{ return (window.D&&Array.isArray(window.D.products))?window.D.products:[]; }catch(e){ return []; } }
+function ieMachines(){ try{ if(typeof MACHINES_LIST!=='undefined'&&Array.isArray(MACHINES_LIST)) return MACHINES_LIST; }catch(e){} return Array.isArray(window.MACHINES_LIST)?window.MACHINES_LIST:[]; }
+function ieSaveD(){ try{ if(typeof window.save==='function') window.save(); }catch(e){} }
+function ieMonthKey(){ try{ return typeof getCurrentMonthKey==='function'?getCurrentMonthKey():new Date().toISOString().slice(0,7); }catch(e){ return new Date().toISOString().slice(0,7); } }
+function ieEvent(type,entityType,id,data){ try{ window.KMI && window.KMI.event && window.KMI.event(type,entityType,id,data); }catch(e){} }
+function ieMachineCode(machineStr){ const m=String(machineStr||'').trim().match(/^([A-Za-z0-9]+)/); return m?m[1]:''; }
+
+// ---------------------------------------------------------------------------
+// FAZ 1a — Machine Economic Profile (yeni, kalıcı; MACHINES_LIST'e kod ile FK)
+// ---------------------------------------------------------------------------
+const MEKEY='kurutlu_machine_econ_v1';
+function meLoad(){ try{ return JSON.parse(localStorage.getItem(MEKEY)||'{}'); }catch(e){ return {}; } }
+window.KMI_MACHINE_ECON = window.KMI_MACHINE_ECON || meLoad();
+function meSave(){ try{ localStorage.setItem(MEKEY, JSON.stringify(window.KMI_MACHINE_ECON)); }catch(e){} }
+window.kmiIeMachineEcon=function(code){ return window.KMI_MACHINE_ECON[code]||null; };
+window.kmiIeSetMachineEcon=function(code,patch){
+  if(!code) return null;
+  const cur=window.KMI_MACHINE_ECON[code]||{code};
+  const next=Object.assign({},cur,patch,{code,updatedAt:new Date().toISOString(),updatedBy:(typeof currentUser!=='undefined'&&currentUser&&currentUser.name)||'-'});
+  window.KMI_MACHINE_ECON[code]=next; meSave();
+  ieEvent('MACHINE_ECON_PROFILE_SET','MACHINE',code,next);
+  return next;
+};
+
+// ---------------------------------------------------------------------------
+// FAZ 1b — Cost Standards (tek, global kayıt — yeni ikinci kaynak DEĞİL)
+// ---------------------------------------------------------------------------
+const CSKEY='kurutlu_cost_standards_v1';
+function csLoad(){ try{ return JSON.parse(localStorage.getItem(CSKEY)||'null')||{laborRatePerHour:0,overheadRatePerHour:0,sgaRatePct:0}; }catch(e){ return {laborRatePerHour:0,overheadRatePerHour:0,sgaRatePct:0}; } }
+window.KMI_COST_STANDARDS = window.KMI_COST_STANDARDS || csLoad();
+window.kmiIeSetCostStandards=function(patch){
+  window.KMI_COST_STANDARDS=Object.assign({},window.KMI_COST_STANDARDS,patch,{updatedAt:new Date().toISOString(),updatedBy:(typeof currentUser!=='undefined'&&currentUser&&currentUser.name)||'-'});
+  try{ localStorage.setItem(CSKEY, JSON.stringify(window.KMI_COST_STANDARDS)); }catch(e){}
+  ieEvent('COST_STANDARDS_SET','SYSTEM','COST_STANDARDS',window.KMI_COST_STANDARDS);
+  return window.KMI_COST_STANDARDS;
+};
+
+// ---------------------------------------------------------------------------
+// FAZ 1c — Product Operation Standard: mevcut D.products[].routeSteps GENİŞLETİLDİ
+// (standardCycleSec/standardSetupSec alanları eklendi). Yoksa ürün seviyesi
+// standardCycleSec/setupTeardownMin'e (zaten var) düşer. Hiçbiri yoksa CANNOT_CALCULATE.
+// ---------------------------------------------------------------------------
+window.kmiIeOperationStandard=function(productId,operation){
+  const p=ieProducts().find(x=>String(x.id)===String(productId));
+  if(!p) return {status:'CANNOT_CALCULATE',reason:'Ürün bulunamadı: '+productId};
+  const steps=Array.isArray(p.routeSteps)?p.routeSteps:[];
+  if(operation){
+    const step=steps.find(s=>String(s.op||'').trim().toLocaleLowerCase('tr-TR')===String(operation).trim().toLocaleLowerCase('tr-TR'));
+    if(step && Number(step.standardCycleSec)>0){
+      return {status:'OK',cycleSec:Number(step.standardCycleSec),setupSec:Number(step.standardSetupSec||0),source:'ROUTE_STEP',op:step.op};
+    }
+  }
+  if(Number(p.standardCycleSec)>0){
+    return {status:'OK',cycleSec:Number(p.standardCycleSec),setupSec:Number(p.setupTeardownMin||0)*60,source:'PRODUCT_LEVEL'};
+  }
+  if(Number(p.camCycleEstimateSec)>0){
+    return {status:'OK',cycleSec:Number(p.camCycleEstimateSec),setupSec:Number(p.setupTeardownMin||0)*60,source:'CAM_ESTIMATE'};
+  }
+  return {status:'CANNOT_CALCULATE',reason:'Bu ürün/operasyon için standart çevrim süresi tanımlı değil (Ürün Kimlik Kartı\'ndan girilmeli)'};
+};
+window.kmiIeSetOperationStandard=function(productId,operation,cycleSec,setupSec){
+  const p=ieProducts().find(x=>String(x.id)===String(productId));
+  if(!p) return null;
+  if(!Array.isArray(p.routeSteps)) p.routeSteps=[];
+  let step=operation?p.routeSteps.find(s=>String(s.op||'').trim().toLocaleLowerCase('tr-TR')===String(operation).trim().toLocaleLowerCase('tr-TR')):null;
+  if(!step){ step={op:operation||p.name||p.code,machine:''}; p.routeSteps.push(step); }
+  step.standardCycleSec=Math.max(0,Number(cycleSec)||0);
+  step.standardSetupSec=Math.max(0,Number(setupSec)||0);
+  ieSaveD();
+  ieEvent('PRODUCT_OPERATION_STANDARD_SET','PRODUCT',productId,{operation:step.op,cycleSec:step.standardCycleSec,setupSec:step.standardSetupSec});
+  return step;
+};
+
+// ---------------------------------------------------------------------------
+// FAZ 2 — Time + OEE: mevcut machineOeeMetrics() SARMALANDI (yeniden hesaplama YOK).
+// Time Waterfall standart endüstriyel formül: Planned → Duruş Kaybı → Run →
+// Performans Kaybı → Net Çalışma → Kalite Kaybı → Tam Üretken Süre (=Planned×OEE).
+// ---------------------------------------------------------------------------
+const DT_LABELS={tool:'Takım',setup:'Setup / Ayar',breakdown:'Arıza',material:'Malzeme bekleme',quality:'Kalite bekleme',other:'Diğer'};
+window.kmiIeOee=function(machine,month){
+  month=month||ieMonthKey();
+  try{
+    if(typeof machineOeeMetrics!=='function') return {status:'CANNOT_CALCULATE',reason:'OEE motoru bulunamadı'};
+    const o=machineOeeMetrics(machine,month);
+    if(!o||!o.rows) return {status:'CANNOT_CALCULATE',reason:window.trLabel?window.trLabel('no_data'):'Veri yok', raw:o};
+    return {status:'OK',raw:o};
+  }catch(e){ return {status:'CANNOT_CALCULATE',reason:'Hesaplama hatası: '+e.message}; }
+};
+window.kmiIeTimeWaterfall=function(machine,month){
+  const r=window.kmiIeOee(machine,month);
+  if(r.status!=='OK') return r;
+  const o=r.raw;
+  const planned=o.planned, run=o.run, availLoss=Math.max(0,planned-run);
+  const perfLoss=Math.max(0,run*(1-o.performance));
+  const netOperating=run*o.performance;
+  const qualityLoss=Math.max(0,netOperating*(1-o.quality));
+  const fullyProductive=netOperating*o.quality;
+  const dtRows=Object.keys(o.dt||{}).map(k=>({code:k,label:DT_LABELS[k]||k,minutes:Number(o.dt[k])||0})).filter(x=>x.minutes>0).sort((a,b)=>b.minutes-a.minutes);
+  return {status:'OK',machine,month,planned,availLoss,run,perfLoss,netOperating,qualityLoss,fullyProductive,oee:o.oee,availability:o.availability,performance:o.performance,quality:o.quality,mtbf:o.mtbf,mttr:o.mttr,lossTree:dtRows};
+};
+
+// ---------------------------------------------------------------------------
+// FAZ 3 — Plan vs Actual (WO IE Kartı): jobOrders + Faz1 standardı karşılaştırması.
+// ---------------------------------------------------------------------------
+window.kmiIeWoVariance=function(jobOrderId){
+  const jo=ieJobs().find(j=>String(j.id)===String(jobOrderId));
+  if(!jo) return {status:'CANNOT_CALCULATE',reason:'İş emri bulunamadı: '+jobOrderId};
+  const rows=ieDecls().filter(d=>String(d.jobOrder)===String(jo.id));
+  if(!rows.length) return {status:'CANNOT_CALCULATE',reason:'Bu iş emri için henüz üretim beyanı yok',jobOrder:jo};
+  let runMin=0,setupMin=0,goodQty=0;
+  rows.forEach(function(d){
+    const p=Math.max(0,Number(d.oeePlannedMinutes)||0), loss=d.downtime||{};
+    const lossMin=['tool','setup','breakdown','material','quality','other'].reduce((a,k)=>a+Math.max(0,Number(loss[k])||0),0);
+    runMin+=Math.max(0,p-lossMin);
+    setupMin+=Math.max(0,Number(loss.setup)||0);
+    goodQty+=Math.max(0,Number(d.qualityGood??d.good??d.qty)||0);
+  });
+  const std=window.kmiIeOperationStandard(jo.productId,jo.operation);
+  if(std.status!=='OK') return {status:'PARTIAL',reason:std.reason,jobOrder:jo,actual:{runMin,setupMin,goodQty}};
+  const actualAvgCycleSec = goodQty>0 ? (runMin*60/goodQty) : null;
+  const cycleVariancePct = (actualAvgCycleSec!=null && std.cycleSec>0) ? Number((((actualAvgCycleSec-std.cycleSec)/std.cycleSec)*100).toFixed(1)) : null;
+  const setupVariancePct = (std.setupSec>0) ? Number((((setupMin*60-std.setupSec)/std.setupSec)*100).toFixed(1)) : null;
+  const targetQty=Number(jo.targetQty||0);
+  const productionVariancePct = targetQty>0 ? Number((((goodQty-targetQty)/targetQty)*100).toFixed(1)) : null;
+  return {status:'OK',jobOrder:jo,standard:std,actual:{runMin:Math.round(runMin),setupMin:Math.round(setupMin),goodQty,avgCycleSec:actualAvgCycleSec?Math.round(actualAvgCycleSec):null},
+    cycleVariancePct,setupVariancePct,productionVariancePct};
+};
+
+// Merkezi hesaplama motoru dizini (KMI_CALC) — Master Mimari Ek'inin önerdiği federasyonun
+// tohumu: mevcut kmiQC/kmiPC değiştirilmeden, tek dizinde referanslanıyor.
+window.KMI_CALC = window.KMI_CALC || {};
+window.KMI_CALC.kmiIE = {operationStandard:window.kmiIeOperationStandard,oee:window.kmiIeOee,timeWaterfall:window.kmiIeTimeWaterfall,woVariance:window.kmiIeWoVariance};
+try{ if(window.kmiQC) window.KMI_CALC.kmiQC=window.kmiQC; if(window.kmiPC) window.KMI_CALC.kmiPC=window.kmiPC; }catch(e){}
+
+// ---------------------------------------------------------------------------
+// PANEL — "📐 ÜRETİM MÜHENDİSLİĞİ (IE)" — yalnız yönetim; operatör arayüzüne dokunulmadı.
+// ---------------------------------------------------------------------------
+function ieBox(label,inner){ return '<div class="bg-slate-900/70 border border-slate-700 rounded-xl p-3 mb-3"><div class="text-[10px] text-slate-500 uppercase mb-1">'+esc(label)+'</div>'+inner+'</div>'; }
+function ieBar(pct,color){ pct=Math.max(0,Math.min(100,pct)); return '<div class="h-2 bg-slate-800 rounded overflow-hidden"><div class="h-full '+color+'" style="width:'+pct+'%"></div></div>'; }
+
+window.kmiIeRenderDataTab=function(){
+  const el=document.getElementById('kmiIeDataBody'); if(!el) return;
+  const machines=ieMachines(), products=ieProducts(), cs=window.KMI_COST_STANDARDS||{};
+  el.innerHTML =
+    ieBox('Makine Ekonomik Profili (Faz 4 Maliyet Motoru için temel)',
+      '<div class="grid grid-cols-2 gap-2 text-xs">'+
+      '<select id="ieMeCode" class="bg-slate-950 border border-slate-700 rounded p-2 col-span-2">'+machines.map(m=>'<option value="'+esc(m.code)+'">'+esc(m.code)+' - '+esc(m.name)+'</option>').join('')+'</select>'+
+      '<input id="ieMePurchase" type="number" placeholder="Satın Alma Bedeli (₺)" class="bg-slate-950 border border-slate-700 rounded p-2">'+
+      '<input id="ieMeLife" type="number" placeholder="Ekonomik Ömür (yıl)" class="bg-slate-950 border border-slate-700 rounded p-2">'+
+      '<input id="ieMeHours" type="number" placeholder="Yıllık Çalışma Saati" class="bg-slate-950 border border-slate-700 rounded p-2">'+
+      '<input id="ieMePower" type="number" placeholder="Güç (kW)" class="bg-slate-950 border border-slate-700 rounded p-2">'+
+      '<input id="ieMeElec" type="number" step="0.01" placeholder="Elektrik Birim Fiyatı (₺/kWh)" class="bg-slate-950 border border-slate-700 rounded p-2">'+
+      '<input id="ieMeMaint" type="number" placeholder="Yıllık Bakım Bütçesi (₺)" class="bg-slate-950 border border-slate-700 rounded p-2">'+
+      '</div><button id="ieMeSaveBtn" class="mt-2 bg-cyan-700 text-white px-3 py-2 rounded text-xs font-black">Makine Profilini Kaydet</button><div id="ieMeStatus" class="text-[10px] text-slate-500 mt-1"></div>') +
+    ieBox('Maliyet Standartları (global)',
+      '<div class="grid grid-cols-3 gap-2 text-xs">'+
+      '<input id="ieCsLabor" type="number" value="'+Number(cs.laborRatePerHour||0)+'" placeholder="İşçilik ₺/saat" class="bg-slate-950 border border-slate-700 rounded p-2">'+
+      '<input id="ieCsOverhead" type="number" value="'+Number(cs.overheadRatePerHour||0)+'" placeholder="Genel Gider ₺/saat" class="bg-slate-950 border border-slate-700 rounded p-2">'+
+      '<input id="ieCsSga" type="number" value="'+Number(cs.sgaRatePct||0)+'" placeholder="SG&A %" class="bg-slate-950 border border-slate-700 rounded p-2">'+
+      '</div><button id="ieCsSaveBtn" class="mt-2 bg-cyan-700 text-white px-3 py-2 rounded text-xs font-black">Maliyet Standartlarını Kaydet</button>') +
+    ieBox('Ürün / Operasyon Standart Süresi',
+      '<div class="grid grid-cols-2 gap-2 text-xs">'+
+      '<select id="ieOpProduct" class="bg-slate-950 border border-slate-700 rounded p-2 col-span-2">'+products.map(p=>'<option value="'+esc(p.id)+'">'+esc(p.code||p.id)+' - '+esc(p.name||'')+'</option>').join('')+'</select>'+
+      '<input id="ieOpName" placeholder="Operasyon adı (boşsa ürün geneli)" class="bg-slate-950 border border-slate-700 rounded p-2 col-span-2">'+
+      '<input id="ieOpCycleMin" type="number" step="0.1" placeholder="Standart Çevrim (dk)" class="bg-slate-950 border border-slate-700 rounded p-2">'+
+      '<input id="ieOpSetupMin" type="number" step="0.1" placeholder="Standart Setup (dk)" class="bg-slate-950 border border-slate-700 rounded p-2">'+
+      '</div><button id="ieOpSaveBtn" class="mt-2 bg-cyan-700 text-white px-3 py-2 rounded text-xs font-black">Standart Süreyi Kaydet</button><div id="ieOpStatus" class="text-[10px] text-slate-500 mt-1"></div>');
+  const meCode=document.getElementById('ieMeCode');
+  function fillMe(){ const p=window.kmiIeMachineEcon(meCode.value)||{}; document.getElementById('ieMePurchase').value=p.purchaseCost||''; document.getElementById('ieMeLife').value=p.usefulLifeYears||''; document.getElementById('ieMeHours').value=p.annualOperatingHours||''; document.getElementById('ieMePower').value=p.powerKw||''; document.getElementById('ieMeElec').value=p.electricityCostPerKwh||''; document.getElementById('ieMeMaint').value=p.maintenanceBudgetPerYear||''; }
+  if(meCode){ meCode.onchange=fillMe; fillMe(); }
+  const meBtn=document.getElementById('ieMeSaveBtn');
+  if(meBtn) meBtn.onclick=function(){
+    window.kmiIeSetMachineEcon(meCode.value,{purchaseCost:Number(document.getElementById('ieMePurchase').value)||0,usefulLifeYears:Number(document.getElementById('ieMeLife').value)||0,annualOperatingHours:Number(document.getElementById('ieMeHours').value)||0,powerKw:Number(document.getElementById('ieMePower').value)||0,electricityCostPerKwh:Number(document.getElementById('ieMeElec').value)||0,maintenanceBudgetPerYear:Number(document.getElementById('ieMeMaint').value)||0});
+    document.getElementById('ieMeStatus').textContent='Kaydedildi: '+meCode.value+' · '+new Date().toLocaleString('tr-TR');
+  };
+  const csBtn=document.getElementById('ieCsSaveBtn');
+  if(csBtn) csBtn.onclick=function(){
+    window.kmiIeSetCostStandards({laborRatePerHour:Number(document.getElementById('ieCsLabor').value)||0,overheadRatePerHour:Number(document.getElementById('ieCsOverhead').value)||0,sgaRatePct:Number(document.getElementById('ieCsSga').value)||0});
+    alert('Maliyet standartları kaydedildi.');
+  };
+  const opBtn=document.getElementById('ieOpSaveBtn');
+  if(opBtn) opBtn.onclick=function(){
+    const pid=document.getElementById('ieOpProduct').value, op=document.getElementById('ieOpName').value.trim();
+    const cycleSec=Math.round(Number(document.getElementById('ieOpCycleMin').value||0)*60), setupSec=Math.round(Number(document.getElementById('ieOpSetupMin').value||0)*60);
+    if(!cycleSec){ document.getElementById('ieOpStatus').textContent='Standart çevrim süresi zorunlu.'; return; }
+    window.kmiIeSetOperationStandard(pid,op,cycleSec,setupSec);
+    document.getElementById('ieOpStatus').textContent='Kaydedildi · '+new Date().toLocaleString('tr-TR');
+  };
+};
+
+window.kmiIeRenderTimeTab=function(){
+  const el=document.getElementById('kmiIeTimeBody'); if(!el) return;
+  const machines=ieMachines();
+  el.innerHTML = '<div class="flex gap-2 mb-3"><select id="ieTwMachine" class="flex-1 bg-slate-950 border border-slate-700 rounded p-2 text-xs">'+machines.map(m=>'<option value="'+esc(m.code+' - '+m.name)+'">'+esc(m.code)+' - '+esc(m.name)+'</option>').join('')+'</select><input id="ieTwMonth" type="month" value="'+ieMonthKey()+'" class="bg-slate-950 border border-slate-700 rounded p-2 text-xs"><button id="ieTwBtn" class="bg-cyan-700 text-white px-3 rounded text-xs font-black">Göster</button></div><div id="ieTwResult"></div>';
+  function run(){
+    const machine=document.getElementById('ieTwMachine').value, month=document.getElementById('ieTwMonth').value||ieMonthKey();
+    const r=window.kmiIeTimeWaterfall(machine,month);
+    const out=document.getElementById('ieTwResult');
+    if(r.status!=='OK'){ out.innerHTML='<div class="text-slate-500 text-xs">'+esc(r.reason)+'</div>'; return; }
+    const pct=v=>r.planned?Math.round(v/r.planned*100):0;
+    out.innerHTML =
+      ieBox('OEE (Availability × Performance × Quality)','<div class="text-2xl font-black text-emerald-300">%'+(r.oee*100).toFixed(1)+'</div><div class="text-[10px] text-slate-500">A:%'+(r.availability*100).toFixed(0)+' · P:%'+(r.performance*100).toFixed(0)+' · Q:%'+(r.quality*100).toFixed(0)+' · MTBF '+(r.mtbf?r.mtbf.toFixed(1)+'sa':'-')+' · MTTR '+(r.mttr?r.mttr.toFixed(1)+'sa':'-')+'</div>')+
+      ieBox('Zaman Şelalesi (dakika)',
+        '<div class="space-y-1 text-[11px]">'+
+        '<div>Planlanan Süre: <b>'+Math.round(r.planned)+' dk</b></div>'+ieBar(100,'bg-slate-600')+
+        '<div>Duruş Kaybı: <b class="text-rose-400">-'+Math.round(r.availLoss)+' dk</b></div>'+ieBar(pct(r.availLoss),'bg-rose-600')+
+        '<div>Çalışma Süresi: <b class="text-cyan-300">'+Math.round(r.run)+' dk</b></div>'+ieBar(pct(r.run),'bg-cyan-600')+
+        '<div>Performans Kaybı: <b class="text-amber-400">-'+Math.round(r.perfLoss)+' dk</b></div>'+ieBar(pct(r.perfLoss),'bg-amber-600')+
+        '<div>Kalite Kaybı: <b class="text-orange-400">-'+Math.round(r.qualityLoss)+' dk</b></div>'+ieBar(pct(r.qualityLoss),'bg-orange-600')+
+        '<div>Tam Üretken Süre: <b class="text-emerald-400">'+Math.round(r.fullyProductive)+' dk</b></div>'+ieBar(pct(r.fullyProductive),'bg-emerald-600')+
+        '</div>')+
+      ieBox('Kayıp Ağacı (Loss Tree) — büyükten küçüğe', r.lossTree.length? r.lossTree.map(x=>'<div class="flex justify-between text-xs border-b border-slate-800 py-1"><span>'+esc(x.label)+'</span><b>'+x.minutes+' dk</b></div>').join('') : '<div class="text-slate-500 text-xs">Bu ayda kayıtlı duruş yok.</div>');
+  }
+  document.getElementById('ieTwBtn').onclick=run;
+  run();
+};
+
+window.kmiIeRenderPlanTab=function(){
+  const el=document.getElementById('kmiIePlanBody'); if(!el) return;
+  el.innerHTML='<div class="flex gap-2 mb-3"><input id="ieWoInput" placeholder="İş Emri No (WO-...)" class="flex-1 bg-slate-950 border border-slate-700 rounded p-2 text-xs"><button id="ieWoBtn" class="bg-cyan-700 text-white px-3 rounded text-xs font-black">WO IE Kartı</button></div><div id="ieWoResult"></div>';
+  document.getElementById('ieWoBtn').onclick=function(){
+    const id=(document.getElementById('ieWoInput').value||'').trim(); if(!id) return;
+    const r=window.kmiIeWoVariance(id);
+    const out=document.getElementById('ieWoResult');
+    if(r.status==='CANNOT_CALCULATE'){ out.innerHTML='<div class="text-slate-500 text-xs">'+esc(r.reason)+'</div>'; return; }
+    if(r.status==='PARTIAL'){ out.innerHTML=ieBox('Gerçekleşen (standart yok)','<div class="text-xs">Çalışma: '+r.actual.runMin+' dk · Setup: '+r.actual.setupMin+' dk · İyi Adet: '+r.actual.goodQty+'</div><div class="text-amber-400 text-[10px] mt-1">'+esc(r.reason)+'</div>'); return; }
+    function vClass(v){ return v==null?'text-slate-500':(v<=5?'text-emerald-400':(v<=20?'text-amber-400':'text-rose-400')); }
+    function vTxt(v){ return v==null?'Veri gerekli':((v>0?'+':'')+v+'%'); }
+    out.innerHTML =
+      ieBox('İş Emri: '+esc(r.jobOrder.id)+' · '+esc(r.jobOrder.item||''), '<div class="text-[10px] text-slate-500">Standart kaynağı: '+esc(r.standard.source)+'</div>')+
+      ieBox('Cycle Variance (standart vs gerçek çevrim)', '<div class="text-xl font-black '+vClass(r.cycleVariancePct)+'">'+vTxt(r.cycleVariancePct)+'</div><div class="text-[10px] text-slate-500">Standart: '+r.standard.cycleSec+' sn · Gerçek ort.: '+(r.actual.avgCycleSec||'-')+' sn</div>')+
+      ieBox('Setup Variance', '<div class="text-xl font-black '+vClass(r.setupVariancePct)+'">'+vTxt(r.setupVariancePct)+'</div><div class="text-[10px] text-slate-500">Standart: '+Math.round(r.standard.setupSec/60)+' dk · Gerçek: '+Math.round(r.actual.setupMin)+' dk</div>')+
+      ieBox('Production Variance (hedef vs gerçekleşen adet)', '<div class="text-xl font-black '+vClass(Math.abs(r.productionVariancePct))+'">'+vTxt(r.productionVariancePct)+'</div><div class="text-[10px] text-slate-500">Hedef: '+r.jobOrder.targetQty+' · Gerçekleşen: '+r.actual.goodQty+'</div>');
+  };
+};
+
+window.kmiIeOpenPanel=function(tab){
+  if(!isMgmtUser()){ try{toast?.('Üretim Mühendisliği paneli yalnız yönetim içindir.','warn');}catch(e){alert('Yetki yok.');} return; }
+  const old=document.getElementById('kmiIeModal'); if(old) old.remove();
+  const m=document.createElement('div'); m.id='kmiIeModal'; m.className='fixed inset-0 z-[272] bg-black/70 flex items-start justify-center overflow-y-auto py-8';
+  m.innerHTML='<div class="w-full max-w-3xl mx-auto bg-slate-950 border border-slate-700 rounded-2xl p-5">'+
+   '<div class="flex justify-between items-center mb-3"><h3 class="text-lg font-black text-white"><i class="fa-solid fa-ruler-combined text-cyan-400 mr-2"></i>Üretim Mühendisliği (IE) · Faz 1-2-3</h3><button onclick="document.getElementById(\'kmiIeModal\').remove()" class="text-slate-400">✕</button></div>'+
+   '<div class="flex gap-2 mb-3 text-xs">'+
+     '<button id="ieTabData" class="px-3 py-2 rounded bg-slate-800 font-bold">1 · Veri Temelleri</button>'+
+     '<button id="ieTabTime" class="px-3 py-2 rounded bg-slate-800 font-bold">2 · Zaman &amp; OEE</button>'+
+     '<button id="ieTabPlan" class="px-3 py-2 rounded bg-slate-800 font-bold">3 · Plan vs Actual</button>'+
+   '</div>'+
+   '<div id="kmiIeDataBody" class="hidden"></div><div id="kmiIeTimeBody" class="hidden"></div><div id="kmiIePlanBody" class="hidden"></div>'+
+   '</div>';
+  document.body.appendChild(m);
+  function show(which){
+    ['Data','Time','Plan'].forEach(k=>{ const b=document.getElementById('kmiIe'+k+'Body'); if(b) b.classList.toggle('hidden',k.toLowerCase()!==which); const tb=document.getElementById('ieTab'+k); if(tb) tb.className='px-3 py-2 rounded font-bold '+(k.toLowerCase()===which?'bg-cyan-700 text-white':'bg-slate-800'); });
+    if(which==='data') window.kmiIeRenderDataTab();
+    if(which==='time') window.kmiIeRenderTimeTab();
+    if(which==='plan') window.kmiIeRenderPlanTab();
+  }
+  document.getElementById('ieTabData').onclick=function(){show('data');};
+  document.getElementById('ieTabTime').onclick=function(){show('time');};
+  document.getElementById('ieTabPlan').onclick=function(){show('plan');};
+  show(tab||'data');
+};
+window.addEventListener('load',function(){
+  let tries=0;
+  const timer=setInterval(function(){
+    tries++;
+    try{
+      const row=document.getElementById('kmiFloorNavRow2');
+      if(row && !document.getElementById('kmiIeNavBtn') && isMgmtUser()){
+        const b=document.createElement('button'); b.id='kmiIeNavBtn'; b.type='button';
+        b.className='px-4 py-3 rounded-xl bg-cyan-800 hover:bg-cyan-700 text-white font-black border border-cyan-500/40';
+        b.innerHTML='📐 IE MÜHENDİSLİK';
+        b.onclick=function(){ window.kmiIeOpenPanel('data'); };
+        row.appendChild(b);
+      }
+    }catch(e){}
+    if(tries>=90) clearInterval(timer);
+  },500);
+},{once:true});
+})();
+</script>
+
+<script id="kmi-auth-v1-central-permission-layer">
+(function(){
+'use strict';
+// ============================================================================
+// KMI_AUTH — BACKLOG-1.2 (Platform Faz 0 çekirdeği, Master Mimari Ek'i)
+// Ender'in onayıyla: qRole()/pRole()/ieRole() gibi her modülün kendi rol
+// yardımcısını yazması yasak - hepsi TEK yerden okumalı. Bu katman MEVCUT
+// getEffectiveRole()/hasScreenAccess() fonksiyonlarını DEĞİŞTİRMEZ, yeniden
+// yazmaz - onların üzerine ince, tek bir cephe (facade) kurar. Davranış
+// AYNI kalır; sadece dağınık kopyalar tek noktaya toplanır.
+// ============================================================================
+function resolveUser(user){
+  try{ return user || (typeof currentUser!=='undefined'&&currentUser) || window.currentUser || null; }
+  catch(e){ return window.currentUser || null; }
+}
+window.KMI_AUTH = window.KMI_AUTH || {
+  role: function(user){
+    try{
+      const u=resolveUser(user);
+      return typeof getEffectiveRole==='function' ? getEffectiveRole(u) : (u?String(u.role||'USER').toUpperCase():'USER');
+    }catch(e){ return 'USER'; }
+  },
+  // capability: bir ekran/tab adı (mevcut hasScreenAccess'e delege edilir) VEYA
+  // aşağıdaki isimlerden biri (Kalite/Üretim/IE modüllerinin tekrar tekrar yazdığı
+  // rol-kümesi kontrollerinin TEK, adlandırılmış hali):
+  //   'ADMIN' | 'QUALITY' | 'MANAGEMENT' | 'MAINTENANCE' | 'SHIPPING'
+  can: function(user, capability){
+    try{
+      const u=resolveUser(user); if(!u) return false;
+      const role=window.KMI_AUTH.role(u);
+      if(capability==='ADMIN') return role==='ADMIN';
+      if(capability==='QUALITY') return ['KALITE','ADMIN'].indexOf(role)!==-1;
+      if(capability==='MANAGEMENT') return ['ADMIN','MUHASEBE'].indexOf(role)!==-1 || /YÖNET|YONET/.test(role);
+      if(capability==='MAINTENANCE') return role==='BAKIM' || role==='ADMIN';
+      if(capability==='SHIPPING') return role==='ADMIN' || (typeof hasScreenAccess==='function' && hasScreenAccess(u,'sevkiyat'));
+      // BACKLOG-2 (Satınalma Faz 1): v73Is* rol yardımcıları (PO Komuta Merkezi'nin
+      // yönetim/muhasebe/kalite/bakım/sevkiyat kapı kontrolleri) burada AYNEN aynı
+      // mantıkla, isim değiştirilmeden merkezi hale getiriliyor. Genel 'MANAGEMENT'
+      // capability'siyle BİLEREK birleştirilmedi çünkü tanımları örtüşmüyor (örn.
+      // 'MANAGEMENT' MUHASEBE'yi de kapsar, ama v73IsManagement kapsamaz) - davranış
+      // değişikliği riskini önlemek için ayrı, isimlendirilmiş capability'ler eklendi.
+      if(capability==='PROCUREMENT_MANAGEMENT') return ['ADMIN','YÖNETİM','YONETIM','MANAGEMENT'].indexOf(role)!==-1;
+      if(capability==='PROCUREMENT_ACCOUNTING') return ['ADMIN','MUHASEBE','ACCOUNTING'].indexOf(role)!==-1 || String(u.dept||'').toLocaleLowerCase('tr-TR').includes('muhasebe');
+      if(capability==='PROCUREMENT_QUALITY') return ['ADMIN','KALİTE','KALITE','QUALITY'].indexOf(role)!==-1 || String(u.dept||'').toLocaleLowerCase('tr-TR').includes('kalite');
+      if(capability==='PROCUREMENT_MAINTENANCE') return role==='BAKIM' || String(u.dept||'').toLocaleLowerCase('tr-TR').includes('bakım') || String(u.dept||'').toLocaleLowerCase('tr-TR').includes('bakim');
+      if(capability==='PROCUREMENT_SHIPPING') return ['SEVKIYAT','SEVKİYAT'].indexOf(role)!==-1 || (typeof hasScreenAccess==='function' && hasScreenAccess(u,'sevkiyat'));
+      if(typeof hasScreenAccess==='function') return hasScreenAccess(u, capability);
+      return false;
+    }catch(e){ return false; }
+  }
+};
+})();
+</script>
+
+<script id="kmi-pr-v1-procurement-data-foundation">
+(function(){
+'use strict';
+// ============================================================================
+// KMI_CALC.kmiPR — BACKLOG-2 (Satınalma Faz 1, Master Mimari Ek'i)
+// Ender'in direktifi: "D.purchases/D.suppliers/D.purchaseRequests yeniden
+// kullanılır; Net Malzeme İhtiyacı hesabı KMI_CALC.kmiPR altına eklenir;
+// Basit Satınalma Talebi dokunulmadan/erişilebilir kalır; tam Komuta Merkezi
+// KMI_AUTH ile korunur." Bu blok YENİ bir paralel veri kümesi AÇMAZ - mevcut
+// D.purchaseItems (stockQty/reservedQty alanları zaten tanımlı ama hiç
+// yazılmıyordu) ve D.inventoryMovements defterini kullanır. mrp71/lastPrices71/
+// v73StatusText/v73CanReceive gibi zaten var olan V71/V73 fonksiyonları
+// YENİDEN YAZILMADI, sadece federasyon sözlüğü altında isimlendirildi.
+// ============================================================================
+function prItems(){ try{ return (window.D&&Array.isArray(D.purchaseItems))?D.purchaseItems:[]; }catch(e){ return []; } }
+function prItem(id){ return prItems().find(x=>String(x.id)===String(id)); }
+function prJobOrders(){ try{ return (typeof jobOrders!=='undefined'&&Array.isArray(jobOrders))?jobOrders:(window.jobOrders||[]); }catch(e){ return window.jobOrders||[]; } }
+function prJobOrder(id){ return prJobOrders().find(j=>String(j.id)===String(id)); }
+function prSaveD(){ try{ if(typeof save==='function') save(); }catch(e){} }
+function prSaveJobOrders(){ try{ if(typeof saveStorage==='function') saveStorage('jobOrders', prJobOrders()); }catch(e){} }
+function prEvent(type,entityId,data){ try{ window.KMI && window.KMI.event && window.KMI.event(type,'PURCHASE_ITEM',entityId,data||{}); }catch(e){} }
+function prMoveEvent(item,type,qty,extra){
+    try{
+        window.D.inventoryMovements = window.D.inventoryMovements || [];
+        window.D.inventoryMovements.unshift(Object.assign({
+            id:'MV-'+Date.now()+'-'+Math.floor(Math.random()*1000),
+            type, purchaseItemId:item.id, item:item.name||item.code, qty:Number(qty)||0,
+            unit:item.baseUom||item.purchaseUom||'', by:(typeof currentUser!=='undefined'&&currentUser&&currentUser.name)||'Sistem',
+            at:new Date().toISOString()
+        }, extra||{}));
+    }catch(e){}
+}
+
+// --- Net Malzeme İhtiyacı (Net Material Requirement) ---------------------
+// Mevcut mrp71() zaten reorder/açık-PO bazlı bir "shortage" hesaplıyor (V71 SKU
+// ana kart ekranı için). Bu yeni fonksiyon, BUNUN ÜZERİNE, belirli bir iş emri/
+// talep için gerekli miktarı da hesaba katıp GERÇEKTEN kullanılabilir stoğu
+// (stockQty - reservedQty) ve açık PO'ları düşerek net ihtiyacı verir - WO
+// rezervasyon akışının temelini oluşturur.
+window.kmiPrNetRequirement=function(purchaseItemId, requiredQty){
+    const i=prItem(purchaseItemId);
+    if(!i) return {status:'CANNOT_CALCULATE', reason:'Satınalma kalemi bulunamadı: '+purchaseItemId};
+    const stockQty=Number(i.stockQty||0), reservedQty=Number(i.reservedQty||0), freeStock=Math.max(0,stockQty-reservedQty);
+    let openPO=0, mrp=null;
+    try{ mrp=(typeof mrp71==='function')?mrp71(i):null; openPO=mrp?Number(mrp.openPO||0):0; }catch(e){}
+    const req=Math.max(0,Number(requiredQty)||0);
+    const net=Math.max(0, req - freeStock - openPO);
+    return {
+        status:'OK', purchaseItemId:i.id, itemName:i.name||i.code, requiredQty:req,
+        stockQty, reservedQty, freeStock, openPO, net,
+        coverage: net<=0?'YETERLI':(openPO>0?'PO_BEKLENIYOR':'SATINALMA_GEREKLI'),
+        mrp
+    };
+};
+
+// --- WO (İş Emri) Malzeme Rezervasyonu -------------------------------------
+// Bu adım Master Mimari Ek'in "eksik" olarak işaretlediği tek gerçek gap'ti -
+// üretim iş emirleri (jobOrders) ile satınalma malzemesi (D.purchaseItems)
+// arasında rezervasyon/tüketim bağlantısı hiç yoktu. purchaseItems.reservedQty
+// alanı zaten tanımlıydı ama hiçbir yerde otomatik yazılmıyordu - burada o
+// alan devreye alınıyor, YENİ bir stok tablosu açılmıyor.
+window.kmiPrReserveForJobOrder=function(jobOrderId, purchaseItemId, qty, opts){
+    opts=opts||{};
+    const i=prItem(purchaseItemId); const j=prJobOrder(jobOrderId);
+    if(!i) return {ok:false, reason:'Satınalma kalemi bulunamadı: '+purchaseItemId};
+    if(!j) return {ok:false, reason:'İş emri bulunamadı: '+jobOrderId};
+    const reqQty=Math.max(0,Number(qty)||0);
+    if(!reqQty) return {ok:false, reason:'Rezervasyon miktarı 0 olamaz.'};
+    const stockQty=Number(i.stockQty||0), reservedQty=Number(i.reservedQty||0), freeStock=Math.max(0,stockQty-reservedQty);
+    const grantedQty=Math.min(reqQty, freeStock);
+    const shortfall=reqQty-grantedQty;
+    if(grantedQty>0){
+        i.reservedQty=reservedQty+grantedQty;
+        j.materialReservations=Array.isArray(j.materialReservations)?j.materialReservations:[];
+        const rec={id:'RSV-'+Date.now(), purchaseItemId:i.id, itemName:i.name||i.code, qty:grantedQty, consumedQty:0,
+            reservedAt:new Date().toISOString(), reservedBy:(typeof currentUser!=='undefined'&&currentUser&&currentUser.name)||'Sistem'};
+        j.materialReservations.push(rec);
+        prMoveEvent(i,'WO_RESERVE',grantedQty,{jobOrderId:j.id, reservationId:rec.id});
+        prEvent('WO_MATERIAL_RESERVED', i.id, {jobOrderId:j.id, qty:grantedQty, shortfall});
+        prSaveD(); prSaveJobOrders();
+    }
+    return {ok:grantedQty>0, requestedQty:reqQty, grantedQty, shortfall,
+        note: shortfall>0 ? `Stokta yalnızca ${grantedQty} adet karşılanabildi; ${shortfall} adet için Net Malzeme İhtiyacı satınalma talebine yönlendirilmeli.` : 'Talep tam karşılandı.'};
+};
+window.kmiPrConsumeReservation=function(jobOrderId, purchaseItemId, qty){
+    const i=prItem(purchaseItemId); const j=prJobOrder(jobOrderId);
+    if(!i||!j) return {ok:false, reason:'Kayıt bulunamadı.'};
+    const reservations=(j.materialReservations||[]).filter(r=>String(r.purchaseItemId)===String(purchaseItemId) && Number(r.qty||0)>Number(r.consumedQty||0));
+    let remaining=Math.max(0,Number(qty)||0), consumedTotal=0;
+    reservations.forEach(r=>{
+        if(remaining<=0) return;
+        const avail=Number(r.qty||0)-Number(r.consumedQty||0);
+        const use=Math.min(avail, remaining);
+        r.consumedQty=Number(r.consumedQty||0)+use; remaining-=use; consumedTotal+=use;
+    });
+    if(consumedTotal>0){
+        i.stockQty=Math.max(0,Number(i.stockQty||0)-consumedTotal);
+        i.reservedQty=Math.max(0,Number(i.reservedQty||0)-consumedTotal);
+        prMoveEvent(i,'WO_CONSUME',consumedTotal,{jobOrderId:j.id});
+        prEvent('WO_MATERIAL_CONSUMED', i.id, {jobOrderId:j.id, qty:consumedTotal});
+        prSaveD(); prSaveJobOrders();
+    }
+    return {ok:consumedTotal>0, consumedQty:consumedTotal, unconsumedRemainder:remaining};
+};
+window.kmiPrReleaseReservation=function(jobOrderId, purchaseItemId, qty){
+    const i=prItem(purchaseItemId); const j=prJobOrder(jobOrderId);
+    if(!i||!j) return {ok:false, reason:'Kayıt bulunamadı.'};
+    const reservations=(j.materialReservations||[]).filter(r=>String(r.purchaseItemId)===String(purchaseItemId) && Number(r.qty||0)>Number(r.consumedQty||0));
+    let remaining=Math.max(0,Number(qty)||0), releasedTotal=0;
+    reservations.forEach(r=>{
+        if(remaining<=0) return;
+        const avail=Number(r.qty||0)-Number(r.consumedQty||0);
+        const rel=Math.min(avail, remaining);
+        r.qty=Number(r.qty||0)-rel; remaining-=rel; releasedTotal+=rel;
+    });
+    if(releasedTotal>0){
+        i.reservedQty=Math.max(0,Number(i.reservedQty||0)-releasedTotal);
+        prMoveEvent(i,'WO_RELEASE',releasedTotal,{jobOrderId:j.id});
+        prEvent('WO_MATERIAL_RELEASED', i.id, {jobOrderId:j.id, qty:releasedTotal});
+        prSaveD(); prSaveJobOrders();
+    }
+    return {ok:releasedTotal>0, releasedQty:releasedTotal};
+};
+
+// --- Federasyon: KMI_CALC.kmiPR --------------------------------------------
+// Master Mimari Ek: "her hesap motoru KMI_CALC altında isimlendirilir, birbirinden
+// habersiz paralel sistemlere dönüşmesin diye." Burada yalnızca MEVCUT V71/V73
+// fonksiyonları isimlendiriliyor - hiçbiri yeniden yazılmadı.
+window.KMI_CALC = window.KMI_CALC || {};
+window.KMI_CALC.kmiPR = {
+    netRequirement: window.kmiPrNetRequirement,
+    reserveForJobOrder: window.kmiPrReserveForJobOrder,
+    consumeReservation: window.kmiPrConsumeReservation,
+    releaseReservation: window.kmiPrReleaseReservation,
+    mrp: (typeof mrp71==='function') ? mrp71 : undefined,
+    lastPrices: (typeof lastPrices71==='function') ? lastPrices71 : undefined,
+    statusText: (typeof v73StatusText==='function') ? v73StatusText : undefined,
+    canReceive: (typeof v73CanReceive==='function') ? v73CanReceive : undefined
+};
+})();
+</script>
+
 </body>
 </html>
