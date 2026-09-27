@@ -2557,6 +2557,19 @@ ead>
             const plate=prompt('Araç plakası (zorunlu):',d.vehiclePlate||''); if(!plate||!plate.trim()){alert('Araç plakası zorunludur.');return;}
             d.deliveryNoteNo=irs.trim(); d.vehiclePlate=plate.trim().toLocaleUpperCase('tr-TR'); d.status='Sevk Edildi'; d.shipmentReady=false; d.shippingApprover=currentUser.name; d.shippingApprovalDate=new Date().toLocaleString('tr-TR'); d.shippedAt=new Date().toISOString(); d.updatedAt=d.shippedAt;
             const jo=jobOrders.find(j=>j.id===d.jobOrder); if(jo){jo.status='Sevk Edildi / Kapandı';jo.shippedAt=d.shippedAt;jo.deliveryNoteNo=d.deliveryNoteNo;jo.vehiclePlate=d.vehiclePlate;jo.updatedAt=d.shippedAt;saveStorage('jobOrders',jobOrders);}
+            // KMI-FIX (2026-09-27): Ender'in isteği - iş emri burada (kendi Sevkiyat onay zincirinde)
+            // kapandığında, bağlı müşteri siparişinin (v118) sevk edilen adedi de OTOMATİK güncellensin;
+            // Command ekranında ikinci kez elle "Sevkiyat" girmeye gerek kalmasın. Ara operasyon (rotanın
+            // son adımı değilse) sipariş sevkiyatına dahil edilmez - bir sonraki/son operasyon sevk edince sayılır.
+            try{
+                if(jo && jo.salesOrderId && Number(d.qty||0)>0 && window.v118AutoShipFromJobOrder){
+                    const isFinalOp = window.kmiIsFinalOperationJobOrder ? window.kmiIsFinalOperationJobOrder(jo) : true;
+                    if(isFinalOp){
+                        const shippedQty=window.v118AutoShipFromJobOrder(jo.salesOrderId, jo.productId, Number(d.qty||0), {jobOrderId:jo.id,deliveryNoteNo:d.deliveryNoteNo,vehiclePlate:d.vehiclePlate});
+                        if(shippedQty>0) queueManagerReport(`Müşteri siparişi otomatik güncellendi: ${jo.salesOrderId} · ${shippedQty} adet sevk edildi olarak işlendi (iş emri: ${jo.id}).`);
+                    }
+                }
+            }catch(e){ console.error('[Sipariş sevkiyat otomatik güncelleme]',e); }
             saveStorage('declarations',declarations); queueManagerReport(`SEVK TAMAMLANDI: ${d.jobOrder} · Plaka ${d.vehiclePlate} · İrsaliye ${d.deliveryNoteNo}`); refreshAllViews(); alert('Sevkiyat tamamlandı. İrsaliye resmi zorunlu değildir.');
         }
         function showShipmentImage(id){const d=declarations.find(x=>x.id===id);if(!d?.shippingDocumentImage)return;const w=window.open('','_blank');w.document.write(`<title>${d.deliveryNoteNo||d.id}</title><body style="margin:0;background:#111;display:flex;align-items:center;justify-content:center;min-height:100vh"><img src="${d.shippingDocumentImage}" style="max-width:96vw;max-height:96vh">
@@ -7156,6 +7169,33 @@ window.v118CreditProduction=function(salesOrderId,productId,qty){
   try{v118Render();}catch(e){}
  }catch(e){ console.error('[v118CreditProduction]',e); }
 };
+// KMI-FIX (2026-09-27): Ender'in isteği - iş emri kendi zincirinde (Sevkiyat onayı/approveShipment)
+// kapandığında, bağlı müşteri siparişinin sevk edilen adedi ARTIK OTOMATİK güncelleniyor; elle
+// ikinci kez Command'da "Sevkiyat" girmeye gerek yok. v118Ship (manuel/Stok akışı) ile aynı stok
+// muhasebesini uygular (onHand/reserved/shipped), sadece prompt() sormadan, iş emrinden gelen
+// adetle otomatik çalışır. Bu, v118CreditProduction'ın (üretim kredisi) sevkiyat karşılığıdır.
+window.v118AutoShipFromJobOrder=function(salesOrderId,productId,qty,meta){
+ try{
+  if(!salesOrderId||!productId||!(Number(qty)>0))return 0;
+  const o=V.orders.find(x=>String(x.id)===String(salesOrderId)); if(!o||o.status==='CANCELLED')return 0;
+  const l=(o.lines||[]).find(x=>String(x.productId)===String(productId)); if(!l)return 0;
+  const remaining=Math.max(0,Number(l.qty||0)-Number(l.shipped||0));
+  const q=Math.min(Number(qty),remaining);
+  if(q<=0)return 0;
+  const st=stockRow(l.productId);
+  const decReserved=Math.min(q,Number(l.reserved||0));
+  st.onHand=Math.max(0,Number(st.onHand||0)-q);
+  st.reserved=Math.max(0,Number(st.reserved||0)-decReserved);
+  l.reserved=Math.max(0,Number(l.reserved||0)-decReserved);
+  l.shipped=Number(l.shipped||0)+q;
+  V.movements.unshift({id:uid('MOV'),at:now(),type:'SHIP',productId:l.productId,qty:-q,ref:o.id,source:'JOB_ORDER_AUTO',meta:meta||null});
+  recalc(o);
+  audit('SHIP','SALES_ORDER',o.id,q+' adet (iş emri sevkiyat onayından otomatik'+(meta?.jobOrderId?' · '+meta.jobOrderId:'')+')');
+  persist();
+  try{v118Render();}catch(e){}
+  return q;
+ }catch(e){ console.error('[v118AutoShipFromJobOrder]',e); return 0; }
+};
 window.v118Ship=function(id){if(!can('warehouse'))return alert('Sevkiyat için Depo/Sevkiyat/Yönetim yetkisi gerekir.');const o=V.orders.find(x=>x.id===id);if(!o)return;let any=0;o.lines.forEach(l=>{const max=Math.min(l.reserved,Math.max(0,l.qty-l.shipped));if(max<=0)return;const q=Number(prompt(product(l.productId).name+' sevk adedi (max '+max+')',max));if(!(q>0)||q>max)return;const st=stockRow(l.productId);st.onHand-=q;st.reserved-=q;l.reserved-=q;l.shipped+=q;any+=q;V.movements.unshift({id:uid('MOV'),at:now(),type:'SHIP',productId:l.productId,qty:-q,ref:o.id})});if(any){recalc(o);audit('SHIP','SALES_ORDER',o.id,any+' adet');persist();v118Render()}return any;}
 window.v118Invoice=function(id){if(!can('finance'))return alert('Fatura işlemi için Muhasebe/Yönetim yetkisi gerekir.');const o=V.orders.find(x=>x.id===id);if(!o||!o.shippedQty)return alert('Önce sevkiyat yapılmalı.');let inv=V.invoices.find(x=>x.orderId===id),created=false;if(!inv){inv={id:uid('INV'),orderId:id,customerId:o.customerId,amount:o.total*(o.shippedQty/o.lines.reduce((a,l)=>a+l.qty,0)),currency:o.currency,status:'OPEN',createdAt:now()};V.invoices.unshift(inv);o.status='INVOICED';audit('INVOICE','INVOICE',inv.id,o.id);persist();created=true;}v118Render();return created;}
 window.v118Pay=function(invId){if(!can('finance'))return alert('Tahsilat için Muhasebe/Yönetim yetkisi gerekir.');const inv=V.invoices.find(x=>x.id===invId);if(!inv)return;const paid=V.payments.filter(x=>x.invoiceId===invId).reduce((a,x)=>a+x.amount,0),q=Number(prompt('Tahsilat tutarı · Kalan '+money(inv.amount-paid,inv.currency),inv.amount-paid));if(!(q>0)||q>inv.amount-paid+0.001)return;V.payments.unshift({id:uid('PAY'),invoiceId:invId,amount:q,currency:inv.currency,at:now(),by:window.currentUser?.name||'-'});const np=paid+q;if(np>=inv.amount-.001){inv.status='PAID';const o=V.orders.find(x=>x.id===inv.orderId);if(o)o.status='PAID'}else inv.status='PARTIAL';audit('PAYMENT','INVOICE',inv.id,money(q,inv.currency));persist();v118Render();return q;}
@@ -7741,7 +7781,10 @@ const rr=window.v118Render;window.v118Render=function(){rr&&rr();document.queryS
 // düşüyordu, ama Akış Durumu'ndaki Sevk adedi 0 kalıyordu - "hiçbir şey doğru çalışmıyor" hissinin
 // bir kaynağı buydu). Artık her fonksiyon gerçekten bir şey değiştirdiyse (adet>0/yeni kayıt)
 // truthy döndürüyor, bu sarmalayıcı da olayı SADECE bu durumda kaydediyor.
-[['v118Reserve','RESERVATION'],['v118ProductionNeed','PRODUCTION_NEED'],['v118ReceiveFinished','FINISHED_GOODS'],['v118Ship','SHIPMENT'],['v118Invoice','INVOICE'],['v118Pay','PAYMENT'],['v118Cancel','CANCEL']].forEach(([fn,t])=>{const old=window[fn];if(typeof old==='function')window[fn]=function(id,...a){const r=old.call(this,id,...a);if(r)KMI.event(t,fn==='v118Pay'?'INVOICE':'SALES_ORDER',id,{label:id,source:'WORKFLOW'});return r}});
+// KMI-FIX (2026-09-27): Ender'in isteği - Passport "Son Hareketler" listesinde sadece olay adı
+// değil, kaç adet olduğu da görünsün (ör. "Sevkiyat · 50 adet"). Fonksiyonların döndürdüğü gerçek
+// miktar (r), sayısalsa olay verisine ekleniyor; humanEvent render'ı bunu gösteriyor.
+[['v118Reserve','RESERVATION'],['v118ProductionNeed','PRODUCTION_NEED'],['v118ReceiveFinished','FINISHED_GOODS'],['v118Ship','SHIPMENT'],['v118Invoice','INVOICE'],['v118Pay','PAYMENT'],['v118Cancel','CANCEL']].forEach(([fn,t])=>{const old=window[fn];if(typeof old==='function')window[fn]=function(id,...a){const r=old.call(this,id,...a);if(r)KMI.event(t,fn==='v118Pay'?'INVOICE':'SALES_ORDER',id,{label:id,source:'WORKFLOW',qty:(typeof r==='number'&&r>0)?r:null});return r}});
 // KMI-FIX (2026-09-26): KRİTİK - window.V118_STATE sayfa ilk açıldığında BİR KEZ core()
 // ile dolduruluyordu ve bir daha asla yenilenmiyordu. Onlarca fonksiyon (v118OrderCommand,
 // orderById, kmiOpenPassport, global arama, Live panoları vb.) "window.V118_STATE||..." ile
@@ -8316,6 +8359,26 @@ window.v118ProductionNeed=function(id,...args){
  return r;
 };
 
+/* KMI-FIX (2026-09-27): Ender'in isteği - "Command ekranında Stok düğmesine basınca bir şey
+   olmuyor". Kök sebep bir hata değildi: v118Reserve stok varsa gerçekten rezerve ediyordu, ama
+   (a) hiçbir görsel geri bildirim (toast) vermiyordu ve (b) açık olan Command penceresi kendini
+   yenilemiyordu - stok yoksa/zaten tam rezerveyse tıklama gerçekten "hiçbir şey olmamış" gibi
+   görünüyordu. Artık ne olduğunu (kaç adet rezerve edildi / edilecek stok yoktu) toast ile
+   söylüyor ve açık Command penceresi varsa güncel sayılarla kendini yeniliyor.*/
+const oldReserveUX=window.v118Reserve;
+window.v118Reserve=function(id,auto,...args){
+ const r=oldReserveUX?.call(this,id,auto,...args);
+ if(auto)return r;
+ setTimeout(()=>{
+  if(r>0)toast(`Stok rezerve edildi · ${r} adet`);
+  else toast('Rezerve edilecek uygun stok yok (stokta yeterli bitmiş/hazır ürün bulunmuyor)','warn');
+  try{if(document.getElementById('v118CommandModal'))window.v118OrderCommand(id);}catch(e){}
+  try{if(document.getElementById('kmiPassport'))window.kmiOpenPassport(id);}catch(e){}
+  try{window.v118Render?.();}catch(e){}
+ },0);
+ return r;
+};
+
 /* Human Passport: technical IDs are secondary, operational meaning is primary. */
 window.kmiOpenPassport=function(id){
  const st=state(),o=(st.orders||[]).find(x=>String(x.id)===String(id));if(!o)return;
@@ -8325,7 +8388,23 @@ window.kmiOpenPassport=function(id){
  m.innerHTML=`<div class="max-w-6xl mx-auto bg-slate-800 border border-cyan-700 rounded-2xl p-4 md:p-5"><div class="flex justify-between gap-3"><div><div class="text-[10px] text-cyan-300 font-black">DIGITAL ORDER PASSPORT</div><h2 class="text-xl md:text-2xl font-black">${esc(o.customerPO||o.id)}</h2><div class="text-xs text-slate-400">Termin ${esc(o.dueDate||'-')} · ${mtr.productionNeed===0&&mtr.activeWO>0?'Üretim planlandı':'Açık sipariş'}</div><details class="mt-1 text-[10px] text-slate-500"><summary>Teknik kimlik</summary>${esc(o.id)}</details></div><button onclick="this.closest('#kmiPassport').remove()" class="h-10 bg-slate-700 px-3 rounded-xl">Kapat</button></div>
  <div class="grid md:grid-cols-3 gap-3 mt-4"><div class="bg-slate-900 rounded-xl p-4"><b>Ürünler</b><div class="mt-2 text-sm text-slate-300">${(o.lines||[]).map(l=>`${esc(productName(l.productId))}<br><span class="text-slate-500">${num(l.qty)} adet · ${woRemaining(o.id,l.productId)?'Üretim planlandı':'Planlama bekliyor'}</span>`).join('<div class="my-2 border-t border-slate-800"></div>')}</div></div>
  <div class="bg-slate-900 rounded-xl p-4"><b>Akış Durumu</b><div class="grid grid-cols-2 gap-2 mt-3 text-xs"><div>Sipariş<br><b class="text-xl">${mtr.ordered}</b></div><div>Aktif WO<br><b class="text-xl text-cyan-300">${mtr.activeWO}</b></div><div>Hazır<br><b class="text-xl text-emerald-300">${mtr.ready}</b></div><div>Sevk<br><b class="text-xl">${mtr.shipped}</b></div></div></div>
- <div class="bg-slate-900 rounded-xl p-4"><b>Son Hareketler</b><div class="mt-2 text-xs text-slate-400">${ev.map(e=>`${new Date(e.at).toLocaleString('tr-TR')} · <b>${esc(humanEvent(e.type))}</b>`).join('<br>')||'Henüz hareket yok.'}</div></div></div>
+ <div class="bg-slate-900 rounded-xl p-4"><b>Son Hareketler</b><div class="mt-2 text-xs text-slate-400">${ev.map(e=>`${new Date(e.at).toLocaleString('tr-TR')} · <b>${esc(humanEvent(e.type))}</b>${(e.data&&e.data.qty)?' · '+num(e.data.qty)+' adet':''}`).join('<br>')||'Henüz hareket yok.'}</div></div></div>
+ ${(()=>{
+  // KMI-FIX (2026-09-27): Ender'in isteği - Passport'ta sağda kaç adet ÜRETİLDİĞİ de görünsün:
+  // üretildi/sağlam/hurda/tahsis kırılımı, bu siparişe bağlı iş emirlerindeki gerçek operatör
+  // beyanlarından (declarations) hesaplanıyor - Kalite onaylı değer varsa o esas alınıyor.
+  try{
+   const ds=(typeof declarations!=='undefined'&&Array.isArray(declarations))?declarations:[];
+   const jos=(Array.isArray(window.jobOrders)?window.jobOrders:[]).filter(j=>String(j.salesOrderId||'')===String(o.id));
+   const joIds=new Set(jos.map(j=>j.id));
+   const rows=ds.filter(d=>joIds.has(d.jobOrder));
+   if(!rows.length)return '';
+   let good=0,scrap=0,alloc=0;
+   rows.forEach(d=>{good+=num(d.qualityGood??d.good);scrap+=num(d.qualityScrap??d.scrap);alloc+=num(d.qualityAllocated??d.allocated);});
+   const total=good+scrap+alloc;
+   return `<div class="bg-slate-900 rounded-xl p-4 mt-3"><b>Üretim Detayı (Operatör Beyanları)</b><div class="grid grid-cols-4 gap-2 mt-3 text-xs"><div>Üretildi (toplam)<br><b class="text-xl">${total}</b></div><div>Sağlam<br><b class="text-xl text-emerald-300">${good}</b></div><div>Tahsis<br><b class="text-xl text-amber-300">${alloc}</b></div><div>Hurda<br><b class="text-xl text-red-300">${scrap}</b></div></div><div class="text-[10px] text-slate-500 mt-2">${rows.length} beyan kaydı · ${jos.length} iş emri</div></div>`;
+  }catch(e){return '';}
+ })()}
  <div class="mt-3 bg-slate-900 rounded-xl p-3"><div class="flex flex-wrap gap-2"><button onclick="kmiPrintOrderQR('${esc(id)}')" class="bg-white text-slate-900 px-3 py-2 rounded-xl font-bold">QR</button><label class="bg-cyan-800 px-3 py-2 rounded-xl font-bold cursor-pointer">Fotoğraf / Belge<input id="kmiMediaInput" type="file" multiple class="hidden"></label><button onclick="kmiAttachMedia('${esc(id)}')" class="bg-blue-700 px-3 py-2 rounded-xl font-bold">Siparişe Ekle</button></div></div></div>`;
  document.body.appendChild(m);
 };
@@ -8702,9 +8781,19 @@ function kmiMachineBoard(){
  // iş emrinin makinesi hep "ÇALIŞIYOR" görünüyordu - gerçekte kimse o tezgahta çalışmıyor olsa da.
  const runningNames=new Set(active.filter(j=>String(j.status||'')==='Üretimde').map(j=>j.machine).filter(Boolean));
  const mr=(()=>{try{return maintenanceRecords}catch(e){return []}})();
+ // KMI-FIX (2026-09-27): Ender'in isteği - "KURUTLU LIVE'da arızalı makine gözükmüyor halbuki
+ // sistemde DOWN hatası var". Kök sebep: bu fonksiyon DOWN durumunu eski/kullanılmayan
+ // "maintenanceRecords" dizisinden okuyordu (hep boş), ama makinenin GERÇEK DOWN durumu Makine
+ // Filosu / Dijital Sağlık Merkezi modülünün kendi deposunda (localStorage "KURUTLU_V35_MACHINES",
+ // m.status==='DOWN') tutuluyor - iki modül birbirinden kopuktu. Artık gerçek kaynaktan okunuyor.
+ let v35Down=new Set();
+ try{
+  const v35=JSON.parse(localStorage.getItem('KURUTLU_V35_MACHINES')||'[]');
+  if(Array.isArray(v35))v35.forEach(x=>{if(x&&x.status==='DOWN')v35Down.add(String(x.name||''))});
+ }catch(e){}
  return (typeof MACHINES_LIST!=='undefined'?MACHINES_LIST:[]).map(m=>{
    const name=`${m.code} - ${m.name}`;
-   const down=mr.some(r=>r.machine===name&&r.status!=='Kapalı'&&r.priority==='CRITICAL')||mr.some(r=>r.machine===name&&r.status!=='Kapalı'&&r.stopsProduction);
+   const down=v35Down.has(name)||mr.some(r=>r.machine===name&&r.status!=='Kapalı'&&r.priority==='CRITICAL')||mr.some(r=>r.machine===name&&r.status!=='Kapalı'&&r.stopsProduction);
    const issue=mr.some(r=>r.machine===name&&r.status!=='Kapalı');
    const running=runningNames.has(name);
    return {name,code:m.code,status:down?'DOWN':running?'RUNNING':issue?'ISSUE':'IDLE'};
@@ -9201,9 +9290,11 @@ window.kmiFinish=function(id,postOp,vibrationMinutes){
  toast(remaining>0?`${doneMsg}. Bu iş emrinde HEDEFE ULAŞILMADI, kalan: ${remaining} adet. İş emri açık kalacak.`:doneMsg, remaining>0?'warn':undefined);
  setTimeout(kmiOpenShopFloor,250)
 };
-/* Entry point on operator screen without replacing legacy declaration workflow. */
-function addEntry(){if(document.getElementById('kmiShopFloorBtn'))return;const tab=document.getElementById('tab-operator')||document.getElementById('tab-operator-beyan');if(!tab)return;const b=document.createElement('button');b.id='kmiShopFloorBtn';b.onclick=kmiOpenShopFloor;b.className='mb-4 bg-emerald-600 hover:bg-emerald-500 px-5 py-3 rounded-xl font-black text-white shadow-xl';b.innerHTML='▶ SHOP FLOOR LIVE · İşlerim';tab.prepend(b)}
-if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',addEntry,{once:true});else addEntry();
+/* KMI-FIX (2026-09-27): Ender'in isteği - "Shop Floor Live" için üç ayrı, birbirinden habersiz
+   giriş noktası vardı (bu buton, enforce()'daki #kmiShopFloorBtnReal, ve üstteki nav pill'i) -
+   aynı ekranı üç yerden açmaya çalışmak "karmaşa" şikayetinin kaynağıydı. Artık TEK giriş noktası
+   var: üstteki nav'daki "LIVE FLOOR / SHOP FLOOR LIVE" pill'i (bkz. kmi-v11924-login-safe-floor-nav).
+   Bu eski, sekme içine gömülü buton kaldırıldı. */
 // KMI-FIX (2026-09-25): Operatör Beyanı panelinin aynı veriyi (myJobs/sess) kullanabilmesi için dışa açılıyor.
 window.kmiMyJobs=myJobs; window.kmiSess=sess; window.kmiElapsed=elapsed; window.kmiFmtTime=fmt;
 // KMI-FIX (2026-09-25): Ender'in isteği - Task Floor / Live Floor'u yöneticiler açtığında TÜM
@@ -9241,31 +9332,50 @@ function seenMap(){try{return JSON.parse(localStorage.getItem(SEEN_KEY)||'{}')||
 function saveSeen(x){localStorage.setItem(SEEN_KEY,JSON.stringify(x))}
 function personKey(){const u=window.currentUser||{};return String(u.id||u.personnelId||u.name||'anon')}
 function toast(t,k){window.kmiToast?window.kmiToast(t,k):console.info(t)}
+// KMI-FIX (2026-09-27): Ender'in isteği - bu panel eskiden HERKES için "bana atanmış" (assignedTo)
+// filtresiyle çalışıyordu; yönetici/admin girişinde, kimseye atanmamış (assignedTo:[]) ya da başka
+// bir operatöre atanmış ama fiilen ÇALIŞMAKTA olan iş emirleri burada hiç görünmüyordu - halbuki
+// aynı ekranın "Shop Floor Live" büyük görünümü yöneticiye zaten TÜM aktif iş emirlerini gösteriyordu
+// (bkz. kmiOpenShopFloor'daki mgr ayrımı). İki ekran arasındaki bu tutarsızlık "iş emrim gözükmüyor"
+// şikayetinin gerçek kaynağıydı. Artık yönetici/admin için bu panel de TÜM aktif iş emirlerini
+// (window.kmiAllProductionJobs) gösteriyor - normal operatör için değişiklik yok (hâlâ sadece kendi işleri).
+function isMgrHere(){
+ const u=window.currentUser||{};
+ const list=(typeof PERSONNEL_LIST!=='undefined'?PERSONNEL_LIST:[]);
+ const p=list.find(x=>Number(x.id)===Number(u.id||u.personnelId))||u;
+ return /ADMIN|YÖNET|YONET|MUHASEBE|ACCOUNT/.test(((p?.role||'')+' '+(p?.job||'')+' '+(p?.department||'')).toUpperCase());
+}
 window.renderOperatorAssignedJobs=function(){
  const panel=document.getElementById('operatorAssignedJobsPanel'); if(!panel) return;
  if(typeof window.kmiMyJobs!=='function'){panel.innerHTML='';return}
- const arr=window.kmiMyJobs();
- const pk=personKey(), seen=seenMap(), mySeen=Array.isArray(seen[pk])?seen[pk]:[];
- const newOnes=arr.filter(j=>!mySeen.includes(String(j.id)));
- if(newOnes.length){
-   newOnes.forEach(j=>toast(`Yeni iş emri atandı: ${j.id} · ${j.item||''}`,'success'));
-   seen[pk]=arr.map(j=>String(j.id)); saveSeen(seen);
+ const mgr=isMgrHere();
+ const arr=mgr?(window.kmiAllProductionJobs?window.kmiAllProductionJobs():window.kmiMyJobs()):window.kmiMyJobs();
+ if(!mgr){
+   const pk=personKey(), seen=seenMap(), mySeen=Array.isArray(seen[pk])?seen[pk]:[];
+   const newOnes=arr.filter(j=>!mySeen.includes(String(j.id)));
+   if(newOnes.length){
+     newOnes.forEach(j=>toast(`Yeni iş emri atandı: ${j.id} · ${j.item||''}`,'success'));
+     seen[pk]=arr.map(j=>String(j.id)); saveSeen(seen);
+   }
+   const badge=document.getElementById('btn-operatör');
+   if(badge){ let dot=document.getElementById('operatorAssignedDot'); if(newOnes.length){ if(!dot){dot=document.createElement('span');dot.id='operatorAssignedDot';dot.className='ml-1 inline-block w-2 h-2 rounded-full bg-red-500 align-middle animate-pulse';badge.appendChild(dot);} } else if(dot){dot.remove();} }
  }
- const badge=document.getElementById('btn-operatör');
- if(badge){ let dot=document.getElementById('operatorAssignedDot'); if(newOnes.length){ if(!dot){dot=document.createElement('span');dot.id='operatorAssignedDot';dot.className='ml-1 inline-block w-2 h-2 rounded-full bg-red-500 align-middle animate-pulse';badge.appendChild(dot);} } else if(dot){dot.remove();} }
  if(!arr.length){panel.innerHTML='';return}
+ const title=mgr?'Tüm Aktif İş Emirleri · Canlı Takip':'Size Atanan İş Emirleri · Canlı Takip';
+ const caption=mgr?`${arr.length} aktif iş emri (atanmış/atanmamış hepsi)`:`${arr.length} iş · en fazla 3'ü aynı anda çalıştırılabilir`;
  panel.innerHTML=`<div class="bg-slate-800 border border-cyan-700/50 rounded-xl p-4 shadow-lg">
-   <div class="flex items-center justify-between gap-3 mb-3"><h2 class="text-base font-black text-white"><i class="fa-solid fa-bolt text-cyan-400 mr-2"></i>Size Atanan İş Emirleri · Canlı Takip</h2><span class="text-[10px] text-slate-500">${arr.length} iş · en fazla 3'ü aynı anda çalıştırılabilir</span></div>
+   <div class="flex items-center justify-between gap-3 mb-3"><h2 class="text-base font-black text-white"><i class="fa-solid fa-bolt text-cyan-400 mr-2"></i>${title}</h2><span class="text-[10px] text-slate-500">${caption}</span></div>
    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
    ${arr.map(j=>{
      const s=window.kmiSess?window.kmiSess(j.id):null;
      const running=s?.startedAt&&!s?.finishedAt;
      const pct=Math.min(100,Math.round(N(j.completedQty)/Math.max(1,N(j.targetQty))*100));
+     const who=mgr?(window.kmiJobPersonName?window.kmiJobPersonName(j):''):'';
      return `<div class="text-left bg-slate-900 border ${running?'border-emerald-500':'border-slate-700'} rounded-xl p-3 hover:border-cyan-600 transition">
        <div onclick="window.kmiOpenWork?.('${E(j.id)}')" class="cursor-pointer">
        <div class="flex justify-between items-start gap-2"><div class="text-[10px] text-cyan-300 font-black">${E(j.id)}</div>${running?'<span class="text-[9px] text-emerald-300 font-black">● ÇALIŞIYOR</span>':''}</div>
        <div class="font-bold text-white text-sm mt-1">${E(j.item||j.productId||'Üretim')}</div>
-       <div class="text-[10px] text-slate-400 mt-0.5">${E(j.machine||'Makine atanmadı')} · ${E(j.shift||'Vardiya atanmadı')}</div>
+       <div class="text-[10px] text-slate-400 mt-0.5">${E(j.machine||'Makine atanmadı')} · ${E(j.shift||'Vardiya atanmadı')}${who?' · '+E(who):''}</div>
        <div class="h-1.5 bg-slate-800 rounded-full mt-2 overflow-hidden"><div class="h-full bg-cyan-500" style="width:${pct}%"></div></div>
        <div class="text-[10px] text-slate-500 mt-1">${N(j.completedQty)} / ${N(j.targetQty)} adet</div>
        </div>
@@ -9612,14 +9722,9 @@ function enforce(){
  const p=person();if(!p)return;
  const sensitive=[["button[onclick*=\"openV61Master('products')\"]",'customer'],["button[onclick*=\"openV61Master('material')\"]",'material'],["button[onclick*=\"openV61Master('supply')\"]",'purchasing'],['#v74OperatorPurchaseRequest','purchasing']];
  sensitive.forEach(([sel,m])=>document.querySelectorAll(sel).forEach(el=>el.style.display=kmiCan(m)?'':'none'));
- /* Shop Floor entry: inject against the real operator section, not guessed IDs. */
- const tab=document.getElementById('tab-operatör');
- if(tab&&!document.getElementById('kmiShopFloorBtnReal')&&kmiCan('shopfloor')){
-   const b=document.createElement('button');b.id='kmiShopFloorBtnReal';b.onclick=()=>{if(kmiPermissionGuard('shopfloor','act'))window.kmiOpenShopFloor?.()};
-   b.className='w-full md:w-auto mb-4 bg-emerald-600 hover:bg-emerald-500 px-5 py-4 rounded-xl font-black text-white shadow-xl text-base';
-   b.innerHTML='▶ SHOP FLOOR LIVE <span class="text-emerald-100 font-normal text-xs ml-2">İşlerim</span>';
-   tab.prepend(b);
- }
+ // KMI-FIX (2026-09-27): Ender'in isteği - Shop Floor Live için sekme içine gömülü ikinci bir
+ // buton daha vardı (#kmiShopFloorBtnReal), üstteki nav pill'i ile aynı işi yapıyordu - kaldırıldı.
+ // Tek giriş noktası artık kmi-v11924-login-safe-floor-nav'daki üst nav pill'i.
 }
 const _open=window.openV61Master;
 window.openV61Master=function(type,...a){const map={products:'customer',material:'material',supply:'purchasing'},m=map[type];if(m&&!kmiPermissionGuard(m,'view'))return false;return _open?.call(this,type,...a)};
@@ -10186,11 +10291,27 @@ function isProduction(p){const z=((p?.role||'')+' '+(p?.job||'')+' '+(p?.departm
 // personeline özel değil artık.
 function isManagement(p){const z=((p?.role||'')+' '+(p?.job||'')+' '+(p?.department||'')).toUpperCase();return /ADMIN|YÖNET|YONET|MUHASEBE|ACCOUNT/.test(z);}
 function taskCount(p){try{return JSON.parse(localStorage.getItem('KMI_TASKS_V1192')||'[]').filter(t=>Number(t.assigneeId)===Number(p.id)&&t.status!=='COMPLETED').length}catch(e){return 0}}
+// KMI-FIX (2026-09-27): Ender'in isteği - "LIVE FLOOR / TASK FLOOR" üstteki ana sekme sırasında
+// (Operatör Beyanı · Kalite Onay · Sevkiyat · ... ile yan yana) durunca kalabalık/karmaşık
+// görünüyordu. Artık bunlar ana sıranın HEMEN ALTINDA, ayrı bir ikinci satırda, birlikte duruyor -
+// ana navigasyon sırası sadeleşti, Live Floor/Task Floor kendi hattında net bir grup oluşturuyor.
+function secondRow(op){
+ const navBar=op.parentElement; if(!navBar) return null;
+ let row=document.getElementById('kmiFloorNavRow2');
+ if(!row){
+  row=document.createElement('div');
+  row.id='kmiFloorNavRow2';
+  row.className='w-full flex flex-wrap gap-2 mt-2';
+  navBar.insertAdjacentElement('afterend',row);
+ }
+ return row;
+}
 function install(){
  const p=currentPerson(); if(!window.currentUser||(!p?.id&&!p?.name))return false;
  const op=[...document.querySelectorAll('button,a')].find(x=>/Operatör\s*Beyan/i.test(text(x))); if(!op)return false;
- if((isProduction(p)||isManagement(p))&&!document.getElementById('kmiShopFloorTopNav')){const sf=document.createElement('button');sf.id='kmiShopFloorTopNav';sf.type='button';sf.className='px-4 py-3 rounded-xl bg-emerald-700 hover:bg-emerald-600 text-white font-black border border-emerald-500/40';sf.innerHTML='▶ '+(isManagement(p)?'LIVE FLOOR':'SHOP FLOOR LIVE');sf.onclick=()=>window.kmiOpenShopFloorLive?.();op.insertAdjacentElement('afterend',sf);}
- const task=document.getElementById('kmiMyTasksNav');if(task&&!task.dataset.kmiSafeStyled){task.dataset.kmiSafeStyled='1';task.className='px-4 py-3 rounded-xl bg-fuchsia-700 hover:bg-fuchsia-600 text-white font-black border border-fuchsia-500/40';task.innerHTML='✓ TASK FLOOR <span class="ml-2 inline-flex min-w-6 h-6 px-2 items-center justify-center rounded-full bg-white/15 text-white text-xs">'+taskCount(p)+'</span>';const sf=document.getElementById('kmiShopFloorTopNav');if(sf&&sf.parentElement===task.parentElement)sf.insertAdjacentElement('afterend',task);}
+ const row=secondRow(op); if(!row)return false;
+ if((isProduction(p)||isManagement(p))&&!document.getElementById('kmiShopFloorTopNav')){const sf=document.createElement('button');sf.id='kmiShopFloorTopNav';sf.type='button';sf.className='px-4 py-3 rounded-xl bg-emerald-700 hover:bg-emerald-600 text-white font-black border border-emerald-500/40';sf.innerHTML='▶ '+(isManagement(p)?'LIVE FLOOR':'SHOP FLOOR LIVE');sf.onclick=()=>window.kmiOpenShopFloorLive?.();row.appendChild(sf);}
+ const task=document.getElementById('kmiMyTasksNav');if(task){if(!task.dataset.kmiSafeStyled){task.dataset.kmiSafeStyled='1';task.className='px-4 py-3 rounded-xl bg-fuchsia-700 hover:bg-fuchsia-600 text-white font-black border border-fuchsia-500/40';}task.innerHTML='✓ TASK FLOOR <span class="ml-2 inline-flex min-w-6 h-6 px-2 items-center justify-center rounded-full bg-white/15 text-white text-xs">'+taskCount(p)+'</span>';if(task.parentElement!==row)row.appendChild(task);}
  return true;
 }
 // KMI-FIX (2026-09-27): Ender'in isteği - "Shop Floor Live" düğmesi sayfaya girer girmez,
