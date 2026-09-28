@@ -14230,7 +14230,7 @@ window.addEventListener('load',function(){
       const hasAny=['finance.customer.view','finance.supplier.view','finance.gl.post','finance.coa.manage'].some(c=>{try{return window.KMI_AUTH.can(undefined,c);}catch(e){return false;}});
       if(row && !document.getElementById('kmiAcctNavBtn') && hasAny){
         const b=document.createElement('button'); b.id='kmiAcctNavBtn'; b.className='nav-btn px-3 py-2 rounded-md hover:bg-slate-700 text-slate-300 text-sm';
-        b.innerHTML='<i class="fa-solid fa-book mr-1"></i> Muhasebe & Finans (Yeni)';
+        b.innerHTML='<i class="fa-solid fa-book mr-1"></i> Muhasebe & Finans';
         b.onclick=function(){ window.kmiOpenAccounting(); };
         row.appendChild(b);
       }
@@ -14613,7 +14613,7 @@ window.addEventListener('load',function(){
       const hasAny=window.KMI_AUTH.can(undefined,'reporting.view');
       if(row && !document.getElementById('kmiRepNavBtn') && hasAny){
         const b=document.createElement('button'); b.id='kmiRepNavBtn'; b.className='nav-btn px-3 py-2 rounded-md hover:bg-slate-700 text-slate-300 text-sm';
-        b.innerHTML='<i class="fa-solid fa-chart-line mr-1"></i> Raporlama (Yeni)';
+        b.innerHTML='<i class="fa-solid fa-chart-line mr-1"></i> Raporlar';
         b.onclick=function(){ window.kmiOpenReporting(); };
         row.appendChild(b);
       }
@@ -14939,7 +14939,7 @@ window.addEventListener('load',function(){
       const hasAny=window.KMI_AUTH.can(undefined,'pulse.view');
       if(row && !document.getElementById('kmiPulseNavBtn') && hasAny){
         const b=document.createElement('button'); b.id='kmiPulseNavBtn'; b.className='nav-btn px-3 py-2 rounded-md hover:bg-slate-700 text-slate-300 text-sm';
-        b.innerHTML='<i class="fa-solid fa-triangle-exclamation mr-1"></i> PULSE (Yeni)';
+        b.innerHTML='<i class="fa-solid fa-triangle-exclamation mr-1"></i> PULSE';
         b.onclick=function(){ window.kmiOpenPulse(); };
         row.appendChild(b);
       }
@@ -15117,23 +15117,12 @@ window.kmiRenderDigitalThread=function(){
    </div>
   </div>`;
 };
-window.addEventListener('load',function(){
-  let tries=0;
-  const timer=setInterval(function(){
-    tries++;
-    try{
-      const row=document.getElementById('kmiFloorNavRow2');
-      const hasAny=window.KMI_AUTH.can(undefined,'digitalthread.view');
-      if(row && !document.getElementById('kmiDtNavBtn') && hasAny){
-        const b=document.createElement('button'); b.id='kmiDtNavBtn'; b.className='nav-btn px-3 py-2 rounded-md hover:bg-slate-700 text-slate-300 text-sm';
-        b.innerHTML='<i class="fa-solid fa-diagram-project mr-1"></i> Digital Thread (Yeni)';
-        b.onclick=function(){ window.kmiOpenDigitalThread(); };
-        row.appendChild(b);
-      }
-    }catch(e){}
-    if(tries>=90) clearInterval(timer);
-  },500);
-},{once:true});
+// KMI-NEXTGEN-FAZ3-FIX (2026-09-28): Ender'in Next-Gen Faz 3 kararı gereği
+// Digital Thread artık NORMAL kullanıcı için global navigasyonda ayrı bir
+// modül DEĞİL - core infrastructure/context capability. Bu yüzden
+// kmiDtNavBtn artık #kmiFloorNavRow2'ye eklenmiyor (kod SİLİNMEDİ,
+// window.kmiOpenDigitalThread() hâlâ çalışıyor - sadece "TÜM ALANLAR"
+// panelinden (ANALİZ alanı) erişilebilir hale getirildi, bkz. KMI-TUM-ALANLAR-FIX).
 })();
 </script>
 
@@ -15362,12 +15351,10 @@ window.addEventListener('load',function(){
     tries++;
     try{
       const row=document.getElementById('kmiFloorNavRow2');
-      if(row && !document.getElementById('kmiPilotNavBtn') && window.KMI_AUTH.can(undefined,'pilot.view')){
-        const b=document.createElement('button'); b.id='kmiPilotNavBtn'; b.className='nav-btn px-3 py-2 rounded-md hover:bg-slate-700 text-slate-300 text-sm';
-        b.innerHTML='<i class="fa-solid fa-flask mr-1"></i> Pilot Manager (Yeni)';
-        b.onclick=function(){ window.kmiOpenPilotManager(); };
-        row.appendChild(b);
-      }
+      // KMI-NEXTGEN-FAZ3-FIX (2026-09-28): Pilot Manager artık normal kullanıcı
+      // için global navigasyonda değil (SOFTWARE & IT / Deployment & Validation
+      // altına taşındı). kmiPilotNavBtn kasıtlı olarak eklenmiyor - kod SİLİNMEDİ,
+      // window.kmiOpenPilotManager() hâlâ çalışıyor, "TÜM ALANLAR" panelinden erişilir.
       if(row && !document.getElementById('kmiIssueNavBtn') && window.KMI_AUTH.can(undefined,'pilot.issue.report')){
         const b2=document.createElement('button'); b2.id='kmiIssueNavBtn'; b2.className='nav-btn px-3 py-2 rounded-md hover:bg-slate-700 text-slate-300 text-sm';
         b2.innerHTML='<i class="fa-solid fa-bug mr-1"></i> Sorun Bildir';
@@ -16099,7 +16086,7 @@ const KMI_NAV_ENTRIES = [
   { id:'kmilive',        label:'KMI Live',               icon:'fa-satellite-dish',        area:'YÖNETİM',   requiredPermission:'controltower.*.view', opens:'kmiOpenControlTowerHub' },
   { id:'warehouse',      label:'Depo & Stok',            icon:'fa-warehouse',             area:'DEPO & STOK',requiredPermission:'warehouse.*',        opens:'kmiOpenWarehouse' },
   { id:'accounting',     label:'Muhasebe & Finans',      icon:'fa-book',                  area:'MUHASEBE & FİNANS', requiredPermission:'finance.*',    opens:'kmiOpenAccounting' },
-  { id:'reporting',      label:'Raporlama',              icon:'fa-chart-line',            area:'RAPORLAR',  requiredPermission:'reporting.view',      opens:'kmiOpenReporting' },
+  { id:'reporting',      label:'Raporlar',               icon:'fa-chart-line',            area:'RAPORLAR',  requiredPermission:'reporting.view',      opens:'kmiOpenReporting' },
   { id:'pulse',          label:'PULSE',                  icon:'fa-triangle-exclamation',  area:'YÖNETİM',   requiredPermission:'pulse.view',          opens:'kmiOpenPulse' },
   { id:'digitalthread',  label:'Digital Thread',         icon:'fa-diagram-project',       area:'ANALİZ',    requiredPermission:'digitalthread.view',  opens:'kmiOpenDigitalThread' },
   { id:'pilotmanager',   label:'Pilot Manager',          icon:'fa-flask',                 area:'SOFTWARE & IT', requiredPermission:'pilot.view',      opens:'kmiOpenPilotManager' },
@@ -16108,6 +16095,18 @@ const KMI_NAV_ENTRIES = [
   { id:'tooling',        label:'Takım Zekası',           icon:'fa-screwdriver-wrench',    area:'TAKIM & TOOLING', requiredPermission:'tooling.view',   opens:'kmiOpenToolingIntel' },
   { id:'performance',    label:'Performans',             icon:'fa-gauge-high',            area:'SOFTWARE & IT', requiredPermission:'perf.view',       opens:'kmiOpenPerf' },
   { id:'mobile',         label:'Mobil Görünüm',          icon:'fa-mobile-screen',         area:'ÜRETİM',     requiredPermission:'mobile.access',      opens:'kmiOpenMobileHome' },
+  // KMI-NEXTGEN-FAZ3-SLICE3-FIX (2026-09-28): Ender'in Faz 3 - Slice 3 (Business
+  // Area Registry Completion) direktifi gereği eklendi. Bu 4 giriş YENİ bir motor/
+  // ekran değil - mevcut, gerçek kod bulunan alanlara (bkz. SLICE3_AREA_MAP.md)
+  // YENİ, ince (thin) wrapper açılış fonksiyonları (aşağıdaki KMI-NEXTGEN-FAZ3-
+  // SLICE3-FIX script bloğunda) üzerinden bağlanıyor. requiredPermission=null,
+  // çünkü hedef fonksiyonların (openV61Master, openAdminModule) KENDİ gerçek
+  // yetki kontrolleri var (kmiPermissionGuard vb.) - registry'de ikinci, uydurma
+  // bir yetki dizesiyle çakışan bir kontrol EKLENMEDİ.
+  { id:'salesorders',    label:'Satış & Sipariş',        icon:'fa-file-invoice-dollar',   area:'SATIŞ & SİPARİŞ', requiredPermission:null,            opens:'kmiOpenSalesOrders', status:'ACTIVE' },
+  { id:'planning',       label:'Planlama',               icon:'fa-diagram-project',       area:'PLANLAMA',  requiredPermission:null,                  opens:'kmiOpenPlanning', status:'PARTIAL' },
+  { id:'purchasing',     label:'Satınalma',              icon:'fa-cart-shopping',         area:'SATINALMA', requiredPermission:null,                  opens:'kmiOpenPurchasing', status:'ACTIVE' },
+  { id:'peopletalent',   label:'İnsan & Yetenek',        icon:'fa-users',                 area:'İNSAN & YETENEK', requiredPermission:null,            opens:'kmiOpenPeopleTalent', status:'PARTIAL' },
 ];
 
 function nrCan(user, permission){
@@ -16134,6 +16133,363 @@ window.KMI_NAV_REGISTRY = {
       try{ return nrCan(user, e.requiredPermission); }catch(err){ return false; }
     });
   }
+};
+})();
+</script>
+
+<!-- ===========================================================================
+     KMI-TUM-ALANLAR-FIX (2026-09-28): Ender'in Next-Gen Experience Faz 3
+     kararı (ab2d3c4e-attachment.txt) uygulaması, İLK DİLİM.
+     ---------------------------------------------------------------------------
+     Direktif: "(Yeni)" etiketleri kullanıcıya gösterilmeyecek; Digital Thread
+     ve Pilot Manager normal kullanıcı için global navigasyondan ÇIKARILIP
+     (kod SİLİNMEDEN) ilgili alanlarına (ANALİZ / SOFTWARE & IT) taşınacak;
+     tek bir global "TÜM ALANLAR" giriş noktası olacak.
+     ---------------------------------------------------------------------------
+     Bu blok window.KMI_NAV_REGISTRY.resolveVisible(user) sonucunu GERÇEK
+     'area' alanına göre gruplayıp bir modal olarak gösterir - registry'de
+     olmayan bir alan/modül UYDURULMAZ, sadece kayıtlı 16 gerçek giriş
+     (KMI-NAV-REGISTRY-FIX) kullanılır. Mevcut 15 nav-injection döngüsüne,
+     hiçbir window.kmiOpen* fonksiyonuna DOKUNULMADI - bu tamamen yeni,
+     paralel bir giriş noktası ekliyor.
+     BİLİNEN EKSİK (dürüstlük ilkesi gereği burada işaretlendi, gizlenmedi):
+     Ender'in hedef ekranındaki "SATIŞ & SİPARİŞ / PLANLAMA / SATINALMA /
+     İNSAN & YETENEK" alanları için KMI_NAV_REGISTRY'de henüz kayıtlı bir
+     kmiOpen* girişi YOK (bu alanlar mevcut eski tab-bar/admin-tile
+     sisteminde yaşıyor, henüz registry'ye taşınmadı) - bu yüzden "TÜM
+     ALANLAR" panelinde bu alanlar için ayrı bir başlık YOK, uydurma bir
+     boş kutu göstermiyoruz. Bu, sıradaki Faz 3 diliminin net bir görevi.
+     =========================================================================== -->
+<script>
+(function(){
+'use strict';
+// Ender'in hedef "TÜM ALANLAR" listesindeki gerçek alan adlarıyla registry'deki
+// 'area' değerlerini eşleştirip görüntüleme SIRASINI belirler - registry'de
+// KMI-NEXTGEN-FAZ3-SLICE3-FIX (2026-09-28) güncellemesi: SATIŞ & SİPARİŞ /
+// PLANLAMA / SATINALMA / İNSAN & YETENEK artık registry'de gerçek girişlere
+// sahip (bkz. KMI-NAV-REGISTRY-FIX'teki 4 yeni satır) - Ender'in hedef sırasına
+// (f4e5e2fe-attachment.txt) göre eklendi.
+const TA_AREA_ORDER = ['YÖNETİM','SATIŞ & SİPARİŞ','PLANLAMA','SATINALMA','DEPO & STOK','ÜRETİM','KALİTE','BAKIM','TAKIM & TOOLING','SEVKİYAT',
+  'MUHASEBE & FİNANS','RAPORLAR','İNSAN & YETENEK','SOFTWARE & IT','ANALİZ','YARDIM','YARDIM / ÖĞRENME'];
+
+function taE(s){ return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];}); }
+
+window.kmiOpenTumAlanlar = function(){
+  document.getElementById('kmiTumAlanlarModal')?.remove();
+  const m=document.createElement('div'); m.id='kmiTumAlanlarModal';
+  m.className='fixed inset-0 z-[295] bg-black/70 flex items-start justify-center p-4 overflow-y-auto';
+  m.onclick=function(ev){ if(ev.target===m) m.remove(); };
+  document.body.appendChild(m);
+  window.kmiRenderTumAlanlar();
+};
+
+window.kmiRenderTumAlanlar = function(){
+  const m=document.getElementById('kmiTumAlanlarModal'); if(!m) return;
+  let visible=[];
+  try{ visible = window.KMI_NAV_REGISTRY ? window.KMI_NAV_REGISTRY.resolveVisible(window.currentUser) : []; }catch(e){ visible=[]; }
+  const byArea={};
+  visible.forEach(function(e){ (byArea[e.area]=byArea[e.area]||[]).push(e); });
+  const orderedAreas = TA_AREA_ORDER.filter(function(a){ return byArea[a] && byArea[a].length; });
+  // Sıra listesinde olmayan ama registry'de görünür olan bir 'area' varsa (ileride
+  // yeni bir giriş eklenip TA_AREA_ORDER güncellenmezse) onu da GİZLEMEDEN, sona ekle.
+  Object.keys(byArea).forEach(function(a){ if(orderedAreas.indexOf(a)===-1) orderedAreas.push(a); });
+
+  m.innerHTML = '<div class="bg-slate-900 border border-slate-700 rounded-2xl max-w-4xl w-full mt-8 mb-8 p-5" onclick="event.stopPropagation()">'
+    + '<div class="flex justify-between items-center mb-4"><div><div class="text-[10px] text-cyan-300 tracking-widest font-black">KMI · NEXT-GEN EXPERIENCE · FAZ 3</div><h2 class="text-2xl font-black">🗂️ Tüm Alanlar</h2><div class="text-xs text-slate-400 mt-1">Yetkiniz olan tüm KMI alanları, tek yerden. Sadece gerçekten erişiminiz olan girişler gösterilir.</div></div>'
+    + '<button onclick="document.getElementById(\'kmiTumAlanlarModal\').remove()" class="bg-slate-800 px-4 py-2 rounded-xl">Kapat</button></div>'
+    + (orderedAreas.length ? orderedAreas.map(function(area){
+        return '<div class="mb-4"><div class="text-xs font-black text-slate-400 tracking-widest mb-2">' + taE(area) + '</div>'
+          + '<div class="grid grid-cols-2 md:grid-cols-3 gap-2">'
+          + byArea[area].map(function(e){
+              return '<button data-ta-id="' + taE(e.id) + '" class="text-left bg-slate-800/60 hover:bg-slate-700 border border-slate-700 rounded-xl p-3 text-sm">'
+                + '<i class="fa-solid ' + taE(e.icon||'fa-circle') + ' mr-2 text-cyan-300"></i>' + taE(e.label) + '</button>';
+            }).join('')
+          + '</div></div>';
+      }).join('')
+      : '<div class="text-slate-500 text-sm">Şu an erişiminiz olan bir alan bulunamadı (VERİ GEREKLİ: giriş yapılı bir kullanıcı ve en az bir yetki gerekiyor).</div>')
+    + '</div>';
+  m.querySelectorAll('[data-ta-id]').forEach(function(btn){
+    btn.onclick=function(){
+      const id=btn.getAttribute('data-ta-id');
+      const entry=(window.KMI_NAV_REGISTRY.entries||[]).find(function(e){ return e.id===id; });
+      if(!entry) return;
+      try{
+        if(typeof window[entry.opens]==='function'){ m.remove(); window[entry.opens](); }
+        else { try{window.kmiToast('Bu alan şu an kullanılamıyor (VERİ GEREKLİ: '+entry.opens+' bulunamadı).','warn');}catch(e){} }
+      }catch(e){ try{window.kmiToast('Açılamadı: '+e.message,'warn');}catch(e2){} }
+    };
+  });
+};
+
+// KMI-NEXTGEN-FAZ3-SLICE2-FIX (2026-09-28): "Tüm Alanlar" artık yeni birincil
+// kmiShellBar'da (bkz. aşağıdaki blok) - kmiFloorNavRow2'ye AYRICA eklenmiyor
+// (aynı işleve iki ayrı buton = kabul kriteri #7 "duplicate routes" ihlali olurdu).
+// Fonksiyon/kod SİLİNMEDİ, window.kmiOpenTumAlanlar() hâlâ tek, gerçek giriş noktası.
+})();
+</script>
+
+<!-- ===========================================================================
+     KMI-SHELL-FAZ3-SLICE2-FIX (2026-09-28): Ender'in Next-Gen Faz 3 - Slice 2
+     "New KMI Shell" direktifi (f4e5e2fe-attachment.txt) uygulaması.
+     ---------------------------------------------------------------------------
+     Birincil global şerit (#kmiShellBar): ANA SAYFA / CANLI / COMMAND CENTER /
+     İŞLERİM / PULSE / RAPORLAR / ARA·KMI'YE SOR / TÜM ALANLAR. Ctrl/Cmd+K kısayolu.
+     ---------------------------------------------------------------------------
+     KORUMA KURALI: Auth/Supabase/Shop Floor/Task Floor/Quality/Maintenance/
+     Orders/Purchasing/Warehouse/Shipping/Accounting/Tooling/PULSE/Reporting/
+     Digital Thread/Pilot Manager motorlarının HİÇBİRİ yeniden yazılmadı - bu
+     blok SADECE mevcut, gerçek window.kmiOpen* fonksiyonlarını çağıran YENİ bir
+     giriş noktası ekliyor (kod tekrarı yok, iş mantığı kopyalanmadı):
+       ANA SAYFA      -> yeni kmiOpenAnaSayfa() (Role Workspace) - gerçek
+                          window.KMI_CONTEXT.resolveUserContext() ve
+                          window.KMI_PULSE.listIncidents()'ten veri okur,
+                          hiçbir metrik UYDURULMADI (yoksa "VERİ GEREKLİ").
+       CANLI          -> role'e göre mevcut gerçek ekranlardan birine yönlendirir
+                          (kmiOpenControlTowerHub / kmiOpenQualityTower /
+                          switchTab('bakim') / kmiOpenShopFloorLive) - yeni bir
+                          "canlı" motor İNŞA EDİLMEDİ.
+       COMMAND CENTER -> yönetim: mevcut 'yonetici' sekmesindeki GERÇEK
+                          #kmiCommandCenterBody tablosuna (window.kmiRenderCommandCenter,
+                          zaten var olan iş emri panosu) gider - VERİ KOPYALANMADI.
+                          Yönetim yetkisi yoksa dürüstçe window.kmiOpenTaskFloor()'a
+                          (İşlerim) yönlendirir, sahte bir "Command Center" göstermez.
+       İŞLERİM        -> mevcut window.kmiOpenTaskFloor() (zaten kişiye göre
+                          kendi görevlerini/atamalarını gösteriyor).
+       PULSE/RAPORLAR -> mevcut window.kmiOpenPulse() / window.kmiOpenReporting().
+       ARA/KMI'YE SOR -> mevcut, önceden hiçbir yere BAĞLANMAMIŞ olan
+                          window.kmiOpenAskKMI() artık buradan (+Ctrl/Cmd+K) açılıyor.
+       TÜM ALANLAR    -> mevcut window.kmiOpenTumAlanlar() (Faz 3 Dilim 1).
+     ---------------------------------------------------------------------------
+     GÖÇ GÜVENLİĞİ: Eski #kmiFloorNavRow2 ikinci-satır butonları, eski üst
+     sekme çubuğu (<nav>, btn-muhasebe vb.) ve admin-module-tile grid'i
+     DOKUNULMADAN duruyor - hiçbir rota kaldırılmadı, sadece BİRİNCİL global
+     giriş noktası eklendi (bkz. "NAVIGATION HIDDEN ≠ ROUTE DELETED").
+     BİLİNEN EKSİK (dürüstçe işaretlendi): YARDIM/AYARLAR/PROFİL/BİLDİRİMLER
+     ikincil yardımcı butonları bu dilimde YOK - karşılığında gerçek, çalışan
+     bir ekran/route bulunamadı (uydurmamak için eklenmedi). Bu, ayrı bir
+     dilimde ele alınmalı.
+     =========================================================================== -->
+<script>
+(function(){
+'use strict';
+
+function asE(s){ return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];}); }
+function shToast(msg,type){ try{ window.kmiToast(msg,type||'warn'); }catch(e){} }
+
+// --- CANLI: role'e göre GERÇEK mevcut ekranlardan birine yönlendirir ---
+window.kmiOpenCanli = function(){
+  const u = window.currentUser;
+  if(!u){ shToast('Önce giriş yapmalısınız.'); return; }
+  try{
+    if(window.KMI_AUTH.can(u,'MANAGEMENT') && typeof window.kmiOpenControlTowerHub==='function'){ window.kmiOpenControlTowerHub(); return; }
+    if(window.KMI_AUTH.can(u,'QUALITY') && typeof window.kmiOpenQualityTower==='function'){ window.kmiOpenQualityTower(); return; }
+    const roleDeptText = String((u.role||'')+' '+(u.dept||'')+' '+(u.department||'')).toUpperCase();
+    if(/BAKIM|MAINTENANCE/.test(roleDeptText) && typeof window.switchTab==='function'){ window.switchTab('bakim'); return; }
+    if(typeof window.kmiOpenShopFloorLive==='function'){ window.kmiOpenShopFloorLive(); return; }
+    shToast('CANLI görünümü bulunamadı (VERİ GEREKLİ).');
+  }catch(e){ shToast('CANLI açılamadı: '+e.message); }
+};
+
+// --- COMMAND CENTER: yönetim -> gerçek iş emri panosu; diğerleri -> İşlerim'e dürüstçe yönlendir ---
+window.kmiOpenCommandCenter = function(){
+  const u = window.currentUser;
+  if(!u){ shToast('Önce giriş yapmalısınız.'); return; }
+  try{
+    if(window.KMI_AUTH.can(u,'MANAGEMENT')){
+      if(typeof window.switchTab==='function') window.switchTab('yonetici');
+      setTimeout(function(){ const el=document.getElementById('kmiCommandCenterBody'); if(el) el.scrollIntoView({behavior:'smooth',block:'start'}); }, 80);
+    } else {
+      shToast('Command Center (iş emri panosu) yönetim görünümü - sizin için İşlerim açılıyor.');
+      if(typeof window.kmiOpenTaskFloor==='function') window.kmiOpenTaskFloor();
+    }
+  }catch(e){ shToast('Command Center açılamadı: '+e.message); }
+};
+
+// --- ANA SAYFA: Role Workspace - SADECE gerçek, mevcut kaynaklardan veri; uydurma yok ---
+window.kmiOpenAnaSayfa = function(){
+  document.getElementById('kmiAnaSayfaModal')?.remove();
+  const m=document.createElement('div'); m.id='kmiAnaSayfaModal';
+  m.className='fixed inset-0 z-[296] bg-black/70 flex items-start justify-center p-4 overflow-y-auto';
+  m.onclick=function(ev){ if(ev.target===m) m.remove(); };
+  document.body.appendChild(m);
+  window.kmiRenderAnaSayfa();
+};
+
+window.kmiRenderAnaSayfa = function(){
+  const m=document.getElementById('kmiAnaSayfaModal'); if(!m) return;
+  const u=window.currentUser;
+  if(!u){ m.innerHTML='<div class="bg-slate-900 border border-slate-700 rounded-2xl max-w-lg w-full mt-24 mx-auto p-5 text-center text-slate-400">Önce giriş yapmalısınız.</div>'; return; }
+
+  let jobsLine='VERİ GEREKLİ';
+  try{
+    if(window.KMI_CONTEXT && typeof window.KMI_CONTEXT.resolveUserContext==='function'){
+      const ctx=window.KMI_CONTEXT.resolveUserContext(u.id);
+      if(ctx && ctx.found) jobsLine = ctx.activeWorkOrders.length + ' aktif iş emri';
+      else if(ctx) jobsLine = (ctx.missingLinks&&ctx.missingLinks[0]) || 'VERİ GEREKLİ';
+    }
+  }catch(e){ jobsLine='VERİ GEREKLİ (context resolver hata)'; }
+
+  let pulseLine='VERİ GEREKLİ';
+  try{
+    if(window.KMI_PULSE && typeof window.KMI_PULSE.listIncidents==='function'){
+      const rows=window.KMI_PULSE.listIncidents(u).filter(function(i){ return i.status==='OPEN'||i.status==='ACKNOWLEDGED'; });
+      pulseLine = rows.length + ' açık uyarı';
+    }
+  }catch(e){ pulseLine='VERİ GEREKLİ (PULSE erişilemedi)'; }
+
+  const capLabels=[['Yönetim','MANAGEMENT'],['Kalite','QUALITY'],['Depo','warehouse.receive'],['Muhasebe & Finans','finance.customer.view'],['Raporlar','reporting.view'],['PULSE','pulse.view'],['Mobil','mobile.access']]
+    .filter(function(c){ try{ return window.KMI_AUTH.can(u,c[1])===true; }catch(e){ return false; } }).map(function(c){ return c[0]; });
+
+  const quick=[['CANLI','kmiOpenCanli','fa-satellite-dish'],['COMMAND CENTER','kmiOpenCommandCenter','fa-table-list'],['İŞLERİM','kmiOpenTaskFloor','fa-list-check'],['PULSE','kmiOpenPulse','fa-triangle-exclamation'],['RAPORLAR','kmiOpenReporting','fa-chart-line'],['TÜM ALANLAR','kmiOpenTumAlanlar','fa-table-cells-large']];
+
+  m.innerHTML = '<div class="bg-slate-900 border border-slate-700 rounded-2xl max-w-2xl w-full mt-8 mb-8 mx-auto p-5" onclick="event.stopPropagation()">'
+    + '<div class="flex justify-between items-center mb-4"><div><div class="text-[10px] text-cyan-300 tracking-widest font-black">KMI · NEXT-GEN EXPERIENCE · FAZ 3</div><h2 class="text-2xl font-black">🏠 Ana Sayfa</h2><div class="text-xs text-slate-400 mt-1">Rol çalışma alanınız - gerçek verilerinizden derlendi.</div></div>'
+    + '<button onclick="document.getElementById(\'kmiAnaSayfaModal\').remove()" class="bg-slate-800 px-4 py-2 rounded-xl">Kapat</button></div>'
+    + '<div class="bg-slate-800/60 border border-slate-700 rounded-xl p-4 mb-4">'
+    + '<div class="text-lg font-black text-white">' + asE(u.name||'-') + '</div>'
+    + '<div class="text-xs text-slate-400">' + asE(u.dept||u.department||'-') + ' · ' + asE(u.role||'-') + '</div>'
+    + (capLabels.length ? '<div class="flex flex-wrap gap-1 mt-2">' + capLabels.map(function(c){ return '<span class="text-[10px] bg-slate-700 px-2 py-0.5 rounded-full text-slate-300">'+asE(c)+'</span>'; }).join('') + '</div>' : '')
+    + '</div>'
+    + '<div class="grid grid-cols-2 gap-3 mb-4">'
+    + '<div class="bg-slate-800/60 border border-slate-700 rounded-xl p-3"><div class="text-[10px] text-slate-500 uppercase font-bold">İşlerim</div><div class="text-sm font-bold text-white mt-1">' + asE(jobsLine) + '</div></div>'
+    + '<div class="bg-slate-800/60 border border-slate-700 rounded-xl p-3"><div class="text-[10px] text-slate-500 uppercase font-bold">PULSE</div><div class="text-sm font-bold text-white mt-1">' + asE(pulseLine) + '</div></div>'
+    + '</div>'
+    + '<div class="grid grid-cols-2 md:grid-cols-3 gap-2">'
+    + quick.map(function(q){ return '<button data-as-fn="'+asE(q[1])+'" class="bg-slate-800/60 hover:bg-slate-700 border border-slate-700 rounded-xl p-3 text-xs font-bold text-left"><i class="fa-solid '+asE(q[2])+' mr-1 text-cyan-300"></i>'+asE(q[0])+'</button>'; }).join('')
+    + '</div></div>';
+  m.querySelectorAll('[data-as-fn]').forEach(function(btn){
+    btn.onclick=function(){ const fn=btn.getAttribute('data-as-fn'); m.remove(); try{ if(typeof window[fn]==='function') window[fn](); }catch(e){} };
+  });
+};
+
+// --- Birincil şerit (#kmiShellBar): #mainSystem'in İLK çocuğu olarak eklenir,
+//     her tab/switchTab() çağrısında hayatta kalır (Explorer raporu ile doğrulandı:
+//     switchTab yalnızca .tab-content/.nav-btn class'larını değiştiriyor, #mainSystem'in
+//     kendi çocuk listesine dokunmuyor). ---
+function shBuildBar(){
+  if(document.getElementById('kmiShellBar')) return document.getElementById('kmiShellBar');
+  const mainSys=document.getElementById('mainSystem'); if(!mainSys) return null;
+  const bar=document.createElement('div'); bar.id='kmiShellBar';
+  bar.className='bg-slate-950 border-b border-cyan-900/50 sticky top-0 z-50 no-print';
+  bar.innerHTML='<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-1.5 flex flex-wrap items-center gap-1" id="kmiShellBarInner"></div>';
+  mainSys.insertBefore(bar, mainSys.firstChild);
+  return bar;
+}
+const SHELL_ITEMS = [
+  { id:'anasayfa', label:'Ana Sayfa', icon:'fa-house', fn:'kmiOpenAnaSayfa', permission:null },
+  { id:'canli', label:'Canlı', icon:'fa-satellite-dish', fn:'kmiOpenCanli', permission:null },
+  { id:'commandcenter', label:'Command Center', icon:'fa-table-list', fn:'kmiOpenCommandCenter', permission:null },
+  { id:'islerim', label:'İşlerim', icon:'fa-list-check', fn:'kmiOpenTaskFloor', permission:null },
+  { id:'pulseshell', label:'PULSE', icon:'fa-triangle-exclamation', fn:'kmiOpenPulse', permission:'pulse.view' },
+  { id:'raporlarshell', label:'Raporlar', icon:'fa-chart-line', fn:'kmiOpenReporting', permission:'reporting.view' },
+  { id:'arakmisor', label:'Ara / KMI\'ye Sor', icon:'fa-magnifying-glass', fn:'kmiOpenAskKMI', permission:null },
+  { id:'tumalanlarshell', label:'Tüm Alanlar', icon:'fa-table-cells-large', fn:'kmiOpenTumAlanlar', permission:null },
+];
+function shRenderBar(){
+  const bar=shBuildBar(); if(!bar) return;
+  const inner=document.getElementById('kmiShellBarInner'); if(!inner) return;
+  const u=window.currentUser;
+  inner.innerHTML = SHELL_ITEMS.filter(function(it){
+    if(!it.permission) return true;
+    try{ return window.KMI_AUTH.can(u, it.permission)===true; }catch(e){ return false; }
+  }).map(function(it){
+    return '<button data-shell-fn="'+asE(it.fn)+'" class="kmi-shell-btn px-3 py-1.5 rounded-md hover:bg-slate-800 text-slate-200 text-xs sm:text-sm font-bold whitespace-nowrap"><i class="fa-solid '+asE(it.icon)+' mr-1 text-cyan-300"></i>'+asE(it.label)+'</button>';
+  }).join('');
+  inner.querySelectorAll('[data-shell-fn]').forEach(function(btn){
+    btn.onclick=function(){ const fn=btn.getAttribute('data-shell-fn'); try{ if(typeof window[fn]==='function') window[fn](); else shToast('Bu alan şu an kullanılamıyor.'); }catch(e){ shToast('Açılamadı: '+e.message); } };
+  });
+}
+window.kmiRenderShellBar = shRenderBar; // testler ve giriş/çıkış akışları için dışa açık
+
+// Giriş yapıldığında (veya kullanıcı değiştiğinde) şeridi yeniden çiz - login akışına
+// DOKUNMADAN, mevcut window.currentUser'ı periyodik olarak izleyerek (basit ve güvenli).
+window.addEventListener('load',function(){
+  let lastUserId=null;
+  shRenderBar();
+  setInterval(function(){
+    try{
+      const u=window.currentUser;
+      const uid=u?u.id:null;
+      if(uid!==lastUserId){ lastUserId=uid; shRenderBar(); }
+    }catch(e){}
+  },800);
+},{once:true});
+
+// Ctrl/Cmd+K -> Ara / KMI'ye Sor (teknik olarak güvenli olduğunda: input/textarea/
+// contenteditable içinde DEĞİLSE, tarayıcının kendi kısayoluyla çakışmayı önlemek için).
+window.addEventListener('keydown', function(ev){
+  const isK = (ev.key==='k'||ev.key==='K');
+  if(!isK || !(ev.ctrlKey||ev.metaKey)) return;
+  const tag=(document.activeElement&&document.activeElement.tagName||'').toUpperCase();
+  if(tag==='INPUT'||tag==='TEXTAREA'||(document.activeElement&&document.activeElement.isContentEditable)) return;
+  if(!window.currentUser) return;
+  try{ ev.preventDefault(); if(typeof window.kmiOpenAskKMI==='function') window.kmiOpenAskKMI(); }catch(e){}
+}, true);
+})();
+</script>
+
+<!-- ===========================================================================
+     KMI-NEXTGEN-FAZ3-SLICE3-FIX (2026-09-28): Ender'in Faz 3 - Slice 3
+     "Business Area Registry Completion" direktifi (f4e5e2fe-attachment.txt)
+     uygulaması. Kanıt/sınıflandırma: docs/KMI_NEXTGEN_FAZ3_SLICE3_AREA_MAP.md
+     (Explore ajanı ile gerçek kod taramasından - uydurma yok).
+     ---------------------------------------------------------------------------
+     Bu blok 4 alan için YENİ bir motor/ekran İNŞA ETMİYOR - sadece mevcut,
+     gerçek, çalışan giriş noktalarına (switchTab/openAdminModule/openV61Master)
+     giden İNCE (thin) wrapper fonksiyonları tanımlıyor, KMI_NAV_REGISTRY'ye
+     bağlanabilsin diye (registry her girişin tek argümansız window.kmiOpen*
+     çağırabileceğini varsayıyor, ama switchTab/openAdminModule argüman istiyor).
+     Hedef fonksiyonların GERÇEK yetki kontrolleri (kmiPermissionGuard vb.)
+     korunuyor - burada DUPLICATE bir yetki kontrolü YOK.
+     =========================================================================== -->
+<script>
+(function(){
+'use strict';
+function s3Toast(msg){ try{ window.kmiToast(msg,'warn'); }catch(e){} }
+
+// SATIŞ & SİPARİŞ -> mevcut 'siparis' sekmesi (müşteri/ürün/sipariş komposeri/
+// Sipariş Komuta Merkezi zaten bu sekmenin içinde - STATUS: ACTIVE)
+window.kmiOpenSalesOrders = function(){
+  if(typeof window.switchTab==='function'){ window.switchTab('siparis'); }
+  else s3Toast('Satış & Sipariş ekranı bulunamadı.');
+};
+
+// PLANLAMA -> yönetici sekmesi içindeki gerçek Kaynak Planlama/Gantt paneli
+// (STATUS: PARTIAL - Smart Assignment ve iş emri ataması ayrı, joborders
+// panelinde kalıyor; burada uydurma bir "birleşik planlama ekranı" YOK).
+window.kmiOpenPlanning = function(){
+  try{
+    if(typeof window.switchTab==='function') window.switchTab('yonetici');
+    setTimeout(function(){
+      if(typeof window.openAdminModule==='function') window.openAdminModule('gantt');
+      else s3Toast('Planlama (Gantt) paneli bulunamadı.');
+    }, 60);
+  }catch(e){ s3Toast('Planlama açılamadı: '+e.message); }
+};
+
+// SATINALMA -> mevcut, gerçek Tedarikçi/PO/RFQ/Talep ekranı (openV61Master('supply'),
+// kendi kmiPermissionGuard('purchasing','view') kontrolü VAR - STATUS: ACTIVE).
+window.kmiOpenPurchasing = function(){
+  try{
+    if(typeof window.switchTab==='function') window.switchTab('siparis');
+    setTimeout(function(){
+      if(typeof window.openV61Master==='function') window.openV61Master('supply');
+      else s3Toast('Satınalma ekranı bulunamadı.');
+    }, 60);
+  }catch(e){ s3Toast('Satınalma açılamadı: '+e.message); }
+};
+
+// İNSAN & YETENEK -> yönetici sekmesi içindeki gerçek Personel/Kabiliyet/Vardiya
+// paneli (STATUS: PARTIAL - Puantaj/Prim ve Academy ayrı panellerde kalıyor,
+// buraya zorla birleştirilmedi; maaş/ücret verisi bu panelde YOK - doğrulandı).
+window.kmiOpenPeopleTalent = function(){
+  try{
+    if(typeof window.switchTab==='function') window.switchTab('yonetici');
+    setTimeout(function(){
+      if(typeof window.openAdminModule==='function') window.openAdminModule('personnel');
+      else s3Toast('İnsan & Yetenek paneli bulunamadı.');
+    }, 60);
+  }catch(e){ s3Toast('İnsan & Yetenek açılamadı: '+e.message); }
 };
 })();
 </script>
