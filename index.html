@@ -8,7 +8,6 @@
     <link rel="icon" type="image/png" sizes="32x32" href="assets/favicon-32.png">
     <link rel="icon" type="image/png" sizes="192x192" href="assets/icon-192.png">
     <link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>KURUTLU MANUFACTURING INTELLIGENCE · Performance Center</title>
     <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com">
@@ -15917,6 +15916,156 @@ function cxResolve(code){
   return { found:false, type:null, missingLinks:['KOD HİÇBİR KAYITLA EŞLEŞMEDİ: '+code+' (makine/iş emri/ürün/LOT değil)'] };
 }
 window.KMI_CONTEXT = { resolve: cxResolve, resolveMachineContext: cxResolveMachineContext };
+})();
+</script>
+
+<!-- ===========================================================================
+     KMI-CONTEXT-FAZ2-FIX (2026-09-28): Performance/Infrastructure Master
+     Directive Faz 2 (Context Resolver + UX Simplification) devamı.
+     Yukarıdaki KMI_CONTEXT'e DOKUNMADAN, yalnızca yeni metodlar EKLER:
+     resolveUserContext() - kişi/rol/departman/aktif iş emri ataması
+     (gerçek jobDrafts verisinden, uydurma yok).
+     resolveShiftContext() - KMI'de yapılandırılmış bir "kişi başına vardiya
+     ataması" veri modeli YOK (sadece serbest metin "vardiya" arayüzleri var),
+     bu yüzden dürüstçe VERİ GEREKLİ döner, asla varsayılan bir vardiya
+     uydurmaz.
+     =========================================================================== -->
+<script>
+(function(){
+'use strict';
+function cx2Personnel(){ return (typeof PERSONNEL_LIST!=='undefined'&&Array.isArray(PERSONNEL_LIST))?PERSONNEL_LIST:(Array.isArray(window.PERSONNEL_LIST)?window.PERSONNEL_LIST:[]); }
+function cx2JobDrafts(){ return (typeof jobDrafts!=='undefined'&&jobDrafts&&typeof jobDrafts==='object')?jobDrafts:(window.jobDrafts&&typeof window.jobDrafts==='object'?window.jobDrafts:JSON.parse(localStorage.getItem('operatorJobDrafts')||'{}')); }
+function cx2JobOrders(){ return (typeof jobOrders!=='undefined'&&Array.isArray(jobOrders))?jobOrders:(Array.isArray(window.jobOrders)?window.jobOrders:JSON.parse(localStorage.getItem('jobOrders')||'[]')); }
+
+function cx2ResolveUserContext(personId){
+  if(!window.KMI_AUTH.can(undefined,'context.resolve')) throw new Error('Giriş yapmalısınız.');
+  const pid = (personId===undefined||personId===null) ? (window.currentUser&&window.currentUser.id) : personId;
+  if(pid===undefined||pid===null) return { found:false, type:'USER', missingLinks:['KULLANICI BELİRTİLMEDİ'] };
+  const person = cx2Personnel().find(p=>String(p.id)===String(pid));
+  if(!person) return { found:false, type:'USER', missingLinks:['PERSONEL BULUNAMADI: '+pid] };
+  const drafts = cx2JobDrafts();
+  const activeDrafts = Object.keys(drafts).map(k=>drafts[k]).filter(d=>d && Number(d.operatorId)===Number(person.id) && d.active===true);
+  const jos = cx2JobOrders();
+  const activeWorkOrders = activeDrafts.map(d=>{
+    const jo = jos.find(j=>j.id===d.jobId);
+    return { id:d.jobId, machine: jo?(jo.machine||null):null, productId: jo?(jo.productId||jo.product||null):null, startedAt: d.startedAt||null };
+  });
+  return {
+    found:true, type:'USER',
+    person: { id:person.id, name:person.name, dept:person.dept||null, role:person.role||null },
+    activeWorkOrders: activeWorkOrders,
+    missingLinks: activeWorkOrders.length?[]:['Bu kişiye ait şu an aktif bir iş emri ataması (draft) bulunamadı']
+  };
+}
+
+function cx2ResolveShiftContext(){
+  if(!window.KMI_AUTH.can(undefined,'context.resolve')) throw new Error('Giriş yapmalısınız.');
+  // Dürüstlük ilkesi: KMI'de "kişi/makine başına yapılandırılmış vardiya ataması"
+  // tutan bir veri modeli yok (sadece serbest metin "vardiya" arayüzleri var).
+  // Bu yüzden varsayılan bir vardiya (ör. "Gündüz") UYDURULMAZ.
+  return { found:false, type:'SHIFT', missingLinks:['VERİ GEREKLİ: KMI\'de yapılandırılmış vardiya atama modeli henüz yok (SAHA DOĞRULAMASI BEKLİYOR)'] };
+}
+
+// Mevcut window.KMI_CONTEXT nesnesine, onu SIFIRLAMADAN yeni metodlar ekle.
+if(window.KMI_CONTEXT){
+  window.KMI_CONTEXT.resolveUserContext = cx2ResolveUserContext;
+  window.KMI_CONTEXT.resolveShiftContext = cx2ResolveShiftContext;
+}
+})();
+</script>
+
+<!-- ===========================================================================
+     KMI-MOBILE-FIX (2026-09-28): Mobile Shop Floor Master Directive
+     Faz 1 (Baseline + Regression - bkz. Git tag mobile-presentation-foundation-baseline)
+     + Faz 2 (Mobile Presentation Foundation).
+     ---------------------------------------------------------------------------
+     Direktif madde 6 ("MOBILE IS A PRESENTATION LAYER"): bu ekran YENİ bir iş
+     mantığı YARATMAZ - sadece mevcut window.KMI_CONTEXT.resolveUserContext()
+     (Performance Faz 2'de eklendi) ve mevcut currentUser/PERSONNEL_LIST
+     üzerinden GERÇEK veriyi, sade/mobil bir arayüzde gösterir.
+     QR okutma (Faz 4/6), aktif üretim sayaçları (Faz 8), bitirme akışı
+     (Faz 10) bu fazda YOK - direktif bu özellikleri ayrı fazlara ayırıyor,
+     burada sahte/çalışmayan buton oluşturmak yerine dürüstçe "YAKINDA"
+     etiketiyle gösterilir (asla uydurma).
+     =========================================================================== -->
+<script>
+(function(){
+'use strict';
+function mfE(v){ return String(v==null?'':v).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+const MOBILE_CAPS = { 'mobile.access': u => !!(u||window.currentUser) };
+const _mfOrigCan = window.KMI_AUTH && window.KMI_AUTH.can;
+if(window.KMI_AUTH){
+  window.KMI_AUTH.can = function(user, capability){
+    if(Object.prototype.hasOwnProperty.call(MOBILE_CAPS, capability)){
+      try{ return !!MOBILE_CAPS[capability](user||window.currentUser); }catch(e){ return false; }
+    }
+    return _mfOrigCan ? _mfOrigCan(user, capability) : false;
+  };
+}
+
+window.kmiOpenMobileHome = function(){
+  if(!window.KMI_AUTH.can(undefined,'mobile.access')){ try{window.kmiToast('Önce giriş yapmalısınız.','warn');}catch(e){} return; }
+  document.getElementById('kmiMobileHomeModal')?.remove();
+  const m=document.createElement('div'); m.id='kmiMobileHomeModal'; m.className='fixed inset-0 z-[290] bg-[#07101f] text-white overflow-y-auto';
+  document.body.appendChild(m);
+  window.kmiRenderMobileHome();
+};
+
+window.kmiRenderMobileHome = function(){
+  const el = document.getElementById('kmiMobileHomeModal'); if(!el) return;
+  const u = window.currentUser;
+  if(!u){ el.innerHTML='<div class="p-6 text-red-300">Giriş yapmalısınız.</div>'; return; }
+  let ctx;
+  try{ ctx = window.KMI_CONTEXT ? window.KMI_CONTEXT.resolveUserContext(u.id) : null; }
+  catch(e){ ctx = { found:false, missingLinks:[e.message] }; }
+  const jobs = (ctx && ctx.found && Array.isArray(ctx.activeWorkOrders)) ? ctx.activeWorkOrders : [];
+  const dept = (u.dept) ? mfE(u.dept) : '';
+  el.innerHTML = `<div class="max-w-md mx-auto min-h-screen flex flex-col p-4" style="padding-top:max(1rem,env(safe-area-inset-top));padding-bottom:max(1rem,env(safe-area-inset-bottom));">
+    <div class="flex justify-between items-center mb-6">
+      <div class="text-[10px] text-cyan-300 tracking-widest font-black">KMI ÜRETİM · MOBİL (FAZ 2)</div>
+      <button onclick="document.getElementById('kmiMobileHomeModal').remove()" class="bg-slate-800 px-3 py-2 rounded-xl text-xs">Kapat</button>
+    </div>
+    <div class="mb-6">
+      <div class="text-2xl font-black">${mfE(u.name||'')}</div>
+      ${dept?`<div class="text-sm text-slate-400">${dept}</div>`:''}
+    </div>
+    <button disabled title="Faz 4'te (QR / Entity Passport Foundation) aktif olacak" class="w-full py-5 mb-6 rounded-2xl bg-slate-800 border-2 border-dashed border-slate-600 text-slate-400 font-black text-lg flex items-center justify-center gap-2 cursor-not-allowed">
+      <i class="fa-solid fa-qrcode"></i> MAKİNE QR OKUT <span class="text-[10px] font-normal">(YAKINDA · Faz 4)</span>
+    </button>
+    <div class="flex-1">
+      <div class="text-sm font-black text-slate-300 mb-2 tracking-wide">İŞLERİM</div>
+      <div class="space-y-2">
+        ${jobs.length ? jobs.map(j=>`<div class="bg-slate-900/70 border border-slate-700 rounded-xl p-4">
+            <div class="font-black text-lg">${mfE(j.id)}</div>
+            <div class="text-sm text-cyan-300">${mfE(j.machine||'Makine ataması yok')}</div>
+            ${j.productId?`<div class="text-xs text-slate-500 mt-1">Ürün: ${mfE(j.productId)}</div>`:''}
+          </div>`).join('') : `<div class="bg-slate-900/50 border border-slate-800 rounded-xl p-4 text-sm text-slate-500">
+            ${ (ctx && !ctx.found) ? 'PERSONEL KAYDI BULUNAMADI (VERİ GEREKLİ)' : 'Şu an size atanmış aktif bir iş emri görünmüyor.' }
+          </div>`}
+      </div>
+    </div>
+    <div class="mt-8 text-center text-[10px] text-slate-600">Bu, mevcut masaüstü KMI'nin aynı gerçek verisini kullanan salt-okunur bir mobil sunum katmanıdır (madde 6). Yeni bir iş mantığı içermez.</div>
+  </div>`;
+};
+
+// #mobile hash'i ile otomatik aç (dedicated mobile route, madde 10) + nav butonu.
+window.addEventListener('load', function(){
+  try{ if(location.hash==='#mobile' && window.KMI_AUTH.can(undefined,'mobile.access')) window.kmiOpenMobileHome(); }catch(e){}
+  let tries=0;
+  const timer=setInterval(function(){
+    tries++;
+    try{
+      const row=document.getElementById('kmiFloorNavRow2');
+      if(row && !document.getElementById('kmiMobileNavBtn') && window.KMI_AUTH.can(undefined,'mobile.access')){
+        const b=document.createElement('button'); b.id='kmiMobileNavBtn'; b.className='nav-btn px-3 py-2 rounded-md hover:bg-slate-700 text-slate-300 text-sm';
+        b.innerHTML='<i class="fa-solid fa-mobile-screen mr-1"></i> Mobil Görünüm';
+        b.onclick=function(){ window.kmiOpenMobileHome(); };
+        row.appendChild(b);
+      }
+    }catch(e){}
+    if(tries>=90) clearInterval(timer);
+  },500);
+},{once:true});
 })();
 </script>
 
