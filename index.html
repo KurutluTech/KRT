@@ -261,7 +261,14 @@ ead>
                     <button onclick="switchTab('sevkiyat')" class="nav-btn px-3 py-2 rounded-md hover:bg-slate-700 text-slate-300" id="btn-sevkiyat"><i class="fa-solid fa-truck-fast mr-1"></i> Sevkiyat</button>
                     <button id="btn-bakim" onclick="switchTab('bakim')" class="nav-btn px-4 py-2 rounded-lg font-semibold text-slate-300 hover:bg-slate-700"><i class="fa-solid fa-screwdriver-wrench mr-2"></i>Bakım & Makine</button>
                     <button onclick="switchTab('siparis')" class="nav-btn px-3 py-2 rounded-md hover:bg-slate-700 text-slate-300" id="btn-siparis"><i class="fa-solid fa-file-invoice mr-1"></i> Sipariş & Stok</button>
-                    <button onclick="switchTab('muhasebe')" class="nav-btn px-3 py-2 rounded-md hover:bg-slate-700 text-slate-300" id="btn-muhasebe"><i class="fa-solid fa-calculator mr-1"></i> Muhasebe</button>
+                    <!-- KMI-NEXTGEN-FAZ3-SLICE4-FIX (2026-09-28): Ender'in Faz 3 - Slice 4
+                         (Accounting Consolidation) direktifi gereği, bu buton artık ESKİ
+                         switchTab('muhasebe') yerine YENİ kanonik Muhasebe & Finans ekranını
+                         (window.kmiOpenMuhasebeCanonical -> kmiOpenAccounting) açıyor. tab-muhasebe
+                         DOM'u ve tüm fonksiyonları (onay kuyruğu vb.) SİLİNMEDİ - yeni ekranın
+                         içinde "Eski Muhasebe Ekranı" bağlantısı olarak hâlâ erişilebilir
+                         (bkz. docs/KMI_NEXTGEN_FAZ3_SLICE4_ACCOUNTING_MAP.md). -->
+                    <button onclick="if(typeof window.kmiOpenMuhasebeCanonical==='function'){window.kmiOpenMuhasebeCanonical();}else{switchTab('muhasebe');}" class="nav-btn px-3 py-2 rounded-md hover:bg-slate-700 text-slate-300" id="btn-muhasebe"><i class="fa-solid fa-calculator mr-1"></i> Muhasebe & Finans</button>
                     <button onclick="switchTab('yonetici')" class="nav-btn px-3 py-2 rounded-md hover:bg-slate-700 text-slate-300" id="btn-yonetici"><i class="fa-solid fa-user-tie mr-1"></i> Yönetici Paneli</button>
                     <button onclick="switchTab('liderlik')" class="nav-btn px-3 py-2 rounded-md hover:bg-slate-700 text-slate-300" id="btn-liderlik"><i class="fa-solid fa-trophy mr-1"></i> Zirvedekiler</button>
                 </div>
@@ -980,10 +987,10 @@ ead>
                     <div id="puantajFormulaCard" class="formula-card"></div>
                     <div class="bg-slate-950/60 border border-amber-800/40 rounded-xl p-4">
                         <div class="flex flex-wrap justify-between items-center gap-2 mb-2">
-                            <div><div class="text-[10px] uppercase tracking-wider text-amber-400 font-bold"><i class="fa-solid fa-door-open mr-1"></i>GEÇKO Devam Kayıtları (Canlı)</div><div class="text-[10px] text-slate-500">Turnike verisi Supabase'den her 15 dakikada bir otomatik senkronlanır; bu panel canlı veriyi doğrudan gösterir.</div></div>
+                            <div><div class="text-[10px] uppercase tracking-wider text-amber-400 font-bold"><i class="fa-solid fa-door-open mr-1"></i>GEÇKO Devam Kayıtları (Canlı)</div><div class="text-[10px] text-slate-500">Turnike verisi Supabase'den her 15 dakikada bir otomatik senkronlanır; bu panel canlı veriyi doğrudan gösterir. Bir satıra tıklayınca o günün ham geçiş zaman çizelgesi açılır.</div></div>
                             <div class="flex items-center gap-2"><span id="geckoLiveStatus" class="text-[10px] text-slate-500">Yükleniyor…</span><button onclick="renderGeckoLiveAttendance()" class="bg-slate-700 hover:bg-slate-600 px-2 py-1 rounded text-[10px] text-white">Yenile</button></div>
                         </div>
-                        <div class="overflow-x-auto"><table class="w-full text-left text-[11px] text-slate-300"><thead class="text-slate-500 uppercase text-[9px]"><tr><th class="p-1.5">Personel</th><th class="p-1.5">Tarih</th><th class="p-1.5">Giriş</th><th class="p-1.5">Çıkış</th><th class="p-1.5">Durum</th></tr></thead><tbody id="geckoLiveAttendanceBody"><tr><td colspan="5" class="p-2 text-slate-600">—</td></tr></tbody></table></div>
+                        <div class="overflow-x-auto"><table class="w-full text-left text-[11px] text-slate-300"><thead class="text-slate-500 uppercase text-[9px]"><tr><th class="p-1.5">Personel</th><th class="p-1.5">Tarih</th><th class="p-1.5">İlk Giriş</th><th class="p-1.5">Son Çıkış</th><th class="p-1.5">Son Hareket</th><th class="p-1.5">Durum</th></tr></thead><tbody id="geckoLiveAttendanceBody"><tr><td colspan="6" class="p-2 text-slate-600">—</td></tr></tbody></table></div>
                     </div>
                     <!-- KMI-FIX (2026-09-25): GEÇKO'dan gelen giriş/çıkış verisiyle personelin üretim
                          alanında ne kadar kaldığı, aylık devamsızlık ve geç kalma bilgisi tek panelde. -->
@@ -3018,6 +3025,12 @@ ead>
         // otomatik senkronlanıyordu ama uygulamanın hiçbir ekranı bu veriyi okumuyordu. Bu fonksiyon
         // doğrudan Supabase'den son devam kayıtlarını okuyup Puantaj sekmesinde gösterir (salt okunur,
         // mevcut localStorage tabanlı prim/puantaj hesaplamasına dokunmaz).
+        // KMI-GECKO-HARDENING (2026-09-28, Direktif 11): "En geç Dışarı" tek başına yanıltıcıydı -
+        // gerçek örnek: biri 19:06'da çıkış yapıp 19:17'de tekrar İÇERİ girdiğinde ekran hâlâ
+        // "19:06'da çıktı" diyordu. Artık İlk Giriş / Son Çıkış ayrıca Son Hareket + Durum
+        // (İÇERİDE/AÇIK OTURUM · DIŞARIDA) gösteriliyor - bu alanlar ham PassLog'lardan (clever-service'in
+        // ürettiği last_event_at/last_known_state/open_session) geliyor, uydurma yok. Satıra tıklayınca
+        // o günün ham GEÇKO geçiş zaman çizelgesi (gecko_pass_events) açılır (drilldown, madde 19).
         async function renderGeckoLiveAttendance(){
             const body=document.getElementById('geckoLiveAttendanceBody'), status=document.getElementById('geckoLiveStatus');
             const client=window.kurutluSupabase;
@@ -3027,24 +3040,69 @@ ead>
             try{
                 const { data, error } = await client
                     .from('attendance_records')
-                    .select('attendance_date, check_in_at, check_out_at, status, personnel:personnel_id(first_name,last_name)')
+                    .select('id, personnel_id, attendance_date, check_in_at, check_out_at, last_event_at, last_known_state, open_session, source_event_count, personnel:personnel_id(first_name,last_name)')
+                    .eq('note','GECKO turnike senkronu (projection)')
                     .order('attendance_date',{ascending:false})
-                    .order('check_in_at',{ascending:false})
+                    .order('last_event_at',{ascending:false})
                     .limit(25);
                 if(error) throw error;
-                if(!data || !data.length){ body.innerHTML='<tr><td colspan="5" class="p-2 text-slate-600">Kayıt yok</td></tr>'; if(status) status.textContent='Güncel · 0 kayıt'; return; }
+                if(!data || !data.length){ body.innerHTML='<tr><td colspan="6" class="p-2 text-slate-600">Kayıt yok</td></tr>'; if(status) status.textContent='Güncel · 0 kayıt'; return; }
                 const fmtT=iso=>iso?new Date(iso).toLocaleTimeString('tr-TR',{hour:'2-digit',minute:'2-digit'}):'—';
-                body.innerHTML=data.map(r=>{
+                body.innerHTML=data.map((r,idx)=>{
                     const name=r.personnel?`${r.personnel.first_name||''} ${r.personnel.last_name||''}`.trim():'Bilinmeyen';
-                    return `<tr class="border-t border-slate-800"><td class="p-1.5 text-white">${escSkill(name)}</td><td class="p-1.5">${r.attendance_date||'—'}</td><td class="p-1.5 text-emerald-400">${fmtT(r.check_in_at)}</td><td class="p-1.5 text-amber-400">${fmtT(r.check_out_at)}</td><td class="p-1.5">${r.status||'—'}</td></tr>`;
+                    const stateBadge = r.open_session
+                        ? '<span class="text-emerald-400 font-bold">● İÇERİDE (AÇIK OTURUM)</span>'
+                        : (r.last_known_state==='OUTSIDE' ? '<span class="text-slate-400">DIŞARIDA</span>' : '<span class="text-slate-600">—</span>');
+                    const rowId = 'geckoRow_'+idx;
+                    return `<tr class="border-t border-slate-800 cursor-pointer hover:bg-slate-800/50" onclick="kmiToggleGeckoDrilldown('${rowId}','${r.personnel_id}','${r.attendance_date}')">
+                        <td class="p-1.5 text-white">${escSkill(name)}</td>
+                        <td class="p-1.5">${r.attendance_date||'—'}</td>
+                        <td class="p-1.5 text-emerald-400">${fmtT(r.check_in_at)}</td>
+                        <td class="p-1.5 text-amber-400">${fmtT(r.check_out_at)}</td>
+                        <td class="p-1.5 text-cyan-300">${fmtT(r.last_event_at)}</td>
+                        <td class="p-1.5">${stateBadge}</td>
+                    </tr><tr id="${rowId}" class="hidden"><td colspan="6" class="p-0"><div class="bg-slate-950/60 border-t border-b border-slate-800 px-3 py-2 text-[10px] text-slate-400" id="${rowId}_body">Yükleniyor…</div></td></tr>`;
                 }).join('');
                 if(status) status.textContent=`Güncel · ${data.length} kayıt · ${new Date().toLocaleTimeString('tr-TR')}`;
             }catch(err){
                 console.error('[GEÇKO live attendance]',err);
                 if(status) status.textContent='Okuma hatası';
-                body.innerHTML='<tr><td colspan="5" class="p-2 text-rose-400">Veri okunamadı: '+(err?.message||'bilinmeyen hata')+'</td></tr>';
+                body.innerHTML='<tr><td colspan="6" class="p-2 text-rose-400">Veri okunamadı: '+(err?.message||'bilinmeyen hata')+'</td></tr>';
             }
         }
+        // KMI-GECKO-HARDENING (2026-09-28, Direktif 11 madde 19): GEÇİŞLERİ GÖR drilldown - o günün
+        // ham GEÇKO PassLog zaman çizelgesini gecko_pass_events'ten (RAW/IMMUTABLE kaynak) okur.
+        // Normal kullanıcıya teknik API alan adları gösterilmiyor, yalnızca saat/yön/cihaz.
+        window.kmiToggleGeckoDrilldown = async function(rowId, personnelId, attendanceDate){
+            const row=document.getElementById(rowId), bodyEl=document.getElementById(rowId+'_body');
+            if(!row) return;
+            const willOpen = row.classList.contains('hidden');
+            row.classList.toggle('hidden');
+            if(!willOpen || !bodyEl || bodyEl.dataset.loaded==='1') return;
+            const client=window.kurutluSupabase;
+            if(!client){ bodyEl.textContent='Supabase bağlantısı hazır değil'; return; }
+            try{
+                const dayStart=new Date(attendanceDate+'T00:00:00+03:00').toISOString();
+                const dayEnd=new Date(attendanceDate+'T23:59:59.999+03:00').toISOString();
+                const { data, error } = await client
+                    .from('gecko_pass_events')
+                    .select('pass_time_utc, location_text, machine_name')
+                    .eq('personnel_id', personnelId)
+                    .gte('pass_time_utc', dayStart).lte('pass_time_utc', dayEnd)
+                    .order('pass_time_utc',{ascending:true});
+                if(error) throw error;
+                if(!data || !data.length){ bodyEl.textContent='Bu gün için ham geçiş kaydı bulunamadı.'; return; }
+                bodyEl.innerHTML='<div class="font-bold text-slate-300 mb-1"><i class="fa-solid fa-timeline mr-1"></i>GEÇİŞLER (ham GEÇKO kaydı)</div>' + data.map(ev=>{
+                    const t=new Date(ev.pass_time_utc).toLocaleTimeString('tr-TR',{hour:'2-digit',minute:'2-digit'});
+                    const dirColor = ev.location_text==='İçeri' ? 'text-emerald-400' : 'text-amber-400';
+                    return `<div>${t} <span class="${dirColor} font-bold">${escSkill(ev.location_text||'—')}</span> — ${escSkill(ev.machine_name||'—')}</div>`;
+                }).join('');
+                bodyEl.dataset.loaded='1';
+            }catch(err){
+                console.error('[GEÇKO drilldown]',err);
+                bodyEl.textContent='Geçiş listesi okunamadı: '+(err?.message||'bilinmeyen hata');
+            }
+        };
         function renderYonTaskOverview(){
             const body=document.getElementById('yonTaskOverviewBody'), status=document.getElementById('yonTaskOverviewStatus');
             if(!body) return;
@@ -14168,7 +14226,13 @@ window.kmiRenderAccounting=function(){
   const custOpts=(function(){ try{ return (window.D&&window.D.customers)||[]; }catch(e){ return []; } })();
   el.innerHTML=`<div class="max-w-6xl mx-auto p-5">
    <div class="flex justify-between items-center mb-4"><div><div class="text-[10px] text-cyan-300 tracking-widest font-black">KMI · MUHASEBE PHASE A</div><h2 class="text-2xl font-black">📒 Muhasebe &amp; Finans</h2><div class="text-xs text-amber-300 mt-1">Hesap Planı ve KDV oranları mali müşavir onayı bekliyor - resmi beyan için kullanılamaz. Legacy V118 fatura/tahsilatları henüz muhasebeleştirilmemiş olabilir, aşağıdan senkronize edin.</div></div>
-   <button onclick="document.getElementById('kmiAcctModal').remove()" class="bg-slate-800 px-4 py-2 rounded-xl">Kapat</button></div>
+   <div class="flex gap-2">
+     <!-- KMI-NEXTGEN-FAZ3-SLICE4-FIX (2026-09-28): eski onay kuyruğu (declaration/iş emri
+          muhasebe onayı) BURADA YOK - o mantık ayrı, hâlâ çalışan tab-muhasebe'de. Kod
+          SİLİNMEDİ/kopyalanmadı, sadece buradan erişilebilir bir bağlantı eklendi. -->
+     <button onclick="document.getElementById('kmiAcctModal').remove(); if(typeof switchTab==='function') switchTab('muhasebe');" class="bg-amber-900/60 hover:bg-amber-800 border border-amber-700 px-4 py-2 rounded-xl text-sm font-bold" title="Fiş/beyan onay kuyruğu (declaration onayları) hâlâ bu ekranda">Eski Muhasebe Ekranı (Onay Kuyruğu)</button>
+     <button onclick="document.getElementById('kmiAcctModal').remove()" class="bg-slate-800 px-4 py-2 rounded-xl">Kapat</button>
+   </div></div>
    <div class="grid md:grid-cols-3 gap-4">
     <div class="bg-slate-900/60 border border-slate-700 rounded-2xl p-4">
      <h3 class="font-black mb-2">Hesap Planı</h3>
@@ -16490,6 +16554,35 @@ window.kmiOpenPeopleTalent = function(){
       else s3Toast('İnsan & Yetenek paneli bulunamadı.');
     }, 60);
   }catch(e){ s3Toast('İnsan & Yetenek açılamadı: '+e.message); }
+};
+})();
+</script>
+
+<!-- ===========================================================================
+     KMI-NEXTGEN-FAZ3-SLICE4-FIX (2026-09-28): Ender'in Faz 3 - Slice 4
+     "Accounting Consolidation" direktifi (f4e5e2fe-attachment.txt) uygulaması.
+     Kanıt/sınıflandırma: docs/KMI_NEXTGEN_FAZ3_SLICE4_ACCOUNTING_MAP.md
+     (Explore ajanı ile gerçek kod taramasından - uydurma yok).
+     ---------------------------------------------------------------------------
+     DEĞİŞEN: SADECE üst menüdeki "Muhasebe" butonu (id="btn-muhasebe") artık
+     eski switchTab('muhasebe') yerine YENİ kanonik window.kmiOpenAccounting()
+     ekranını açıyor - kullanıcı artık İKİ AYRI "Muhasebe" seçeneği görmüyor,
+     TEK "Muhasebe & Finans" girişi var (madde 627-635).
+     DEĞİŞMEYEN (SİLİNMEDİ/YENİDEN YAZILMADI): tab-muhasebe DOM'u, renderMuhasebeTable(),
+     renderMuhasebeV98(), approveDeclarationByMuhasebe(), v98AccountingApprove(),
+     KMI_REJECT_STAGES.muhasebe, getAllowedTabs()/hasScreenAccess() yetki zinciri,
+     MUHASEBE rolü giriş sonrası varsayılan iniş sekmesi (satır ~6641) - hepsi
+     BİREBİR duruyor ve yeni ekranın içindeki "Eski Muhasebe Ekranı" bağlantısından
+     hâlâ erişilebiliyor (STILL REQUIRED - bkz. area map).
+     =========================================================================== -->
+<script>
+(function(){
+'use strict';
+// btn-muhasebe'nin yeni onclick'inin çağırdığı, KANONİK giriş noktası.
+// Doğrudan window.kmiOpenAccounting'i çağırıyor - kod tekrarı/yeni mantık YOK.
+window.kmiOpenMuhasebeCanonical = function(){
+  if(typeof window.kmiOpenAccounting==='function'){ window.kmiOpenAccounting(); }
+  else if(typeof window.switchTab==='function'){ window.switchTab('muhasebe'); } // GEO fallback - yeni ekran hiç yüklenmemişse eski ekrana düş
 };
 })();
 </script>
