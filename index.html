@@ -15593,5 +15593,332 @@ window.addEventListener('load',function(){
 })();
 </script>
 
+<!-- ===========================================================================
+     KMI-TOOLING-FIX (2026-09-28): KMI Tooling Intelligence Master Directive
+     FAZ 2 (Canonical Tool Domain Model) - salt okunur, additive.
+     ---------------------------------------------------------------------------
+     KAPSAM (Faz 0 Gap Map'e göre): D.toolMasters/toolInstances/toolLifeEvents
+     ÜZERİNDEN OKUR, HİÇBİR VERİYİ TAŞIMAZ/KOPYALAMAZ/DEĞİŞTİRMEZ. TOOL ITEM /
+     TOOL INSTANCE / TOOL EVENT kavramlarını standart isimlerle sunar ve gerçek
+     bir veri kalitesi taraması yapar. LockCell/Nikken alanları (lockcell, cell,
+     nikkenLabel) BU AŞAMADA hâlâ elle girilen düz metindir - gerçek bir
+     LockCell/Nikken API/cihaz bağlantısı YOKTUR (bkz.
+     docs/KMI_TOOLING_INTELLIGENCE_GAP_MAP.md). Bu modül bunu GİZLEMEZ, aksine
+     her ekranda açıkça "MANUEL GİRİŞ - GERÇEK API YOK" olarak işaretler.
+     Faz 1/3/4/9 (Source of Truth Contract, LockCell/Nikken adapter) gerçek
+     API erişimi/dokümantasyonu olmadan kodlanamaz - "asla uydurma" ilkesi.
+     =========================================================================== -->
+<script>
+(function(){
+'use strict';
+function ktE(v){ return String(v==null?'':v).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function ktUser(u){ return u||window.currentUser||null; }
+function ktIsAdmin(u){ try{ return !!(window.KMI_AUTH && window.KMI_AUTH.can(u,'ADMIN')); }catch(e){ return false; } }
+function ktIsMgmt(u){ u=ktUser(u); return !!(u && (u.role==='ADMIN'||u.role==='MANAGEMENT')); }
+function ktHasToolingAssignment(u){ try{ return !!(window.KMI_ORG && window.KMI_ORG.hasAssignment(ktUser(u), 'TOOLING')); }catch(e){ return false; } }
+const TOOLING_CAPS = {
+  'tooling.view': u => ktIsAdmin(u) || ktIsMgmt(u) || ktHasToolingAssignment(u),
+  'tooling.admin': u => ktIsAdmin(u) || ktHasToolingAssignment(u)
+};
+const _ktOrigCan = window.KMI_AUTH && window.KMI_AUTH.can;
+if(window.KMI_AUTH){
+  window.KMI_AUTH.can = function(user, capability){
+    if(Object.prototype.hasOwnProperty.call(TOOLING_CAPS, capability)){
+      try{ return !!TOOLING_CAPS[capability](ktUser(user)); }catch(e){ return false; }
+    }
+    return _ktOrigCan ? _ktOrigCan(user, capability) : false;
+  };
+}
+function ktRequire(){ if(!window.KMI_AUTH.can(undefined,'tooling.view')) throw new Error('Takım Yönetimi ekranı için yetkiniz yok.'); }
+function ktMasters(){ const md = window.D || window.KMI_MASTER_DATA || {}; return Array.isArray(md.toolMasters)?md.toolMasters:[]; }
+function ktInstances(){ const md = window.D || window.KMI_MASTER_DATA || {}; return Array.isArray(md.toolInstances)?md.toolInstances:[]; }
+function ktEvents(){ const md = window.D || window.KMI_MASTER_DATA || {}; return Array.isArray(md.toolLifeEvents)?md.toolLifeEvents:[]; }
+
+// --- Kanonik TOOL ITEM / TOOL INSTANCE görünümü (salt okunur, veri kopyalamaz) ---
+function ktResolveItem(itemId){
+  ktRequire();
+  const tm = ktMasters().find(x=>String(x.id)===String(itemId));
+  if(!tm) return { found:false, missingLinks:['TOOL ITEM BULUNAMADI: '+itemId] };
+  const instances = ktInstances().filter(i=>String(i.toolMasterId)===String(tm.id));
+  const missing=[];
+  if(!tm.manufacturer) missing.push('ÜRETİCİ BİLGİSİ YOK - VERİ GEREKLİ');
+  if(!tm.category) missing.push('KATEGORİ YOK - VERİ GEREKLİ');
+  return {
+    found:true,
+    toolItemId: tm.id, code: tm.code, name: tm.name, category: tm.category||null,
+    manufacturer: tm.manufacturer||null, manufacturerCode: tm.manufacturerCode||null,
+    diameter: tm.diameter||null, coating: tm.coating||null, grade: tm.grade||null,
+    supplier: tm.supplier||null, lastPrice: tm.lastPrice!=null?tm.lastPrice:null, currency: tm.currency||null,
+    stock: tm.stock!=null?tm.stock:null, minStock: tm.minStock!=null?tm.minStock:null,
+    instanceCount: instances.length,
+    missingLinks: missing
+  };
+}
+function ktResolveInstance(instanceId){
+  ktRequire();
+  const ti = ktInstances().find(x=>String(x.id)===String(instanceId));
+  if(!ti) return { found:false, missingLinks:['TOOL INSTANCE BULUNAMADI: '+instanceId] };
+  const tm = ktMasters().find(x=>String(x.id)===String(ti.toolMasterId));
+  const events = ktEvents().filter(e=>String(e.instanceId)===String(ti.id)).sort((a,b)=>String(a.at).localeCompare(String(b.at)));
+  const missing=[];
+  if(!tm) missing.push('TOOL ITEM BAĞLANTISI YOK: '+ti.toolMasterId);
+  return {
+    found:true,
+    toolInstanceId: ti.id, status: ti.status||null, toolItem: tm?{id:tm.id,code:tm.code,name:tm.name}:null,
+    lockCellLocation: { cabinet: ti.lockcell||null, cell: ti.cell||null, source: 'MANUEL GİRİŞ - GERÇEK LOCKCELL API YOK' },
+    nikkenPreset: { label: ti.nikkenLabel||null, measuredLength: ti.measuredLength!=null?ti.measuredLength:null, measuredDiameter: ti.measuredDiameter!=null?ti.measuredDiameter:null, source: 'MANUEL GİRİŞ - GERÇEK NIKKEN API YOK' },
+    eventCount: events.length, lastEvent: events.length?events[events.length-1]:null,
+    scrapReason: ti.scrapReason||null,
+    missingLinks: missing
+  };
+}
+// --- Veri Kalitesi Taraması (madde 64, gerçek kontrol - uydurma bulgu yok) ---
+function ktDataQuality(){
+  ktRequire();
+  const masters = ktMasters(), instances = ktInstances();
+  const issues = [];
+  const codeCount = {};
+  masters.forEach(tm=>{ const c=String(tm.code||'').trim(); if(c){ codeCount[c]=(codeCount[c]||0)+1; } });
+  Object.keys(codeCount).forEach(c=>{ if(codeCount[c]>1) issues.push({type:'DUPLICATE_TOOL_ITEM_CODE', detail:c+' kodu '+codeCount[c]+' kez kullanılmış'}); });
+  masters.forEach(tm=>{
+    if(!tm.manufacturer) issues.push({type:'MISSING_MANUFACTURER', detail:tm.code||tm.id});
+    if(!tm.category) issues.push({type:'MISSING_CATEGORY', detail:tm.code||tm.id});
+  });
+  let orphanInstances=0, manualLockCellCount=0, manualNikkenCount=0;
+  instances.forEach(ti=>{
+    if(!masters.some(tm=>String(tm.id)===String(ti.toolMasterId))){ orphanInstances++; issues.push({type:'ORPHAN_TOOL_INSTANCE', detail:ti.id}); }
+    if(ti.lockcell) manualLockCellCount++;
+    if(ti.nikkenLabel) manualNikkenCount++;
+  });
+  return {
+    totalItems: masters.length, totalInstances: instances.length,
+    issues, orphanInstances,
+    manualLockCellCount, manualNikkenCount,
+    note: 'lockcell/nikken alanlarının tamamı MANUEL GİRİŞ - gerçek API/entegrasyon bağlantısı yok (Faz 0 Gap Map).'
+  };
+}
+
+window.KMI_TOOLING = { resolveItem: ktResolveItem, resolveInstance: ktResolveInstance, dataQuality: ktDataQuality, listItems: ()=>{ ktRequire(); return ktMasters(); }, listInstances: ()=>{ ktRequire(); return ktInstances(); } };
+
+// --- Ekran: Takım Zekası (salt okunur, Faz 2) ---
+window.kmiOpenToolingIntel=function(){
+  if(!window.KMI_AUTH.can(undefined,'tooling.view')){ try{window.kmiToast('Bu ekran için yetkiniz yok.','warn');}catch(e){} return; }
+  document.getElementById('kmiToolingModal')?.remove();
+  const m=document.createElement('div'); m.id='kmiToolingModal'; m.className='fixed inset-0 z-[280] bg-[#07101f] text-white overflow-y-auto';
+  document.body.appendChild(m);
+  window.kmiRenderToolingIntel();
+};
+window.kmiRenderToolingIntel=function(){
+  const el=document.getElementById('kmiToolingModal'); if(!el) return;
+  let dq; try{ dq = window.KMI_TOOLING.dataQuality(); }catch(e){ el.innerHTML='<div class="p-6 text-red-300">'+ktE(e.message)+'</div>'; return; }
+  el.innerHTML=`<div class="max-w-5xl mx-auto p-5">
+   <div class="flex justify-between items-center mb-4"><div><div class="text-[10px] text-cyan-300 tracking-widest font-black">KMI · TOOLING INTELLIGENCE FAZ 2</div><h2 class="text-2xl font-black">🔧 Takım Zekası (Canonical Model)</h2></div>
+   <button onclick="document.getElementById('kmiToolingModal').remove()" class="bg-slate-800 px-4 py-2 rounded-xl">Kapat</button></div>
+   <div class="bg-amber-900/30 border border-amber-600 text-amber-200 rounded-xl p-3 text-sm mb-4">${ktE(dq.note)}</div>
+   <div class="grid md:grid-cols-4 gap-3 mb-5">
+    <div class="bg-slate-900/60 border border-slate-700 rounded-2xl p-4"><div class="text-[10px] text-slate-500">TOOL ITEM</div><div class="text-2xl font-black">${dq.totalItems}</div></div>
+    <div class="bg-slate-900/60 border border-slate-700 rounded-2xl p-4"><div class="text-[10px] text-slate-500">TOOL INSTANCE</div><div class="text-2xl font-black">${dq.totalInstances}</div></div>
+    <div class="bg-slate-900/60 border border-slate-700 rounded-2xl p-4"><div class="text-[10px] text-slate-500">MANUEL LOCKCELL ALANI</div><div class="text-2xl font-black text-amber-300">${dq.manualLockCellCount}</div></div>
+    <div class="bg-slate-900/60 border border-slate-700 rounded-2xl p-4"><div class="text-[10px] text-slate-500">MANUEL NIKKEN ALANI</div><div class="text-2xl font-black text-amber-300">${dq.manualNikkenCount}</div></div>
+   </div>
+   <div class="bg-slate-900/60 border border-slate-700 rounded-2xl p-4">
+    <h3 class="font-black mb-2">Veri Kalitesi Bulguları (${dq.issues.length})</h3>
+    <div class="space-y-1 text-xs max-h-96 overflow-y-auto">${dq.issues.map(i=>`<div class="bg-slate-950 rounded p-2"><b class="text-amber-300">${ktE(i.type)}</b> · ${ktE(i.detail)}</div>`).join('')||'<div class="text-slate-500">Bulgu yok.</div>'}</div>
+   </div>
+  </div>`;
+};
+window.addEventListener('load',function(){
+  let tries=0;
+  const timer=setInterval(function(){
+    tries++;
+    try{
+      const row=document.getElementById('kmiFloorNavRow2');
+      if(row && !document.getElementById('kmiToolingNavBtn') && window.KMI_AUTH.can(undefined,'tooling.view')){
+        const b=document.createElement('button'); b.id='kmiToolingNavBtn'; b.className='nav-btn px-3 py-2 rounded-md hover:bg-slate-700 text-slate-300 text-sm';
+        b.innerHTML='<i class="fa-solid fa-screwdriver-wrench mr-1"></i> Takım Zekası';
+        b.onclick=function(){ window.kmiOpenToolingIntel(); };
+        row.appendChild(b);
+      }
+    }catch(e){}
+    if(tries>=90) clearInterval(timer);
+  },500);
+},{once:true});
+})();
+</script>
+
+<!-- ===========================================================================
+     KMI-PERF-FIX (2026-09-28): KMI Performance & Field Infrastructure Master
+     Directive FAZ 1 (Performance Instrumentation) - GERÇEK ölçüm toplama,
+     hiçbir "iyileşme" iddiası içermez (madde 86 "No Claim Without Measurement").
+     ---------------------------------------------------------------------------
+     Bu modül SADECE tarayıcının kendi performance API'sinden GERÇEK sayılar
+     toplar (sayfa yükleme süresi + isteğe bağlı mark/measure). Hiçbir sayı
+     uydurulmaz/varsayılmaz. Gerçek fabrika ağı/yük testi burada YAPILMAZ
+     (bkz. docs/KMI_PERFORMANCE_INFRASTRUCTURE_GAP_MAP.md, Bölüm 3).
+     =========================================================================== -->
+<script>
+(function(){
+'use strict';
+function kpE(v){ return String(v==null?'':v).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function kpUser(u){ return u||window.currentUser||null; }
+function kpIsAdmin(u){ try{ return !!(window.KMI_AUTH && window.KMI_AUTH.can(u,'ADMIN')); }catch(e){ return false; } }
+function kpIsMgmt(u){ u=kpUser(u); return !!(u && (u.role==='ADMIN'||u.role==='MANAGEMENT')); }
+function kpHasItAssignment(u){ try{ return !!(window.KMI_ORG && window.KMI_ORG.hasAssignment(kpUser(u), 'SOFTWARE_IT')); }catch(e){ return false; } }
+const PERF_CAPS = { 'perf.view': u => kpIsAdmin(u) || kpIsMgmt(u) || kpHasItAssignment(u) };
+const _kpOrigCan = window.KMI_AUTH && window.KMI_AUTH.can;
+if(window.KMI_AUTH){
+  window.KMI_AUTH.can = function(user, capability){
+    if(Object.prototype.hasOwnProperty.call(PERF_CAPS, capability)){
+      try{ return !!PERF_CAPS[capability](kpUser(user)); }catch(e){ return false; }
+    }
+    return _kpOrigCan ? _kpOrigCan(user, capability) : false;
+  };
+}
+const PERF_KEY='KMI_PERF_MEASUREMENTS_V1';
+function kpLoad(){ try{ const v=JSON.parse(localStorage.getItem(PERF_KEY)); return Array.isArray(v)?v:[]; }catch(e){ return []; } }
+function kpSave(a){ try{ localStorage.setItem(PERF_KEY, JSON.stringify(a.slice(-500))); }catch(e){} }
+
+// --- Gerçek sayfa yükleme süresi (tarayıcı Navigation Timing API) ---
+let __kpPageLoadMs = null;
+function kpComputePageLoad(){
+  try{
+    const nav = performance.getEntriesByType && performance.getEntriesByType('navigation')[0];
+    if(nav && nav.loadEventEnd>0) return Math.round(nav.loadEventEnd);
+    if(performance.timing && performance.timing.loadEventEnd>0){
+      return Math.max(0, performance.timing.loadEventEnd - performance.timing.navigationStart);
+    }
+  }catch(e){}
+  return null;
+}
+function kpPageLoadMs(){ return __kpPageLoadMs; }
+
+// --- Genel amaçlı gerçek zaman ölçümü (isteğe bağlı, diğer modüller kullanabilir) ---
+function kpRecordMeasurement(label, ms){
+  if(typeof ms!=='number' || !isFinite(ms) || ms<0) return null;
+  const rec = { label:String(label||'GENEL'), ms:Math.round(ms), at:new Date().toISOString() };
+  const all = kpLoad(); all.push(rec); kpSave(all);
+  return rec;
+}
+const __kpMarks = {};
+function kpMark(label){ __kpMarks[label] = (typeof performance!=='undefined'&&performance.now)?performance.now():Date.now(); }
+function kpMeasure(label){
+  const start = __kpMarks[label];
+  if(start==null) return null; // uydurma yok: başlamamış ölçüm için sahte sayı üretilmez
+  const now = (typeof performance!=='undefined'&&performance.now)?performance.now():Date.now();
+  delete __kpMarks[label];
+  return kpRecordMeasurement(label, now-start);
+}
+function kpSummary(){
+  if(!window.KMI_AUTH.can(undefined,'perf.view')) throw new Error('Performans görünümü için yetkiniz yok.');
+  const all = kpLoad();
+  const byLabel = {};
+  all.forEach(function(r){
+    byLabel[r.label] = byLabel[r.label] || { label:r.label, count:0, sum:0, min:Infinity, max:-Infinity };
+    const b = byLabel[r.label]; b.count++; b.sum+=r.ms; b.min=Math.min(b.min,r.ms); b.max=Math.max(b.max,r.ms);
+  });
+  return { pageLoadMs: kpPageLoadMs(), totalMeasurements: all.length,
+    byLabel: Object.keys(byLabel).map(function(k){ const b=byLabel[k]; return { label:b.label, count:b.count, avgMs: Math.round(b.sum/b.count), minMs: b.min, maxMs: b.max }; }) };
+}
+
+window.KMI_PERF = { pageLoadMs: kpPageLoadMs, mark: kpMark, measure: kpMeasure, recordMeasurement: kpRecordMeasurement, summary: kpSummary };
+
+window.kmiOpenPerf=function(){
+  if(!window.KMI_AUTH.can(undefined,'perf.view')){ try{window.kmiToast('Bu ekran için yetkiniz yok.','warn');}catch(e){} return; }
+  document.getElementById('kmiPerfModal')?.remove();
+  const m=document.createElement('div'); m.id='kmiPerfModal'; m.className='fixed inset-0 z-[280] bg-[#07101f] text-white overflow-y-auto';
+  document.body.appendChild(m);
+  window.kmiRenderPerf();
+};
+window.kmiRenderPerf=function(){
+  const el=document.getElementById('kmiPerfModal'); if(!el) return;
+  let s; try{ s=window.KMI_PERF.summary(); }catch(e){ el.innerHTML='<div class="p-6 text-red-300">'+kpE(e.message)+'</div>'; return; }
+  el.innerHTML=`<div class="max-w-4xl mx-auto p-5">
+   <div class="flex justify-between items-center mb-4"><div><div class="text-[10px] text-cyan-300 tracking-widest font-black">KMI · PERFORMANCE FAZ 1</div><h2 class="text-2xl font-black">⏱ Performans Ölçümleri (gerçek, ham veri)</h2></div>
+   <button onclick="document.getElementById('kmiPerfModal').remove()" class="bg-slate-800 px-4 py-2 rounded-xl">Kapat</button></div>
+   <div class="bg-amber-900/30 border border-amber-600 text-amber-200 rounded-xl p-3 text-sm mb-4">Bu ekran sadece bu tarayıcıda gerçekten ölçülen sayıları gösterir. "İyileşti/kötüleşti" iddiası yoktur - karşılaştırma için yeterli geçmiş veri birikmesi gerekir.</div>
+   <div class="bg-slate-900/60 border border-slate-700 rounded-2xl p-4 mb-4"><div class="text-[10px] text-slate-500">BU SAYFA YÜKLEME SÜRESİ (gerçek, Navigation Timing API)</div><div class="text-3xl font-black">${s.pageLoadMs!=null?s.pageLoadMs+' ms':'ÖLÇÜLEMEDİ'}</div></div>
+   <div class="bg-slate-900/60 border border-slate-700 rounded-2xl p-4">
+    <h3 class="font-black mb-2">Toplanan Ölçümler (${s.totalMeasurements})</h3>
+    <div class="space-y-1 text-xs">${s.byLabel.map(b=>`<div class="bg-slate-950 rounded p-2 flex justify-between"><b class="text-cyan-300">${kpE(b.label)}</b><span>n=${b.count} · ort ${b.avgMs}ms · min ${b.minMs}ms · maks ${b.maxMs}ms</span></div>`).join('')||'<div class="text-slate-500">Henüz mark/measure ile toplanmış ölçüm yok.</div>'}</div>
+   </div>
+  </div>`;
+};
+window.addEventListener('load',function(){
+  setTimeout(function(){ __kpPageLoadMs = kpComputePageLoad(); }, 0);
+  let tries=0;
+  const timer=setInterval(function(){
+    tries++;
+    try{
+      const row=document.getElementById('kmiFloorNavRow2');
+      if(row && !document.getElementById('kmiPerfNavBtn') && window.KMI_AUTH.can(undefined,'perf.view')){
+        const b=document.createElement('button'); b.id='kmiPerfNavBtn'; b.className='nav-btn px-3 py-2 rounded-md hover:bg-slate-700 text-slate-300 text-sm';
+        b.innerHTML='<i class="fa-solid fa-gauge-high mr-1"></i> Performans';
+        b.onclick=function(){ window.kmiOpenPerf(); };
+        row.appendChild(b);
+      }
+    }catch(e){}
+    if(tries>=90) clearInterval(timer);
+  },500);
+},{once:true});
+})();
+</script>
+
+<!-- ===========================================================================
+     KMI-CONTEXT-FIX (2026-09-28): Ortak parça - Performance/Infrastructure
+     Master Directive Faz 2 (Context Resolver) + Mobile Shop Floor Master
+     Directive Faz 2 (Context-First UX) için TEK, salt okunur, additive temel.
+     ---------------------------------------------------------------------------
+     "Bir kod okutulunca (makine/iş emri/ürün/LOT) bu ne?" sorusuna TEK bir
+     yerden, mevcut veriler üzerinden (MACHINES_LIST, jobOrders, D.products,
+     D.lots) cevap verir. HİÇBİR VERİYİ KOPYALAMAZ/TAŞIMAZ, eşleşme yoksa
+     açıkça "BULUNAMADI" der, uydurmaz.
+     =========================================================================== -->
+<script>
+(function(){
+'use strict';
+function cxUser(u){ return u||window.currentUser||null; }
+function cxMachines(){ return (typeof MACHINES_LIST!=='undefined'&&Array.isArray(MACHINES_LIST))?MACHINES_LIST:(Array.isArray(window.MACHINES_LIST)?window.MACHINES_LIST:[]); }
+function cxJobOrders(){ return (typeof jobOrders!=='undefined'&&Array.isArray(jobOrders))?jobOrders:(Array.isArray(window.jobOrders)?window.jobOrders:JSON.parse(localStorage.getItem('jobOrders')||'[]')); }
+function cxProducts(){ const md=window.D||window.KMI_MASTER_DATA||{}; return Array.isArray(md.products)?md.products:[]; }
+function cxLots(){ const md=window.D||window.KMI_MASTER_DATA||{}; return Array.isArray(md.lots)?md.lots:[]; }
+const CONTEXT_CAPS = { 'context.resolve': u => !!cxUser(u) }; // giriş yapmış herkes - QR okutan operatör dahil
+const _cxOrigCan = window.KMI_AUTH && window.KMI_AUTH.can;
+if(window.KMI_AUTH){
+  window.KMI_AUTH.can = function(user, capability){
+    if(Object.prototype.hasOwnProperty.call(CONTEXT_CAPS, capability)){
+      try{ return !!CONTEXT_CAPS[capability](cxUser(user)); }catch(e){ return false; }
+    }
+    return _cxOrigCan ? _cxOrigCan(user, capability) : false;
+  };
+}
+function cxRequire(){ if(!window.KMI_AUTH.can(undefined,'context.resolve')) throw new Error('Giriş yapmalısınız.'); }
+
+function cxResolveMachineContext(machineCode){
+  cxRequire();
+  const machine = cxMachines().find(m=>String(m.code)===String(machineCode));
+  if(!machine) return { found:false, type:'MACHINE', missingLinks:['MAKİNE BULUNAMADI: '+machineCode] };
+  const activeStates = ['DEVAM EDİYOR','BAŞLADI','AKTİF','IN_PROGRESS','ACTIVE','STARTED'];
+  const relatedWO = cxJobOrders().filter(jo=>String(jo.machine)===String(machineCode) && activeStates.indexOf(String(jo.status||'').toUpperCase())>=0);
+  return { found:true, type:'MACHINE', machine:{code:machine.code,name:machine.name}, activeWorkOrders: relatedWO.map(jo=>({id:jo.id,productId:jo.productId||jo.product||null,status:jo.status||null})),
+    missingLinks: relatedWO.length?[]:['Bu makinede şu an aktif görünen bir iş emri yok (VERİ GEREKLİ veya makine boşta)'] };
+}
+function cxResolve(code){
+  cxRequire();
+  code = String(code||'').trim();
+  if(!code) return { found:false, type:null, missingLinks:['BOŞ KOD'] };
+  const machine = cxMachines().find(m=>String(m.code)===code);
+  if(machine) return cxResolveMachineContext(code);
+  const wo = cxJobOrders().find(j=>String(j.id)===code);
+  if(wo) return { found:true, type:'WORK_ORDER', workOrder:{id:wo.id,machine:wo.machine||null,productId:wo.productId||wo.product||null,status:wo.status||null}, missingLinks: wo.machine?[]:['İş emrinde makine ataması yok'] };
+  const product = cxProducts().find(p=>String(p.code)===code || String(p.id)===code);
+  if(product) return { found:true, type:'PRODUCT', product:{id:product.id,code:product.code,name:product.name}, missingLinks:[] };
+  const lot = cxLots().find(l=>String(l.id)===code);
+  if(lot) return { found:true, type:'MATERIAL_LOT', lot:{id:lot.id,productId:lot.productId||null,qcStatus:lot.qcStatus||lot.status||null}, missingLinks: lot.productId?[]:['LOT ürün bağlantısı yok'] };
+  return { found:false, type:null, missingLinks:['KOD HİÇBİR KAYITLA EŞLEŞMEDİ: '+code+' (makine/iş emri/ürün/LOT değil)'] };
+}
+window.KMI_CONTEXT = { resolve: cxResolve, resolveMachineContext: cxResolveMachineContext };
+})();
+</script>
+
 </body>
 </html>
