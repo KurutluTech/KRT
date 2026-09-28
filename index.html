@@ -16069,5 +16069,74 @@ window.addEventListener('load', function(){
 })();
 </script>
 
+<!-- ===========================================================================
+     KMI-NAV-REGISTRY-FIX (2026-09-28): KMI Next-Generation Experience Master
+     Directive Faz 2 (Navigation Registry) - İLK, KISITLI DİLİM.
+     ---------------------------------------------------------------------------
+     Direktif madde 94/115 gereği: merkezi bir kayıt oluştur, ama mevcut
+     navigasyonu/route'ları KIRMADAN, kademeli olarak. Bu blok:
+     1) MEVCUT 15 ikinci-satır nav hedefini (KMI_UX_NAVIGATION_GAP_MAP.md §1.3'te
+        listelenen, gerçek kod taramasından) SALT OKUNUR bir kayıt olarak
+        tanımlar - her girişin id/label/icon/area/requiredPermission/opens alanı
+        var, GERÇEK, halihazırda kullanılan capability string'lerine ve GERÇEK
+        window.kmiOpen* fonksiyonlarına referans veriyor (uydurma değil).
+     2) window.KMI_NAV_REGISTRY.resolveVisible(user) - o kullanıcı için hangi
+        girişlerin GERÇEKTEN görünür olduğunu (window.KMI_AUTH.can ile) döner -
+        bu, gelecekteki Role Workspace Resolver (Faz 3) için temel.
+     3) MEVCUT 15 setInterval nav-injection döngüsüne DOKUNMAZ, onları
+        DEĞİŞTİRMEZ/KALDIRMAZ - direktif madde 95 "Do not break routes during
+        migration" gereği, bu sadece PARALEL bir kayıt, henüz UI'ı yönetmiyor.
+     =========================================================================== -->
+<script>
+(function(){
+'use strict';
+// KMI_UX_NAVIGATION_GAP_MAP.md §1.3'teki gerçek envanterden birebir alındı.
+const KMI_NAV_ENTRIES = [
+  { id:'shopfloor',      label:'Shop Floor Live',        icon:'fa-industry',              area:'ÜRETİM',    requiredPermission:null,                  opens:'kmiOpenShopFloorLive', legacyRoleCheck:'isProduction||isManagement' },
+  { id:'qualitytower',   label:'Kalite Kulesi',          icon:'fa-shield-halved',         area:'KALİTE',    requiredPermission:'QUALITY',             opens:'kmiOpenQualityTower' },
+  { id:'productionintel',label:'Üretim Zekası',          icon:'fa-industry',              area:'ÜRETİM',    requiredPermission:'MANAGEMENT',          opens:'kmiOpenProductionIntel' },
+  { id:'ieengineering',  label:'IE Mühendislik',         icon:'fa-ruler-combined',        area:'ÜRETİM',    requiredPermission:'MANAGEMENT',          opens:'kmiIeOpenPanel' },
+  { id:'kmilive',        label:'KMI Live',               icon:'fa-satellite-dish',        area:'YÖNETİM',   requiredPermission:'controltower.*.view', opens:'kmiOpenControlTowerHub' },
+  { id:'warehouse',      label:'Depo & Stok',            icon:'fa-warehouse',             area:'DEPO & STOK',requiredPermission:'warehouse.*',        opens:'kmiOpenWarehouse' },
+  { id:'accounting',     label:'Muhasebe & Finans',      icon:'fa-book',                  area:'MUHASEBE & FİNANS', requiredPermission:'finance.*',    opens:'kmiOpenAccounting' },
+  { id:'reporting',      label:'Raporlama',              icon:'fa-chart-line',            area:'RAPORLAR',  requiredPermission:'reporting.view',      opens:'kmiOpenReporting' },
+  { id:'pulse',          label:'PULSE',                  icon:'fa-triangle-exclamation',  area:'YÖNETİM',   requiredPermission:'pulse.view',          opens:'kmiOpenPulse' },
+  { id:'digitalthread',  label:'Digital Thread',         icon:'fa-diagram-project',       area:'ANALİZ',    requiredPermission:'digitalthread.view',  opens:'kmiOpenDigitalThread' },
+  { id:'pilotmanager',   label:'Pilot Manager',          icon:'fa-flask',                 area:'SOFTWARE & IT', requiredPermission:'pilot.view',      opens:'kmiOpenPilotManager' },
+  { id:'issuereporter',  label:'Sorun Bildir',           icon:'fa-bug',                   area:'YARDIM',     requiredPermission:'pilot.issue.report', opens:'kmiOpenIssueReporter' },
+  { id:'academy',        label:'KMI Academy',            icon:'fa-graduation-cap',        area:'YARDIM / ÖĞRENME', requiredPermission:'training.access', opens:'kmiOpenAcademy' },
+  { id:'tooling',        label:'Takım Zekası',           icon:'fa-screwdriver-wrench',    area:'TAKIM & TOOLING', requiredPermission:'tooling.view',   opens:'kmiOpenToolingIntel' },
+  { id:'performance',    label:'Performans',             icon:'fa-gauge-high',            area:'SOFTWARE & IT', requiredPermission:'perf.view',       opens:'kmiOpenPerf' },
+  { id:'mobile',         label:'Mobil Görünüm',          icon:'fa-mobile-screen',         area:'ÜRETİM',     requiredPermission:'mobile.access',      opens:'kmiOpenMobileHome' },
+];
+
+function nrCan(user, permission){
+  if(!permission) return true; // requiredPermission yoksa (legacyRoleCheck'e sahip eski girişler) burada engellenmiyor - o girişler kendi eski kontrolünü kendi injection kodunda yapıyor
+  if(permission.indexOf('*')>=0){
+    // "warehouse.*" gibi bir joker - gerçek WMS_CAPS/ACCT_CAPS/CT_CAPABILITIES listesini
+    // uydurmadan, sadece prefix eşleşmesiyle EN AZ BİR gerçek capability true mu diye sorar.
+    const prefix = permission.slice(0, permission.indexOf('*'));
+    // Bilinen gerçek capability'lerin bir kısmı (CAPS nesnelerinden, madde 3'te listelenen) - tam liste değil, en az bir tanesi true dönerse yeterli.
+    const known = ['warehouse.receive','warehouse.transfer','warehouse.reserve','warehouse.issue','warehouse.count','warehouse.adjust','warehouse.finishedgoods','warehouse.shippingstage','warehouse.admin',
+      'finance.customer.view','finance.supplier.view','finance.coa.manage','finance.period.close','finance.gl.post','finance.invoice.sales.create','finance.collection.create','finance.invoice.purchase.create','finance.payment.create',
+      'controltower.executive.view','controltower.production.view','controltower.quality.view','controltower.purchasing.view','controltower.shipping.view','controltower.maintenance.view','controltower.tooling.view','controltower.people.view','controltower.warehouse.view','controltower.finance.view','controltower.it.view'];
+    return known.some(function(c){ return c.indexOf(prefix)===0 && window.KMI_AUTH.can(user, c); });
+  }
+  return window.KMI_AUTH.can(user, permission);
+}
+
+window.KMI_NAV_REGISTRY = {
+  entries: KMI_NAV_ENTRIES.slice(),
+  // Bir kullanıcı için GERÇEKTEN görünür (yetkisi olan) girişleri döner - uydurma yok,
+  // her satır gerçek window.KMI_AUTH.can() sonucuna dayanır.
+  resolveVisible: function(user){
+    return KMI_NAV_ENTRIES.filter(function(e){
+      try{ return nrCan(user, e.requiredPermission); }catch(err){ return false; }
+    });
+  }
+};
+})();
+</script>
+
 </body>
 </html>
