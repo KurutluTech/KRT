@@ -17,9 +17,9 @@
          `git blame`/diffs on this file quiet between releases and avoid a
          commit-hash feedback loop (the source commit's SHA cannot depend on
          a value computed from that same SHA). See docs/KMI_DEPLOY_ID.md. -->
-    <meta name="kmi-source-commit" content="eafac9ba9603344c0dda4724151a89874da0084c">
-    <meta name="kmi-build-id" content="eafac9ba9603-20261001T092530Z">
-    <meta name="kmi-built-at" content="2026-10-01T09:25:30.215Z">
+    <meta name="kmi-source-commit" content="b58a219131052e5d1e068e90cd071b59fe98ad9a">
+    <meta name="kmi-build-id" content="b58a21913105-20261001T160741Z">
+    <meta name="kmi-built-at" content="2026-10-01T16:07:41.428Z">
     <script>
       // Derived from the meta tags above at runtime, so there is exactly one
       // place (the meta tags) where the build script substitutes real
@@ -7632,6 +7632,19 @@ window.addEventListener('kurutlu:supabase-identity',()=>{});
   }
   let identitySeq=0;
   let identityPromise=null, identityUid=null, identityLoadedAt=0;
+  // KMI-PILOT-MFA-REMEDIATION-001 (2026-10-01): onAuthStateChange fires independently of
+  // loadIdentity() and used to clear state.profile/state.roles/state.user unconditionally on
+  // ANY session-falsy event (including the SDK's own INITIAL_SESSION(null) on page load). If
+  // that event resolved AFTER a real, newer login had already populated identity, it silently
+  // wiped it right before v77EnterPortalFromSession read it - see KMI-PILOT-MFA-DEFECT-001.
+  // authEventClear() is the single, generation-aware gate every identity-clearing auth event
+  // must go through from here on, so an older/uninformative event can never erase identity a
+  // newer, successful operation already established. It mirrors loadIdentity()'s own
+  // identitySeq guard rather than introducing a second, parallel notion of "latest".
+  function authEventClear(){
+    identitySeq++; // invalidate any older in-flight loadIdentity continuation too
+    state.session=null; state.user=null; state.profile=null; state.roles=[]; state.permissions=[];
+  }
   async function loadIdentity(session){
     const requestedUid=session?.user?.id||null;
     if(requestedUid && identityPromise && identityUid===requestedUid) return identityPromise;
@@ -7697,8 +7710,19 @@ window.addEventListener('kurutlu:supabase-identity',()=>{});
       status('Bağlantı hazır · güvenli giriş bekleniyor','ok');
       state.client.auth.onAuthStateChange((_event,session)=>{
         // Auth olayı tek başına portalı AÇMAZ. Yalnız oturum referansını günceller.
-        state.session=session||null; state.user=session?.user||null;
-        if(!session){ state.profile=null; state.roles=[]; state.permissions=[]; }
+        // KMI-PILOT-MFA-REMEDIATION-001: sadece GERÇEK, açık bir SIGNED_OUT olayı kimliği
+        // yetkili biçimde temizler (bkz. authEventClear). Oturumu boş (falsy) gösteren ama
+        // açık bir çıkış OLMAYAN bir olay (örn. SDK'nin kendi INITIAL_SESSION(null) sinyali,
+        // sayfa yüklenirken depoda geçerli oturum bulunamadığında ateşlenir) - halihazırda
+        // doğrulanmış bir kimlik varsa ASLA onu silmez; bu olay o kimlikten daha YENİ bir
+        // bilgi taşımıyor. Henüz hiçbir kimlik kurulmamışsa (örn. ilk sayfa yüklemesi, login
+        // öncesi) bu dal zaten boş durumu teyit eder - zararsız no-op.
+        if(_event==='SIGNED_OUT'){ authEventClear(); return; }
+        if(!session){
+          if(!state.user && !state.roles.length){ state.session=null; state.user=null; state.profile=null; state.roles=[]; state.permissions=[]; }
+          return;
+        }
+        state.session=session; state.user=session.user||null;
       });
     }catch(err){
       state.error=err;
@@ -7775,7 +7799,10 @@ window.addEventListener('kurutlu:supabase-identity',()=>{});
     return result.data;
   };
   window.v82SecureSignOut=async function(){
-    state.profile=null; state.roles=[]; state.permissions=[]; state.user=null; state.session=null;
+    // KMI-PILOT-MFA-REMEDIATION-001: explicit, user-initiated sign-out goes through the same
+    // generation-aware gate as the SIGNED_OUT auth event, so an older in-flight identity load
+    // cannot resurrect itself after this call (see authEventClear() above).
+    authEventClear();
     try{localStorage.removeItem('kurutluV81VerifiedIdentity');}catch(e){}
     if(state.client) await state.client.auth.signOut();
   };
