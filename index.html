@@ -17,9 +17,9 @@
          `git blame`/diffs on this file quiet between releases and avoid a
          commit-hash feedback loop (the source commit's SHA cannot depend on
          a value computed from that same SHA). See docs/KMI_DEPLOY_ID.md. -->
-    <meta name="kmi-source-commit" content="b58a219131052e5d1e068e90cd071b59fe98ad9a">
-    <meta name="kmi-build-id" content="b58a21913105-20261001T160741Z">
-    <meta name="kmi-built-at" content="2026-10-01T16:07:41.428Z">
+    <meta name="kmi-source-commit" content="9479df9a8b0c76c1c9b107e2930b59e4752a2e80">
+    <meta name="kmi-build-id" content="9479df9a8b0c-20261001T174742Z">
+    <meta name="kmi-built-at" content="2026-10-01T17:47:42.506Z">
     <script>
       // Derived from the meta tags above at runtime, so there is exactly one
       // place (the meta tags) where the build script substitutes real
@@ -1862,7 +1862,7 @@ ead>
                     tick(); __loginTicker=setInterval(tick,200);
                 }
                 await window.v82SecureSignIn(email,inputPass);
-                if(!window.v77EnterPortalFromSession()) throw new Error('Doğrulanmış kullanıcı profili/rolü olmadan portal açılamaz.');
+                if(!window.v77EnterPortalFromSession()) throw window.v77PortalFailureError();
                 const totalMs=Math.round(performance.now()-t0);
                 console.info(`[V85 PERF] secure login→portal ${totalMs} ms`, window.__KMI_LOGIN_PERF||{});
                 try{
@@ -2259,7 +2259,18 @@ ead>
             document.getElementById('pageTitle').innerText = titles[tabName] || 'KURUTLU MANUFACTURING INTELLIGENCE';
             
             if(currentUser) {
-                document.getElementById('declOperator').value = currentUser.name;
+                // KMI-PILOT-MFA-REMEDIATION-002 (2026-10-01): #declOperator (the old manual
+                // "Yeni Üretim Beyanı Girişi" declaration form's operator-name field) was
+                // permanently removed from the page by the 2026-09-30 retirement commit
+                // (414f3ca), but this one, separate reference inside switchTab() - unrelated
+                // to that form's own code - was missed. It threw unconditionally on EVERY
+                // successful login of EVERY role (TypeError: Cannot set properties of null),
+                // which v77EnterPortalFromSession's try/catch silently swallowed into a
+                // false return - see KMI-PILOT-MFA-DEFECT-002. Guarded the same way the
+                // fallback branch a few lines above already guards its own lookup; the
+                // legacy form itself is NOT restored.
+                const declOperatorEl = document.getElementById('declOperator');
+                if (declOperatorEl) declOperatorEl.value = currentUser.name;
                 updateJobOrderDropdowns();
                 document.getElementById('kaliteUserBadge').innerText = `Aktif Kalite Personeli: ${currentUser.name}`;
             }
@@ -7577,9 +7588,19 @@ function v80RenderFirstScreen(role){
   else if(role==='SEVKIYAT'){ if(typeof renderSevkiyatTable==='function') renderSevkiyatTable(); }
   // Admin ilk açılışta ağır bütün modülleri çizmez; modül tıklanınca mevcut fonksiyonlar render eder.
 }
+// KMI-PILOT-MFA-REMEDIATION-002 (2026-10-01): exposes WHY the last v77EnterPortalFromSession()
+// call returned false, without changing its existing boolean return (both call sites below
+// keep working unmodified for that part). 'no_identity' = the top-line guard itself failed
+// (genuinely no verified profile/role - the ONLY case the generic "Doğrulanmış kullanıcı
+// profili/rolü olmadan portal açılamaz." message should ever describe). Any other value is a
+// real runtime exception that happened AFTER identity was already verified (see
+// KMI-PILOT-MFA-DEFECT-002) and must be reported as what it is, not relabeled as a profile/role
+// failure.
+window.__v77LastPortalFailureReason=null;
 window.v77EnterPortalFromSession=function(){
   const sb=window.KURUTLU_SUPABASE;
-  if(!sb?.user||!sb.roles?.length) return false;
+  if(!sb?.user||!sb.roles?.length){ window.__v77LastPortalFailureReason='no_identity'; return false; }
+  window.__v77LastPortalFailureReason=null;
   try{
     const t0=performance.now();
     // V84 CRITICAL: legacy RBAC uses the top-level lexical `currentUser`, not only window.currentUser.
@@ -7605,7 +7626,19 @@ window.v77EnterPortalFromSession=function(){
       }
     },80);
     return true;
-  }catch(e){console.error('[V80 session restore]',e);return false;}
+  }catch(e){
+    console.error('[V80 session restore]',e);
+    window.__v77LastPortalFailureReason='runtime_exception: '+(e?.message||String(e));
+    return false;
+  }
+};
+// KMI-PILOT-MFA-REMEDIATION-002: shared helper so both login call sites (handleLogin and the
+// badge/PIN login path) report the TRUE reason a portal-entry attempt failed, instead of both
+// hard-coding the profile/role message regardless of cause (see KMI-PILOT-MFA-DEFECT-002).
+window.v77PortalFailureError=function(){
+  const reason=window.__v77LastPortalFailureReason;
+  if(!reason || reason==='no_identity') return new Error('Doğrulanmış kullanıcı profili/rolü olmadan portal açılamaz.');
+  return new Error('Giriş kimliği doğrulandı ancak portal ekranı açılırken bir hata oluştu ('+reason+'). Lütfen tekrar deneyin; sorun sürerse bu mesajı IT ile paylaşın.');
 };
 // V82: Supabase identity event portalı otomatik açmaz. Portal yalnız explicit handleLogin sonrası açılır.
 window.addEventListener('kurutlu:supabase-identity',()=>{});
@@ -8612,7 +8645,7 @@ window.kmiBadgeSubmitPin=async function(){
   const main=document.getElementById('mainSystem'),login=document.getElementById('loginScreen');
   const t0=performance.now();
   await window.v82SecureSignInWithOtp(email,otp);
-  if(!window.v77EnterPortalFromSession()) throw new Error('Doğrulanmış kullanıcı profili/rolü olmadan portal açılamaz.');
+  if(!window.v77EnterPortalFromSession()) throw window.v77PortalFailureError();
   console.info('[KMI badge login] portal açıldı',Math.round(performance.now()-t0),'ms');
   setTimeout(()=>{
    try{ initToolRows(); }catch(e){}
