@@ -17,9 +17,9 @@
          `git blame`/diffs on this file quiet between releases and avoid a
          commit-hash feedback loop (the source commit's SHA cannot depend on
          a value computed from that same SHA). See docs/KMI_DEPLOY_ID.md. -->
-    <meta name="kmi-source-commit" content="9479df9a8b0c76c1c9b107e2930b59e4752a2e80">
-    <meta name="kmi-build-id" content="9479df9a8b0c-20261001T174742Z">
-    <meta name="kmi-built-at" content="2026-10-01T17:47:42.506Z">
+    <meta name="kmi-source-commit" content="47b6b9a82c348052bf0cabca99e380a3127542ad">
+    <meta name="kmi-build-id" content="47b6b9a82c34-20261001T203854Z">
+    <meta name="kmi-built-at" content="2026-10-01T20:38:54.207Z">
     <script>
       // Derived from the meta tags above at runtime, so there is exactly one
       // place (the meta tags) where the build script substitutes real
@@ -1885,7 +1885,18 @@ ead>
             } catch(err) {
                 console.error('[V84 login]',err);
                 if(main) main.classList.add('hidden'); if(login) login.classList.remove('hidden');
+                // KMI-PILOT-MFA-REMEDIATION-003 (2026-10-01): this block used to clear only the
+                // lexical `currentUser`, not `window.currentUser` - per the V84 comment in
+                // v77EnterPortalFromSession, these are two separate bindings that must be kept
+                // in sync explicitly, they are not automatically the same reference. A genuine
+                // portal-entry failure (e.g. KMI-PILOT-MFA-DEFECT-003's declMachine crash) left
+                // window.currentUser populated with the just-authenticated identity even though
+                // the UI had fallen back to the login screen, which Shop Floor Live's own
+                // deferred open (scheduled earlier by switchTab(), unaware of this failure) then
+                // read as if the login had succeeded. Both references are now cleared together,
+                // so a real failure can never leave a usable stale window.currentUser behind.
                 currentUser=null;
+                window.currentUser=null;
                 document.querySelectorAll('.nav-btn').forEach(btn=>btn.classList.add('hidden'));
                 alert('Giriş başarısız: ' + (err?.message || 'E-posta veya şifreyi kontrol edin.'));
             } finally {
@@ -2301,7 +2312,16 @@ ead>
         }
 
         function initMachineDropdown() {
+            // KMI-PILOT-MFA-REMEDIATION-003 (2026-10-01): #declMachine belonged to the same
+            // retired legacy manual "Yeni Üretim Beyanı Girişi" declaration form removed by
+            // commit 414f3ca (2026-09-30) - the sibling of #declOperator (see
+            // KMI-PILOT-MFA-DEFECT-002 / REMEDIATION-002). This reference was missed because
+            // it only runs for OPERATOR/CAM role logins (v80RenderFirstScreen), which M1's
+            // ADMIN-only regression never exercised - see KMI-PILOT-MFA-DEFECT-003. The legacy
+            // form itself is NOT restored; this only stops the function from crashing on its
+            // absence, the same way declOperator's own reference was guarded.
             const select = document.getElementById('declMachine');
+            if (!select) return;
             select.innerHTML = MACHINES_LIST.map(m => `<option value="${m.code} - ${m.name}">${m.code} - ${m.name}</option>`).join('');
         }
 
@@ -2330,7 +2350,19 @@ ead>
         function getChangedTools(){return Array.from({length:TOOL_ROW_COUNT},(_,i)=>({no:document.getElementById('toolNo'+i)?.value.trim()||'',barcode:document.getElementById('toolBarcode'+i)?.value.trim()||'',name:document.getElementById('toolName'+i)?.value.trim()||''})).filter(x=>x.no||x.barcode||x.name);}
         function syncChangedTools(){const t=getChangedTools();document.getElementById('declToolsChanged').value=t.length?t.map(x=>[x.no,x.barcode,x.name].filter(Boolean).join(' / ')).join(' | '):'Değişen Takım Yok';}
         function saveActiveJobDraft(){if(!activeJobDraftId||!currentUser)return;jobDrafts[draftKey(activeJobDraftId)]={...(jobDrafts[draftKey(activeJobDraftId)]||{}),jobId:activeJobDraftId,operatorId:currentUser.id,active:true,tools:getChangedTools(),notes:document.getElementById('declNotes')?.value||'',idealCycleSec:Number(document.getElementById('declIdealCycleSec')?.value)||0,downtime:{tool:Number(document.getElementById('declDtTool')?.value)||0,setup:Number(document.getElementById('declDtSetup')?.value)||0,breakdown:Number(document.getElementById('declDtBreakdown')?.value)||0,material:Number(document.getElementById('declDtMaterial')?.value)||0,quality:Number(document.getElementById('declDtQuality')?.value)||0,other:Number(document.getElementById('declDtOther')?.value)||0},updatedAt:new Date().toISOString()};saveStorage('operatorJobDrafts',jobDrafts);}
-        function loadActiveJobDraft(jobId){activeJobDraftId=jobId;initToolRows();const d=jobDrafts[draftKey(jobId)]||{};(d.tools||[]).slice(0,10).forEach((x,i)=>{document.getElementById('toolNo'+i).value=x.no||'';document.getElementById('toolBarcode'+i).value=x.barcode||'';document.getElementById('toolName'+i).value=x.name||'';});if(document.getElementById('declNotes'))document.getElementById('declNotes').value=d.notes||'';if(document.getElementById('declIdealCycleSec'))document.getElementById('declIdealCycleSec').value=d.idealCycleSec||'';const dt=d.downtime||{};[['declDtTool','tool'],['declDtSetup','setup'],['declDtBreakdown','breakdown'],['declDtMaterial','material'],['declDtQuality','quality'],['declDtOther','other']].forEach(([id,k])=>{const el=document.getElementById(id);if(el)el.value=dt[k]||0});const pm=document.getElementById('declPlannedMinutes');if(pm&&d.startedAt)pm.value=Math.max(1,Math.round((new Date()-new Date(d.startedAt))/60000));}
+        function loadActiveJobDraft(jobId){activeJobDraftId=jobId;initToolRows();const d=jobDrafts[draftKey(jobId)]||{};(d.tools||[]).slice(0,10).forEach((x,i)=>{
+            // KMI-PILOT-MFA-REMEDIATION-003 (2026-10-01): #toolRows (and the toolNo/toolBarcode/
+            // toolName inputs it used to render) belonged to the same retired legacy declaration
+            // form removed by commit 414f3ca (initToolRows() above already no-ops safely when
+            // #toolRows is absent - see its own `if(!wrap)return;`). This forEach was still
+            // unguarded: a pre-existing operatorJobDrafts entry saved BEFORE the retirement, with
+            // a non-empty `tools` array, would hit a null .value set here the moment that job
+            // order is reactivated today - a third sibling of KMI-PILOT-MFA-DEFECT-002/-003's
+            // declOperator/declMachine bug, found in the mandatory boundary audit. Guarded the
+            // same way; the legacy per-row tool inputs are NOT restored.
+            const tn=document.getElementById('toolNo'+i),tb=document.getElementById('toolBarcode'+i),tm=document.getElementById('toolName'+i);
+            if(tn)tn.value=x.no||''; if(tb)tb.value=x.barcode||''; if(tm)tm.value=x.name||'';
+        });if(document.getElementById('declNotes'))document.getElementById('declNotes').value=d.notes||'';if(document.getElementById('declIdealCycleSec'))document.getElementById('declIdealCycleSec').value=d.idealCycleSec||'';const dt=d.downtime||{};[['declDtTool','tool'],['declDtSetup','setup'],['declDtBreakdown','breakdown'],['declDtMaterial','material'],['declDtQuality','quality'],['declDtOther','other']].forEach(([id,k])=>{const el=document.getElementById(id);if(el)el.value=dt[k]||0});const pm=document.getElementById('declPlannedMinutes');if(pm&&d.startedAt)pm.value=Math.max(1,Math.round((new Date()-new Date(d.startedAt))/60000));}
         function activateJobOrder(jobId){const j=jobOrders.find(x=>x.id===jobId);if(!j)return;const k=draftKey(jobId);jobDrafts[k]=jobDrafts[k]||{jobId,operatorId:currentUser.id,active:true,startedAt:new Date().toISOString(),tools:[]};jobDrafts[k].active=true;saveStorage('operatorJobDrafts',jobDrafts);selectJobForDeclaration(jobId);refreshAllViews();}
         async function openBarcodeScanner(row){
             activeBarcodeRow=Number(row)||0;
@@ -4424,7 +4456,14 @@ renderOperatorMotivationPanel=function(){
 };
 
 // V31 güvenli ilk render
-setTimeout(()=>{try{renderMaintenanceCenter();renderOperatorMotivationPanel();}catch(e){console.error('V31 ilk render',e);}},0);
+// KMI-PILOT-STARTUP-PERFORMANCE-REMEDIATION-001 (2026-10-01): this registration and the
+// "V32 son güvenli render" one below (~line 4531, same two function calls) ran back-to-back
+// on every page load, unconditionally, before any login - i.e. renderMaintenanceCenter()
+// and renderOperatorMotivationPanel() were each executed TWICE for zero benefit (proven
+// duplicate, ~600-800ms each in profiling). renderMaintenanceCenter's own CANLI/son tanım
+// (see the KMI-PLATFORM-FAZ0 comment above its V32 definition) is the one kept below; this
+// first, redundant registration is removed. No feature, role, or render OUTPUT changed -
+// exactly one of the two identical renders now runs instead of two.
 
 
 
@@ -4496,7 +4535,15 @@ function v32GameCard(title,icon,rows,stat){return `<div class="rounded-2xl borde
 const v32OldMotivation=renderOperatorMotivationPanel;renderOperatorMotivationPanel=function(){v32OldMotivation();const top=document.getElementById('operatorTopPerformers');if(!top)return;const r=v32RankData();top.innerHTML=`<div class="grid grid-cols-1 xl:grid-cols-3 gap-3">${v32GameCard('Genel Güç Sıralaması','🏆',r.overall,x=>x.points.toFixed(1)+' P')}${v32GameCard('Bugünün En İyi 5’i','⚡',r.today,x=>x.good+' ADET')}${v32GameCard('Kalite Ustaları','🎯',r.quality,x=>x.quality.toFixed(1)+'%')}</div><div class="mt-2 text-[9px] text-slate-500">Canlı motivasyon istatistikleri. Primler ay sonu Yönetim onayına kadar tahminidir.</div>`;};
 
 // Son güvenli render
-setTimeout(()=>{try{renderMaintenanceCenter();renderOperatorMotivationPanel();}catch(e){console.error('V32 render',e);}},0);
+// KMI-PILOT-STARTUP-PERFORMANCE-REMEDIATION-001 (2026-10-01): this is now the ONLY one of
+// the two identical V31/V32 pre-render registrations (the V31 copy above was removed - see
+// its comment). Also gated behind a resolved identity: before login there is no
+// window.currentUser and nothing on screen needs this render yet (the login screen is all
+// that's visible); the real, authoritative render already happens on demand via
+// openAdminModule('maintenance') and via refreshAllViews() once data/identity exist. This
+// removes real, profiled main-thread work from the pre-login critical path without
+// changing what any authenticated role eventually sees.
+setTimeout(()=>{try{if(!window.currentUser)return;renderMaintenanceCenter();renderOperatorMotivationPanel();}catch(e){console.error('V32 render',e);}},0);
 
 // ===== V33: MAKİNE DİJİTAL DOSYASI + SEVKİYAT + MOTİVASYON (TEK KAYNAK) =====
 function v33e(v){return String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
@@ -5130,7 +5177,15 @@ const v34OpenAdminBase=openAdminModule;openAdminModule=function(name){v34OpenAdm
 const v34PuantajBase=renderPuantajAdmin;renderPuantajAdmin=function(){v34PuantajBase();renderPuantajExclusionsV34();};
 // Operatör kartında Top 5'i her yenilemede zorla üret.
 const v34MotBase=renderOperatorMotivationPanel;renderOperatorMotivationPanel=function(){v34MotBase();renderOperatorTop5V33();};
-setTimeout(()=>{renderMachineFleetV34();renderPuantajExclusionsV34();renderOperatorTop5V33();},50);
+// KMI-PILOT-STARTUP-PERFORMANCE-REMEDIATION-001 (2026-10-01): found via the
+// perf_startup_profile.js regression test added for this remediation - a third, previously
+// unprofiled unconditional pre-login safety-net render (same pattern as the V47/V31/V32/V59
+// ones already fixed above). renderPuantajExclusionsV34 touches the ADMIN-only Puantaj tab
+// (#monthlyPuantajExclusionPanel/#puantajMonth); renderMachineFleetV34/renderOperatorTop5V33
+// are SHARED. Gated the same way: NO ROLE -> NO RENDER. openAdminModule('puantaj')/
+// ('maintenance') above and the normal refresh/tab triggers already cover every case where a
+// real, authenticated user actually needs these.
+setTimeout(()=>{if(!window.currentUser)return;renderMachineFleetV34();renderPuantajExclusionsV34();renderOperatorTop5V33();},50);
 
 
 </script>
@@ -5650,7 +5705,16 @@ function renderKpis(M){const el=document.getElementById('leadershipKpis');if(!el
 function renderV59(){try{const M=model();const l=document.getElementById('leadershipMonthLabel');if(l)l.textContent=`${typeof formatMonthLabel==='function'?formatMonthLabel(M.m):M.m} · canlı performans`;renderKpis(M);renderPool(M);renderCards(M);renderRanking(M);renderRecords(M);renderDailyShiftMachine(M);render7(M);const h=document.getElementById('z58Health');if(h)h.textContent=`✓ ${M.rows.length} kalite onaylı kayıt · ${M.stats.length} personel · tek veri motoru`;}catch(err){console.error('V59 leadership fatal',err);const h=document.getElementById('z58Health');if(h){h.className='text-[10px] font-bold text-rose-600 mt-1';h.textContent='Zirvedekiler veri hatası: '+err.message;}}}
 window.renderZirveV54=renderV59;window.renderLeaderboard=renderV59;window.renderLeadershipPoolGauge=renderV59;window.renderLeadershipPerformanceChart=()=>{};
 const sw=window.switchTab;window.switchTab=function(tab){const r=sw.apply(this,arguments);if(tab==='liderlik'){setTimeout(renderV59,0);setTimeout(()=>{try{renderSahaLive();}catch(e){console.warn('[Saha Live]',e);}},0);}if(tab==='yonetici'){setTimeout(()=>{try{renderYonTaskOverview();renderPersonnelTaskPerformanceBoard();window.kmiPullRemoteTasks?.().then(ch=>{if(ch){renderYonTaskOverview();renderPersonnelTaskPerformanceBoard();}});}catch(e){console.warn('[Task overview]',e);}},0);}return r};
-setTimeout(renderV59,250);
+// KMI-PILOT-STARTUP-PERFORMANCE-REMEDIATION-001 (2026-10-01): this unconditional pre-login
+// safety-net render was found (via the perf_startup_profile.js regression test added for
+// this remediation) to still run renderV59 - the single most expensive of the five V47
+// dashboard calls (model()+renderKpis+renderPool+renderCards+renderRanking+renderRecords+
+// renderDailyShiftMachine+render7) - before any identity exists, independently of the V47
+// block's own (already role-gated) calls to the same function. Gated the same way: nothing
+// on the login screen needs this before a real identity is resolved; the real triggers
+// (switchTab('liderlik') above, and the V47 block's refreshAllViews/150ms hook once an
+// identity exists) already cover every case where a logged-in user actually needs it.
+setTimeout(()=>{if(window.currentUser)renderV59();},250);
 })();
 </script>
 
@@ -5670,7 +5734,14 @@ function barRows(items,max){return items.map(([n,v],i)=>`<div class="mb-2"><div 
 // bir override YOK, window.renderProductionTargetCenter olduğu gibi bırakılıyor.
 const oldBonus=window.renderBonusAdminTable;window.renderBonusAdminTable=function(){oldBonus&&oldBonus.apply(this,arguments);const tb=document.getElementById('bonusAdminTableBody');if(!tb)return;tb.querySelectorAll('tr').forEach(tr=>{const cells=tr.children;if(cells.length>=16){cells[14].classList.add('bg-emerald-950/20');cells[14].style.minWidth='125px';}});};
 const oldOpen=window.openAdminModule;window.openAdminModule=function(n){const r=oldOpen&&oldOpen.apply(this,arguments);if(n==='targets')setTimeout(()=>window.renderProductionTargetCenter(),0);if(n==='bonuslist')setTimeout(()=>window.renderBonusAdminTable(),0);return r;};
-setTimeout(()=>{try{window.renderProductionTargetCenter()}catch(e){}try{window.renderBonusAdminTable()}catch(e){}},450);
+// KMI-PILOT-STARTUP-PERFORMANCE-REMEDIATION-001 (2026-10-01): renderProductionTargetCenter
+// and renderBonusAdminTable both render ADMIN-only "Yönetim" tab panels (data-admin-module
+// "targets"/"bonuslist" - only ADMIN has 'yonetici' in ROLE_ALLOWED_TABS). This unconditional
+// pre-login safety-net render (found via the perf_startup_profile.js regression test added
+// for this remediation) ran both before any identity/role was known. Gated the same way as
+// the V47 block: NO ROLE -> NO ADMIN-ONLY RENDER. openAdminModule's own on-demand triggers
+// above already cover every case where a real ADMIN actually opens these modules.
+setTimeout(()=>{if((typeof getEffectiveRole==='function'?getEffectiveRole(window.currentUser):null)!=='ADMIN')return;try{window.renderProductionTargetCenter()}catch(e){}try{window.renderBonusAdminTable()}catch(e){}},450);
 })();
 </script>
 <script id="v56-machine-transfer-workflow">
@@ -7793,6 +7864,14 @@ window.addEventListener('kurutlu:supabase-identity',()=>{});
     if(!state.client) throw new Error('Supabase henüz hazır değil');
     // Önce eski oturumun kimlik verisini sıfırla; yetki başka kullanıcıdan taşınamaz.
     state.profile=null; state.roles=[]; state.permissions=[];
+    // KMI-PILOT-MFA-REMEDIATION-003 (2026-10-01): the DATA above was already reset synchronously
+    // (it always was - see the comment on the previous line), but the visible status widget
+    // text was not repainted until the new user's role query resolved, so it kept showing the
+    // PREVIOUS user's role/permission-count label (e.g. "ADMIN · 105 yetki") on screen for the
+    // whole duration of the new sign-in attempt - a cosmetic staleness only (the underlying
+    // state.profile/roles/permissions were never actually wrong), but easily mistaken for a
+    // real identity/permission bug - see KMI-PILOT-MFA-DEFECT-003 §E.
+    status('Kimlik doğrulanıyor…','pending');
     // KMI-FIX (2026-09-25): giriş süresinin nerede geçtiğini (auth isteği vs. profil/rol okuma)
     // görebilmek için iki adım ayrı ayrı ölçülüyor - login ekranında canlı gösteriliyor.
     const __ts0=performance.now();
@@ -9299,8 +9378,37 @@ window.renderPuantajAdmin=function(){
  }catch(err){console.error('V47 PUANTAJ RUNTIME',err);const tb=document.getElementById('puantajAdminTableBody');if(tb)tb.innerHTML='<tr><td colspan="11" class="p-4 text-red-300 font-bold">Puantaj motoru çalışma hatası: '+esc(err?.message||err)+'</td></tr>';let d=document.getElementById('puantajV47Diagnostic');if(!d){d=document.createElement('div');d.id='puantajV47Diagnostic';document.getElementById('puantajWeightStatus')?.parentElement?.appendChild(d);}if(d){d.className='text-[10px] text-red-400 mt-2';d.textContent='✕ Puantaj motoru hata: '+(err?.message||err);}}
 };
 // Keep the public leaderboard and bonus widgets on the same canonical engine.
-const oldRefresh=window.refreshAllViews;window.refreshAllViews=function(){try{oldRefresh&&oldRefresh();}catch(e){console.error('V47 legacy refresh',e);}for(const fn of [renderPuantajAdmin,renderBonusAdminTable,renderLeaderboard,renderLeadershipPoolGauge,renderOperatorMotivationPanel]){try{typeof fn==='function'&&fn();}catch(e){console.error('V47 render',fn?.name,e);}}};
-setTimeout(()=>{try{renderPuantajAdmin();renderBonusAdminTable();renderLeaderboard();renderLeadershipPoolGauge();renderOperatorMotivationPanel();}catch(e){console.error('V47 init',e);}},150);
+// KMI-PILOT-STARTUP-PERFORMANCE-REMEDIATION-001 (2026-10-01): this block used to run all
+// five renders unconditionally - on every refreshAllViews() call AND once more via an
+// unconditional setTimeout(...,150) at page load, before any login, before any role was
+// known (proven single largest profiled task, ~2.0-2.2s). Two problems found while mapping
+// the five calls:
+//  1. renderLeaderboard and renderLeadershipPoolGauge are literally the SAME function
+//     (window.renderZirveV54=renderV59; window.renderLeaderboard=renderV59;
+//     window.renderLeadershipPoolGauge=renderV59 - see the V59 Zirvedekiler block above),
+//     so calling both back-to-back always rendered the Zirvedekiler board TWICE for no
+//     reason. It is SHARED - every role's ROLE_ALLOWED_TABS includes 'liderlik' - so it
+//     still runs for every authenticated role, just once.
+//  2. renderPuantajAdmin/renderBonusAdminTable render the "Yönetim" tab's Puantaj/Prim
+//     admin tables; per ROLE_ALLOWED_TABS only ADMIN has 'yonetici'. They must not run for
+//     any other role or before a role is known - NO ROLE -> NO ROLE-SPECIFIC RENDER.
+// renderOperatorMotivationPanel is SHARED (used by every role's own motivation panel) but
+// its wrapped layers compute leaderboard/rank data with no currentUser guard of their own,
+// so it still waits for a resolved identity like everything else here.
+// Nothing about WHAT any role eventually sees has changed - only WHEN/whether each render
+// runs before a real identity exists.
+function kmiV47RunDashboards(){
+ const role=(function(){try{return window.currentUser?((typeof getEffectiveRole==='function')?getEffectiveRole(window.currentUser):window.currentUser.role):null;}catch(e){return null;}})();
+ if(!role) return; // no resolved identity yet - nothing to render
+ try{renderLeaderboard();}catch(e){console.error('V47 render','renderLeaderboard/renderLeadershipPoolGauge',e);} // same function as renderLeadershipPoolGauge - call once
+ try{renderOperatorMotivationPanel();}catch(e){console.error('V47 render','renderOperatorMotivationPanel',e);}
+ if(role==='ADMIN'){
+  try{renderPuantajAdmin();}catch(e){console.error('V47 render','renderPuantajAdmin',e);}
+  try{renderBonusAdminTable();}catch(e){console.error('V47 render','renderBonusAdminTable',e);}
+ }
+}
+const oldRefresh=window.refreshAllViews;window.refreshAllViews=function(){try{oldRefresh&&oldRefresh();}catch(e){console.error('V47 legacy refresh',e);}kmiV47RunDashboards();};
+setTimeout(()=>{try{kmiV47RunDashboards();}catch(e){console.error('V47 init',e);}},150);
 })();
 </script>
 <script id="v52-bonus-list-clean-engine">
@@ -9314,7 +9422,16 @@ window.renderBonusAdminTable=function(){
  const b=document.getElementById('bonusListSummary');if(b){const c=(l,v,k='text-white')=>'<div class="bg-slate-950 border border-slate-700 rounded-xl p-3"><div class="text-[9px] uppercase tracking-wider text-slate-500">'+l+'</div><div class="text-lg font-black '+k+'">'+v+'</div></div>';b.innerHTML=c('Personel',ps.length)+c('Uygun Personel',eligible)+c('Toplam Puantaj',pts.toFixed(2)+' P','text-amber-300')+c('Tahmini Dağıtım',est.toLocaleString('tr-TR',{minimumFractionDigits:2,maximumFractionDigits:2})+' TL','text-cyan-300')+c('Kesinleşen',ok+' kişi','text-emerald-400')+c('Puantaj Dışı',out+' kişi','text-rose-400');}
 };
 const oo=window.openAdminModule;if(typeof oo==='function')window.openAdminModule=function(n){const r=oo.apply(this,arguments);if(n==='bonuslist')setTimeout(window.renderBonusAdminTable,0);return r;};
-setTimeout(()=>{try{window.renderBonusAdminTable();}catch(e){console.error('V52 bonus',e)}},350);
+// KMI-PILOT-STARTUP-PERFORMANCE-REMEDIATION-001 (2026-10-01): this is the FINAL (V52,
+// "clean engine") definition of window.renderBonusAdminTable - it renders the ADMIN-only
+// "Yönetim" tab's bonus list (data-admin-module="bonuslist"; only ADMIN has 'yonetici' in
+// ROLE_ALLOWED_TABS). This unconditional pre-login safety-net render (found via the
+// perf_startup_profile.js regression test added for this remediation) ran before any
+// identity/role was known, redundantly with the v55-operations-cleanup block's own
+// unconditional call to the same function (see its comment) and with the V47 block's
+// (already role-gated) call to whatever renderBonusAdminTable currently resolves to.
+// Gated the same way: NO ROLE -> NO ADMIN-ONLY RENDER.
+setTimeout(()=>{if((typeof getEffectiveRole==='function'?getEffectiveRole(window.currentUser):null)!=='ADMIN')return;try{window.renderBonusAdminTable();}catch(e){console.error('V52 bonus',e)}},350);
 })();</script>
 
 <script id="v87-operator-assignment-identity-fix">
