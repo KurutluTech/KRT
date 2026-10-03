@@ -17,9 +17,9 @@
          `git blame`/diffs on this file quiet between releases and avoid a
          commit-hash feedback loop (the source commit's SHA cannot depend on
          a value computed from that same SHA). See docs/KMI_DEPLOY_ID.md. -->
-    <meta name="kmi-source-commit" content="ab1efc003b5f894a0b97c9665f4ad120c5d257f4">
-    <meta name="kmi-build-id" content="ab1efc003b5f-20261003T115756Z">
-    <meta name="kmi-built-at" content="2026-10-03T11:57:56.090Z">
+    <meta name="kmi-source-commit" content="c08219e1e09d938662a2dabd7532b527f520cba7">
+    <meta name="kmi-build-id" content="c08219e1e09d-20261003T130012Z">
+    <meta name="kmi-built-at" content="2026-10-03T13:00:12.678Z">
     <script>
       // Derived from the meta tags above at runtime, so there is exactly one
       // place (the meta tags) where the build script substitutes real
@@ -19418,7 +19418,7 @@ function asRenderHeader(u){
   // Hızlı İşlemler - R2'nin "quick" dizisiyle AYNI gerçek hedefler, yeni bir eylem İCAT EDİLMEDİ.
   const quick=[['Canlı','kmiOpenCanli','fa-satellite-dish'],['Command Center','kmiOpenCommandCenter','fa-table-list'],['İşlerim','kmiOpenTaskFloor','fa-list-check'],['Yeni Görev','kmiOpenTaskCreate','fa-plus'],['Raporlar','kmiOpenReporting','fa-chart-line'],['Tüm Alanlar','kmiOpenTumAlanlar','fa-table-cells-large']]
     .filter(function(q){ return typeof window[q[1]]==='function'; });
-  return '<div class="flex flex-wrap items-center justify-between gap-3 mb-5">'
+  return '<div class="flex flex-wrap items-center justify-between gap-3 mb-4">'
     + '<div><h1 class="text-2xl sm:text-3xl font-black text-white">'+asE(greet)+' <span class="text-cyan-300">'+asE((u.name||'').split(' ')[0]||u.name||'')+'</span></h1>'
     + '<div class="text-xs sm:text-sm text-slate-400 mt-1">Kurutlu Manufacturing Intelligence · Üretim Performans Merkezi</div></div>'
     + '<div class="flex items-center gap-2">'+shiftHtml
@@ -19465,19 +19465,29 @@ function asComputeKpis(){
   }catch(e){ out.operatorsOnFloor=null; out.operatorsTotal=null; }
   return out;
 }
-function asTile(label,valHtml,sub,icon){
-  return '<div class="bg-slate-900 border border-slate-700 rounded-xl p-3"><div class="flex items-center justify-between"><div class="text-[10px] text-slate-500 uppercase font-bold tracking-wide">'+asE(label)+'</div><i class="fa-solid '+asE(icon)+' text-slate-600 text-xs"></i></div><div class="text-xl sm:text-2xl font-black text-white mt-1">'+valHtml+'</div>'+(sub?'<div class="text-[10px] text-slate-500 mt-0.5">'+sub+'</div>':'')+'</div>';
+function asTile(label,valHtml,sub,icon,valCls){
+  return '<div class="bg-slate-900 border border-slate-700 rounded-xl p-3"><div class="flex items-center justify-between"><div class="text-[10px] text-slate-500 uppercase font-bold tracking-wide">'+asE(label)+'</div><i class="fa-solid '+asE(icon)+' text-slate-600 text-xs"></i></div><div class="text-xl sm:text-2xl font-black '+(valCls||'text-white')+' mt-1">'+valHtml+'</div>'+(sub?'<div class="text-[10px] text-slate-500 mt-0.5">'+sub+'</div>':'')+'</div>';
 }
 function asRenderKpiStrip(k){
   const vg='<span class="text-slate-600 text-sm">VERİ GEREKLİ</span>';
   const pct = (k.machinesTotal&&k.machinesRunning!=null) ? Math.round(k.machinesRunning/Math.max(1,k.machinesTotal)*100) : null;
-  return '<div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 mb-5">'
+  // KMI-R4.1 (owner §F "exception color only when meaningful" - Kalite
+  // Bekleyen amber/red if >0, Sevkiyata Hazır emerald if >0; Çalışan Makine
+  // gets a compact progress bar under its canonical running/total+% value -
+  // same canonical k.qualityWaiting/k.shipReady/pct numbers already computed
+  // above, no new data source, only the display treatment changes).
+  const qualityCls = (k.qualityWaiting!=null && k.qualityWaiting>0) ? 'text-amber-300' : 'text-white';
+  const shipCls = (k.shipReady!=null && k.shipReady>0) ? 'text-emerald-300' : 'text-white';
+  const machineSub = pct!=null
+    ? ('<div class="mt-0.5"><div class="h-1 w-full bg-slate-800 rounded-full overflow-hidden"><div class="h-1 bg-cyan-500 rounded-full" style="width:'+Math.max(0,Math.min(100,pct))+'%"></div></div><div class="text-[10px] text-slate-500 mt-0.5">%'+pct+'</div></div>')
+    : '';
+  return '<div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 mb-4">'
     + asTile('Aktif Sipariş', k.activeOrders!=null?asE(k.activeOrders):vg, '', 'fa-file-invoice')
     + asTile('Üretimde İş Emri', k.activeWOs!=null?asE(k.activeWOs):vg, '', 'fa-industry')
-    + asTile('Çalışan Makine', k.machinesTotal!=null?asE(k.machinesRunning)+' <span class="text-slate-500 text-sm">/ '+asE(k.machinesTotal)+'</span>':vg, pct!=null?('%'+pct):'', 'fa-gauge')
+    + asTile('Çalışan Makine', k.machinesTotal!=null?asE(k.machinesRunning)+' <span class="text-slate-500 text-sm">/ '+asE(k.machinesTotal)+'</span>':vg, machineSub, 'fa-gauge')
     + asTile('Sahadaki Operatör', (k.operatorsOnFloor!=null)?asE(k.operatorsOnFloor)+(k.operatorsTotal?' <span class="text-slate-500 text-sm">/ '+asE(k.operatorsTotal)+'</span>':''):vg, '', 'fa-user-helmet-safety')
-    + asTile('Kalite Bekleyen', k.qualityWaiting!=null?asE(k.qualityWaiting):vg, '', 'fa-shield-halved')
-    + asTile('Sevkiyata Hazır', k.shipReady!=null?asE(k.shipReady):vg, '', 'fa-truck-fast')
+    + asTile('Kalite Bekleyen', k.qualityWaiting!=null?asE(k.qualityWaiting):vg, '', 'fa-shield-halved', qualityCls)
+    + asTile('Sevkiyata Hazır', k.shipReady!=null?asE(k.shipReady):vg, '', 'fa-truck-fast', shipCls)
     + '</div>';
 }
 
@@ -19514,7 +19524,18 @@ function asRenderLiveFloorSummary(){
   // window.jobOrders zaten var olan, başka her yerde (kmiOpenLive, Task Floor) okunan
   // AYNI global dizi - ikinci bir "iş emri" kaynağı İCAT EDİLMEDİ.
   const jobsArr = Array.isArray(window.jobOrders) ? window.jobOrders : [];
-  const cards=board.slice(0,8).map(function(m){
+  // KMI-R4.1 (owner §G "Prioritize information hierarchy: FAULT/BLOCKED >
+  // PRODUCTION > WAITING > MAINTENANCE > IDLE"): sort the SAME board by
+  // status priority before slicing to 8, so a down/faulted machine is never
+  // pushed off the home preview by machines earlier in the raw board order -
+  // no new data, no new status, only the display order changed.
+  const asLiveFloorPriority = { DOWN:0, ISSUE:0, RUNNING:1, PAUSED:2, HOLD:2, MAINTENANCE:3, IDLE:4 };
+  const boardSorted = board.slice().sort(function(a,b){
+    const pa = asLiveFloorPriority[a.status]!=null ? asLiveFloorPriority[a.status] : 5;
+    const pb = asLiveFloorPriority[b.status]!=null ? asLiveFloorPriority[b.status] : 5;
+    return pa - pb;
+  });
+  const cards=boardSorted.slice(0,8).map(function(m){
     const sess=byMachine[m.name];
     const j = sess ? jobsArr.find(function(x){ return String(x.id)===String(sess.jobId); }) : null;
     const pct = (j&&j.targetQty) ? Math.min(100,Math.round(Number(j.completedQty||0)/Number(j.targetQty)*100)) : null;
@@ -19576,13 +19597,28 @@ function asRenderOperators(){
   let running=[]; try{ running=(typeof window.kmiMachinesRunningNow==='function')?window.kmiMachinesRunningNow():[]; }catch(e){}
   const runningByName={}; running.forEach(function(s){ if(s&&s.operator) runningByName[s.operator]=s.machine; });
   let tasks=[]; try{ tasks=(typeof kmiTasksRaw==='function')?kmiTasksRaw():[]; }catch(e){}
-  const rows=roster.filter(function(p){
+  // KMI-R4.1 (owner §I "Keep current truthful priority: MAKİNEDE > GÖREVDE >
+  // VARDİYADA > VERİ YOK" - this must govern which 8 people are actually
+  // SHOWN, not just how they're colored once shown). Previously state was
+  // computed inside the same .map() that ran AFTER .slice(0,8) had already
+  // cut the roster down in raw array order - a genuinely MAKİNEDE operator
+  // could be silently excluded from the home preview by a VERİ YOK person
+  // earlier in the roster. Fix: compute state for the FULL filtered roster
+  // first, sort by state priority, THEN slice to 8, THEN render HTML - same
+  // pattern as asLiveFloorPriority/boardSorted above. No new data/fields.
+  const asOperatorPriority = { 'MAKİNEDE':0, 'GÖREVDE':1, 'VARDİYADA':2, 'VERİ YOK':3 };
+  const scored = roster.filter(function(p){
     return /OPERATOR|OPERATÖR|URETIM|ÜRETİM|CNC|BAKIM|MAINTENANCE/.test(String((p.role||'')+' '+(p.job||'')+' '+(p.department||'')).toUpperCase());
-  }).slice(0,8).map(function(p){
+  }).map(function(p){
     let state='VERİ YOK', cls='text-slate-500', detail='';
     if(runningByName[p.name]){ state='MAKİNEDE'; cls='text-emerald-300'; detail=runningByName[p.name]; }
     else if(tasks.some(function(t){ return Number(t.assigneeId)===Number(p.id)&&t.status==='ACTIVE'; })){ state='GÖREVDE'; cls='text-cyan-300'; }
     else { try{ const sh=window.kmiResolveShift(p); if(sh&&sh.assigned){ state='VARDİYADA'; cls='text-amber-300'; detail=sh.label; } }catch(e){} }
+    return { p:p, state:state, cls:cls, detail:detail };
+  });
+  scored.sort(function(a,b){ return asOperatorPriority[a.state]-asOperatorPriority[b.state]; });
+  const rows=scored.slice(0,8).map(function(row){
+    const p=row.p, state=row.state, cls=row.cls, detail=row.detail;
     return '<div class="flex items-center justify-between gap-2 py-1 border-b border-slate-800/70 last:border-0">'
       + '<div class="min-w-0"><div class="text-xs font-bold text-white truncate">'+asE(p.name||'-')+'</div><div class="text-[9px] text-slate-500 truncate">'+asE(p.dept||p.department||'-')+'</div></div>'
       + '<div class="text-right shrink-0"><span class="text-[9px] font-black '+cls+'">'+state+'</span>'+(detail?'<div class="text-[9px] text-slate-500">'+asE(detail)+'</div>':'')+'</div></div>';
@@ -19601,6 +19637,23 @@ function asRenderOperators(){
 function asRenderPulse(u){
   let rows=[]; try{ rows=(window.KMI_PULSE&&typeof window.KMI_PULSE.listIncidents==='function') ? window.KMI_PULSE.listIncidents(u).filter(function(i){ return i.status==='OPEN'||i.status==='ACKNOWLEDGED'||i.status==='ESCALATED'; }) : []; }catch(e){}
   const sevCls={CRITICAL:'text-red-300',HIGH:'text-amber-300',NORMAL:'text-slate-400'};
+  // KMI-R4.1 (owner §J "Prioritize: critical, urgent, escalated,
+  // acknowledged/open"): sort the SAME canonical incident list by severity
+  // first (CRITICAL>HIGH>NORMAL), then by status (ESCALATED>ACKNOWLEDGED>OPEN),
+  // then oldest-first within a tier, before slicing to 5 - so a critical
+  // incident is never pushed off the home PULSE panel by an older-but-lower-
+  // severity one earlier in the raw list. No new data, no new severities.
+  const asPulseSevRank={CRITICAL:0,HIGH:1,NORMAL:2};
+  const asPulseStatusRank={ESCALATED:0,ACKNOWLEDGED:1,OPEN:2};
+  rows = rows.slice().sort(function(a,b){
+    const sa=asPulseSevRank[a.severity]!=null?asPulseSevRank[a.severity]:3;
+    const sb=asPulseSevRank[b.severity]!=null?asPulseSevRank[b.severity]:3;
+    if(sa!==sb) return sa-sb;
+    const ta=asPulseStatusRank[a.status]!=null?asPulseStatusRank[a.status]:3;
+    const tb=asPulseStatusRank[b.status]!=null?asPulseStatusRank[b.status]:3;
+    if(ta!==tb) return ta-tb;
+    return String(a.openedAt||'').localeCompare(String(b.openedAt||''));
+  });
   const body = rows.length ? rows.slice(0,5).map(function(i){
     return '<div class="py-1.5 border-b border-slate-800/70 last:border-0"><div class="flex items-center justify-between gap-2"><b class="text-xs '+(sevCls[i.severity]||'text-slate-300')+'">'+asE(i.title||i.ruleName||'-')+'</b><span class="text-[9px] text-slate-500 shrink-0">'+asTimeAgo(i.openedAt)+'</span></div><div class="text-[9px] text-slate-500">'+asE(i.status)+'</div></div>';
   }).join('') : '<div class="text-slate-500 text-xs py-4 text-center">Açık kritik durum yok.</div>';
@@ -19655,13 +19708,20 @@ function asRenderTodayPerf(k){
 //     + kmiTasksRaw()'ın GERÇEK dueAt'i birleştirilip tarihe göre sıralanır.
 //     Yeni bir takvim/etkinlik motoru İCAT EDİLMEDİ, sadece var olan iki gerçek
 //     tarih alanı bir arada listelendi.
-function asRenderUpcoming(){
+function asRenderUpcoming(u){
   const items=[];
+  // KMI-R4.1 (owner §O "Do not expose unauthorized: customer... information" -
+  // real gap found in discovery: this list previously printed the customer
+  // name unconditionally for every role that can see Home. Gate it behind
+  // the SAME canonical permission check asRenderTaskFloor already uses -
+  // non-management roles see the order id/kind only, never the customer).
+  const asCanSeeCustomer = (function(){ try{ return window.KMI_AUTH.can(u,'MANAGEMENT')===true; }catch(e){ return false; } })();
   try{
     const st=(window.V118_STATE&&Array.isArray(window.V118_STATE.orders))?window.V118_STATE:(typeof core==='function'?core():{orders:[]});
     (st.orders||[]).filter(function(o){ return !['PAID','CANCELLED','SHIPPED'].includes(o.status) && o.dueDate; }).forEach(function(o){
       const dd=(new Date(o.dueDate)-Date.now())/86400000;
-      if(dd<=7) items.push({at:o.dueDate, label:'Sevkiyat/Termin · '+(o.customer||o.id||'Sipariş'), kind:'Sipariş'});
+      const who = asCanSeeCustomer ? (o.customer||o.id||'Sipariş') : ('Sipariş #'+(o.id||'-'));
+      if(dd<=7) items.push({at:o.dueDate, label:'Sevkiyat/Termin · '+who, kind:'Sipariş'});
     });
   }catch(e){}
   try{
@@ -19728,7 +19788,7 @@ window.kmiRenderAnaSayfa = function(){
     +     asRenderLiveFloorSummary()
     +     '<div class="grid grid-cols-1 lg:grid-cols-2 gap-4">' + asRenderTaskFloor(u) + asRenderTodayPerf(k) + '</div>'
     +   '</div>'
-    +   '<div class="flex flex-col gap-4 min-w-0">' + asRenderOperators() + asRenderPulse(u) + asRenderUpcoming() + '</div>'
+    +   '<div class="flex flex-col gap-4 min-w-0">' + asRenderOperators() + asRenderPulse(u) + asRenderUpcoming(u) + '</div>'
     + '</div></div>';
   page.querySelectorAll('[data-as-fn]').forEach(function(btn){
     btn.onclick=function(){ const fn=btn.getAttribute('data-as-fn'); try{ if(typeof window[fn]==='function') window[fn](); }catch(e){} };
