@@ -17,9 +17,9 @@
          `git blame`/diffs on this file quiet between releases and avoid a
          commit-hash feedback loop (the source commit's SHA cannot depend on
          a value computed from that same SHA). See docs/KMI_DEPLOY_ID.md. -->
-    <meta name="kmi-source-commit" content="bcfc0d8e876211454b10d1ea7d2e33b06827c79b">
-    <meta name="kmi-build-id" content="bcfc0d8e8762-20261003T000523Z">
-    <meta name="kmi-built-at" content="2026-10-03T00:05:23.354Z">
+    <meta name="kmi-source-commit" content="3bccd6a0fc8ad4924c63693b2ccd877ada75c3de">
+    <meta name="kmi-build-id" content="3bccd6a0fc8a-20261003T083928Z">
+    <meta name="kmi-built-at" content="2026-10-03T08:39:28.822Z">
     <script>
       // Derived from the meta tags above at runtime, so there is exactly one
       // place (the meta tags) where the build script substitutes real
@@ -7910,6 +7910,20 @@ window.v77EnterPortalFromSession=function(){
     if(typeof applyRoleAccess==='function') applyRoleAccess();
     const first={OPERATOR:'operatör',CAM:'operatör',BAKIM:'bakim',KALITE:'kalite',SEVKIYAT:'sevkiyat',MUHASEBE:'muhasebe',ADMIN:'yonetici'}[currentUser.role]||'liderlik';
     if(typeof switchTab==='function') switchTab(first);
+    // KMI-PHASE-1-R2-FIX8 (2026-10-03, owner "OWNER VISUAL REVIEW FIX PASS"):
+    // switchTab(first) above sets the BACKGROUND tab-content state exactly as
+    // before (unchanged, still needed so legacy-dependent code paths keep
+    // working) - but until now nothing then opened the actual Performance
+    // Center on top of it, so an ADMIN/Management login landed directly on
+    // the old #tab-yonetici admin-module-tile wall as the FIRST thing seen
+    // (Ender+ChatGPT's live-review finding: "the user should see the product,
+    // not legacy navigation before the actual workspace", FIX8). Ana Sayfa
+    // (window.kmiOpenAnaSayfa, already the real Phase 1D Performance Center)
+    // is now opened right after a real login, for every role, so it is
+    // genuinely the landing experience - not merely reachable if someone
+    // happens to click "Ana Sayfa". Wrapped defensively: a failure here must
+    // never block or break the login flow itself.
+    try{ if(typeof window.kmiOpenAnaSayfa==='function') window.kmiOpenAnaSayfa(); }catch(e){ console.warn('[KMI-PHASE-1-R2-FIX8] Ana Sayfa otomatik açılamadı',e); }
     v80RenderFirstScreen(currentUser.role);
     v80LastEnteredUid=sb.user.id;
     console.info(`[V81 PERF] portal first screen ${Math.round(performance.now()-t0)} ms`);
@@ -19452,15 +19466,22 @@ function shBuildBar(){
   mainSys.insertBefore(bar, mainSys.firstChild);
   return bar;
 }
+// KMI-PHASE-1-R2-FIX2 (2026-10-03, owner "OWNER VISUAL REVIEW FIX PASS"): the top
+// bar used to repeat destinations that the canonical left nav (KMI_LEFT_NAV_GROUPS)
+// already covers (Ana Sayfa, Canlı, Command Center, İşlerim, Raporlar, Tüm Alanlar) -
+// this is exactly the "top bar is another complete navigation system" defect Ender +
+// ChatGPT flagged in live review. The top bar is now a COMMAND BAR: only global
+// utilities/status that do NOT duplicate a left-nav destination remain - search,
+// the PULSE status indicator, and a persistent "Sorun Bildir" quick action (a
+// cross-cutting contextual action, not a department, per Phase 1C's own allowed
+// list). Every removed item is still reachable from the left nav drawer - nothing
+// was deleted, only de-duplicated. 'Sorun Bildir' reuses the REAL, already-existing
+// window.kmiOpenIssueReporter + 'pilot.issue.report' permission (KMI_NAV_REGISTRY id
+// 'issuereporter') - no new destination invented.
 const SHELL_ITEMS = [
-  { id:'anasayfa', label:'Ana Sayfa', icon:'fa-house', fn:'kmiOpenAnaSayfa', permission:null },
-  { id:'canli', label:'Canlı', icon:'fa-satellite-dish', fn:'kmiOpenCanli', permission:null },
-  { id:'commandcenter', label:'Command Center', icon:'fa-table-list', fn:'kmiOpenCommandCenter', permission:null },
-  { id:'islerim', label:'İşlerim', icon:'fa-list-check', fn:'kmiOpenTaskFloor', permission:null },
   { id:'pulseshell', label:'PULSE', icon:'fa-triangle-exclamation', fn:'kmiOpenPulse', permission:'pulse.view' },
-  { id:'raporlarshell', label:'Raporlar', icon:'fa-chart-line', fn:'kmiOpenReporting', permission:'reporting.view' },
+  { id:'issuereportershell', label:'Sorun Bildir', icon:'fa-bug', fn:'kmiOpenIssueReporter', permission:'pilot.issue.report' },
   { id:'arakmisor', label:'Ara / KMI\'ye Sor', icon:'fa-magnifying-glass', fn:'kmiOpenAskKMI', permission:null },
-  { id:'tumalanlarshell', label:'Tüm Alanlar', icon:'fa-table-cells-large', fn:'kmiOpenTumAlanlar', permission:null },
 ];
 function shRenderBar(){
   const bar=shBuildBar(); if(!bar) return;
@@ -19588,9 +19609,23 @@ const KMI_LEFT_NAV_GROUPS = [
     // yorumu, satır ~19110), burada YENİ bir yetki dizesi uydurulmadı.
     { label:'Live Floor', icon:'fa-industry', resolve:function(){ return {fn:'kmiOpenShopFloorLive'}; } },
     { label:'Task Floor', icon:'fa-list-check', resolve:function(){ return {fn:'kmiOpenTaskFloor'}; } },
+    // KMI-PHASE-1-R2-FIX5 (2026-10-03, owner "OWNER VISUAL REVIEW FIX PASS"):
+    // "Operatör Beyan" bir ÜRETİM departmanı değil, bir OPERATÖR İŞ AKIŞI/
+    // YÜRÜTME aktivitesidir - ÜRETİM AİLESİ'nden (Üretim/Planlama/Kalite/Bakım
+    // ile sınırlı kalması gereken, direktifin kendi tanımı) buraya, Live
+    // Floor/Task Floor'un yanına taşındı. Erişim (hasScreenAccess) DEĞİŞMEDİ.
+    { label:'Operatör Beyan', icon:'fa-user-gear', resolve:function(u){ return hasScreenAccess(u,'operatör') ? {legacyTab:'operatör'} : null; } },
+    // KMI-PHASE-1-R2-FIX4 (2026-10-03): eskiden #kmiFloorNavRow2'ye (bkz. install()
+    // fonksiyonu civarı ~satır 19036) enjekte edilen "Mobil Görünüm" girişinin
+    // kanonik karşılığı - KMI_NAV_REGISTRY'nin kendi 'mobile' girişiyle AYNI
+    // fonksiyon/yetki (kmiOpenMobileHome / mobile.access), YÜRÜTME'ye eklendi
+    // (şahane bir "departman" değil, operatör/saha görünüm modu - registry'nin
+    // kendi area:'ÜRETİM' etiketi de bunu doğruluyor, ama ÜRETİM AİLESİ grubu
+    // direktifçe Üretim/Planlama/Kalite/Bakım ile sınırlı tutulduğu için execution
+    // bağlamına, Operatör Beyan'ın yanına yerleştirildi).
+    { label:'Mobil Görünüm', icon:'fa-mobile-screen', resolve:function(u){ return (nrCanSafe(u,'mobile.access') && typeof window.kmiOpenMobileHome==='function') ? {fn:'kmiOpenMobileHome'} : null; } },
   ]},
   { title:'ÜRETİM AİLESİ', items:[
-    { label:'Operatör Beyan', icon:'fa-user-gear', resolve:function(u){ return hasScreenAccess(u,'operatör') ? {legacyTab:'operatör'} : null; } },
     { label:'Üretim', icon:'fa-industry', resolve:function(u){ return (nrCanSafe(u,'MANAGEMENT') && typeof window.kmiOpenProductionIntel==='function') ? {fn:'kmiOpenProductionIntel'} : null; } },
     { label:'Planlama', icon:'fa-diagram-project', resolve:function(u){ return (nrCanSafe(u,'MANAGEMENT') && typeof window.kmiOpenPlanning==='function') ? {fn:'kmiOpenPlanning'} : null; } },
     { label:'Kalite', icon:'fa-shield-halved', resolve:function(u){
@@ -19619,6 +19654,19 @@ const KMI_LEFT_NAV_GROUPS = [
         if(hasScreenAccess(u,'muhasebe')) return {legacyTab:'muhasebe'};
         return null;
       } },
+    // KMI-PHASE-1-R2-FIX6 (2026-10-03, owner "OWNER VISUAL REVIEW FIX PASS"):
+    // sahip, canlı inceleme sırasında drawer'da "CAM / Üretim Mühendisliği"nin
+    // eksik olduğunu bildirdi. Doğrulama: sahte bir hedef İCAT ETMEDİK -
+    // window.kmiIeOpenPanel ZATEN gerçek, var olan bir fonksiyon (modalının
+    // kendi başlığı literal olarak "Üretim Mühendisliği (IE) · Faz 1-2-3" der,
+    // satır ~15498) ve KMI_NAV_REGISTRY'nin kendi 'ieengineering' girişi
+    // (satır ~19073, area:'ÜRETİM', requiredPermission:'MANAGEMENT') zaten bu
+    // İÇERİĞİ production-engineering/CAM alanı olarak sınıflandırıyor (makine
+    // ekonomisi, operasyon zaman standartları, OEE/varyans) - sadece eskiden
+    // #kmiFloorNavRow2'ye enjekte ediliyordu, kanonik sol navda YOKTU. Şimdi
+    // DESTEK'e (direktifin kendi "Muhasebe & Finans / CAM-Üretim Mühendisliği /
+    // Takımhane / İnsan & Yetkinlik" sırasıyla) eklendi, AYNI gerçek izin.
+    { label:'CAM / Üretim Müh.', icon:'fa-ruler-combined', resolve:function(u){ return (nrCanSafe(u,'MANAGEMENT') && typeof window.kmiIeOpenPanel==='function') ? {fn:'kmiIeOpenPanel'} : null; } },
     { label:'Takımhane', icon:'fa-screwdriver-wrench', resolve:function(u){ return (nrCanSafe(u,'tooling.view') && typeof window.kmiOpenToolingIntel==='function') ? {fn:'kmiOpenToolingIntel'} : null; } },
     { label:'İnsan & Yetkinlik', icon:'fa-users', resolve:function(u){ return (nrCanSafe(u,'MANAGEMENT') && typeof window.kmiOpenPeopleTalent==='function') ? {fn:'kmiOpenPeopleTalent'} : null; } },
   ]},
@@ -19627,8 +19675,16 @@ const KMI_LEFT_NAV_GROUPS = [
     { label:'KMI Academy', icon:'fa-graduation-cap', resolve:function(u){ return nrCanSafe(u,'training.access') ? {fn:'kmiOpenAcademy'} : null; } },
     { label:'Zirvedekiler', icon:'fa-trophy', resolve:function(u){ return hasScreenAccess(u,'liderlik') ? {legacyTab:'liderlik'} : null; } },
   ]},
-  { title:null, items:[
+  // Phase 1B'nin "role/context: KMI LIVE, IT/Software, Management/Settings,
+  // Tüm Alanlar" grubu - başlık ekleniyor (önceden null idi), direktifin
+  // kendi adlandırmasıyla.
+  { title:'IT / YÖNETİM', items:[
     { label:'KMI Live', icon:'fa-satellite-dish', resolve:function(u){ return (nrCanSafe(u,'controltower.*.view') && typeof window.kmiOpenControlTowerHub==='function') ? {fn:'kmiOpenControlTowerHub'} : null; } },
+    // KMI-PHASE-1-R2-FIX4 (2026-10-03): eskiden #kmiFloorNavRow2'ye enjekte
+    // edilen "Performans" girişinin kanonik karşılığı - KMI_NAV_REGISTRY'nin
+    // kendi 'performance' girişiyle AYNI fonksiyon/izin (kmiOpenPerf/perf.view,
+    // area:'SOFTWARE & IT' - bu yüzden bu IT/Yönetim grubuna eklendi).
+    { label:'Performans', icon:'fa-gauge-high', resolve:function(u){ return (nrCanSafe(u,'perf.view') && typeof window.kmiOpenPerf==='function') ? {fn:'kmiOpenPerf'} : null; } },
     { label:'Yönetici Paneli', icon:'fa-user-tie', resolve:function(u){ return hasScreenAccess(u,'yonetici') ? {legacyTab:'yonetici'} : null; } },
     { label:'Tüm Alanlar', icon:'fa-table-cells-large', resolve:function(){ return {fn:'kmiOpenTumAlanlar'}; } },
   ]},
@@ -19684,16 +19740,29 @@ window.kmiOpenLeftNav = function(){
   const d = document.createElement('div'); d.id='kmiLeftNavDrawer';
   d.className='fixed inset-0 z-[500] bg-black/60 no-print';
   d.onclick = function(ev){ if(ev.target===d) window.kmiCloseLeftNav(); };
-  d.innerHTML = '<div class="h-full w-80 max-w-[85vw] bg-slate-900 border-r border-cyan-900/50 overflow-y-auto shadow-2xl" onclick="event.stopPropagation()">'
-    + '<div class="sticky top-0 bg-slate-950 border-b border-slate-800 p-4 flex items-center justify-between">'
+  // KMI-PHASE-1-R2-FIX7 (2026-10-03, owner "OWNER VISUAL REVIEW FIX PASS") -
+  // drawer polish within the APPROVED visual direction (no new visual concept
+  // invented, per the directive's own instruction): a persistent/collapsible
+  // desktop sidebar was evaluated but deferred - converting this into a
+  // non-overlay sidebar would require shifting #mainSystem's own layout, which
+  // this 20k-line app was never built around, and risked exactly the kind of
+  // regression this fix pass exists to prevent. Instead: wider panel on
+  // desktop (w-80 -> sm:w-96) for better density/hierarchy, a visible divider
+  // between groups (not just spacing) for clearer section separation, and an
+  // explicit hover/focus affordance already present is kept consistent.
+  // overflow-y-auto (scroll) and the sticky header (bottom reachability) were
+  // already correct and are unchanged.
+  d.innerHTML = '<div class="h-full w-80 sm:w-96 max-w-[85vw] bg-slate-900 border-r border-cyan-900/50 overflow-y-auto shadow-2xl flex flex-col" onclick="event.stopPropagation()">'
+    + '<div class="sticky top-0 bg-slate-950 border-b border-slate-800 p-4 flex items-center justify-between z-10">'
     + '<div><div class="text-[10px] text-cyan-300 tracking-[.2em] font-black">KURUTLU MANUFACTURING INTELLIGENCE</div><div class="text-sm font-bold text-white">Performance Center</div></div>'
     + '<button onclick="window.kmiCloseLeftNav()" class="bg-slate-800 hover:bg-slate-700 w-8 h-8 rounded-lg text-slate-300"><i class="fa-solid fa-xmark"></i></button>'
     + '</div>'
-    + '<div class="p-3">'
-    + (groups.length ? groups.map(function(g){
-        return (g.title ? '<div class="text-[10px] font-black text-slate-500 tracking-widest mt-3 mb-1 px-2">'+lnE(g.title)+'</div>' : '')
+    + '<div class="p-3 pb-6">'
+    + (groups.length ? groups.map(function(g,gi){
+        return (gi>0 ? '<div class="border-t border-slate-800/70 my-2"></div>' : '')
+          + (g.title ? '<div class="text-[10px] font-black text-slate-500 tracking-widest mt-2 mb-1 px-2">'+lnE(g.title)+'</div>' : '')
           + g.items.map(function(it){
-              return '<button data-ln-fn="'+lnE(it.dest.fn||'')+'" data-ln-tab="'+lnE(it.dest.legacyTab||'')+'" class="kmi-leftnav-item w-full text-left flex items-center gap-2.5 px-3 py-2.5 rounded-xl hover:bg-slate-800 text-slate-200 text-sm font-semibold"><i class="fa-solid '+lnE(it.icon||'fa-circle')+' text-cyan-400 w-4 text-center"></i>'+lnE(it.label)+'</button>';
+              return '<button data-ln-fn="'+lnE(it.dest.fn||'')+'" data-ln-tab="'+lnE(it.dest.legacyTab||'')+'" class="kmi-leftnav-item w-full text-left flex items-center gap-2.5 px-3 py-2.5 rounded-xl hover:bg-slate-800 focus:bg-slate-800 focus:outline-none text-slate-200 text-sm font-semibold transition-colors"><i class="fa-solid '+lnE(it.icon||'fa-circle')+' text-cyan-400 w-4 text-center"></i>'+lnE(it.label)+'</button>';
             }).join('');
       }).join('')
       : '<div class="text-slate-500 text-sm p-3">VERİ GEREKLİ: görüntülenecek bir alan bulunamadı.</div>')
@@ -19765,6 +19834,29 @@ window.addEventListener('load', function(){
 <style>
   /* KMI-PHASE-1E: bkz. kmiLegacyNavRetire() - DOM/fonksiyonellik SİLİNMEDİ, yalnız gizlendi. */
   .kmi-legacy-nav-retired{ display:none !important; }
+  /* KMI-PHASE-1-R2-FIX1/FIX3/FIX4 (2026-10-03, owner "OWNER VISUAL REVIEW FIX PASS"):
+     #kmiFloorNavRow2 (secondRow()/install(), ~satır 12614) Ender+ChatGPT'nin canlı
+     incelemede gördüğü "büyük renkli modül butonları" (LIVE FLOOR/KALİTE KULESİ/
+     ÜRETİM/IE MÜHENDİSLİK/KMI LIVE/Depo & Stok) VE altındaki "ikincil satır"
+     (Raporlar/PULSE/Sorun Bildir/KMI Academy/Takım Zekası/Performans/Mobil
+     Görünüm) - GÖRSEL OLARAK iki satıra bölünmüş gibi görünse de TEK bir
+     konteyner (#kmiFloorNavRow2, flex-wrap). Eski nav-btn şeridinin "afterend"
+     KARDEŞİ olarak eklendiği için, o şeridi .kmi-legacy-nav-retired ile gizlemek
+     BUNU gizlemiyordu (CSS display:none bir elemanı gizler, sonradan DOM'a
+     eklenen KARDEŞİNİ değil) - canlı incelemede hâlâ görünür kalmasının GERÇEK
+     kök nedeni budur.
+     Doğrudan ID ile, HER ZAMAN gizleniyor (sınıf/interval tabanlı değil - bu
+     konteyner SADECE bu amaç için var, başka hiçbir yerde okunmuyor, bu yüzden
+     zamanlama riski olmayan kalıcı bir CSS kuralı güvenli). SİLİNMEDİ: install()
+     ve tüm kmiXxxNavBtn enjektörleri (KALİTE KULESİ/ÜRETİM/IE MÜHENDİSLİK/
+     KMI LIVE/Depo & Stok/Muhasebe/Raporlar/PULSE/Sorun Bildir/KMI Academy/
+     Takım Zekası/Performans/Mobil Görünüm) ÇALIŞMAYA DEVAM EDİYOR - sadece
+     normal görünümden kayboldu. Her birinin kanonik karşılığı artık sol navda
+     (KMI_LEFT_NAV_GROUPS) veya top bar'da (SHELL_ITEMS) GERÇEKTEN var - bkz.
+     o blokların KMI-PHASE-1-R2-FIX4/FIX6 yorumları - "önce kanıtla, sonra gizle"
+     kuralı (FIX1) bu yüzden burada karşılanıyor.
+  */
+  #kmiFloorNavRow2{ display:none !important; }
 </style>
 
 <!-- ===========================================================================

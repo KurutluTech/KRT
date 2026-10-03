@@ -1,106 +1,119 @@
-KMI_PHASE_1_DEPLOY.zip — MANUAL DEPLOY INSTRUCTIONS
-=====================================================
-Owner directive: "FIVE-PHASE REAL PRODUCT CONVERGENCE PROGRAM" — PHASE 1/5
-(Shell + Navigation + Performance Center)
+KMI — PHASE 1/5 — OWNER REVIEW FIX R2 — MANUAL DEPLOY PACKAGE
+================================================================
 
-THIS CANDIDATE
---------------
-SOURCE (git commit):  bcfc0d8e876211454b10d1ea7d2e33b06827c79b
-BUILD:                bcfc0d8e8762-20261003T000523Z
-BUILT AT (UTC):       2026-10-03T00:05:23.354Z
-INDEX SHA256:         f40c6fbcff47eea50595a1b1bd87bfac1cd76c5069c05775541b37f241dd8c58
+THIS IS A FIX PASS, NOT A NEW DESIGN. The R1 candidate (sourceCommit bcfc0d8e...)
+was reviewed live by Ender and found "technically functioning" but NOT visually
+accepted: behind the new left-nav drawer, the deployed page still showed 3 other
+competing navigation surfaces (legacy top nav, a large colored module-launch row,
+and a secondary utility row). R1 was NEVER deployed to production, so it is not a
+"previous verified live" state — do not treat it as a rollback target.
 
-PREVIOUS VERIFIED LIVE (= THIS PHASE'S ROLLBACK TARGET)
---------------------------------------------------------
-SOURCE:  42e8aabdfe99e6d869d8469aaeab8dab6327a830
-BUILD:   42e8aabdfe99-20261002T221100Z
+This R2 package fixes the root causes the owner's review identified. It replaces
+the R1 package; do not deploy R1.
 
-If anything goes wrong after deploying this Phase 1 candidate, re-upload
-the previously verified index.html (source 42e8aab..., build
-42e8aab...-20261002T221100Z) to restore last known-good production.
-Do NOT roll back to the FROZEN Monday Factory Acceptance candidate
-(source e72c688..., build e72c688d2d94-20261002T173555Z) — that one is
-older than the current verified-live baseline and is kept frozen for its
-own separate acceptance record, not as a rollback target.
+CANDIDATE IDENTITY (THIS PACKAGE — NEW, NOT A REUSE OF R1)
+------------------------------------------------------------
+sourceCommit : 3bccd6a0fc8ad4924c63693b2ccd877ada75c3de
+buildId      : 3bccd6a0fc8a-20261003T083928Z
+builtAt      : 2026-10-03T08:39:28.822Z (UTC)
+sha256       : 47a91f99782ffeb53051586e1be7f2bfeb25469326cb226d0b73e987898969c5
+               (of index.html in this package; independently cross-checked with
+               the system `sha256sum` command, not only the build script's own
+               computation)
 
-WHAT IS IN THIS ZIP
---------------------
-index.html                  — the built Phase 1 artifact (placeholders
-                               already substituted with the identity above)
-kmi-version.json            — {"sourceCommit","buildId","builtAt"} record,
-                               matching the values in this README exactly
-kurutlu-manifest.webmanifest — PWA manifest, unchanged from current production
-assets/                      — unchanged icon/logo assets referenced by
-                               index.html (favicon, touch icon, PWA icons,
-                               Kurutlu logo/symbol images)
+R1 candidate identity (REJECTED at owner visual review — do not deploy, listed
+here only so it is never confused with this package):
+  sourceCommit bcfc0d8e876211454b10d1ea7d2e33b06827c79b
+  buildId      bcfc0d8e8762-20261003T000523Z
+  sha256       f40c6fbcff47eea50595a1b1bd87bfac1cd76c5069c05775541b37f241dd8c58
 
-MANUAL UPLOAD STEPS (KurutluTech/KRT, GitHub Pages — flow.kurutlu.com)
-------------------------------------------------------------------------
-1. Open the KurutluTech/KRT repository on github.com in your browser.
-2. Open the folder that currently holds the live index.html (the same
-   folder flow.kurutlu.com is already being served from).
-3. Upload/replace index.html with the index.html from this ZIP.
-4. Upload/replace kurutlu-manifest.webmanifest with the one from this ZIP
-   (only if it differs from what is already there — it has not changed
-   this phase, so this step may be a no-op).
-5. Upload/replace the files inside assets/ with the ones from this ZIP's
-   assets/ folder (only if they differ — unchanged this phase, so this
-   step may also be a no-op).
-6. Commit the upload directly to the branch GitHub Pages serves from.
-7. Wait for GitHub Pages to finish publishing (usually under a minute),
-   then reload flow.kurutlu.com.
+ROLLBACK TARGET (unchanged — this is the last VERIFIED LIVE deployment; R1 was
+never deployed, so it is not a valid rollback point):
+  SOURCE  42e8aabdfe99e6d869d8469aaeab8dab6327a830
+  BUILD   42e8aabdfe99-20261002T221100Z
 
-DO NOT TOUCH
-------------
-- CNAME file (domain mapping) — leave exactly as-is.
-- Any file in the KRT repository not listed above.
-- Do NOT upload anything from dist/ in the local dev repo — that folder
-  holds a separate, frozen, unrelated acceptance candidate and must never
-  be published from.
+WHAT CHANGED IN R2 (owner's 10 FIX items — see the full owner directive for exact
+wording; summarized here honestly against what was actually implemented)
+------------------------------------------------------------
+FIX1  Read-only discovery + classification of every competing nav item was done
+      BEFORE any hiding — each item's new home (left nav / top bar / contextual
+      action / honest retirement) was confirmed reachable first.
+FIX2  Top command bar trimmed from 8 items to 3 genuine utilities that do not
+      repeat a left-nav destination: PULSE, Sorun Bildir, Ara / KMI'ye Sor.
+FIX3  The large colored module-launch row removed from visible rendering. Root
+      cause: it and the "secondary row" the owner also saw are the SAME DOM
+      container (#kmiFloorNavRow2), inserted as a CSS SIBLING of the already-
+      hidden legacy nav row — a parent's display:none never hides a sibling,
+      which is exactly why Phase 1's first hide attempt did not visually work.
+      Fixed with a direct, always-applying CSS id selector targeting that
+      container itself, so it is hidden regardless of which of the 14
+      independent scripts populates it or when.
+FIX4  Every item that was in the secondary row now has a canonical home
+      (folded into the left nav or top bar above) rather than being silently
+      dropped — nothing was deleted, only unwired from a forced-visible launcher.
+FIX5  "Operatör Beyan" moved out of ÜRETİM AİLESİ (now strictly Üretim /
+      Planlama / Kalite / Bakım) into YÜRÜTME, alongside the other operator-
+      facing entry points.
+FIX6  "CAM / Üretim Müh." added to the left nav. This is a REAL, pre-existing
+      feature (window.kmiIeOpenPanel — "Üretim Mühendisliği (IE) · Faz 1-2-3":
+      machine economics, operation time standards, OEE/variance) that had no
+      navigation entry point before — confirmed by reading the function itself,
+      not invented or guessed at.
+FIX7  Left-nav drawer polish: group dividers, a wider desktop panel (w-80 up to
+      w-96), visible keyboard-focus states. A persistent/collapsible desktop
+      sidebar was evaluated and deliberately NOT implemented this pass — it is
+      higher-risk layout surgery against a 20,000+ line app that was never
+      built around that assumption, and the directive asked to improve the
+      approved drawer direction, not invent a new visual concept.
+FIX8  Performance Center is now the real landing experience: the post-login
+      function (window.v77EnterPortalFromSession) opens it automatically.
+      It shows ONLY real canonical counts — 0 where there is genuinely no open
+      data (e.g. "0 Açık Sipariş"), never a fake/seeded number.
+FIX9  New browser-level acceptance test added
+      (tests/test_phase1_r2_single_navigation_system.js, 18/18 assertions)
+      that checks real DOM state (element ids, getComputedStyle, attribute
+      sets) — not substring Tailwind-class matching, which can false-positive.
+      It asserts: legacy top nav AND #kmiFloorNavRow2 are both
+      display:none; the top bar has exactly 3 items with no left-nav-duplicate
+      function; exactly one left-nav drawer exists with the corrected IA;
+      Performance Center opens on real login; the admin tile grid still exists
+      underneath (proving it was not deleted, only no longer the default view).
+FIX10 Screenshot evidence was captured AND REVIEWED (not just generated) before
+      this report was written, at both required viewports — see
+      "SCREENSHOT EVIDENCE" in the accompanying report message.
 
-WHAT PHASE 1 CHANGES ON THE LIVE SITE
----------------------------------------
-INCLUDED THIS PHASE:
-- One new left-navigation drawer ("Menü" button in the top bar) that
-  consolidates all previously-scattered navigation destinations
-  (department workspaces, Live Floor, Task Floor, Command Center, Tüm
-  Alanlar, etc.) into a single role-aware, de-duplicated list, in the
-  owner-specified order (Ana Sayfa/Command Center → Live Floor/Task Floor
-  → Üretim Ailesi → Tedarik & Müşteri Akışı → Destek → Analitik/Gelişim →
-  role/context items).
-- The old second-row legacy tab strip (Operatör/Kalite/Sevkiyat/Bakım/
-  Sipariş/Muhasebe/Yönetici/Liderlik buttons) is now hidden from normal
-  view (CSS display:none) — it is NOT deleted; the underlying tabs and
-  switchTab() logic still work exactly as before for anything that still
-  depends on them internally.
-- Ana Sayfa ("Home") is rebuilt into a real "Performance Center": a new
-  "Fabrika Nabzı" (Factory Pulse) grid shows 6 live counts — Açık Sipariş,
-  Aktif İş Emri, Üretimde Makine, Makine Down/Bakım, Kalite Bekliyor,
-  Sevke Hazır — computed from the same canonical sources/definitions
-  already used elsewhere in the app (no new/second definition of "active
-  work order" or "machine state" was invented). If any of these cannot be
-  computed, it honestly shows "VERİ GEREKLİ" instead of a fake number.
-- The top command bar (Ana Sayfa/Canlı/Command Center/İşlerim/PULSE/
-  Raporlar/Ara-KMI'ye Sor/Tüm Alanlar) is unchanged from current
-  production except for the new "Menü" button prepended to it.
+WHAT WAS NOT CHANGED / NOT DELETED
+------------------------------------------------------------
+No business logic, canonical business rule, V47 Puantaj formula, DB/RLS/RPC
+shape, or working feature was removed. Legacy functions (CANLI / COMMAND CENTER
+routing, the admin-tile grid itself, etc.) remain fully intact in the code and
+reachable — only their forced-visible, competing launcher surfaces were retired
+(KEEP_COMPATIBILITY_HIDDEN, exactly as the master directive requires: hidden
+behind canonical replacements with proven reachability, not deleted).
 
-NOT INCLUDED THIS PHASE (by design — later phases or pre-existing, not
-regressions introduced here):
-- The ~15 second-row buttons that some department screens still inject
-  independently, and the old admin-tile grid, are UNTOUCHED (neither
-  hidden nor removed) — Phase 1 only retired the single legacy tab-strip
-  row per the directive's explicit scope; these other two of the five
-  historically-identified competing nav surfaces are tracked for a later
-  phase, not silently left in place by oversight.
-- A pre-existing, unrelated-to-navigation horizontal overflow at phone
-  width (~390px) was found and traced to a wide <table> in a department
-  screen that predates this phase's work — it is not new, and it is not
-  caused by the Phase 1 shell/nav/Home changes. Left for a later
-  responsive-focused phase (the directive's own Phase 5M).
-- Phases 2–5 (Live Floor/machine visuals, Task Floor/Production/Operator
-  experience, integrated Order-to-Ship departments, and the remaining
-  product areas + legacy visual retirement) have not been started.
+KNOWN OPEN ITEMS (carried over or newly observed — reported honestly, not hidden)
+------------------------------------------------------------
+- Pre-existing mobile table overflow on some data-heavy legacy tabs (noted in
+  the R1 package already; not addressed by this fix pass, which was scoped to
+  navigation convergence only).
+- At 390px mobile width, the "Ara / KMI'ye Sor" top-bar label visually wraps /
+  crowds the other 2 items in the trimmed bar. Not yet formally diagnosed or
+  fixed — flagged here rather than silently left for the next review to find.
+- FontAwesome icon glyphs render as empty boxes ONLY in this development
+  sandbox's own screenshot tooling (the sandbox blocks the icon webfont CDN
+  request; confirmed as a test-environment-only artifact, not an app defect —
+  the real deployed site has normal internet access).
 
-DO NOT DEPLOY THIS YOURSELF VIA CLAUDE — Ender manually uploads this ZIP's
-contents to KurutluTech/KRT as described above. Claude does not have, and
-will not use, any mechanism to publish to production directly.
+WHAT TO DO WITH THIS PACKAGE
+------------------------------------------------------------
+1. Deploy the CONTENTS of this folder (index.html, kmi-version.json,
+   kurutlu-manifest.webmanifest, assets/) to KurutluTech/KRT via the GitHub
+   web UI, exactly as with the R1 package — Claude does not and will not
+   deploy this itself.
+2. After deploying, tell Claude deployment is complete so a READ-ONLY live
+   verification pass can run (checking the live page's own version metadata
+   against sourceCommit/buildId/sha256 above).
+3. Review the live result visually again. If accepted, say so explicitly
+   ("PHASE 1 ACCEPTED — CONTINUE PHASE 2") to begin Phase 2. If not, describe
+   what is still wrong the same way this review did — the real DOM state is
+   what gets fixed, not a guess at what "probably" looks better.
