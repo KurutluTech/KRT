@@ -17,9 +17,9 @@
          `git blame`/diffs on this file quiet between releases and avoid a
          commit-hash feedback loop (the source commit's SHA cannot depend on
          a value computed from that same SHA). See docs/KMI_DEPLOY_ID.md. -->
-    <meta name="kmi-source-commit" content="7636f430c4969915be40e20ae47b1450577de391">
-    <meta name="kmi-build-id" content="7636f430c496-20261003T113204Z">
-    <meta name="kmi-built-at" content="2026-10-03T11:32:04.964Z">
+    <meta name="kmi-source-commit" content="ab1efc003b5f894a0b97c9665f4ad120c5d257f4">
+    <meta name="kmi-build-id" content="ab1efc003b5f-20261003T115756Z">
+    <meta name="kmi-built-at" content="2026-10-03T11:57:56.090Z">
     <script>
       // Derived from the meta tags above at runtime, so there is exactly one
       // place (the meta tags) where the build script substitutes real
@@ -19780,6 +19780,11 @@ function shBuildBar(){
 // Üst şeritteki, bir sol-nav hedefini tekrarlamayan GERÇEK aksiyon düğmeleri.
 // 'kmilive' window.kmiOpenCanli() (KMI-SHELL-FAZ3-SLICE2-FIX'te tanımlı, rol
 // bazlı gerçek yönlendirici) - referans görselindeki "KMI LIVE" pill'in karşılığı.
+// KMI-PHASE-1-R3.1 (header clock flicker fix): tracks the uid shRenderBar()
+// last actually rebuilt #kmiShellUserSlot's DOM for, so repeated 800ms ticks
+// can skip destroying/recreating the clock span (and the rest of the
+// identity block) when the signed-in user hasn't changed. See shRenderBar().
+let shLastRenderedUserId = undefined;
 const SHELL_ITEMS = [
   { id:'kmilive', label:'KMI LIVE', icon:'fa-satellite-dish', fn:'kmiOpenCanli', permission:null, dot:true },
   { id:'pulseshell', label:'PULSE', icon:'fa-triangle-exclamation', fn:'kmiOpenPulse', permission:'pulse.view', pulseCount:true },
@@ -19833,16 +19838,50 @@ function shRenderBar(){
   // var olan güncelleyici DOKUNULMADAN bu yeni konumu besler) ve Çıkış
   // (window.handleLogout - AYNI gerçek fonksiyon) önce BURAYA taşındı -
   // "önce kanıtla/taşı, sonra gizle" (FIX1).
+  //
+  // KMI-PHASE-1-R3.1 (owner "HEADER CLOCK FLICKER BUG" - gerçek üretim
+  // videosunda gözlemlendi): bu blok önceden userSlot.innerHTML'i HER 800ms
+  // tikte koşulsuz yeniden yazıyordu - #kmiFactoryClockTime/Date span'leri
+  // de dahil olmak üzere TÜM düğüm ağacını yok edip "--:--:--" placeholder
+  // metniyle YENİDEN OLUŞTURUYORDU. Bağımsız kmiTickFactoryClock() saat
+  // güncelleyicisi (1000ms, satır ~5144) o span'lerin textContent'ini
+  // güncelliyordu - ama bu iki döngü senkronize değildi, bu yüzden kullanıcı
+  // her 800ms'de kısa bir an için saatin placeholder'a SIFIRLANDIĞINI
+  // görüyordu (gerçek saat -> --:--:-- -> gerçek saat -> ...): gözlemlenen
+  // "flicker/blink". ASIL CANLI KALMASI GEREKEN tek şey actionsSlot'taki
+  // PULSE rozet sayısıydı (bkz. yukarısı, her 800ms'de koşulsuz yenileniyor,
+  // DEĞİŞMEDİ) - kullanıcı kimliği (ad/rol/avatar) ve saat span'leri ise
+  // kullanıcı GERÇEKTEN değişmediği sürece yeniden oluşturulmaya hiç ihtiyaç
+  // duymuyordu. Düzeltme: userSlot yalnızca kullanıcı kimliği (uid) GERÇEKTEN
+  // değiştiğinde yeniden oluşturulur - saat span'lerinin DOM kimliği artık
+  // tikler arasında sabit kalır, kmiTickFactoryClock() onları asla yok
+  // edilmeden günceller, CSS geçişi/animasyonu yeniden tetiklenmez.
   const userSlot=document.getElementById('kmiShellUserSlot');
   if(userSlot){
-    userSlot.innerHTML = u ? (
-      '<div class="hidden md:flex flex-col items-end leading-tight bg-slate-900/70 border border-slate-700 rounded-lg px-2 py-1 mr-1">'
-      + '<span id="kmiFactoryClockTime" class="text-[11px] font-black text-cyan-300 font-mono">--:--:--</span>'
-      + '<span id="kmiFactoryClockDate" class="text-[8px] text-slate-500 uppercase">-</span></div>'
-      + '<div class="text-right hidden sm:block leading-tight"><div class="text-xs font-bold text-white truncate max-w-[140px]">'+asE(u.name||'-')+'</div><div class="text-[9px] text-slate-500 uppercase truncate max-w-[140px]">'+asE(u.dept||u.department||'-')+' · '+asE(u.role||'-')+'</div></div>'
-      + '<div class="w-8 h-8 rounded-full bg-cyan-700 text-white text-xs font-black flex items-center justify-center shrink-0">'+asE(shInitials(u.name))+'</div>'
-      + '<button onclick="handleLogout()" class="bg-red-600/80 hover:bg-red-600 text-white text-[10px] px-2 py-1.5 rounded font-medium shrink-0"><i class="fa-solid fa-right-from-bracket"></i><span class="hidden lg:inline ml-1">Çıkış</span></button>'
-    ) : '';
+    const uid = u ? u.id : null;
+    const identityChanged = (shLastRenderedUserId !== uid) || !userSlot.firstChild;
+    if(identityChanged){
+      shLastRenderedUserId = uid;
+      userSlot.innerHTML = u ? (
+        '<div class="hidden md:flex flex-col items-end leading-tight bg-slate-900/70 border border-slate-700 rounded-lg px-2 py-1 mr-1">'
+        + '<span id="kmiFactoryClockTime" class="text-[11px] font-black text-cyan-300 font-mono">--:--:--</span>'
+        + '<span id="kmiFactoryClockDate" class="text-[8px] text-slate-500 uppercase">-</span></div>'
+        + '<div class="text-right hidden sm:block leading-tight"><div class="text-xs font-bold text-white truncate max-w-[140px]">'+asE(u.name||'-')+'</div><div class="text-[9px] text-slate-500 uppercase truncate max-w-[140px]">'+asE(u.dept||u.department||'-')+' · '+asE(u.role||'-')+'</div></div>'
+        + '<div class="w-8 h-8 rounded-full bg-cyan-700 text-white text-xs font-black flex items-center justify-center shrink-0">'+asE(shInitials(u.name))+'</div>'
+        + '<button onclick="handleLogout()" class="bg-red-600/80 hover:bg-red-600 text-white text-[10px] px-2 py-1.5 rounded font-medium shrink-0"><i class="fa-solid fa-right-from-bracket"></i><span class="hidden lg:inline ml-1">Çıkış</span></button>'
+      ) : '';
+      // Kimlik gerçekten değiştiğinde (ör. giriş) saat span'leri sıfırdan
+      // oluşturulduğu için placeholder'dan gerçek değere anında dönsün diye
+      // bağımsız tikleyiciyi hemen bir kez çağır - 1000ms'ye kadar bekletme.
+      if(u) try{ if(typeof window.kmiTickFactoryClock==='function') window.kmiTickFactoryClock(); }catch(e){}
+    } else if(u && (u.dept||u.department||u.role) && userSlot.children[1]){
+      // Kimlik AYNI kaldığında bile ad/rol metnini (nadiren değişebilir,
+      // ör. rol ataması) güncelle - ama yalnızca mevcut metin düğümünü
+      // günceller, span/düğüm ağacını yok edip yeniden kurmaz.
+      const roleLine = userSlot.children[1].querySelector('div:last-child');
+      const wanted = asE(u.dept||u.department||'-')+' · '+asE(u.role||'-');
+      if(roleLine && roleLine.innerHTML!==wanted) roleLine.innerHTML=wanted;
+    }
   }
 
   const inner=document.getElementById('kmiShellBarInner'); if(!inner) return;

@@ -13,13 +13,18 @@ NOT rebuild it.").
 
 CANDIDATE IDENTITY (THIS PACKAGE)
 ------------------------------------------------------------
-sourceCommit : 7636f430c4969915be40e20ae47b1450577de391
-buildId      : 7636f430c496-20261003T113204Z
-builtAt      : 2026-10-03T11:32:04.964Z (UTC)
-sha256       : e7d945a464ccb29f0db72a682f7d8a246ec8e50e8ca73bd18a859a6d54b2abe8
+sourceCommit : ab1efc003b5f894a0b97c9665f4ad120c5d257f4
+buildId      : ab1efc003b5f-20261003T115756Z
+builtAt      : 2026-10-03T11:57:56.090Z (UTC)
+sha256       : 793f09f50a9026a4be544266adcf9d234408fcae89871dc674c811edcdbf655d
                (of index.html in this package; independently cross-checked
                with the system `sha256sum` command, not only the build
                script's own computation)
+
+This identity supersedes an earlier, never-distributed R3.1 build
+(sourceCommit 7636f430c4969915be40e20ae47b1450577de391) made before the
+header-clock-flicker fix below - that earlier build was never sent to the
+owner and is not a valid deploy target.
 
 Prior (do-not-use as a deploy target other than R3 itself, which the owner
 has already manually deployed) candidate identities - listed only so they
@@ -135,6 +140,47 @@ existed), fixed with pointer-events:none on the sidebar container +
 pointer-events:auto on its own buttons only, then re-confirmed green on a
 full regression re-run.
 
+HEADER CLOCK FLICKER (owner-reported, from a real production video - found
+and fixed in this same package, addendum to the 18 numbered findings above)
+------------------------------------------------------------
+ROOT CAUSE: shRenderBar() (the top shell bar's own renderer) was
+unconditionally rebuilding #kmiShellUserSlot's entire innerHTML - which
+contains the #kmiFactoryClockTime/Date spans, hardcoded back to "--:--:--"
+placeholder markup in that template - on every 800ms tick of ITS OWN
+interval (added in R3 to keep the PULSE badge count live), completely
+unsynchronized with kmiTickFactoryClock()'s own, separate 1000ms interval
+that fills in the real time. The two loops fighting over the same DOM
+produced exactly the reported symptom: real time -> destroyed and reset to
+placeholder -> real time again -> repeat, every ~0.8-1s.
+DUPLICATE WRITERS FOUND: Not a second clock-FORMATTING function (there is
+and remains only one: kmiTickFactoryClock(), one setInterval, 1000ms) - but
+a second, competing DOM-DESTROYING writer of the same subtree (shRenderBar's
+unconditional 800ms full innerHTML rebuild of #kmiShellUserSlot).
+FIX: shRenderBar() now tracks the last user identity (uid) it actually
+rendered for and only rebuilds #kmiShellUserSlot's DOM when that identity
+genuinely changes (login/logout/role switch) - never on a no-op tick. The
+PULSE badge in actionsSlot is untouched and still refreshes every 800ms as
+R3 intended. The clock span's DOM node is now never destroyed by anything
+other than a real identity change, and kmiTickFactoryClock() is the only
+thing that ever touches its text on a routine tick.
+DOM STABILITY TEST: tests/test_phase1_r3_1_header_clock_stability.js - a
+real headless-browser test that logs in, tags the live clock DOM nodes,
+waits 3.2 real seconds (several real 800ms/1000ms tick cycles), then uses a
+MutationObserver to prove: the clock span's DOM object identity is
+unchanged; no destructive childList rebuild touches its containers; no
+class/style mutation occurs (nothing that could retrigger a CSS
+transition); the displayed time value genuinely advances; the header/shell
+bar itself is not torn down either. This test was verified to correctly
+FAIL (8/13, specifically on the DOM-identity and destructive-rebuild
+assertions, and catching the clock frozen on "--:--:--" at the sampled
+instant) against the pre-fix code via a direct git-stash comparison before
+being trusted - so it is a genuine regression test for this exact bug, not
+a tautology that would pass regardless.
+RESULT: 13/13 PASS with the fix, verified live over multiple real clock
+ticks in a real (headless) browser, not by code inspection alone. Included
+in the full regression run (SONUÇ: TÜMÜ GEÇTİ.) for both this package's
+source and its own built index.html.
+
 A KNOWN TEST-ENVIRONMENT LIMITATION (disclosed honestly, not a product
 defect - do not mistake this for a real visual discrepancy)
 ------------------------------------------------------------
@@ -169,21 +215,25 @@ remain intact and reachable.
 TEST EVIDENCE
 ------------------------------------------------------------
 Full regression (tests/run_all.js): syntax check (94 <script> blocks, 0
-errors) + 86 Playwright end-to-end specs (85 from R3 + 1 new) + Python smoke
-test + duplicate-id / shared-container scans - ALL PASS, run twice: once
-against src/index.html, once again against THIS PACKAGE'S OWN index.html
-(the actual built artifact, via KMI_HTML_PATH), so what is in this zip is
-what was tested, not just the source it was built from. SONUÇ: TÜMÜ GEÇTİ.
-on both runs.
+errors) + 87 Playwright end-to-end specs (85 from R3 + 2 new) + Python smoke
+test + duplicate-id / shared-container scans - ALL PASS, run multiple times
+across this pass's changes: against src/index.html and again against THIS
+PACKAGE'S OWN index.html (the actual built artifact, via KMI_HTML_PATH), so
+what is in this zip is what was tested, not just the source it was built
+from. SONUÇ: TÜMÜ GEÇTİ. on every run.
 
-New test: tests/test_phase1_r3_1_visual_convergence.js - directive §17's
-own checklist: Home Live Floor/Active Operators/PULSE/Task Floor/Today's
-Performance/Upcoming all confirmed VISIBLY PRESENT via real-rendering checks
-(not display:none - not just an innerHTML substring, which R3's own test
-already covers separately), no structural horizontal overflow at desktop or
-mobile width, persistent sidebar present only at >=1024px and built from the
-single shared nav registry, mobile drawer path fully unchanged. 18/18 PASS
-standalone, and included in the full regression run above.
+New tests:
+- tests/test_phase1_r3_1_visual_convergence.js - directive §17's own
+  checklist: Home Live Floor/Active Operators/PULSE/Task Floor/Today's
+  Performance/Upcoming all confirmed VISIBLY PRESENT via real-rendering
+  checks (not display:none - not just an innerHTML substring, which R3's
+  own test already covers separately), no structural horizontal overflow at
+  desktop or mobile width, persistent sidebar present only at >=1024px and
+  built from the single shared nav registry, mobile drawer path fully
+  unchanged. 18/18 PASS standalone, included in the full regression above.
+- tests/test_phase1_r3_1_header_clock_stability.js - see "HEADER CLOCK
+  FLICKER" above. 13/13 PASS standalone, included in the full regression
+  above.
 
 WHAT TO DO WITH THIS PACKAGE
 ------------------------------------------------------------
