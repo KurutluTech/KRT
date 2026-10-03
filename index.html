@@ -17,9 +17,9 @@
          `git blame`/diffs on this file quiet between releases and avoid a
          commit-hash feedback loop (the source commit's SHA cannot depend on
          a value computed from that same SHA). See docs/KMI_DEPLOY_ID.md. -->
-    <meta name="kmi-source-commit" content="d621c973ce1123da3426bdbe8e7fc546331001f1">
-    <meta name="kmi-build-id" content="d621c973ce11-20261003T094506Z">
-    <meta name="kmi-built-at" content="2026-10-03T09:45:06.519Z">
+    <meta name="kmi-source-commit" content="7636f430c4969915be40e20ae47b1450577de391">
+    <meta name="kmi-build-id" content="7636f430c496-20261003T113204Z">
+    <meta name="kmi-built-at" content="2026-10-03T11:32:04.964Z">
     <script>
       // Derived from the meta tags above at runtime, so there is exactly one
       // place (the meta tags) where the build script substitutes real
@@ -329,8 +329,12 @@ ead>
         <!-- MAIN CONTAINER -->
         <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
 
-            <!-- GLOBAL HEADER ACTIONS -->
-            <div class="flex justify-between items-center mb-6 no-print">
+            <!-- GLOBAL HEADER ACTIONS (KMI-PHASE-1-R3.1: id eklendi - Ana Sayfa kendi zengin
+                 başlığını gösterdiğinde bu jenerik şerit, owner'ın "dead vertical space"
+                 bulgusunu kapatmak için gizleniyor; bkz. kmiOpenAnaSayfa()/switchTab sarmalayıcısı,
+                 aşağıda R3.1 script bloğu - KEEP_COMPATIBILITY_HIDDEN, diğer TÜM sekmeler için
+                 DOKUNULMADAN aynen çalışmaya devam ediyor.) -->
+            <div id="kmiGlobalPageHeaderBand" class="flex justify-between items-center mb-6 no-print">
                 <div>
                     <h1 id="pageTitle" class="text-2xl font-bold text-white">Operatör Günlük Beyan Ekranı</h1>
                     <p class="text-slate-400 text-xs mt-1">Sistem Tarihi: <span id="liveSystemDate">-</span> | Vardiya Operasyon Portalı</p>
@@ -2325,13 +2329,17 @@ ead>
                         'siparis': 'Müşteri Sipariş · Stok · Finans'
                     };
                     document.getElementById('pageTitle').innerText = fallbackTitles[fallback] || 'KURUTLU MANUFACTURING INTELLIGENCE';
+                    // R3.1 Task 353: Ana Sayfa gizlediği genel #kmiGlobalPageHeaderBand'i
+                    // başka bir sekmeye (bu fallback dahil) geçişte GERİ GÖSTER - bu band
+                    // tüm uygulama genelinde paylaşılan altyapı, sadece Ana Sayfa'ya özel değil.
+                    document.getElementById('kmiGlobalPageHeaderBand')?.classList.remove('hidden');
                     return;
                 }
             }
 
             document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
             document.querySelectorAll('.nav-btn').forEach(el => el.classList.remove('bg-slate-700', 'text-blue-400'));
-            
+
             document.getElementById(`tab-${tabName}`).classList.add('active');
             const activeBtn = document.getElementById(`btn-${tabName}`);
             if(activeBtn) activeBtn.classList.add('bg-slate-700', 'text-blue-400');
@@ -2346,6 +2354,11 @@ ead>
                         'siparis': 'Müşteri Sipariş · Stok · Finans'
             };
             document.getElementById('pageTitle').innerText = titles[tabName] || 'KURUTLU MANUFACTURING INTELLIGENCE';
+            // R3.1 Task 353: aynı şekilde normal sekme geçişinde de bandı geri göster.
+            // kmiOpenAnaSayfa() bu bandı gizler; switchTab() HER gerçek sekme geçişinde
+            // çalışır (Ana Sayfa'nın kendisi switchTab() çağırmaz), bu yüzden burası
+            // bandın güvenle geri yüklendiği tek yer.
+            document.getElementById('kmiGlobalPageHeaderBand')?.classList.remove('hidden');
             
             if(currentUser) {
                 // KMI-PILOT-MFA-REMEDIATION-002 (2026-10-01): #declOperator (the old manual
@@ -19475,6 +19488,24 @@ function asMachineStateChip(status){
   const m=map[status]||['BOŞTA','bg-slate-800 border-slate-700 text-slate-400'];
   return '<span class="text-[9px] font-black px-1.5 py-0.5 rounded border '+m[1]+'">'+m[0]+'</span>';
 }
+// KMI-PHASE-1-R3.1 (owner "FINAL LIVE VISUAL CONVERGENCE" §3/§4): per-machine-model
+// görsel varlık kütüphanesi YOK (uydurmamak için) - bu yüzden HER durum için
+// "approved neutral CNC/machine silhouette/icon treatment" kullanılıyor (fa-industry,
+// kodda zaten başka yerlerde - ör. satır ~393/4928/5198 - makine kimliği için
+// kullanılan AYNI ikon; yeni/ilgisiz bir görsel İCAT EDİLMEDİ). Görsel sadece
+// makine KİMLİĞİ/BAĞLAMI - hiçbir telemetri/veri taşımıyor.
+function asMachineVisualTheme(status){
+  const map={
+    RUNNING:{icon:'fa-industry',badge:'bg-emerald-500/15 text-emerald-300 border-emerald-700',card:'bg-emerald-950/20 border-emerald-800/60'},
+    PAUSED:{icon:'fa-industry',badge:'bg-amber-500/15 text-amber-300 border-amber-700',card:'bg-amber-950/10 border-amber-800/50'},
+    DOWN:{icon:'fa-triangle-exclamation',badge:'bg-red-500/15 text-red-300 border-red-700',card:'bg-red-950/20 border-red-800/60'},
+    ISSUE:{icon:'fa-triangle-exclamation',badge:'bg-red-500/15 text-red-300 border-red-700',card:'bg-red-950/20 border-red-800/60'},
+    MAINTENANCE:{icon:'fa-screwdriver-wrench',badge:'bg-blue-500/15 text-blue-300 border-blue-700',card:'bg-blue-950/15 border-blue-800/50'},
+    HOLD:{icon:'fa-hand',badge:'bg-violet-500/15 text-violet-300 border-violet-700',card:'bg-violet-950/15 border-violet-800/50'},
+    IDLE:{icon:'fa-industry',badge:'bg-slate-800 text-slate-500 border-slate-700',card:'bg-slate-900 border-slate-700'}
+  };
+  return map[status]||map.IDLE;
+}
 function asRenderLiveFloorSummary(){
   let board=[], running=[];
   try{ board=(typeof kmiMachineBoard==='function')?kmiMachineBoard():[]; }catch(e){}
@@ -19489,13 +19520,44 @@ function asRenderLiveFloorSummary(){
     const pct = (j&&j.targetQty) ? Math.min(100,Math.round(Number(j.completedQty||0)/Number(j.targetQty)*100)) : null;
     const runMin = (sess&&sess.startedAt) ? Math.max(0,Math.round((Date.now()-new Date(sess.startedAt).getTime())/60000)) : null;
     const runtime = runMin!=null ? (runMin>=60?Math.floor(runMin/60)+' sa '+(runMin%60)+' dk':runMin+' dk') : '—';
-    return '<div class="bg-slate-900 border border-slate-700 rounded-xl p-3">'
-      + '<div class="flex items-center justify-between mb-1"><b class="text-sm text-white">'+asE(m.code||'')+'</b>'+asMachineStateChip(m.status)+'</div>'
-      + '<div class="text-[10px] text-slate-500 truncate mb-1.5">'+asE((m.name||'').replace(m.code+' - ',''))+'</div>'
+    const th=asMachineVisualTheme(m.status);
+    const idle = (m.status==='IDLE');
+    const isDown = (m.status==='DOWN'||m.status==='ISSUE');
+    // BLOCKER (gerçek, §4): DOWN/ARIZA makineler için window.v35GetMachineTruthByName'in
+    // AYNI canonical kaynağı - downSince/openBreakdownCount - İKİNCİ bir arıza kaydı
+    // İCAT EDİLMEDİ. Bulunamazsa sessizce atlanır (dürüst, zorlamıyor).
+    let blockerHtml='';
+    if(isDown){
+      try{
+        const t=(typeof window.v35GetMachineTruthByName==='function')?window.v35GetMachineTruthByName(m.name):null;
+        if(t){
+          const parts=[];
+          if(t.downSince){ parts.push(asTimeAgo(t.downSince)+' beri'); }
+          if(t.openBreakdownCount){ parts.push(t.openBreakdownCount+' açık arıza kaydı'); }
+          if(parts.length) blockerHtml='<div class="text-[10px] text-red-300/90 mt-1 truncate"><i class="fa-solid fa-ban mr-1"></i>'+asE(parts.join(' · '))+'</div>';
+        }
+      }catch(e){}
+    }
+    const icon='<div class="w-8 h-8 rounded-lg border flex items-center justify-center shrink-0 '+th.badge+'"><i class="fa-solid '+th.icon+' text-sm"></i></div>';
+    if(idle){
+      // §4 "BOŞTA makineler için dev boş kart bırakma - kompakt kasıtlı bir boşta
+      // durumu kullan": tek satırlık kompakt kart, aynı veri kaynağı (sess=null).
+      return '<div class="border rounded-xl px-3 py-2 flex items-center gap-2 '+th.card+'">'
+        + icon
+        + '<div class="min-w-0 flex-1"><div class="flex items-center gap-1.5"><b class="text-xs text-white">'+asE(m.code||'')+'</b>'+asMachineStateChip(m.status)+'</div>'
+        + '<div class="text-[9px] text-slate-500 truncate">'+asE((m.name||'').replace(m.code+' - ',''))+'</div></div>'
+        + '</div>';
+    }
+    return '<div class="border rounded-xl p-3 '+th.card+'">'
+      + '<div class="flex items-start gap-2 mb-1">'
+      + icon
+      + '<div class="min-w-0 flex-1"><div class="flex items-center justify-between gap-1"><b class="text-sm text-white">'+asE(m.code||'')+'</b>'+asMachineStateChip(m.status)+'</div>'
+      + '<div class="text-[10px] text-slate-500 truncate">'+asE((m.name||'').replace(m.code+' - ',''))+'</div></div>'
+      + '</div>'
       + (sess ? ('<div class="text-[11px] text-slate-300 truncate"><i class="fa-solid fa-user text-cyan-400 mr-1"></i>'+asE(sess.operator||'-')+'</div>'
           + '<div class="text-[11px] text-slate-400 truncate">'+asE(j?(j.item||j.productId||''):'')+'</div>'
           + (pct!=null ? ('<div class="w-full h-1.5 bg-slate-800 rounded-full overflow-hidden mt-1.5"><div class="h-full bg-emerald-500" style="width:'+pct+'%"></div></div><div class="text-[9px] text-slate-500 mt-0.5">'+asE(Number(j.completedQty||0))+' / '+asE(Number(j.targetQty||0))+' · '+runtime+'</div>') : '<div class="text-[9px] text-slate-500 mt-1">'+runtime+'</div>'))
-        : '<div class="text-[10px] text-slate-600 italic">Boşta</div>')
+        : (blockerHtml || '<div class="text-[10px] text-slate-600 italic">Üretimde değil</div>'))
       + '</div>';
   }).join('') || '<div class="col-span-full text-center text-slate-500 text-xs py-6">VERİ GEREKLİ: makine panosu okunamadı.</div>';
   return '<div class="bg-slate-900/60 border border-slate-800 rounded-2xl p-4">'
@@ -19516,19 +19578,23 @@ function asRenderOperators(){
   let tasks=[]; try{ tasks=(typeof kmiTasksRaw==='function')?kmiTasksRaw():[]; }catch(e){}
   const rows=roster.filter(function(p){
     return /OPERATOR|OPERATÖR|URETIM|ÜRETİM|CNC|BAKIM|MAINTENANCE/.test(String((p.role||'')+' '+(p.job||'')+' '+(p.department||'')).toUpperCase());
-  }).slice(0,10).map(function(p){
+  }).slice(0,8).map(function(p){
     let state='VERİ YOK', cls='text-slate-500', detail='';
     if(runningByName[p.name]){ state='MAKİNEDE'; cls='text-emerald-300'; detail=runningByName[p.name]; }
     else if(tasks.some(function(t){ return Number(t.assigneeId)===Number(p.id)&&t.status==='ACTIVE'; })){ state='GÖREVDE'; cls='text-cyan-300'; }
     else { try{ const sh=window.kmiResolveShift(p); if(sh&&sh.assigned){ state='VARDİYADA'; cls='text-amber-300'; detail=sh.label; } }catch(e){} }
-    return '<div class="flex items-center justify-between gap-2 py-1.5 border-b border-slate-800/70 last:border-0">'
+    return '<div class="flex items-center justify-between gap-2 py-1 border-b border-slate-800/70 last:border-0">'
       + '<div class="min-w-0"><div class="text-xs font-bold text-white truncate">'+asE(p.name||'-')+'</div><div class="text-[9px] text-slate-500 truncate">'+asE(p.dept||p.department||'-')+'</div></div>'
       + '<div class="text-right shrink-0"><span class="text-[9px] font-black '+cls+'">'+state+'</span>'+(detail?'<div class="text-[9px] text-slate-500">'+asE(detail)+'</div>':'')+'</div></div>';
   }).join('') || '<div class="text-slate-500 text-xs py-4 text-center">VERİ GEREKLİ: personel listesi okunamadı.</div>';
-  return '<div class="bg-slate-900/60 border border-slate-800 rounded-2xl p-4 h-full">'
+  // KMI-PHASE-1-R3.1 (owner §9 "improve density"): h-full kaldırıldı (artık sağ
+  // rayda items-start ile serbest yükseklik - bkz. kmiRenderAnaSayfa) ve satır
+  // dolgusu daraltıldı (py-1.5->py-1); liste 8 kişiyle sınırlı, taşarsa kendi
+  // iç kaydırmasında kalır (max-height) - PULSE/Yaklaşanlar'ı aşağı itmez.
+  return '<div class="bg-slate-900/60 border border-slate-800 rounded-2xl p-4">'
     + '<div class="flex items-center justify-between mb-2"><b class="text-sm text-white">Canlı Operatörler</b>'
     + (typeof window.kmiOpenPeopleTalent==='function' ? '<button data-as-fn="kmiOpenPeopleTalent" class="text-[11px] text-cyan-300 hover:text-cyan-200 font-bold">Tümünü Gör →</button>' : '')
-    + '</div>' + rows + '</div>';
+    + '</div><div class="max-h-[280px] overflow-y-auto pr-0.5">' + rows + '</div></div>';
 }
 
 // --- C5: PULSE · Kritik Durumlar - window.KMI_PULSE.listIncidents() AYNI kaynak. ---
@@ -19629,6 +19695,14 @@ window.kmiOpenAnaSayfa = function(){
   }
   page.classList.add('active');
   const pt=document.getElementById('pageTitle'); if(pt) pt.innerText='Performance Center';
+  // KMI-PHASE-1-R3.1 (owner "FINAL LIVE VISUAL CONVERGENCE" §1): Ana Sayfa'nın
+  // kendi zengin başlığı (asRenderHeader - gerçek selamlama/vardiya/hızlı işlemler)
+  // bu jenerik şeritle aynı bilgiyi (başlık + "Sistem Tarihi") tekrarlıyordu, aradaki
+  // iki ayrı mb-6/py-6 boşluğu "large dead vertical space" olarak bildirildi. Jenerik
+  // şerit SİLİNMEDİ (tüm diğer sekmeler için GEREKLİ) - sadece Ana Sayfa görünürken
+  // gizleniyor; switchTab() sarmalayıcısı (aşağıda) başka HERHANGİ bir sekmeye
+  // geçildiğinde otomatik geri getiriyor.
+  document.getElementById('kmiGlobalPageHeaderBand')?.classList.add('hidden');
   window.kmiRenderAnaSayfa();
 };
 
@@ -19637,17 +19711,24 @@ window.kmiRenderAnaSayfa = function(){
   const u=window.currentUser;
   if(!u){ page.innerHTML='<div class="text-center text-slate-500 p-16">Önce giriş yapmalısınız.</div>'; return; }
   const k=asComputeKpis();
+  // KMI-PHASE-1-R3.1 (owner "FINAL LIVE VISUAL CONVERGENCE" §2/§10): cockpit
+  // yeniden düzenlendi - MAIN (~%75-80, Live Floor en büyük yüzey, altında Task
+  // Floor + Bugünün Performansı yan yana) + RIGHT RAIL (~%20-25, Canlı Operatörler
+  // + PULSE + Yaklaşanlar dikey istiflenmiş) - referansın "6 KPI üstte / Live
+  // Floor sol-orta / Operatörler sağ-orta / PULSE sağ-altı / Task Floor+Performans
+  // altta sol-orta / Yaklaşanlar sağ-altta" yerleşimiyle aynı hiyerarşiyi, TEK bir
+  // first-viewport taramasında (ilk ekranda) görünür kılmak için. Hiçbir panel
+  // kaldırılmadı/taşınmadı - sadece ızgara (grid) yerleşimi değişti, veri
+  // kaynakları (asRender*) BİREBİR AYNI.
   page.innerHTML = '<div class="max-w-[1800px] mx-auto p-4 sm:p-6">'
     + asRenderHeader(u)
     + asRenderKpiStrip(k)
-    + '<div class="grid grid-cols-1 xl:grid-cols-[1fr_360px] gap-4 mb-4">'
-    +   asRenderLiveFloorSummary()
-    +   '<div class="flex flex-col gap-4">' + asRenderOperators() + asRenderPulse(u) + '</div>'
-    + '</div>'
-    + '<div class="grid grid-cols-1 lg:grid-cols-3 gap-4">'
-    +   asRenderTaskFloor(u)
-    +   asRenderTodayPerf(k)
-    +   asRenderUpcoming()
+    + '<div class="grid grid-cols-1 xl:grid-cols-[1fr_320px] gap-4 items-start">'
+    +   '<div class="flex flex-col gap-4 min-w-0">'
+    +     asRenderLiveFloorSummary()
+    +     '<div class="grid grid-cols-1 lg:grid-cols-2 gap-4">' + asRenderTaskFloor(u) + asRenderTodayPerf(k) + '</div>'
+    +   '</div>'
+    +   '<div class="flex flex-col gap-4 min-w-0">' + asRenderOperators() + asRenderPulse(u) + asRenderUpcoming() + '</div>'
     + '</div></div>';
   page.querySelectorAll('[data-as-fn]').forEach(function(btn){
     btn.onclick=function(){ const fn=btn.getAttribute('data-as-fn'); try{ if(typeof window[fn]==='function') window[fn](); }catch(e){} };
@@ -20069,6 +20150,65 @@ window.kmiOpenLeftNav = function(){
 };
 window.kmiCloseLeftNav = function(){ document.getElementById('kmiLeftNavDrawer')?.remove(); };
 
+// KMI-PHASE-1-R3.1 (owner "FINAL LIVE VISUAL CONVERGENCE" §11 - persistent
+// desktop sidebar using the EXISTING canonical nav registry, ONE navigation
+// source, no duplicated destinations): this renders an ADDITIVE, parallel
+// fixed-position sidebar at lg+ (>=1024px) ONLY - it is a pure CSS/display
+// alternate presentation of the SAME kmiLeftNavResolve(user) groups and the
+// SAME fn/legacyTab click-dispatch already used by window.kmiOpenLeftNav()'s
+// overlay drawer. No second destination list was invented. Below the lg
+// breakpoint this element is display:none (see <style>) and the existing
+// Menü-triggered drawer is unchanged and remains the only nav surface there.
+// Deliberately LOW-RISK: this does NOT restructure #mainSystem's own DOM/flex
+// hierarchy (a 20k-line app never built around that) - it only reserves
+// horizontal space via margin-left at lg+ (see <style>), which is the
+// smallest change that achieves "persistent sidebar" without touching how
+// any existing tab/page renders internally.
+function kmiRenderPersistentSidebar(){
+  const existing = document.getElementById('kmiPersistentSidebar');
+  if(!window.currentUser){
+    if(existing) existing.remove();
+    try{ document.documentElement.style.setProperty('--kmi-sidebar-w','0px'); }catch(e){}
+    return;
+  }
+  let collapsed=false; try{ collapsed = localStorage.getItem('kmiSidebarCollapsed')==='1'; }catch(e){}
+  let el = existing;
+  if(!el){ el=document.createElement('div'); el.id='kmiPersistentSidebar'; el.className='no-print'; document.body.appendChild(el); }
+  el.classList.toggle('kmi-sidebar-collapsed', collapsed);
+  try{ document.documentElement.style.setProperty('--kmi-sidebar-w', collapsed?'64px':'260px'); }catch(e){}
+  const groups = kmiLeftNavResolve(window.currentUser);
+  el.innerHTML = '<div class="flex items-center justify-between px-3 py-3 border-b border-slate-800 shrink-0">'
+    + '<div class="kmi-sidebar-brand min-w-0 overflow-hidden"><div class="text-[9px] text-cyan-300 tracking-[.2em] font-black whitespace-nowrap">KURUTLU</div><div class="text-xs font-bold text-white whitespace-nowrap">Performance Center</div></div>'
+    + '<button id="kmiSidebarCollapseBtn" class="shrink-0 w-7 h-7 rounded-lg hover:bg-slate-800 text-slate-400" title="'+(collapsed?'Genişlet':'Daralt')+'"><i class="fa-solid '+(collapsed?'fa-angles-right':'fa-angles-left')+' text-xs"></i></button>'
+    + '</div>'
+    + '<div class="flex-1 overflow-y-auto p-2">'
+    + (groups.length ? groups.map(function(g,gi){
+        return (gi>0 ? '<div class="border-t border-slate-800/70 my-1.5"></div>' : '')
+          + (g.title ? '<div class="kmi-sidebar-label text-[9px] font-black text-slate-500 tracking-widest mt-1.5 mb-0.5 px-2">'+lnE(g.title)+'</div>' : '')
+          + g.items.map(function(it){
+              return '<button data-pn-fn="'+lnE(it.dest.fn||'')+'" data-pn-tab="'+lnE(it.dest.legacyTab||'')+'" title="'+lnE(it.label)+'" class="kmi-sidebar-item w-full text-left flex items-center gap-2.5 px-2.5 py-2 rounded-lg hover:bg-slate-800 focus:bg-slate-800 focus:outline-none text-slate-200 text-[13px] font-semibold transition-colors"><i class="fa-solid '+lnE(it.icon||'fa-circle')+' text-cyan-400 w-4 text-center shrink-0"></i><span class="kmi-sidebar-label truncate">'+lnE(it.label)+'</span></button>';
+            }).join('');
+      }).join('')
+      : '<div class="kmi-sidebar-label text-slate-500 text-xs p-2">VERİ GEREKLİ</div>')
+    + '</div>';
+  el.querySelectorAll('[data-pn-fn], [data-pn-tab]').forEach(function(btn){
+    btn.onclick = function(){
+      const fn = btn.getAttribute('data-pn-fn'); const tab = btn.getAttribute('data-pn-tab');
+      try{
+        if(fn && typeof window[fn]==='function') window[fn]();
+        else if(tab && typeof window.switchTab==='function') window.switchTab(tab);
+      }catch(e){ try{window.kmiToast?.('Açılamadı: '+e.message,'warn');}catch(e2){} }
+    };
+  });
+  const collapseBtn = el.querySelector('#kmiSidebarCollapseBtn');
+  if(collapseBtn) collapseBtn.onclick = function(){
+    const next = !collapsed;
+    try{ localStorage.setItem('kmiSidebarCollapsed', next?'1':'0'); }catch(e){}
+    kmiRenderPersistentSidebar();
+  };
+}
+window.kmiRenderPersistentSidebar = kmiRenderPersistentSidebar; // testler için dışa açık
+
 // Mevcut #kmiShellBar'ın İLK öğesi olarak tek bir "Menü" aç/kapa düğmesi ekler -
 // şeritteki diğer GERÇEK girişlere (Ana Sayfa/Canlı/Command Center/İşlerim/
 // PULSE/Raporlar/Ara/Tüm Alanlar) dokunmadan, PHASE 1C'nin "ONE TOP COMMAND
@@ -20116,6 +20256,7 @@ function kmiLegacyNavRetire(){
 function kmiRenderPhase1Shell(){
   try{ kmiInjectLeftNavToggle(); }catch(e){}
   try{ kmiLegacyNavRetire(); }catch(e){}
+  try{ kmiRenderPersistentSidebar(); }catch(e){}
 }
 window.kmiRenderPhase1Shell = kmiRenderPhase1Shell; // testler için dışa açık
 
@@ -20134,6 +20275,38 @@ window.addEventListener('load', function(){
 <style>
   /* KMI-PHASE-1E: bkz. kmiLegacyNavRetire() - DOM/fonksiyonellik SİLİNMEDİ, yalnız gizlendi. */
   .kmi-legacy-nav-retired{ display:none !important; }
+  /* KMI-PHASE-1-R3.1 (owner "FINAL LIVE VISUAL CONVERGENCE" §11 - persistent desktop
+     sidebar, additive/low-risk): hidden below lg (drawer/Menü remains the only nav
+     surface there, unchanged); at lg+ it becomes a fixed left rail and #mainSystem
+     reserves the same width via margin-left so content is never covered. Collapsing
+     only shrinks the rail's own width/labels - it does not touch #mainSystem's DOM. */
+  #kmiPersistentSidebar{
+    display:none; position:fixed; top:0; left:0; bottom:0; z-index:40;
+    width:260px; flex-direction:column; background:#0b1220; border-right:1px solid rgba(8,145,178,.3);
+    transition:width .15s ease;
+    /* KMI-PHASE-1-R3.1 regression fix: a real production overlay (e.g. the
+       Puantaj duruş bottom sheet, z-[260]) always stacks above this z-40
+       rail and is unaffected either way - but this rail must never be able
+       to swallow a click meant for whatever is visually beneath its own
+       EMPTY surface (padding/dividers/group labels) at any viewport/scroll
+       position. pointer-events:none on the container + pointer-events:auto
+       re-enabled only on its real interactive buttons below is the standard
+       safe pattern for a persistent fixed rail and fully preserves its own
+       click handlers. */
+    pointer-events:none;
+  }
+  #kmiPersistentSidebar.kmi-sidebar-collapsed{ width:64px; }
+  #kmiPersistentSidebar.kmi-sidebar-collapsed .kmi-sidebar-label,
+  #kmiPersistentSidebar.kmi-sidebar-collapsed .kmi-sidebar-brand{ display:none; }
+  #kmiPersistentSidebar button{ pointer-events:auto; }
+  @media (min-width:1024px){
+    #kmiPersistentSidebar{ display:flex; }
+    #mainSystem{ margin-left:var(--kmi-sidebar-w,260px); transition:margin-left .15s ease; }
+    /* Masaüstünde (lg+) kalıcı rail zaten var; şeritteki "Menü" düğmesi artık
+       YEDEK/tekrarlı olduğu için gizlenir - SİLİNMEZ (dar ekranda hâlâ gösterilir
+       ve işlevseldir, aynı KEEP_COMPATIBILITY_HIDDEN deseni). */
+    #kmiLeftNavToggleBtn{ display:none; }
+  }
   /* KMI-PHASE-1-R2-FIX1/FIX3/FIX4 (2026-10-03, owner "OWNER VISUAL REVIEW FIX PASS"):
      #kmiFloorNavRow2 (secondRow()/install(), ~satır 12614) Ender+ChatGPT'nin canlı
      incelemede gördüğü "büyük renkli modül butonları" (LIVE FLOOR/KALİTE KULESİ/
