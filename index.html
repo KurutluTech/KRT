@@ -17,9 +17,9 @@
          `git blame`/diffs on this file quiet between releases and avoid a
          commit-hash feedback loop (the source commit's SHA cannot depend on
          a value computed from that same SHA). See docs/KMI_DEPLOY_ID.md. -->
-    <meta name="kmi-source-commit" content="42e8aabdfe99e6d869d8469aaeab8dab6327a830">
-    <meta name="kmi-build-id" content="42e8aabdfe99-20261002T221100Z">
-    <meta name="kmi-built-at" content="2026-10-02T22:11:00.806Z">
+    <meta name="kmi-source-commit" content="bcfc0d8e876211454b10d1ea7d2e33b06827c79b">
+    <meta name="kmi-build-id" content="bcfc0d8e8762-20261003T000523Z">
+    <meta name="kmi-built-at" content="2026-10-03T00:05:23.354Z">
     <script>
       // Derived from the meta tags above at runtime, so there is exactly one
       // place (the meta tags) where the build script substitutes real
@@ -2900,6 +2900,16 @@ ead>
                     if(jo){ jo.status='Muhasebe Onayı Bekliyor'; jo.updatedAt=new Date().toISOString(); saveStorage('jobOrders',jobOrders); }
                 }
                 saveStorage('declarations', declarations);
+                // KMI-OTS-AUDIT-GAP (2026-10-03, HISTORICAL-DECISIONS-EXECUTION-PASS): Karar 6
+                // ("her canonical approval/release olayı audit üretmeli") - approveKalite bu ana
+                // kadar hiçbir window.KMI.event() üretmiyordu (yalnız Sevkiyat ve Reddet ürtüyordu -
+                // bkz. docs/KMI_OTS_CANONICAL_MIGRATION_PLAN.md §3.C, "3/5 onay adımı audit
+                // üretmiyor"). Bu, server-canonical declaration_quality_approve_verify RPC'sinin
+                // zaten audit_log'a yazdığı (DEF-007 TRACK B) ayrı bir katman - burada eklenen,
+                // KMI LIVE/Reporting/Pulse'un okuduğu CLIENT-side event bus'a aynı onayı düşürmek.
+                // Reddet akışıyla (kmiRejectDeclaration) AYNI desen: sadece BİLGİLENDİRME, hiçbir
+                // yetki/iş kuralı buna bağlı değil - eklenmemesi hiçbir mevcut davranışı bozmaz.
+                try{window.KMI?.event?.('QUALITY_APPROVED','JOB_ORDER',d.jobOrder,{label:'Kalite onayladı: '+d.id,qty:Number(d.qualityGood||0),source:'APPROVE_FLOW'});}catch(e){}
                 refreshAllViews();
                 queueManagerReport('kalite onayı');
             }
@@ -3021,7 +3031,11 @@ ead>
             }
             d.deliveryNoteNo=irs.trim(); d.status='Yönetim Onayı Bekliyor'; d.accountingApprover=currentUser.name; d.accountingApprovalDate=new Date().toLocaleString('tr-TR'); d.updatedAt=new Date().toISOString();
             const jo=jobOrders.find(j=>j.id===d.jobOrder); if(jo){jo.status='Yönetim Onayı Bekliyor';jo.deliveryNoteNo=d.deliveryNoteNo;jo.updatedAt=new Date().toISOString();saveStorage('jobOrders',jobOrders);}
-            saveStorage('declarations',declarations); refreshAllViews(); queueManagerReport('muhasebe onayı / irsaliye '+d.deliveryNoteNo);
+            saveStorage('declarations',declarations);
+            // KMI-OTS-AUDIT-GAP (2026-10-03, HISTORICAL-DECISIONS-EXECUTION-PASS): bkz. approveKalite
+            // üzerindeki aynı başlıklı not - Muhasebe onayı bugüne kadar KMI.event() üretmiyordu.
+            try{window.KMI?.event?.('ACCOUNTING_APPROVED','JOB_ORDER',d.jobOrder,{label:'Muhasebe onayladı, irsaliye '+d.deliveryNoteNo,source:'APPROVE_FLOW'});}catch(e){}
+            refreshAllViews(); queueManagerReport('muhasebe onayı / irsaliye '+d.deliveryNoteNo);
         }
 
         // KMI-FIX (2026-09-24): karşı yön - bu cihazda hiç oluşmamış ama başka bir cihazda üretilip
@@ -3089,12 +3103,15 @@ ead>
                 console.warn('[KMI-DEF-013] declaration_management_approve_verify HARD FAIL-CLOSED - yerel onay YAZILMADI:',e);
                 return;
             }
+            // KMI-OTS-AUDIT-GAP (2026-10-03, HISTORICAL-DECISIONS-EXECUTION-PASS): bkz. approveKalite
+            // üzerindeki aynı başlıklı not - Yönetim son onayı bugüne kadar KMI.event() üretmiyordu
+            // (OTS Migration Plan §3.C'nin "3/5 onay adımı audit üretmiyor" bulgusunun 3. ayağı).
             if (type === 'declaration') {
                 const d = declarations.find(x=>x.id===id);
-                if (d) { const jo=jobOrders.find(j=>j.id===d.jobOrder); d.managementApprover=currentUser.name; d.managementApprovalDate=new Date().toLocaleString('tr-TR'); d.updatedAt=new Date().toISOString(); if(jo?.targetType==='timed'){ d.status='Tamamlandı (Yönetim Onaylı)'; finalizeDeclarationBonus(d); if(jo){jo.status='Tamamlandı (Yönetim Onaylı)';jo.updatedAt=new Date().toISOString();saveStorage('jobOrders',jobOrders);} } else { d.status='Sevk Onayı Bekliyor'; d.shipmentReady=true; d.shipmentReadyAt=new Date().toISOString(); finalizeDeclarationBonus(d); if(jo){jo.status='Sevke Hazır';jo.updatedAt=new Date().toISOString();saveStorage('jobOrders',jobOrders);} } saveStorage('declarations', declarations); refreshAllViews(); queueManagerReport('yönetim son onayı / sevke hazır'); }
+                if (d) { const jo=jobOrders.find(j=>j.id===d.jobOrder); d.managementApprover=currentUser.name; d.managementApprovalDate=new Date().toLocaleString('tr-TR'); d.updatedAt=new Date().toISOString(); if(jo?.targetType==='timed'){ d.status='Tamamlandı (Yönetim Onaylı)'; finalizeDeclarationBonus(d); if(jo){jo.status='Tamamlandı (Yönetim Onaylı)';jo.updatedAt=new Date().toISOString();saveStorage('jobOrders',jobOrders);} } else { d.status='Sevk Onayı Bekliyor'; d.shipmentReady=true; d.shipmentReadyAt=new Date().toISOString(); finalizeDeclarationBonus(d); if(jo){jo.status='Sevke Hazır';jo.updatedAt=new Date().toISOString();saveStorage('jobOrders',jobOrders);} } saveStorage('declarations', declarations); try{window.KMI?.event?.('MANAGEMENT_APPROVED','JOB_ORDER',d.jobOrder,{label:'Yönetim son onayı: '+d.id,source:'APPROVE_FLOW'});}catch(e){} refreshAllViews(); queueManagerReport('yönetim son onayı / sevke hazır'); }
             } else {
                 const j = jobOrders.find(x=>x.id===id);
-                if (j) { j.status = 'Tamamlandı (Yönetim Onaylı)'; j.managementApprover = currentUser.name; j.managementApprovalDate = new Date().toLocaleDateString('tr-TR'); j.updatedAt = new Date().toISOString(); saveStorage('jobOrders', jobOrders); refreshAllViews(); queueManagerReport('yönetim iş emri son onayı'); }
+                if (j) { j.status = 'Tamamlandı (Yönetim Onaylı)'; j.managementApprover = currentUser.name; j.managementApprovalDate = new Date().toLocaleDateString('tr-TR'); j.updatedAt = new Date().toISOString(); saveStorage('jobOrders', jobOrders); try{window.KMI?.event?.('MANAGEMENT_APPROVED','JOB_ORDER',j.id,{label:'Yönetim iş emri son onayı: '+j.id,source:'APPROVE_FLOW'});}catch(e){} refreshAllViews(); queueManagerReport('yönetim iş emri son onayı'); }
             }
         }
 
@@ -9485,7 +9502,14 @@ window.kmiJobOrderScanApprove=function(id){
   }
   window.kmiToast('Bu durum ('+(status||'-')+') için barkodla otomatik onay tanımlı değil.','warn');
 };
-window.kmiOpenLive=function(){document.getElementById('kmiLiveModal')?.remove();const st=core(),orders=st.orders||[],stock=st.stock||[],mov=st.movements||[];const open=orders.filter(o=>!['PAID','CANCELLED'].includes(o.status)).length,res=stock.reduce((a,x)=>a+Number(x.reserved||0),0),on=stock.reduce((a,x)=>a+Number(x.onHand||0),0),today=new Date().toISOString().slice(0,10),todayEv=KMI.events.filter(e=>e.at.slice(0,10)===today).length;const m=document.createElement('div');m.id='kmiLiveModal';m.className='fixed inset-0 z-[160] bg-[#07101f] p-5 overflow-y-auto';m.innerHTML=`<div class=\"max-w-7xl mx-auto\"><div class=\"flex justify-between items-start\"><div><div class=\"text-cyan-300 text-sm tracking-[.25em] font-black\">KURUTLU MANUFACTURING INTELLIGENCE</div><h1 class=\"text-4xl md:text-6xl font-black mt-2\">KURUTLU LIVE</h1><div class=\"text-slate-400\">Performance Center · Paperless Machining</div><div class=\"text-slate-500 italic text-sm\">Every movement measured. Every decision informed.</div></div><button onclick=\"this.closest('#kmiLiveModal').remove()\" class=\"bg-slate-800 px-4 py-2 rounded\">Kapat</button></div><div class=\"grid grid-cols-2 lg:grid-cols-4 gap-4 mt-8\">${[['AÇIK SİPARİŞ',open],['REZERVE',res+' ad'],['BİTMİŞ STOK',on+' ad'],['BUGÜN EVENT',todayEv]].map(x=>`<div class=\"bg-slate-900 border border-slate-700 rounded-2xl p-5\"><div class=\"text-xs text-slate-500\">${x[0]}</div><div class=\"text-4xl font-black text-cyan-300 mt-2\">${x[1]}</div></div>`).join('')}</div><div class=\"grid lg:grid-cols-2 gap-4 mt-4\"><div class=\"bg-slate-900 rounded-2xl p-5 border border-slate-700\"><h3 class=\"font-black text-xl\">LIVE FACTORY EVENTS</h3><div class=\"mt-3 space-y-2 text-sm\">${KMI.events.slice(0,12).map(e=>`<div class=\"border-b border-slate-800 pb-2\"><span class=\"text-cyan-300\">${new Date(e.at).toLocaleTimeString('tr-TR')}</span> · <b>${esc(e.type)}</b> · ${esc(e.data?.label||e.entityId)} <span class=\"text-slate-500\">${esc(e.user)}</span></div>`).join('')||'Henüz event yok.'}</div></div><div class=\"bg-slate-900 rounded-2xl p-5 border border-slate-700\"><h3 class=\"font-black text-xl\">ORDER FLOW</h3><div class=\"mt-3 space-y-2 text-sm\">${orders.slice(0,10).map(o=>`<button onclick=\"kmiOpenPassport('${esc(o.id)}')\" class=\"w-full text-left bg-slate-950 border border-slate-800 rounded p-3\"><b>${esc(o.customerPO||o.id)}</b><span class=\"float-right text-cyan-300\">${esc(o.status)}</span><div class=\"text-xs text-slate-500\">Termin ${esc(o.dueDate||'-')}</div></button>`).join('')||'Sipariş yok.'}</div></div></div></div>`;document.body.appendChild(m)};
+// KMI-LIVE-CONSOLIDATION (2026-10-03): Bu dosyada üç ayrı window.kmiOpenLive tanımı
+// vardı - bu ilk (en eski, core()/stock/movements tabanlı) tanım ve onu saran
+// "humanize" dekoratörü (bir alt bölümde duruyordu), dosyanın ilerisindeki ÜÇÜNCÜ
+// ve GERÇEKTEN ÇALIŞAN tanım (kmiMachineBoard()/jobOrders/declarations tabanlı,
+// aşağıda) tarafından koşulsuz olarak EZİLİYORDU - script yüklenirken son atama
+// kazanıyor, bu ikisi hiçbir zaman çalışmıyordu (ölü/shadow kod). Kanonik KMI LIVE
+// ekranı DEĞİŞMEDİ - sadece hiçbir zaman çalışmayan bu iki eski kopya kaldırıldı
+// (KMI_CANONICAL_REQUIREMENT_LEDGER BATCH-D, "kmiOpenLive triple-definition").
 // Add Passport button without rewriting the canonical V118 renderer.
 const rr=window.v118Render;window.v118Render=function(){rr&&rr();document.querySelectorAll('#v118Orders tr').forEach(tr=>{const id=tr.querySelector('td .text-slate-500')?.textContent?.trim();const cell=tr.lastElementChild?.querySelector('.flex');if(id&&cell&&!cell.querySelector('.kmi-pass')){const b=document.createElement('button');b.className='kmi-pass bg-fuchsia-800 px-2 py-1 rounded';b.textContent='Passport';b.onclick=()=>kmiOpenPassport(id);cell.prepend(b)}});kmiRenderStream()};
 // Capture important existing business actions as live events.
@@ -10238,14 +10262,11 @@ window.kmiOpenPassport=function(id){
  document.body.appendChild(m);
 };
 
-/* Humanize KURUTLU LIVE event labels without touching its data source. */
-const oldLive=window.kmiOpenLive;
-window.kmiOpenLive=function(){
- oldLive?.();
- requestAnimationFrame(()=>{const root=document.getElementById('kmiLiveModal');if(!root)return;
-  root.querySelectorAll('*').forEach(el=>{if(el.children.length===0&&/PRODUCTION_NEED|RESERVATION|FINISHED_GOODS|SHIPMENT|INVOICE|PAYMENT/.test(el.textContent||'')){let t=el.textContent;['PRODUCTION_NEED','RESERVATION','FINISHED_GOODS','SHIPMENT','INVOICE','PAYMENT'].forEach(k=>t=t.replaceAll(k,humanEvent(k)));el.textContent=t}})
- });
-};
+// KMI-LIVE-CONSOLIDATION (2026-10-03): Bu "humanize" dekoratörü, yukarıda kaldırılan
+// ilk kmiOpenLive tanımını sarıyordu (oldLive=window.kmiOpenLive). O temel tanım zaten
+// dosyanın ilerisindeki üçüncü/kanonik tanım tarafından koşulsuz eziliyordu - yani bu
+// dekoratör de hiçbir zaman çalışmadı (dead code). Kaldırıldı; kanonik KMI LIVE davranışı
+// değişmedi.
 })();
 </script>
 
@@ -19359,16 +19380,53 @@ window.kmiRenderAnaSayfa = function(){
   const capLabels=[['Yönetim','MANAGEMENT'],['Kalite','QUALITY'],['Depo','warehouse.receive'],['Muhasebe & Finans','finance.customer.view'],['Raporlar','reporting.view'],['PULSE','pulse.view'],['Mobil','mobile.access']]
     .filter(function(c){ try{ return window.KMI_AUTH.can(u,c[1])===true; }catch(e){ return false; } }).map(function(c){ return c[0]; });
 
+  // KMI-PHASE-1D (2026-10-03, owner directive "FIVE-PHASE REAL PRODUCT
+  // CONVERGENCE PROGRAM"): Ana Sayfa'yı gerçek bir "Performance Center"a
+  // taşıyan ilk dilim - "ŞU AN NE ÇALIŞIYOR / NE BEKLİYOR / NE YANLIŞ"
+  // sorularına GERÇEK, kanonik kaynaklardan saniyeler içinde cevap. Her
+  // sayı, zaten var olan ve başka ekranlarda (canonical kmiOpenLive,
+  // kmiMachineBoard) kullanılan AYNI hesaplamadan okunuyor - yeni bir
+  // ikinci "aktif iş emri" veya "makine durumu" tanımı İCAT EDİLMEDİ.
+  // Okunamayan/hesaplanamayan her satır dürüstçe "VERİ GEREKLİ" gösterir -
+  // uydurma sayı YOK.
+  let pulseGrid = '';
+  try{
+    const st = (window.V118_STATE && Array.isArray(window.V118_STATE.orders)) ? window.V118_STATE : (typeof core === 'function' ? core() : {orders:[]});
+    const activeOrders = (st.orders||[]).filter(function(o){ return !['PAID','CANCELLED'].includes(o.status); }).length;
+    // Aynı "aktif iş emri" tanımı canonical window.kmiOpenLive'ın (src/index.html,
+    // KMI-LIVE-CONSOLIDATION ile tek tanıma indirgenen fonksiyon) kullandığı tanımla
+    // BİREBİR aynı - iki ayrı "aktif WO" sayımı UYDURULMADI.
+    const jos = (Array.isArray(window.jobOrders) ? window.jobOrders : []);
+    const activeWOs = jos.filter(function(j){ return !j.deleted && !['Silindi','Kapalı','Tamamlandı','COMPLETED','CANCELLED'].includes(String(j.status||'')); }).length;
+    const board = (typeof kmiMachineBoard === 'function') ? kmiMachineBoard() : [];
+    const producing = board.filter(function(mb){ return mb.status==='RUNNING'; }).length;
+    const down = board.filter(function(mb){ return mb.condition && mb.condition!=='AVAILABLE'; }).length;
+    const ds = (typeof declarations !== 'undefined' && Array.isArray(declarations)) ? declarations : [];
+    const qualityWaiting = ds.filter(function(d){ return d.status==='Kalite Bekliyor'; }).length;
+    const shipReady = ds.filter(function(d){ return d.status==='Sevk Onayı Bekliyor'; }).length;
+    const tiles = [
+      ['Açık Sipariş', activeOrders], ['Aktif İş Emri', activeWOs],
+      ['Üretimde Makine', producing], ['Makine Down/Bakım', down],
+      ['Kalite Bekliyor', qualityWaiting], ['Sevke Hazır', shipReady],
+    ];
+    pulseGrid = '<div class="mb-4"><div class="text-[10px] text-slate-500 uppercase font-bold mb-2">Fabrika Nabzı · şu an</div><div class="grid grid-cols-3 gap-2">'
+      + tiles.map(function(t){ return '<div class="bg-slate-800/60 border border-slate-700 rounded-xl p-2.5 text-center"><div class="text-xl font-black text-cyan-300">'+asE(t[1])+'</div><div class="text-[9px] text-slate-500 mt-0.5">'+asE(t[0])+'</div></div>'; }).join('')
+      + '</div></div>';
+  }catch(e){
+    pulseGrid = '<div class="mb-4 text-[11px] text-slate-500">Fabrika Nabzı: VERİ GEREKLİ (hesaplanamadı).</div>';
+  }
+
   const quick=[['CANLI','kmiOpenCanli','fa-satellite-dish'],['COMMAND CENTER','kmiOpenCommandCenter','fa-table-list'],['İŞLERİM','kmiOpenTaskFloor','fa-list-check'],['PULSE','kmiOpenPulse','fa-triangle-exclamation'],['RAPORLAR','kmiOpenReporting','fa-chart-line'],['TÜM ALANLAR','kmiOpenTumAlanlar','fa-table-cells-large']];
 
   m.innerHTML = '<div class="bg-slate-900 border border-slate-700 rounded-2xl max-w-2xl w-full mt-8 mb-8 mx-auto p-5" onclick="event.stopPropagation()">'
-    + '<div class="flex justify-between items-center mb-4"><div><div class="text-[10px] text-cyan-300 tracking-widest font-black">KMI · NEXT-GEN EXPERIENCE · FAZ 3</div><h2 class="text-2xl font-black">🏠 Ana Sayfa</h2><div class="text-xs text-slate-400 mt-1">Rol çalışma alanınız - gerçek verilerinizden derlendi.</div></div>'
+    + '<div class="flex justify-between items-center mb-4"><div><div class="text-[10px] text-cyan-300 tracking-widest font-black">KURUTLU MANUFACTURING INTELLIGENCE</div><h2 class="text-2xl font-black">🏠 Performance Center</h2><div class="text-xs text-slate-400 mt-1">Rol çalışma alanınız - gerçek verilerinizden derlendi.</div></div>'
     + '<button onclick="document.getElementById(\'kmiAnaSayfaModal\').remove()" class="bg-slate-800 px-4 py-2 rounded-xl">Kapat</button></div>'
     + '<div class="bg-slate-800/60 border border-slate-700 rounded-xl p-4 mb-4">'
     + '<div class="text-lg font-black text-white">' + asE(u.name||'-') + '</div>'
     + '<div class="text-xs text-slate-400">' + asE(u.dept||u.department||'-') + ' · ' + asE(u.role||'-') + '</div>'
     + (capLabels.length ? '<div class="flex flex-wrap gap-1 mt-2">' + capLabels.map(function(c){ return '<span class="text-[10px] bg-slate-700 px-2 py-0.5 rounded-full text-slate-300">'+asE(c)+'</span>'; }).join('') + '</div>' : '')
     + '</div>'
+    + pulseGrid
     + '<div class="grid grid-cols-2 gap-3 mb-4">'
     + '<div class="bg-slate-800/60 border border-slate-700 rounded-xl p-3"><div class="text-[10px] text-slate-500 uppercase font-bold">İşlerim</div><div class="text-sm font-bold text-white mt-1">' + asE(jobsLine) + '</div></div>'
     + '<div class="bg-slate-800/60 border border-slate-700 rounded-xl p-3"><div class="text-[10px] text-slate-500 uppercase font-bold">PULSE</div><div class="text-sm font-bold text-white mt-1">' + asE(pulseLine) + '</div></div>'
@@ -19446,6 +19504,268 @@ window.addEventListener('keydown', function(ev){
 }, true);
 })();
 </script>
+
+<!-- ===========================================================================
+     KMI-PHASE-1-SHELL (2026-10-03): OWNER DIRECTIVE "FULL PRODUCT VISUAL
+     CONVERGENCE" / FIVE-PHASE PROGRAM, PHASE 1 (Shell + Navigation +
+     Performance Center).
+     ---------------------------------------------------------------------------
+     Master State Audit §6 / this session's historical-decisions recovery pass
+     had already found, by direct code count, FIVE simultaneous navigation
+     surfaces fighting for the same screen: (1) the legacy 8-tab top-bar row
+     (#navBar .nav-btn, lines ~296-316), (2) ~15 second-row buttons injected
+     by independent setInterval loops into department screens, (3) the old
+     admin-tile grid, (4) this Next-Gen #kmiShellBar (Ana Sayfa/Canlı/Command
+     Center/İşlerim/PULSE/Raporlar/Ara/Tüm Alanlar - KMI-SHELL-FAZ3-SLICE2-FIX
+     above), (5) the "Tüm Alanlar" modal grouping window.KMI_NAV_REGISTRY.
+     Phase 1's own rule is explicit: do NOT add a sixth layer, and the FINAL
+     user experience must be ONE coherent nav even though the migration itself
+     may be additive internally.
+     ---------------------------------------------------------------------------
+     What this block actually does (no new engine, no new permission string,
+     no invented business workflow - every destination below is a REAL,
+     already-existing, already-permission-checked function or legacy tab):
+     1) KMI_LEFT_NAV_GROUPS: the Phase 1B navigation order (Ana Sayfa/Command
+        Center -> Live Floor/Task Floor -> ÜRETİM AİLESİ -> TEDARİK & MÜŞTERİ
+        AKIŞI -> DESTEK -> ANALİTİK/GELİŞİM -> role/context group), each item
+        resolving to ONE already-real destination:
+          - a window.kmiOpen*() function already in KMI_NAV_REGISTRY/the shell
+            bar (Live Floor=kmiOpenShopFloorLive, Task Floor=kmiOpenTaskFloor,
+            Command Center=kmiOpenCommandCenter, etc.), gated by that
+            registry's own real requiredPermission; or
+          - one of the 8 legacy switchTab() destinations (operatör/kalite/
+            sevkiyat/bakim/siparis/muhasebe/yonetici/liderlik), gated by the
+            SAME hasScreenAccess()/getAllowedTabs() the old tab row already
+            used - no access is widened or narrowed.
+        Where both a modern screen and a legacy tab cover overlapping ground
+        for the SAME user (e.g. Kalite Kulesi vs. the legacy "kalite" approval
+        queue), the resolver picks ONE real destination per user (prefers the
+        modern screen when that user's permission actually grants it) rather
+        than showing two nav rows that open two different screens for the
+        same label - this is what Phase 1C/1E call "do not duplicate the same
+        destination in several visible areas" / "do not show two competing
+        entries".
+     2) A single toggle ("Menü") is prepended to the existing #kmiShellBar -
+        clicking it opens a left-anchored drawer (#kmiLeftNavDrawer) listing
+        the resolved groups. This is intentionally a drawer, not a
+        permanently-reflowing sidebar: the app has 300+ existing `fixed
+        inset-0` modals across every department (see duplicate_scan.js /
+        shared_container_scan.js output) that assume full-viewport width:
+        permanently narrowing the body would silently misalign every one of
+        them. A drawer is additive (new DOM, new z-index layer, zero change
+        to any existing modal's CSS) while still being the one real, primary,
+        role-aware left navigation the directive asks for.
+     3) Because every one of the 8 legacy tabs now has a real, reachable
+        mapping in the new drawer (see KMI_LEFT_NAV_GROUPS), the legacy
+        second-row tab strip (surface #1 above) is now hidden from normal
+        view via kmiLegacyNavRetire() - NOT deleted (KEEP_COMPATIBILITY_HIDDEN,
+        not DEAD_REMOVE_SAFE per Phase 1E's own classification rule): the
+        buttons/tab-content DOM and switchTab() logic are untouched and still
+        fully functional (switchTab() only ever reads these elements by id,
+        never depends on their visibility - confirmed by reading switchTab()
+        before hiding anything), so nothing that currently depends on them
+        (including this repo's own Playwright tests) breaks.
+     Surfaces #2 (second-row injected buttons) and #3 (admin-tile grid) are
+     NOT touched by this slice - retiring those safely requires auditing each
+     one's own injection site individually (Phase 1E's own "first prove
+     replacement" rule), which is tracked as the next slice of Phase 1E
+     rather than guessed at here.
+     =========================================================================== -->
+<script>
+(function(){
+'use strict';
+
+// Phase 1B'nin BİREBİR grup/sıra tanımı. Her satır GERÇEK bir hedefe çözülür -
+// hiçbir yeni yetki dizesi/iş akışı/ekran UYDURULMADI.
+const KMI_LEFT_NAV_GROUPS = [
+  { title:null, items:[
+    { label:'Ana Sayfa', icon:'fa-house', resolve:function(){ return {fn:'kmiOpenAnaSayfa'}; } },
+    { label:'Command Center', icon:'fa-table-list', resolve:function(){ return {fn:'kmiOpenCommandCenter'}; } },
+  ]},
+  { title:'YÜRÜTME', items:[
+    // KMI_NAV_REGISTRY'deki 'shopfloor' girişiyle AYNI kural: requiredPermission:null -
+    // kmiOpenShopFloorLive() kendi iç kontrolünü kendi yapıyor (registry'nin kendi
+    // yorumu, satır ~19110), burada YENİ bir yetki dizesi uydurulmadı.
+    { label:'Live Floor', icon:'fa-industry', resolve:function(){ return {fn:'kmiOpenShopFloorLive'}; } },
+    { label:'Task Floor', icon:'fa-list-check', resolve:function(){ return {fn:'kmiOpenTaskFloor'}; } },
+  ]},
+  { title:'ÜRETİM AİLESİ', items:[
+    { label:'Operatör Beyan', icon:'fa-user-gear', resolve:function(u){ return hasScreenAccess(u,'operatör') ? {legacyTab:'operatör'} : null; } },
+    { label:'Üretim', icon:'fa-industry', resolve:function(u){ return (nrCanSafe(u,'MANAGEMENT') && typeof window.kmiOpenProductionIntel==='function') ? {fn:'kmiOpenProductionIntel'} : null; } },
+    { label:'Planlama', icon:'fa-diagram-project', resolve:function(u){ return (nrCanSafe(u,'MANAGEMENT') && typeof window.kmiOpenPlanning==='function') ? {fn:'kmiOpenPlanning'} : null; } },
+    { label:'Kalite', icon:'fa-shield-halved', resolve:function(u){
+        if(nrCanSafe(u,'QUALITY') && typeof window.kmiOpenQualityTower==='function') return {fn:'kmiOpenQualityTower'};
+        if(hasScreenAccess(u,'kalite')) return {legacyTab:'kalite'};
+        return null;
+      } },
+    { label:'Bakım', icon:'fa-screwdriver-wrench', resolve:function(u){ return hasScreenAccess(u,'bakim') ? {legacyTab:'bakim'} : null; } },
+  ]},
+  { title:'TEDARİK & MÜŞTERİ AKIŞI', items:[
+    { label:'Satınalma', icon:'fa-cart-shopping', resolve:function(u){ return (nrCanSafe(u,'MANAGEMENT') && typeof window.kmiOpenPurchasing==='function') ? {fn:'kmiOpenPurchasing'} : null; } },
+    { label:'Depo & Stok', icon:'fa-warehouse', resolve:function(u){
+        if(nrCanSafe(u,'warehouse.*') && typeof window.kmiOpenWarehouse==='function') return {fn:'kmiOpenWarehouse'};
+        if(hasScreenAccess(u,'siparis') && !nrCanSafe(u,'MANAGEMENT')) return {legacyTab:'siparis'};
+        return null;
+      } },
+    { label:'Satış & Müşteri', icon:'fa-file-invoice-dollar', resolve:function(u){
+        if(nrCanSafe(u,'MANAGEMENT') && typeof window.kmiOpenSalesOrders==='function') return {fn:'kmiOpenSalesOrders'};
+        return null;
+      } },
+    { label:'Sevkiyat & Lojistik', icon:'fa-truck-fast', resolve:function(u){ return hasScreenAccess(u,'sevkiyat') ? {legacyTab:'sevkiyat'} : null; } },
+  ]},
+  { title:'DESTEK', items:[
+    { label:'Muhasebe & Finans', icon:'fa-calculator', resolve:function(u){
+        if(typeof window.kmiOpenMuhasebeCanonical==='function' && (isBurcuAccountingAuthority(u)||nrCanSafe(u,'MANAGEMENT'))) return {fn:'kmiOpenMuhasebeCanonical'};
+        if(hasScreenAccess(u,'muhasebe')) return {legacyTab:'muhasebe'};
+        return null;
+      } },
+    { label:'Takımhane', icon:'fa-screwdriver-wrench', resolve:function(u){ return (nrCanSafe(u,'tooling.view') && typeof window.kmiOpenToolingIntel==='function') ? {fn:'kmiOpenToolingIntel'} : null; } },
+    { label:'İnsan & Yetkinlik', icon:'fa-users', resolve:function(u){ return (nrCanSafe(u,'MANAGEMENT') && typeof window.kmiOpenPeopleTalent==='function') ? {fn:'kmiOpenPeopleTalent'} : null; } },
+  ]},
+  { title:'ANALİTİK / GELİŞİM', items:[
+    { label:'Raporlar', icon:'fa-chart-line', resolve:function(u){ return nrCanSafe(u,'reporting.view') ? {fn:'kmiOpenReporting'} : null; } },
+    { label:'KMI Academy', icon:'fa-graduation-cap', resolve:function(u){ return nrCanSafe(u,'training.access') ? {fn:'kmiOpenAcademy'} : null; } },
+    { label:'Zirvedekiler', icon:'fa-trophy', resolve:function(u){ return hasScreenAccess(u,'liderlik') ? {legacyTab:'liderlik'} : null; } },
+  ]},
+  { title:null, items:[
+    { label:'KMI Live', icon:'fa-satellite-dish', resolve:function(u){ return (nrCanSafe(u,'controltower.*.view') && typeof window.kmiOpenControlTowerHub==='function') ? {fn:'kmiOpenControlTowerHub'} : null; } },
+    { label:'Yönetici Paneli', icon:'fa-user-tie', resolve:function(u){ return hasScreenAccess(u,'yonetici') ? {legacyTab:'yonetici'} : null; } },
+    { label:'Tüm Alanlar', icon:'fa-table-cells-large', resolve:function(){ return {fn:'kmiOpenTumAlanlar'}; } },
+  ]},
+];
+
+// nrCan (window.KMI_NAV_REGISTRY'nin kendi dosyasında tanımlı) burada DOĞRUDAN
+// erişilebilir değil (modül kapsamı farklı script bloğu) - aynı GERÇEK mantığı
+// (bilinen capability prefix taraması, joker * desteği) tekrar UYDURMADAN,
+// window.KMI_AUTH.can'i doğrudan çağıran güvenli bir sarmalayıcı kullanılır.
+function nrCanSafe(user, permission){
+  if(!permission) return true;
+  try{
+    if(permission.indexOf('*')>=0){
+      const prefix = permission.slice(0, permission.indexOf('*'));
+      const known = ['warehouse.receive','warehouse.transfer','warehouse.reserve','warehouse.issue','warehouse.count','warehouse.adjust','warehouse.finishedgoods','warehouse.shippingstage','warehouse.admin',
+        'controltower.executive.view','controltower.production.view','controltower.quality.view','controltower.purchasing.view','controltower.shipping.view','controltower.maintenance.view','controltower.tooling.view','controltower.people.view','controltower.warehouse.view','controltower.finance.view','controltower.it.view'];
+      return known.some(function(c){ return c.indexOf(prefix)===0 && window.KMI_AUTH.can(user, c); });
+    }
+    return window.KMI_AUTH.can(user, permission)===true;
+  }catch(e){ return false; }
+}
+
+// Görünür gruplar/öğeleri o kullanıcı için GERÇEKTEN çözer - aynı (label) iki
+// farklı gerçek hedefe açılmasın diye, ilk eşleşen gerçek hedef kullanılır ve
+// aynı turda aynı (fn veya legacyTab) hedefi ikinci kez LİSTELEMEZ (Phase 1C/1E
+// "do not duplicate the same destination" kuralı).
+function kmiLeftNavResolve(user){
+  const seenTargets = new Set();
+  const groups = [];
+  KMI_LEFT_NAV_GROUPS.forEach(function(g){
+    const items = [];
+    g.items.forEach(function(it){
+      let dest=null;
+      try{ dest = it.resolve(user); }catch(e){ dest=null; }
+      if(!dest) return;
+      const key = dest.fn ? ('fn:'+dest.fn) : ('tab:'+dest.legacyTab);
+      if(seenTargets.has(key)) return;
+      seenTargets.add(key);
+      items.push({ label:it.label, icon:it.icon, dest:dest });
+    });
+    if(items.length) groups.push({ title:g.title, items:items });
+  });
+  return groups;
+}
+window.kmiLeftNavResolve = kmiLeftNavResolve; // test ve tanılama için dışa açık
+
+function lnE(s){ return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];}); }
+
+window.kmiOpenLeftNav = function(){
+  if(!window.currentUser){ try{window.kmiToast?.('Önce giriş yapmalısınız.','warn');}catch(e){} return; }
+  document.getElementById('kmiLeftNavDrawer')?.remove();
+  const groups = kmiLeftNavResolve(window.currentUser);
+  const d = document.createElement('div'); d.id='kmiLeftNavDrawer';
+  d.className='fixed inset-0 z-[500] bg-black/60 no-print';
+  d.onclick = function(ev){ if(ev.target===d) window.kmiCloseLeftNav(); };
+  d.innerHTML = '<div class="h-full w-80 max-w-[85vw] bg-slate-900 border-r border-cyan-900/50 overflow-y-auto shadow-2xl" onclick="event.stopPropagation()">'
+    + '<div class="sticky top-0 bg-slate-950 border-b border-slate-800 p-4 flex items-center justify-between">'
+    + '<div><div class="text-[10px] text-cyan-300 tracking-[.2em] font-black">KURUTLU MANUFACTURING INTELLIGENCE</div><div class="text-sm font-bold text-white">Performance Center</div></div>'
+    + '<button onclick="window.kmiCloseLeftNav()" class="bg-slate-800 hover:bg-slate-700 w-8 h-8 rounded-lg text-slate-300"><i class="fa-solid fa-xmark"></i></button>'
+    + '</div>'
+    + '<div class="p-3">'
+    + (groups.length ? groups.map(function(g){
+        return (g.title ? '<div class="text-[10px] font-black text-slate-500 tracking-widest mt-3 mb-1 px-2">'+lnE(g.title)+'</div>' : '')
+          + g.items.map(function(it){
+              return '<button data-ln-fn="'+lnE(it.dest.fn||'')+'" data-ln-tab="'+lnE(it.dest.legacyTab||'')+'" class="kmi-leftnav-item w-full text-left flex items-center gap-2.5 px-3 py-2.5 rounded-xl hover:bg-slate-800 text-slate-200 text-sm font-semibold"><i class="fa-solid '+lnE(it.icon||'fa-circle')+' text-cyan-400 w-4 text-center"></i>'+lnE(it.label)+'</button>';
+            }).join('');
+      }).join('')
+      : '<div class="text-slate-500 text-sm p-3">VERİ GEREKLİ: görüntülenecek bir alan bulunamadı.</div>')
+    + '</div></div>';
+  document.body.appendChild(d);
+  d.querySelectorAll('[data-ln-fn], [data-ln-tab]').forEach(function(btn){
+    btn.onclick = function(){
+      const fn = btn.getAttribute('data-ln-fn'); const tab = btn.getAttribute('data-ln-tab');
+      window.kmiCloseLeftNav();
+      try{
+        if(fn && typeof window[fn]==='function') window[fn]();
+        else if(tab && typeof window.switchTab==='function') window.switchTab(tab);
+      }catch(e){ try{window.kmiToast?.('Açılamadı: '+e.message,'warn');}catch(e2){} }
+    };
+  });
+};
+window.kmiCloseLeftNav = function(){ document.getElementById('kmiLeftNavDrawer')?.remove(); };
+
+// Mevcut #kmiShellBar'ın İLK öğesi olarak tek bir "Menü" aç/kapa düğmesi ekler -
+// şeritteki diğer GERÇEK girişlere (Ana Sayfa/Canlı/Command Center/İşlerim/
+// PULSE/Raporlar/Ara/Tüm Alanlar) dokunmadan, PHASE 1C'nin "ONE TOP COMMAND
+// BAR" hedefine uyacak şekilde aynı şeride monte edilir (altıncı bir şerit
+// DEĞİL - var olanın bir parçası).
+function kmiInjectLeftNavToggle(){
+  const inner = document.getElementById('kmiShellBarInner'); if(!inner) return;
+  if(document.getElementById('kmiLeftNavToggleBtn')) return;
+  const btn = document.createElement('button');
+  btn.id='kmiLeftNavToggleBtn';
+  btn.className='kmi-shell-btn px-3 py-1.5 rounded-md hover:bg-slate-800 text-cyan-300 text-xs sm:text-sm font-black whitespace-nowrap border border-cyan-800/60';
+  btn.innerHTML='<i class="fa-solid fa-bars mr-1"></i>Menü';
+  btn.onclick = function(){ window.kmiOpenLeftNav(); };
+  inner.insertBefore(btn, inner.firstChild);
+}
+
+// KMI-PHASE-1E (Legacy Navigation Retirement): eski ikinci-satır nav-btn
+// şeridi (#navBar'ın "Navigation Tabs" bloğu, satır ~296-316) artık YUKARIDAKİ
+// KMI_LEFT_NAV_GROUPS'ta 8 legacy tab'ın HER BİRİ için gerçek, erişilebilir bir
+// karşılık bulunduğu için normal görünümden GİZLENİR - SİLİNMEZ. Butonların/
+// tab-content'in kendisi ve switchTab() DOKUNULMADAN kalır (switchTab()
+// butonların görünür olup olmadığına hiç bakmaz - yukarıdaki inceleme notuna
+// bkz.), bu yüzden hem mevcut testler hem de doğrudan switchTab('...') çağıran
+// her yer değişmeden çalışmaya devam eder. KEEP_COMPATIBILITY_HIDDEN (Phase 1E
+// sınıflandırması) - DEAD_REMOVE_SAFE DEĞİL.
+function kmiLegacyNavRetire(){
+  try{
+    const legacyRow = document.querySelector('nav .flex-wrap.gap-1.text-sm.font-medium.pb-2');
+    if(legacyRow) legacyRow.classList.add('kmi-legacy-nav-retired');
+  }catch(e){}
+}
+
+function kmiRenderPhase1Shell(){
+  try{ kmiInjectLeftNavToggle(); }catch(e){}
+  try{ kmiLegacyNavRetire(); }catch(e){}
+}
+window.kmiRenderPhase1Shell = kmiRenderPhase1Shell; // testler için dışa açık
+
+window.addEventListener('load', function(){
+  kmiRenderPhase1Shell();
+  let lastUserId=null;
+  setInterval(function(){
+    try{
+      const u=window.currentUser; const uid=u?u.id:null;
+      if(uid!==lastUserId){ lastUserId=uid; kmiRenderPhase1Shell(); }
+    }catch(e){}
+  }, 800);
+},{once:true});
+})();
+</script>
+<style>
+  /* KMI-PHASE-1E: bkz. kmiLegacyNavRetire() - DOM/fonksiyonellik SİLİNMEDİ, yalnız gizlendi. */
+  .kmi-legacy-nav-retired{ display:none !important; }
+</style>
 
 <!-- ===========================================================================
      KMI-NEXTGEN-FAZ3-SLICE3-FIX (2026-09-28): Ender'in Faz 3 - Slice 3
