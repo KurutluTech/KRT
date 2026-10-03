@@ -17,9 +17,9 @@
          `git blame`/diffs on this file quiet between releases and avoid a
          commit-hash feedback loop (the source commit's SHA cannot depend on
          a value computed from that same SHA). See docs/KMI_DEPLOY_ID.md. -->
-    <meta name="kmi-source-commit" content="3bccd6a0fc8ad4924c63693b2ccd877ada75c3de">
-    <meta name="kmi-build-id" content="3bccd6a0fc8a-20261003T083928Z">
-    <meta name="kmi-built-at" content="2026-10-03T08:39:28.822Z">
+    <meta name="kmi-source-commit" content="d621c973ce1123da3426bdbe8e7fc546331001f1">
+    <meta name="kmi-build-id" content="d621c973ce11-20261003T094506Z">
+    <meta name="kmi-built-at" content="2026-10-03T09:45:06.519Z">
     <script>
       // Derived from the meta tags above at runtime, so there is exactly one
       // place (the meta tags) where the build script substitutes real
@@ -264,7 +264,11 @@ ead>
                      flex-wrap ile alt satıra düşüp SOLA yapışıyordu. Üst satırı (logo+
                      kullanıcı) sekmelerden ayırdık - kullanıcı bloğu artık her koşulda
                      sağ üstte, küçültülmüş halde sabit kalıyor. -->
-                <div class="flex items-center justify-between min-h-12 py-1.5 gap-2">
+                <!-- KMI-PHASE-1-R3: bu satırın kimliği, kmiLegacyNavRetire() tarafından
+                     (aşağıdaki Navigation Tabs satırına ek olarak) gizleniyor; GERÇEK karşılığı
+                     artık #kmiShellBar'ın kendisi (marka+arama+KMI LIVE+PULSE+saat+kullanıcı+
+                     Çıkış - hepsi taşındı, "önce taşı sonra gizle" FIX1 kuralı). -->
+                <div id="kmiLegacyTopIdRow" class="flex items-center justify-between min-h-12 py-1.5 gap-2">
                     <div class="flex items-center space-x-2 min-w-0">
                         <img src="assets/kurutlu-k-symbol.png" alt="Kurutlu" class="kurutlu-brand-icon shrink-0">
                         <span class="font-bold text-sm sm:text-base tracking-wide text-white truncate">KURUTLU <span class="text-cyan-300">MANUFACTURING INTELLIGENCE</span></span>
@@ -280,9 +284,14 @@ ead>
                         <!-- KMI-FIX (2026-09-26): Ender'in isteği - sistemde fabrikanın bulunduğu yerle
                              (Türkiye/İstanbul, UTC+3) uyumlu, her zaman görünür bir sistem saati. Tüm
                              mühür/damga (kimin/ne zaman girdiği) bu saatten üretilir. -->
+                        <!-- KMI-PHASE-1-R3 (2026-10-03): bu satırın tamamı artık gizli (bkz.
+                             .kmi-legacy-topid-retired, aşağıdaki <style>) - gerçek, canlı saat
+                             #kmiShellBar'ın kullanıcı bölümüne taşındı (AYNI id'ler orada, bu
+                             yüzden bu span'lar duplicate id çakışmasını önlemek için "Legacy"
+                             son ekiyle yeniden adlandırıldı; hiçbir JS artık bunları okumuyor). -->
                         <div id="kmiFactoryClock" class="hidden md:flex flex-col items-end leading-tight bg-slate-900/70 border border-slate-700 rounded-lg px-2.5 py-1" title="Fabrika sistem saati (Türkiye/İstanbul)">
-                            <span id="kmiFactoryClockTime" class="text-xs font-black text-cyan-300 font-mono">--:--:--</span>
-                            <span id="kmiFactoryClockDate" class="text-[8px] text-slate-500 uppercase">-</span>
+                            <span id="kmiFactoryClockTimeLegacy" class="text-xs font-black text-cyan-300 font-mono">--:--:--</span>
+                            <span id="kmiFactoryClockDateLegacy" class="text-[8px] text-slate-500 uppercase">-</span>
                         </div>
                         <div class="text-right hidden sm:block leading-tight">
                             <div id="currentUserDisplay" class="text-[11px] font-bold text-white">-</div>
@@ -8417,7 +8426,7 @@ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',
 setTimeout(unlock,0);setTimeout(unlock,250);
 })();
 </script>
-\n<script id="v98-authoritative-supabase-workflow">
+<script id="v98-authoritative-supabase-workflow">
 // ===== KURUTLU V98 · AUTHORITATIVE SUPABASE WORKFLOW =====
 (function(){
 'use strict';
@@ -8497,7 +8506,7 @@ window.addEventListener('kurutlu:supabase-identity',()=>setTimeout(async()=>{try
 document.addEventListener('click',e=>{if(e.target.closest?.('[data-module-button="workorders"],[data-module-button="approvals"]'))setTimeout(()=>load(true),50)},true);
 setTimeout(()=>{if(window.KURUTLU_SUPABASE?.user)load(true)},1200);
 })();
-// ===== /V98 =====</script>\n
+// ===== /V98 =====</script>
 <script>
 // ===== V113 · PO management approval reliability + manager edit/note =====
 (function(){
@@ -19359,141 +19368,405 @@ window.kmiOpenCommandCenter = function(){
   }catch(e){ shToast('Command Center açılamadı: '+e.message); }
 };
 
-// --- ANA SAYFA: Role Workspace - SADECE gerçek, mevcut kaynaklardan veri; uydurma yok ---
+// ===========================================================================
+// KMI-PHASE-1-R3 (2026-10-03, owner "PHASE 1 + PHASE 2 VISUAL IMPLEMENTATION
+// CONTRACT" / Reference B, section C): Ana Sayfa, R2'deki merkezlenmiş modal
+// yerine artık GERÇEK bir sayfa (diğer switchTab() hedefleriyle AYNI .tab-content
+// mekanizması - bkz. #tab-performance-center aşağıda). Modal YOK, arkasında eski
+// Admin sayfası YOK (switchTab'ın zaten yaptığı .tab-content gizleme aynen
+// kullanılıyor - ikinci bir "gizleme" motoru İCAT EDİLMEDİ). Her blok (C1-C8)
+// SADECE gerçek, var olan canonical fonksiyon/veriden okur; hesaplanamayan her
+// alan dürüstçe "VERİ GEREKLİ" gösterir - mockup sayı UYDURULMADI.
+// ---------------------------------------------------------------------------
+
+function asTimeAgo(iso){
+  try{
+    const ms=Date.now()-new Date(iso).getTime();
+    if(!(ms>=0)) return '';
+    const min=Math.floor(ms/60000);
+    if(min<1) return 'az önce';
+    if(min<60) return min+' dk önce';
+    const h=Math.floor(min/60);
+    if(h<24) return h+' sa önce';
+    return Math.floor(h/24)+' gün önce';
+  }catch(e){ return ''; }
+}
+
+// --- C1: Karşılama + vardiya + hızlı işlemler ---
+function asRenderHeader(u){
+  const h=new Date().getHours();
+  const greet = h<12 ? 'Günaydın' : (h<18 ? 'İyi günler' : 'İyi akşamlar');
+  let shiftHtml='';
+  try{
+    const p=(typeof PERSONNEL_LIST!=='undefined'?PERSONNEL_LIST:[]).find(function(x){ return Number(x.id)===Number(u.id||u.personnelId||u.personId); });
+    const sh=(typeof window.kmiResolveShift==='function') ? window.kmiResolveShift(p||u) : {label:'VERİ GEREKLİ'};
+    shiftHtml = '<div class="bg-slate-800/60 border border-slate-700 rounded-lg px-3 py-2 text-xs text-slate-300 flex items-center gap-2"><i class="fa-solid fa-clock text-amber-300"></i>'+asE(sh.label)+'</div>';
+  }catch(e){ shiftHtml='<div class="bg-slate-800/60 border border-slate-700 rounded-lg px-3 py-2 text-xs text-slate-500">Vardiya: VERİ GEREKLİ</div>'; }
+  // Hızlı İşlemler - R2'nin "quick" dizisiyle AYNI gerçek hedefler, yeni bir eylem İCAT EDİLMEDİ.
+  const quick=[['Canlı','kmiOpenCanli','fa-satellite-dish'],['Command Center','kmiOpenCommandCenter','fa-table-list'],['İşlerim','kmiOpenTaskFloor','fa-list-check'],['Yeni Görev','kmiOpenTaskCreate','fa-plus'],['Raporlar','kmiOpenReporting','fa-chart-line'],['Tüm Alanlar','kmiOpenTumAlanlar','fa-table-cells-large']]
+    .filter(function(q){ return typeof window[q[1]]==='function'; });
+  return '<div class="flex flex-wrap items-center justify-between gap-3 mb-5">'
+    + '<div><h1 class="text-2xl sm:text-3xl font-black text-white">'+asE(greet)+' <span class="text-cyan-300">'+asE((u.name||'').split(' ')[0]||u.name||'')+'</span></h1>'
+    + '<div class="text-xs sm:text-sm text-slate-400 mt-1">Kurutlu Manufacturing Intelligence · Üretim Performans Merkezi</div></div>'
+    + '<div class="flex items-center gap-2">'+shiftHtml
+    + '<div class="relative" id="asQuickWrap"><button id="asQuickBtn" class="bg-cyan-600 hover:bg-cyan-500 text-white font-black text-xs sm:text-sm px-4 py-2.5 rounded-xl flex items-center gap-2"><i class="fa-solid fa-bolt"></i>Hızlı İşlemler<i class="fa-solid fa-chevron-down text-[10px]"></i></button>'
+    + '<div id="asQuickMenu" class="hidden absolute right-0 mt-1 bg-slate-900 border border-slate-700 rounded-xl p-1.5 w-48 z-20 shadow-2xl">'
+    + quick.map(function(q){ return '<button data-as-fn="'+asE(q[1])+'" class="w-full text-left px-3 py-2 rounded-lg hover:bg-slate-800 text-xs font-bold text-slate-200 flex items-center gap-2"><i class="fa-solid '+asE(q[2])+' text-cyan-300 w-4"></i>'+asE(q[0])+'</button>'; }).join('')
+    + '</div></div></div></div>';
+}
+
+// --- C2: Altı KPI şeridi - R1/R2'nin pulseGrid'iyle AYNI gerçek sayım
+//     (activeOrders/activeWOs/board/declarations), yalnızca Reference B'nin
+//     altı kutu biçimine (bazıları pay/toplam) taşındı. İkinci bir tanım yok.
+function asComputeKpis(){
+  const out={};
+  try{
+    const st = (window.V118_STATE && Array.isArray(window.V118_STATE.orders)) ? window.V118_STATE : (typeof core === 'function' ? core() : {orders:[]});
+    out.activeOrders = (st.orders||[]).filter(function(o){ return !['PAID','CANCELLED'].includes(o.status); }).length;
+  }catch(e){ out.activeOrders=null; }
+  try{
+    const jos = (Array.isArray(window.jobOrders) ? window.jobOrders : []);
+    out.activeWOs = jos.filter(function(j){ return !j.deleted && !['Silindi','Kapalı','Tamamlandı','COMPLETED','CANCELLED'].includes(String(j.status||'')); }).length;
+  }catch(e){ out.activeWOs=null; }
+  try{
+    const board = (typeof kmiMachineBoard === 'function') ? kmiMachineBoard() : [];
+    out.machinesTotal = board.length;
+    out.machinesRunning = board.filter(function(mb){ return mb.status==='RUNNING'; }).length;
+  }catch(e){ out.machinesTotal=null; out.machinesRunning=null; }
+  try{
+    const ds = (typeof declarations !== 'undefined' && Array.isArray(declarations)) ? declarations : [];
+    out.qualityWaiting = ds.filter(function(d){ return d.status==='Kalite Bekliyor'; }).length;
+    out.shipReady = ds.filter(function(d){ return d.status==='Sevk Onayı Bekliyor'; }).length;
+  }catch(e){ out.qualityWaiting=null; out.shipReady=null; }
+  try{
+    // "Sahadaki Operatör": şu an GERÇEKTEN bir üretim session'ı açık olan farklı
+    // operatör sayısı / üretim rolündeki toplam aktif personel. "İzinli" (devamsızlık)
+    // bilgisi KMI'da ayrı bir canonical kaynağa sahip değil - bu yüzden referansın
+    // "2 izinli" alt-metni burada gösterilmiyor (uydurulmadı, dürüstçe atlandı).
+    const running=(typeof window.kmiMachinesRunningNow==='function') ? window.kmiMachinesRunningNow() : [];
+    const onFloor=new Set(running.map(function(s){ return s.operator; }).filter(Boolean)).size;
+    const roster=(typeof PERSONNEL_LIST!=='undefined'?PERSONNEL_LIST:[]).filter(function(p){
+      return p && p.active!==false && /OPERATOR|OPERATÖR|URETIM|ÜRETİM|CNC|BAKIM|MAINTENANCE/.test(String((p.role||'')+' '+(p.job||'')+' '+(p.department||'')).toUpperCase());
+    }).length;
+    out.operatorsOnFloor=onFloor; out.operatorsTotal=roster||null;
+  }catch(e){ out.operatorsOnFloor=null; out.operatorsTotal=null; }
+  return out;
+}
+function asTile(label,valHtml,sub,icon){
+  return '<div class="bg-slate-900 border border-slate-700 rounded-xl p-3"><div class="flex items-center justify-between"><div class="text-[10px] text-slate-500 uppercase font-bold tracking-wide">'+asE(label)+'</div><i class="fa-solid '+asE(icon)+' text-slate-600 text-xs"></i></div><div class="text-xl sm:text-2xl font-black text-white mt-1">'+valHtml+'</div>'+(sub?'<div class="text-[10px] text-slate-500 mt-0.5">'+sub+'</div>':'')+'</div>';
+}
+function asRenderKpiStrip(k){
+  const vg='<span class="text-slate-600 text-sm">VERİ GEREKLİ</span>';
+  const pct = (k.machinesTotal&&k.machinesRunning!=null) ? Math.round(k.machinesRunning/Math.max(1,k.machinesTotal)*100) : null;
+  return '<div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 mb-5">'
+    + asTile('Aktif Sipariş', k.activeOrders!=null?asE(k.activeOrders):vg, '', 'fa-file-invoice')
+    + asTile('Üretimde İş Emri', k.activeWOs!=null?asE(k.activeWOs):vg, '', 'fa-industry')
+    + asTile('Çalışan Makine', k.machinesTotal!=null?asE(k.machinesRunning)+' <span class="text-slate-500 text-sm">/ '+asE(k.machinesTotal)+'</span>':vg, pct!=null?('%'+pct):'', 'fa-gauge')
+    + asTile('Sahadaki Operatör', (k.operatorsOnFloor!=null)?asE(k.operatorsOnFloor)+(k.operatorsTotal?' <span class="text-slate-500 text-sm">/ '+asE(k.operatorsTotal)+'</span>':''):vg, '', 'fa-user-helmet-safety')
+    + asTile('Kalite Bekleyen', k.qualityWaiting!=null?asE(k.qualityWaiting):vg, '', 'fa-shield-halved')
+    + asTile('Sevkiyata Hazır', k.shipReady!=null?asE(k.shipReady):vg, '', 'fa-truck-fast')
+    + '</div>';
+}
+
+// --- C3: Home Live Floor özeti - kmiMachineBoard()/kmiMachinesRunningNow()'ın
+//     AYNI gerçek verisi, yoğun kart biçiminde. "Tümünü Gör" -> gerçek Live Floor.
+function asMachineStateChip(status){
+  const map={RUNNING:['ÜRETİMDE','bg-emerald-950/50 border-emerald-700 text-emerald-300'],PAUSED:['BEKLEMEDE','bg-amber-950/50 border-amber-700 text-amber-300'],DOWN:['ARIZA','bg-red-950/50 border-red-700 text-red-300'],MAINTENANCE:['BAKIM','bg-blue-950/40 border-blue-800 text-blue-300'],HOLD:['HOLD','bg-violet-950/40 border-violet-700 text-violet-300'],ISSUE:['ARIZA','bg-red-950/50 border-red-700 text-red-300'],IDLE:['BOŞTA','bg-slate-800 border-slate-700 text-slate-400']};
+  const m=map[status]||['BOŞTA','bg-slate-800 border-slate-700 text-slate-400'];
+  return '<span class="text-[9px] font-black px-1.5 py-0.5 rounded border '+m[1]+'">'+m[0]+'</span>';
+}
+function asRenderLiveFloorSummary(){
+  let board=[], running=[];
+  try{ board=(typeof kmiMachineBoard==='function')?kmiMachineBoard():[]; }catch(e){}
+  try{ running=(typeof window.kmiMachinesRunningNow==='function')?window.kmiMachinesRunningNow():[]; }catch(e){}
+  const byMachine={}; running.forEach(function(s){ if(s&&s.machine) byMachine[s.machine]=s; });
+  // window.jobOrders zaten var olan, başka her yerde (kmiOpenLive, Task Floor) okunan
+  // AYNI global dizi - ikinci bir "iş emri" kaynağı İCAT EDİLMEDİ.
+  const jobsArr = Array.isArray(window.jobOrders) ? window.jobOrders : [];
+  const cards=board.slice(0,8).map(function(m){
+    const sess=byMachine[m.name];
+    const j = sess ? jobsArr.find(function(x){ return String(x.id)===String(sess.jobId); }) : null;
+    const pct = (j&&j.targetQty) ? Math.min(100,Math.round(Number(j.completedQty||0)/Number(j.targetQty)*100)) : null;
+    const runMin = (sess&&sess.startedAt) ? Math.max(0,Math.round((Date.now()-new Date(sess.startedAt).getTime())/60000)) : null;
+    const runtime = runMin!=null ? (runMin>=60?Math.floor(runMin/60)+' sa '+(runMin%60)+' dk':runMin+' dk') : '—';
+    return '<div class="bg-slate-900 border border-slate-700 rounded-xl p-3">'
+      + '<div class="flex items-center justify-between mb-1"><b class="text-sm text-white">'+asE(m.code||'')+'</b>'+asMachineStateChip(m.status)+'</div>'
+      + '<div class="text-[10px] text-slate-500 truncate mb-1.5">'+asE((m.name||'').replace(m.code+' - ',''))+'</div>'
+      + (sess ? ('<div class="text-[11px] text-slate-300 truncate"><i class="fa-solid fa-user text-cyan-400 mr-1"></i>'+asE(sess.operator||'-')+'</div>'
+          + '<div class="text-[11px] text-slate-400 truncate">'+asE(j?(j.item||j.productId||''):'')+'</div>'
+          + (pct!=null ? ('<div class="w-full h-1.5 bg-slate-800 rounded-full overflow-hidden mt-1.5"><div class="h-full bg-emerald-500" style="width:'+pct+'%"></div></div><div class="text-[9px] text-slate-500 mt-0.5">'+asE(Number(j.completedQty||0))+' / '+asE(Number(j.targetQty||0))+' · '+runtime+'</div>') : '<div class="text-[9px] text-slate-500 mt-1">'+runtime+'</div>'))
+        : '<div class="text-[10px] text-slate-600 italic">Boşta</div>')
+      + '</div>';
+  }).join('') || '<div class="col-span-full text-center text-slate-500 text-xs py-6">VERİ GEREKLİ: makine panosu okunamadı.</div>';
+  return '<div class="bg-slate-900/60 border border-slate-800 rounded-2xl p-4">'
+    + '<div class="flex items-center justify-between mb-3"><div class="flex items-center gap-2"><span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span><b class="text-sm text-white">Live Floor · Canlı Üretim</b></div>'
+    + (typeof window.kmiOpenShopFloorLive==='function' ? '<button data-as-fn="kmiOpenShopFloorLive" class="text-[11px] text-cyan-300 hover:text-cyan-200 font-bold">Tümünü Gör →</button>' : '')
+    + '</div><div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">' + cards + '</div></div>';
+}
+
+// --- C4: Canlı Operatörler - PERSONNEL_LIST + kmiMachinesRunningNow() +
+//     kmiResolveShift() + kmiTasksRaw() üzerinden, her biri GERÇEK bir sinyal.
+//     Hiçbir "online/oturum açık" bilgisi UYDURULMADI - böyle bir canonical
+//     kaynak yok, bu yüzden MAKİNEDE/VARDİYADA/GÖREVDE'nin hiçbiri tutmazsa
+//     dürüstçe "VERİ YOK" gösterilir.
+function asRenderOperators(){
+  let roster=[]; try{ roster=(typeof PERSONNEL_LIST!=='undefined'?PERSONNEL_LIST:[]).filter(function(p){ return p&&p.active!==false; }); }catch(e){}
+  let running=[]; try{ running=(typeof window.kmiMachinesRunningNow==='function')?window.kmiMachinesRunningNow():[]; }catch(e){}
+  const runningByName={}; running.forEach(function(s){ if(s&&s.operator) runningByName[s.operator]=s.machine; });
+  let tasks=[]; try{ tasks=(typeof kmiTasksRaw==='function')?kmiTasksRaw():[]; }catch(e){}
+  const rows=roster.filter(function(p){
+    return /OPERATOR|OPERATÖR|URETIM|ÜRETİM|CNC|BAKIM|MAINTENANCE/.test(String((p.role||'')+' '+(p.job||'')+' '+(p.department||'')).toUpperCase());
+  }).slice(0,10).map(function(p){
+    let state='VERİ YOK', cls='text-slate-500', detail='';
+    if(runningByName[p.name]){ state='MAKİNEDE'; cls='text-emerald-300'; detail=runningByName[p.name]; }
+    else if(tasks.some(function(t){ return Number(t.assigneeId)===Number(p.id)&&t.status==='ACTIVE'; })){ state='GÖREVDE'; cls='text-cyan-300'; }
+    else { try{ const sh=window.kmiResolveShift(p); if(sh&&sh.assigned){ state='VARDİYADA'; cls='text-amber-300'; detail=sh.label; } }catch(e){} }
+    return '<div class="flex items-center justify-between gap-2 py-1.5 border-b border-slate-800/70 last:border-0">'
+      + '<div class="min-w-0"><div class="text-xs font-bold text-white truncate">'+asE(p.name||'-')+'</div><div class="text-[9px] text-slate-500 truncate">'+asE(p.dept||p.department||'-')+'</div></div>'
+      + '<div class="text-right shrink-0"><span class="text-[9px] font-black '+cls+'">'+state+'</span>'+(detail?'<div class="text-[9px] text-slate-500">'+asE(detail)+'</div>':'')+'</div></div>';
+  }).join('') || '<div class="text-slate-500 text-xs py-4 text-center">VERİ GEREKLİ: personel listesi okunamadı.</div>';
+  return '<div class="bg-slate-900/60 border border-slate-800 rounded-2xl p-4 h-full">'
+    + '<div class="flex items-center justify-between mb-2"><b class="text-sm text-white">Canlı Operatörler</b>'
+    + (typeof window.kmiOpenPeopleTalent==='function' ? '<button data-as-fn="kmiOpenPeopleTalent" class="text-[11px] text-cyan-300 hover:text-cyan-200 font-bold">Tümünü Gör →</button>' : '')
+    + '</div>' + rows + '</div>';
+}
+
+// --- C5: PULSE · Kritik Durumlar - window.KMI_PULSE.listIncidents() AYNI kaynak. ---
+function asRenderPulse(u){
+  let rows=[]; try{ rows=(window.KMI_PULSE&&typeof window.KMI_PULSE.listIncidents==='function') ? window.KMI_PULSE.listIncidents(u).filter(function(i){ return i.status==='OPEN'||i.status==='ACKNOWLEDGED'||i.status==='ESCALATED'; }) : []; }catch(e){}
+  const sevCls={CRITICAL:'text-red-300',HIGH:'text-amber-300',NORMAL:'text-slate-400'};
+  const body = rows.length ? rows.slice(0,5).map(function(i){
+    return '<div class="py-1.5 border-b border-slate-800/70 last:border-0"><div class="flex items-center justify-between gap-2"><b class="text-xs '+(sevCls[i.severity]||'text-slate-300')+'">'+asE(i.title||i.ruleName||'-')+'</b><span class="text-[9px] text-slate-500 shrink-0">'+asTimeAgo(i.openedAt)+'</span></div><div class="text-[9px] text-slate-500">'+asE(i.status)+'</div></div>';
+  }).join('') : '<div class="text-slate-500 text-xs py-4 text-center">Açık kritik durum yok.</div>';
+  return '<div class="bg-slate-900/60 border border-slate-800 rounded-2xl p-4">'
+    + '<div class="flex items-center justify-between mb-2"><b class="text-sm text-white">PULSE · Kritik Durumlar</b>'
+    + (typeof window.kmiOpenPulse==='function' ? '<button data-as-fn="kmiOpenPulse" class="text-[11px] text-cyan-300 hover:text-cyan-200 font-bold">Tümünü Gör →</button>' : '')
+    + '</div>' + body + '</div>';
+}
+
+// --- C6: Task Floor · Görevlerim - kmiTasksRaw() AYNI kaynak (kmiOpenTaskFloor'un
+//     kendi kullandığı). ---
+function asRenderTaskFloor(u){
+  let rows=[]; try{ rows=(typeof kmiTasksRaw==='function')?kmiTasksRaw():[]; }catch(e){}
+  const mgr = (function(){ try{ return window.KMI_AUTH.can(u,'MANAGEMENT')===true; }catch(e){ return false; } })();
+  const mine = mgr ? rows : rows.filter(function(t){ return Number(t.assigneeId)===Number(u.id); });
+  const open = mine.filter(function(t){ return t.status!=='COMPLETED'; }).sort(function(a,b){ return String(a.dueAt||'9999').localeCompare(String(b.dueAt||'9999')); }).slice(0,6);
+  const body = open.length ? '<table class="w-full text-[11px]"><thead class="text-slate-500"><tr><th class="text-left font-bold pb-1">Görev</th><th class="text-left font-bold pb-1">Öncelik</th><th class="text-left font-bold pb-1">Termin</th><th class="text-left font-bold pb-1">Durum</th></tr></thead><tbody>'
+    + open.map(function(t){ return '<tr class="border-t border-slate-800/70"><td class="py-1.5 font-bold text-white truncate max-w-[160px]">'+asE(t.title||'-')+'</td><td class="py-1.5 text-slate-400">'+asE(t.priority||'NORMAL')+'</td><td class="py-1.5 text-slate-400">'+(t.dueAt?new Date(t.dueAt).toLocaleDateString('tr-TR'):'—')+'</td><td class="py-1.5 text-slate-400">'+asE(t.status||'-')+'</td></tr>'; }).join('')
+    + '</tbody></table>' : '<div class="text-slate-500 text-xs py-4 text-center">Açık görev yok.</div>';
+  return '<div class="bg-slate-900/60 border border-slate-800 rounded-2xl p-4">'
+    + '<div class="flex items-center justify-between mb-2"><b class="text-sm text-white">Task Floor · '+(mgr?'Görevler':'Görevlerim')+'</b>'
+    + (typeof window.kmiOpenTaskFloor==='function' ? '<button data-as-fn="kmiOpenTaskFloor" class="text-[11px] text-cyan-300 hover:text-cyan-200 font-bold">Tümünü Gör →</button>' : '')
+    + '</div>' + body + '</div>';
+}
+
+// --- C7: Bugünün Performansı - sadece GERÇEKTEN hesaplanabilen metrikler
+//     (kmiOpenLive'ın bugünkü üretim/hurda hesabıyla AYNI); hedef vs gerçekleşen
+//     ve OTIF için fabrika-geneli tek bir canonical kaynak bulunamadı - Section
+//     C7'nin kendi kuralına göre ("omit it or VERİ GEREKLİ") atlanıyor/işaretleniyor.
+function asRenderTodayPerf(k){
+  let todayQty=null, scrap=null;
+  try{
+    const ds=(typeof declarations!=='undefined'&&Array.isArray(declarations))?declarations:[];
+    const today=new Date().toISOString().slice(0,10);
+    const todayRows=ds.filter(function(d){ return (typeof kmiDeclDateKey==='function'?kmiDeclDateKey(d):String(d.date||'').slice(0,10))===today; });
+    todayQty=todayRows.reduce(function(a,d){ return a+Math.max(0,Number(d.qty)||0); },0);
+    scrap=todayRows.reduce(function(a,d){ return a+Math.max(0,Number(d.qualityScrap!=null?d.qualityScrap:d.scrap)||0); },0);
+  }catch(e){}
+  const scrapPct = (todayQty!=null && todayQty+((scrap||0))>0) ? ((scrap||0)/(todayQty+(scrap||0))*100).toFixed(1) : null;
+  const util = (k.machinesTotal&&k.machinesRunning!=null) ? Math.round(k.machinesRunning/Math.max(1,k.machinesTotal)*100) : null;
+  const vg='<span class="text-slate-600">VERİ GEREKLİ</span>';
+  return '<div class="bg-slate-900/60 border border-slate-800 rounded-2xl p-4">'
+    + '<b class="text-sm text-white">Bugünün Performansı</b>'
+    + '<div class="grid grid-cols-3 gap-2 mt-3 text-center">'
+    + '<div><div class="text-lg font-black text-cyan-300">'+(todayQty!=null?asE(todayQty):vg)+'</div><div class="text-[9px] text-slate-500">ÜRETİM ADEDİ</div></div>'
+    + '<div><div class="text-lg font-black '+(scrapPct!=null?'text-amber-300':'text-slate-600')+'">'+(scrapPct!=null?('%'+scrapPct):vg)+'</div><div class="text-[9px] text-slate-500">HURDA ORANI</div></div>'
+    + '<div><div class="text-lg font-black text-emerald-300">'+(util!=null?('%'+util):vg)+'</div><div class="text-[9px] text-slate-500">MAKİNE KULLANIMI</div></div>'
+    + '</div><div class="text-[9px] text-slate-600 mt-2">Zamanında teslim (OTIF): VERİ GEREKLİ - fabrika-geneli canonical bir kaynak henüz yok.</div></div>';
+}
+
+// --- C8: Yaklaşanlar - orders'ın GERÇEK dueDate'i (riskOrders ile aynı pencere)
+//     + kmiTasksRaw()'ın GERÇEK dueAt'i birleştirilip tarihe göre sıralanır.
+//     Yeni bir takvim/etkinlik motoru İCAT EDİLMEDİ, sadece var olan iki gerçek
+//     tarih alanı bir arada listelendi.
+function asRenderUpcoming(){
+  const items=[];
+  try{
+    const st=(window.V118_STATE&&Array.isArray(window.V118_STATE.orders))?window.V118_STATE:(typeof core==='function'?core():{orders:[]});
+    (st.orders||[]).filter(function(o){ return !['PAID','CANCELLED','SHIPPED'].includes(o.status) && o.dueDate; }).forEach(function(o){
+      const dd=(new Date(o.dueDate)-Date.now())/86400000;
+      if(dd<=7) items.push({at:o.dueDate, label:'Sevkiyat/Termin · '+(o.customer||o.id||'Sipariş'), kind:'Sipariş'});
+    });
+  }catch(e){}
+  try{
+    const tasks=(typeof kmiTasksRaw==='function')?kmiTasksRaw():[];
+    tasks.filter(function(t){ return t.dueAt && t.status!=='COMPLETED'; }).forEach(function(t){
+      const dd=(new Date(t.dueAt)-Date.now())/86400000;
+      if(dd<=7) items.push({at:t.dueAt, label:t.title||'Görev', kind:'Görev'});
+    });
+  }catch(e){}
+  items.sort(function(a,b){ return String(a.at).localeCompare(String(b.at)); });
+  const body = items.length ? items.slice(0,6).map(function(it){
+    const d=new Date(it.at);
+    return '<div class="flex items-center gap-2 py-1.5 border-b border-slate-800/70 last:border-0"><div class="text-[10px] font-black text-cyan-300 w-12 shrink-0">'+(isNaN(d)?'—':d.toLocaleDateString('tr-TR',{day:'2-digit',month:'2-digit'}))+'</div><div class="min-w-0"><div class="text-xs text-white truncate">'+asE(it.label)+'</div><div class="text-[9px] text-slate-500">'+asE(it.kind)+'</div></div></div>';
+  }).join('') : '<div class="text-slate-500 text-xs py-4 text-center">Önümüzdeki 7 gün için bilinen bir yükümlülük yok.</div>';
+  return '<div class="bg-slate-900/60 border border-slate-800 rounded-2xl p-4"><b class="text-sm text-white">Yaklaşanlar</b><div class="mt-2">'+body+'</div></div>';
+}
+
+// --- ANA SAYFA: gerçek sayfa (modal değil), diğer tüm .tab-content ile AYNI
+//     switchTab mekanizmasıyla gösterilir/gizlenir - arkada eski Admin sayfası
+//     KALMAZ (switchTab zaten TÜM .tab-content'lerden 'active' kaldırıyor).
 window.kmiOpenAnaSayfa = function(){
-  document.getElementById('kmiAnaSayfaModal')?.remove();
-  const m=document.createElement('div'); m.id='kmiAnaSayfaModal';
-  m.className='fixed inset-0 z-[296] bg-black/70 flex items-start justify-center p-4 overflow-y-auto';
-  m.onclick=function(ev){ if(ev.target===m) m.remove(); };
-  document.body.appendChild(m);
+  const u=window.currentUser; if(!u) return;
+  document.getElementById('kmiAnaSayfaModal')?.remove(); // eski R1/R2 modal artığı varsa temizle
+  document.querySelectorAll('.tab-content').forEach(function(el){ el.classList.remove('active'); });
+  document.querySelectorAll('.nav-btn').forEach(function(el){ el.classList.remove('bg-slate-700','text-blue-400'); });
+  let page=document.getElementById('tab-performance-center');
+  if(!page){
+    page=document.createElement('div'); page.id='tab-performance-center'; page.className='tab-content';
+    const mainSys=document.getElementById('mainSystem');
+    (mainSys||document.body).appendChild(page);
+  }
+  page.classList.add('active');
+  const pt=document.getElementById('pageTitle'); if(pt) pt.innerText='Performance Center';
   window.kmiRenderAnaSayfa();
 };
 
 window.kmiRenderAnaSayfa = function(){
-  const m=document.getElementById('kmiAnaSayfaModal'); if(!m) return;
+  const page=document.getElementById('tab-performance-center'); if(!page) return;
   const u=window.currentUser;
-  if(!u){ m.innerHTML='<div class="bg-slate-900 border border-slate-700 rounded-2xl max-w-lg w-full mt-24 mx-auto p-5 text-center text-slate-400">Önce giriş yapmalısınız.</div>'; return; }
-
-  let jobsLine='VERİ GEREKLİ';
-  try{
-    if(window.KMI_CONTEXT && typeof window.KMI_CONTEXT.resolveUserContext==='function'){
-      const ctx=window.KMI_CONTEXT.resolveUserContext(u.id);
-      if(ctx && ctx.found) jobsLine = ctx.activeWorkOrders.length + ' aktif iş emri';
-      else if(ctx) jobsLine = (ctx.missingLinks&&ctx.missingLinks[0]) || 'VERİ GEREKLİ';
-    }
-  }catch(e){ jobsLine='VERİ GEREKLİ (context resolver hata)'; }
-
-  let pulseLine='VERİ GEREKLİ';
-  try{
-    if(window.KMI_PULSE && typeof window.KMI_PULSE.listIncidents==='function'){
-      const rows=window.KMI_PULSE.listIncidents(u).filter(function(i){ return i.status==='OPEN'||i.status==='ACKNOWLEDGED'; });
-      pulseLine = rows.length + ' açık uyarı';
-    }
-  }catch(e){ pulseLine='VERİ GEREKLİ (PULSE erişilemedi)'; }
-
-  const capLabels=[['Yönetim','MANAGEMENT'],['Kalite','QUALITY'],['Depo','warehouse.receive'],['Muhasebe & Finans','finance.customer.view'],['Raporlar','reporting.view'],['PULSE','pulse.view'],['Mobil','mobile.access']]
-    .filter(function(c){ try{ return window.KMI_AUTH.can(u,c[1])===true; }catch(e){ return false; } }).map(function(c){ return c[0]; });
-
-  // KMI-PHASE-1D (2026-10-03, owner directive "FIVE-PHASE REAL PRODUCT
-  // CONVERGENCE PROGRAM"): Ana Sayfa'yı gerçek bir "Performance Center"a
-  // taşıyan ilk dilim - "ŞU AN NE ÇALIŞIYOR / NE BEKLİYOR / NE YANLIŞ"
-  // sorularına GERÇEK, kanonik kaynaklardan saniyeler içinde cevap. Her
-  // sayı, zaten var olan ve başka ekranlarda (canonical kmiOpenLive,
-  // kmiMachineBoard) kullanılan AYNI hesaplamadan okunuyor - yeni bir
-  // ikinci "aktif iş emri" veya "makine durumu" tanımı İCAT EDİLMEDİ.
-  // Okunamayan/hesaplanamayan her satır dürüstçe "VERİ GEREKLİ" gösterir -
-  // uydurma sayı YOK.
-  let pulseGrid = '';
-  try{
-    const st = (window.V118_STATE && Array.isArray(window.V118_STATE.orders)) ? window.V118_STATE : (typeof core === 'function' ? core() : {orders:[]});
-    const activeOrders = (st.orders||[]).filter(function(o){ return !['PAID','CANCELLED'].includes(o.status); }).length;
-    // Aynı "aktif iş emri" tanımı canonical window.kmiOpenLive'ın (src/index.html,
-    // KMI-LIVE-CONSOLIDATION ile tek tanıma indirgenen fonksiyon) kullandığı tanımla
-    // BİREBİR aynı - iki ayrı "aktif WO" sayımı UYDURULMADI.
-    const jos = (Array.isArray(window.jobOrders) ? window.jobOrders : []);
-    const activeWOs = jos.filter(function(j){ return !j.deleted && !['Silindi','Kapalı','Tamamlandı','COMPLETED','CANCELLED'].includes(String(j.status||'')); }).length;
-    const board = (typeof kmiMachineBoard === 'function') ? kmiMachineBoard() : [];
-    const producing = board.filter(function(mb){ return mb.status==='RUNNING'; }).length;
-    const down = board.filter(function(mb){ return mb.condition && mb.condition!=='AVAILABLE'; }).length;
-    const ds = (typeof declarations !== 'undefined' && Array.isArray(declarations)) ? declarations : [];
-    const qualityWaiting = ds.filter(function(d){ return d.status==='Kalite Bekliyor'; }).length;
-    const shipReady = ds.filter(function(d){ return d.status==='Sevk Onayı Bekliyor'; }).length;
-    const tiles = [
-      ['Açık Sipariş', activeOrders], ['Aktif İş Emri', activeWOs],
-      ['Üretimde Makine', producing], ['Makine Down/Bakım', down],
-      ['Kalite Bekliyor', qualityWaiting], ['Sevke Hazır', shipReady],
-    ];
-    pulseGrid = '<div class="mb-4"><div class="text-[10px] text-slate-500 uppercase font-bold mb-2">Fabrika Nabzı · şu an</div><div class="grid grid-cols-3 gap-2">'
-      + tiles.map(function(t){ return '<div class="bg-slate-800/60 border border-slate-700 rounded-xl p-2.5 text-center"><div class="text-xl font-black text-cyan-300">'+asE(t[1])+'</div><div class="text-[9px] text-slate-500 mt-0.5">'+asE(t[0])+'</div></div>'; }).join('')
-      + '</div></div>';
-  }catch(e){
-    pulseGrid = '<div class="mb-4 text-[11px] text-slate-500">Fabrika Nabzı: VERİ GEREKLİ (hesaplanamadı).</div>';
-  }
-
-  const quick=[['CANLI','kmiOpenCanli','fa-satellite-dish'],['COMMAND CENTER','kmiOpenCommandCenter','fa-table-list'],['İŞLERİM','kmiOpenTaskFloor','fa-list-check'],['PULSE','kmiOpenPulse','fa-triangle-exclamation'],['RAPORLAR','kmiOpenReporting','fa-chart-line'],['TÜM ALANLAR','kmiOpenTumAlanlar','fa-table-cells-large']];
-
-  m.innerHTML = '<div class="bg-slate-900 border border-slate-700 rounded-2xl max-w-2xl w-full mt-8 mb-8 mx-auto p-5" onclick="event.stopPropagation()">'
-    + '<div class="flex justify-between items-center mb-4"><div><div class="text-[10px] text-cyan-300 tracking-widest font-black">KURUTLU MANUFACTURING INTELLIGENCE</div><h2 class="text-2xl font-black">🏠 Performance Center</h2><div class="text-xs text-slate-400 mt-1">Rol çalışma alanınız - gerçek verilerinizden derlendi.</div></div>'
-    + '<button onclick="document.getElementById(\'kmiAnaSayfaModal\').remove()" class="bg-slate-800 px-4 py-2 rounded-xl">Kapat</button></div>'
-    + '<div class="bg-slate-800/60 border border-slate-700 rounded-xl p-4 mb-4">'
-    + '<div class="text-lg font-black text-white">' + asE(u.name||'-') + '</div>'
-    + '<div class="text-xs text-slate-400">' + asE(u.dept||u.department||'-') + ' · ' + asE(u.role||'-') + '</div>'
-    + (capLabels.length ? '<div class="flex flex-wrap gap-1 mt-2">' + capLabels.map(function(c){ return '<span class="text-[10px] bg-slate-700 px-2 py-0.5 rounded-full text-slate-300">'+asE(c)+'</span>'; }).join('') + '</div>' : '')
+  if(!u){ page.innerHTML='<div class="text-center text-slate-500 p-16">Önce giriş yapmalısınız.</div>'; return; }
+  const k=asComputeKpis();
+  page.innerHTML = '<div class="max-w-[1800px] mx-auto p-4 sm:p-6">'
+    + asRenderHeader(u)
+    + asRenderKpiStrip(k)
+    + '<div class="grid grid-cols-1 xl:grid-cols-[1fr_360px] gap-4 mb-4">'
+    +   asRenderLiveFloorSummary()
+    +   '<div class="flex flex-col gap-4">' + asRenderOperators() + asRenderPulse(u) + '</div>'
     + '</div>'
-    + pulseGrid
-    + '<div class="grid grid-cols-2 gap-3 mb-4">'
-    + '<div class="bg-slate-800/60 border border-slate-700 rounded-xl p-3"><div class="text-[10px] text-slate-500 uppercase font-bold">İşlerim</div><div class="text-sm font-bold text-white mt-1">' + asE(jobsLine) + '</div></div>'
-    + '<div class="bg-slate-800/60 border border-slate-700 rounded-xl p-3"><div class="text-[10px] text-slate-500 uppercase font-bold">PULSE</div><div class="text-sm font-bold text-white mt-1">' + asE(pulseLine) + '</div></div>'
-    + '</div>'
-    + '<div class="grid grid-cols-2 md:grid-cols-3 gap-2">'
-    + quick.map(function(q){ return '<button data-as-fn="'+asE(q[1])+'" class="bg-slate-800/60 hover:bg-slate-700 border border-slate-700 rounded-xl p-3 text-xs font-bold text-left"><i class="fa-solid '+asE(q[2])+' mr-1 text-cyan-300"></i>'+asE(q[0])+'</button>'; }).join('')
+    + '<div class="grid grid-cols-1 lg:grid-cols-3 gap-4">'
+    +   asRenderTaskFloor(u)
+    +   asRenderTodayPerf(k)
+    +   asRenderUpcoming()
     + '</div></div>';
-  m.querySelectorAll('[data-as-fn]').forEach(function(btn){
-    btn.onclick=function(){ const fn=btn.getAttribute('data-as-fn'); m.remove(); try{ if(typeof window[fn]==='function') window[fn](); }catch(e){} };
+  page.querySelectorAll('[data-as-fn]').forEach(function(btn){
+    btn.onclick=function(){ const fn=btn.getAttribute('data-as-fn'); try{ if(typeof window[fn]==='function') window[fn](); }catch(e){} };
   });
+  const qb=document.getElementById('asQuickBtn'), qm=document.getElementById('asQuickMenu');
+  if(qb&&qm){
+    qb.onclick=function(ev){ ev.stopPropagation(); qm.classList.toggle('hidden'); };
+    document.addEventListener('click',function(){ qm.classList.add('hidden'); });
+  }
 };
 
 // --- Birincil şerit (#kmiShellBar): #mainSystem'in İLK çocuğu olarak eklenir,
 //     her tab/switchTab() çağrısında hayatta kalır (Explorer raporu ile doğrulandı:
 //     switchTab yalnızca .tab-content/.nav-btn class'larını değiştiriyor, #mainSystem'in
 //     kendi çocuk listesine dokunmuyor). ---
+// KMI-PHASE-1-R3 (2026-10-03, owner "PHASE 1 + PHASE 2 VISUAL IMPLEMENTATION
+// CONTRACT", Reference B header "B - GLOBAL TOP HEADER"): önceki R2 şeridi sadece
+// 3 ufak buton taşıyordu; referans tasarım üst şeritte GERÇEK kimlik/marka, geniş
+// bir Universal Search, KMI LIVE, PULSE (gerçek sayı) ve oturum açmış kullanıcıyı
+// (ad/rol/avatar baş harfi) istiyor. Hiçbiri yeni bir "departman navigasyonu"
+// DEĞİL - referansın kendi kuralı ("Do NOT put department navigation in the
+// header") zaten karşılanıyor: aşağıdaki hiçbir öğe KMI_LEFT_NAV_GROUPS'taki bir
+// hedefi TEKRARLAMIYOR (arama bir departman değil, KMI LIVE zaten var olan
+// window.kmiOpenCanli() yönlendiricisi, PULSE/Sorun Bildir zaten R2'den beri
+// buradaydı). BUILD ID burada hiç gösterilmiyor (zaten yalnız <meta> içinde ve
+// gizli eski <nav>'daki #kmiBuildBadge içinde yaşıyor - referansın "Do NOT
+// prominently display full BUILD ID here" kuralı bu yüzden ek değişiklik
+// gerektirmeden karşılanıyor).
 function shBuildBar(){
   if(document.getElementById('kmiShellBar')) return document.getElementById('kmiShellBar');
   const mainSys=document.getElementById('mainSystem'); if(!mainSys) return null;
   const bar=document.createElement('div'); bar.id='kmiShellBar';
   bar.className='bg-slate-950 border-b border-cyan-900/50 sticky top-0 z-50 no-print';
-  bar.innerHTML='<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-1.5 flex flex-wrap items-center gap-1" id="kmiShellBarInner"></div>';
+  bar.innerHTML =
+    '<div class="max-w-[1800px] mx-auto px-3 sm:px-5 lg:px-7 py-2 flex items-center gap-2 sm:gap-3" id="kmiShellBarInner">'
+    + '<div class="flex items-center gap-2 shrink-0" id="kmiShellBrand">'
+    + '<img src="assets/kurutlu-k-symbol.png" alt="Kurutlu" class="h-7 w-7 object-contain">'
+    + '<div class="leading-tight hidden sm:block">'
+    + '<div class="font-black text-xs sm:text-sm text-white whitespace-nowrap">KURUTLU <span class="text-cyan-300">MANUFACTURING INTELLIGENCE</span></div>'
+    + '<div class="text-[9px] text-slate-500">Performance Center · Paperless Machining</div>'
+    + '</div></div>'
+    + '<div class="flex-1 min-w-0" id="kmiShellSearchSlot"></div>'
+    + '<div class="flex items-center gap-1.5 sm:gap-2 shrink-0" id="kmiShellActionsSlot"></div>'
+    + '<div class="flex items-center gap-2 shrink-0" id="kmiShellUserSlot"></div>'
+    + '</div>';
   mainSys.insertBefore(bar, mainSys.firstChild);
   return bar;
 }
-// KMI-PHASE-1-R2-FIX2 (2026-10-03, owner "OWNER VISUAL REVIEW FIX PASS"): the top
-// bar used to repeat destinations that the canonical left nav (KMI_LEFT_NAV_GROUPS)
-// already covers (Ana Sayfa, Canlı, Command Center, İşlerim, Raporlar, Tüm Alanlar) -
-// this is exactly the "top bar is another complete navigation system" defect Ender +
-// ChatGPT flagged in live review. The top bar is now a COMMAND BAR: only global
-// utilities/status that do NOT duplicate a left-nav destination remain - search,
-// the PULSE status indicator, and a persistent "Sorun Bildir" quick action (a
-// cross-cutting contextual action, not a department, per Phase 1C's own allowed
-// list). Every removed item is still reachable from the left nav drawer - nothing
-// was deleted, only de-duplicated. 'Sorun Bildir' reuses the REAL, already-existing
-// window.kmiOpenIssueReporter + 'pilot.issue.report' permission (KMI_NAV_REGISTRY id
-// 'issuereporter') - no new destination invented.
+// Üst şeritteki, bir sol-nav hedefini tekrarlamayan GERÇEK aksiyon düğmeleri.
+// 'kmilive' window.kmiOpenCanli() (KMI-SHELL-FAZ3-SLICE2-FIX'te tanımlı, rol
+// bazlı gerçek yönlendirici) - referans görselindeki "KMI LIVE" pill'in karşılığı.
 const SHELL_ITEMS = [
-  { id:'pulseshell', label:'PULSE', icon:'fa-triangle-exclamation', fn:'kmiOpenPulse', permission:'pulse.view' },
-  { id:'issuereportershell', label:'Sorun Bildir', icon:'fa-bug', fn:'kmiOpenIssueReporter', permission:'pilot.issue.report' },
-  { id:'arakmisor', label:'Ara / KMI\'ye Sor', icon:'fa-magnifying-glass', fn:'kmiOpenAskKMI', permission:null },
+  { id:'kmilive', label:'KMI LIVE', icon:'fa-satellite-dish', fn:'kmiOpenCanli', permission:null, dot:true },
+  { id:'pulseshell', label:'PULSE', icon:'fa-triangle-exclamation', fn:'kmiOpenPulse', permission:'pulse.view', pulseCount:true },
+  { id:'issuereportershell', label:'Sorun Bildir', icon:'fa-bug', fn:'kmiOpenIssueReporter', permission:'pilot.issue.report', iconOnly:true },
 ];
+function shPulseOpenCount(u){
+  try{
+    if(window.KMI_PULSE && typeof window.KMI_PULSE.listIncidents==='function'){
+      return window.KMI_PULSE.listIncidents(u).filter(function(i){ return i.status==='OPEN'||i.status==='ACKNOWLEDGED'; }).length;
+    }
+  }catch(e){}
+  return null; // VERİ GEREKLİ - uydurma 0 değil, bilinmiyor
+}
+function shInitials(name){
+  const parts=String(name||'').trim().split(/\s+/).filter(Boolean);
+  if(!parts.length) return '?';
+  return (parts[0][0]+(parts[parts.length-1][0]||'')).toUpperCase();
+}
 function shRenderBar(){
   const bar=shBuildBar(); if(!bar) return;
-  const inner=document.getElementById('kmiShellBarInner'); if(!inner) return;
   const u=window.currentUser;
-  inner.innerHTML = SHELL_ITEMS.filter(function(it){
-    if(!it.permission) return true;
-    try{ return window.KMI_AUTH.can(u, it.permission)===true; }catch(e){ return false; }
-  }).map(function(it){
-    return '<button data-shell-fn="'+asE(it.fn)+'" class="kmi-shell-btn px-3 py-1.5 rounded-md hover:bg-slate-800 text-slate-200 text-xs sm:text-sm font-bold whitespace-nowrap"><i class="fa-solid '+asE(it.icon)+' mr-1 text-cyan-300"></i>'+asE(it.label)+'</button>';
-  }).join('');
+
+  // Universal Search - Reference B'nin büyük arama çubuğu. Gerçek hedefi: mevcut,
+  // önceden hiçbir yere bağlanmamış window.kmiOpenAskKMI() (R2'de küçük bir
+  // buton olarak zaten vardı, burada görsel olarak büyütüldü - İKİNCİ bir arama
+  // motoru İCAT EDİLMEDİ, aynı tek fonksiyon).
+  const searchSlot=document.getElementById('kmiShellSearchSlot');
+  if(searchSlot && !document.getElementById('kmiShellSearchBtn')){
+    searchSlot.innerHTML = '<button id="kmiShellSearchBtn" data-shell-fn="kmiOpenAskKMI" class="kmi-shell-btn w-full text-left bg-slate-900 border border-slate-700 hover:border-cyan-700 rounded-lg px-3 py-2 text-slate-500 text-xs sm:text-sm flex items-center gap-2 transition-colors"><i class="fa-solid fa-magnifying-glass text-slate-500"></i><span class="truncate hidden xs:inline">Ara... (Sipariş, İş Emri, Müşteri, Parça, Makine, Kişi, Doküman...)</span><span class="truncate xs:hidden">Ara...</span><span class="ml-auto text-[10px] bg-slate-800 px-1.5 py-0.5 rounded hidden sm:inline shrink-0">⌘K</span></button>';
+  }
+
+  const actionsSlot=document.getElementById('kmiShellActionsSlot');
+  if(actionsSlot){
+    actionsSlot.innerHTML = SHELL_ITEMS.filter(function(it){
+      if(!it.permission) return true;
+      try{ return window.KMI_AUTH.can(u, it.permission)===true; }catch(e){ return false; }
+    }).map(function(it){
+      const count = it.pulseCount ? shPulseOpenCount(u) : null;
+      const badge = (it.pulseCount && count!==null && count>0) ? '<span class="ml-1 bg-red-600 text-white text-[10px] font-black rounded-full px-1.5 min-w-[16px] text-center">'+asE(count)+'</span>' : '';
+      const dot = it.dot ? '<span class="w-1.5 h-1.5 rounded-full bg-emerald-500 mr-1.5"></span>' : '';
+      const labelHtml = it.iconOnly ? ('<span class="sr-only">'+asE(it.label)+'</span>') : asE(it.label);
+      return '<button data-shell-fn="'+asE(it.fn)+'" title="'+asE(it.label)+'" class="kmi-shell-btn px-2.5 py-1.5 rounded-md hover:bg-slate-800 text-slate-200 text-xs sm:text-sm font-bold whitespace-nowrap flex items-center"><i class="fa-solid '+asE(it.icon)+' '+(it.iconOnly?'':'mr-1')+' text-cyan-300"></i>'+dot+labelHtml+badge+'</button>';
+    }).join('');
+  }
+
+  // Oturum açmış kullanıcı - ad/rol + avatar baş harfi (gerçek currentUser'dan).
+  // KMI-PHASE-1-R3: eski <nav>'ın üst kimlik satırı (logo/saat/kullanıcı/Çıkış)
+  // bu şeritle TAM olarak aynı GERÇEK bilgiyi taşıyordu - "ONE coherent top
+  // header" için o satır artık aşağıda gizleniyor (bkz. .kmi-legacy-topid-
+  // retired), bu yüzden fabrika saati (#kmiFactoryClockTime/Date - AYNI id,
+  // var olan güncelleyici DOKUNULMADAN bu yeni konumu besler) ve Çıkış
+  // (window.handleLogout - AYNI gerçek fonksiyon) önce BURAYA taşındı -
+  // "önce kanıtla/taşı, sonra gizle" (FIX1).
+  const userSlot=document.getElementById('kmiShellUserSlot');
+  if(userSlot){
+    userSlot.innerHTML = u ? (
+      '<div class="hidden md:flex flex-col items-end leading-tight bg-slate-900/70 border border-slate-700 rounded-lg px-2 py-1 mr-1">'
+      + '<span id="kmiFactoryClockTime" class="text-[11px] font-black text-cyan-300 font-mono">--:--:--</span>'
+      + '<span id="kmiFactoryClockDate" class="text-[8px] text-slate-500 uppercase">-</span></div>'
+      + '<div class="text-right hidden sm:block leading-tight"><div class="text-xs font-bold text-white truncate max-w-[140px]">'+asE(u.name||'-')+'</div><div class="text-[9px] text-slate-500 uppercase truncate max-w-[140px]">'+asE(u.dept||u.department||'-')+' · '+asE(u.role||'-')+'</div></div>'
+      + '<div class="w-8 h-8 rounded-full bg-cyan-700 text-white text-xs font-black flex items-center justify-center shrink-0">'+asE(shInitials(u.name))+'</div>'
+      + '<button onclick="handleLogout()" class="bg-red-600/80 hover:bg-red-600 text-white text-[10px] px-2 py-1.5 rounded font-medium shrink-0"><i class="fa-solid fa-right-from-bracket"></i><span class="hidden lg:inline ml-1">Çıkış</span></button>'
+    ) : '';
+  }
+
+  const inner=document.getElementById('kmiShellBarInner'); if(!inner) return;
   inner.querySelectorAll('[data-shell-fn]').forEach(function(btn){
+    if(btn.dataset.shBound) return; btn.dataset.shBound='1';
     btn.onclick=function(){ const fn=btn.getAttribute('data-shell-fn'); try{ if(typeof window[fn]==='function') window[fn](); else shToast('Bu alan şu an kullanılamıyor.'); }catch(e){ shToast('Açılamadı: '+e.message); } };
   });
 }
@@ -19502,15 +19775,13 @@ window.kmiRenderShellBar = shRenderBar; // testler ve giriş/çıkış akışlar
 // Giriş yapıldığında (veya kullanıcı değiştiğinde) şeridi yeniden çiz - login akışına
 // DOKUNMADAN, mevcut window.currentUser'ı periyodik olarak izleyerek (basit ve güvenli).
 window.addEventListener('load',function(){
-  let lastUserId=null;
   shRenderBar();
-  setInterval(function(){
-    try{
-      const u=window.currentUser;
-      const uid=u?u.id:null;
-      if(uid!==lastUserId){ lastUserId=uid; shRenderBar(); }
-    }catch(e){}
-  },800);
+  // KMI-PHASE-1-R3: R2'de yalnız kullanıcı DEĞİŞTİĞİNDE yeniden çiziliyordu -
+  // bu, girişten hemen sonra PULSE/kullanıcı bloğunun görünmesini garantiliyordu.
+  // PULSE rozetindeki GERÇEK açık-uyarı sayısı da canlı kalsın diye artık HER
+  // tikte (800ms, aynı eski periyot) koşulsuz yeniden çiziliyor - ucuz bir DOM
+  // güncellemesi (4-5 öğe), giriş sonrası anlık görünürlük davranışı KORUNDU.
+  setInterval(function(){ try{ shRenderBar(); }catch(e){} }, 800);
 },{once:true});
 
 // Ctrl/Cmd+K -> Ara / KMI'ye Sor (teknik olarak güvenli olduğunda: input/textarea/
@@ -19599,30 +19870,25 @@ window.addEventListener('keydown', function(ev){
 // Phase 1B'nin BİREBİR grup/sıra tanımı. Her satır GERÇEK bir hedefe çözülür -
 // hiçbir yeni yetki dizesi/iş akışı/ekran UYDURULMADI.
 const KMI_LEFT_NAV_GROUPS = [
+  // KMI-PHASE-1-R3 (2026-10-03, owner "PHASE 1 + PHASE 2 VISUAL IMPLEMENTATION
+  // CONTRACT" / Reference B): sahip onaylı referans tasarımın sol şeridi, üst
+  // grupta başlıksız olarak Ana Sayfa/Command Center/Live Floor/Task Floor'u
+  // birlikte gösteriyor - Live Floor ve Task Floor önceden ayrı bir "YÜRÜTME"
+  // başlığı altındaydı (R2), şimdi referansla birebir aynı sırada buraya taşındı.
+  // Hedef fonksiyonlar DEĞİŞMEDİ (aynı kmiOpenShopFloorLive/kmiOpenTaskFloor).
   { title:null, items:[
     { label:'Ana Sayfa', icon:'fa-house', resolve:function(){ return {fn:'kmiOpenAnaSayfa'}; } },
     { label:'Command Center', icon:'fa-table-list', resolve:function(){ return {fn:'kmiOpenCommandCenter'}; } },
-  ]},
-  { title:'YÜRÜTME', items:[
-    // KMI_NAV_REGISTRY'deki 'shopfloor' girişiyle AYNI kural: requiredPermission:null -
-    // kmiOpenShopFloorLive() kendi iç kontrolünü kendi yapıyor (registry'nin kendi
-    // yorumu, satır ~19110), burada YENİ bir yetki dizesi uydurulmadı.
     { label:'Live Floor', icon:'fa-industry', resolve:function(){ return {fn:'kmiOpenShopFloorLive'}; } },
     { label:'Task Floor', icon:'fa-list-check', resolve:function(){ return {fn:'kmiOpenTaskFloor'}; } },
-    // KMI-PHASE-1-R2-FIX5 (2026-10-03, owner "OWNER VISUAL REVIEW FIX PASS"):
-    // "Operatör Beyan" bir ÜRETİM departmanı değil, bir OPERATÖR İŞ AKIŞI/
-    // YÜRÜTME aktivitesidir - ÜRETİM AİLESİ'nden (Üretim/Planlama/Kalite/Bakım
-    // ile sınırlı kalması gereken, direktifin kendi tanımı) buraya, Live
-    // Floor/Task Floor'un yanına taşındı. Erişim (hasScreenAccess) DEĞİŞMEDİ.
+  ]},
+  { title:'YÜRÜTME', items:[
+    // KMI-PHASE-1-R2-FIX5 (2026-10-03): "Operatör Beyan" bir ÜRETİM departmanı
+    // değil, bir OPERATÖR İŞ AKIŞI aktivitesidir - ÜRETİM AİLESİ'nden (Reference
+    // B'nin kendi tanımıyla Üretim/Planlama/Kalite/Bakım ile sınırlı) ayrı tutuldu.
     { label:'Operatör Beyan', icon:'fa-user-gear', resolve:function(u){ return hasScreenAccess(u,'operatör') ? {legacyTab:'operatör'} : null; } },
-    // KMI-PHASE-1-R2-FIX4 (2026-10-03): eskiden #kmiFloorNavRow2'ye (bkz. install()
-    // fonksiyonu civarı ~satır 19036) enjekte edilen "Mobil Görünüm" girişinin
-    // kanonik karşılığı - KMI_NAV_REGISTRY'nin kendi 'mobile' girişiyle AYNI
-    // fonksiyon/yetki (kmiOpenMobileHome / mobile.access), YÜRÜTME'ye eklendi
-    // (şahane bir "departman" değil, operatör/saha görünüm modu - registry'nin
-    // kendi area:'ÜRETİM' etiketi de bunu doğruluyor, ama ÜRETİM AİLESİ grubu
-    // direktifçe Üretim/Planlama/Kalite/Bakım ile sınırlı tutulduğu için execution
-    // bağlamına, Operatör Beyan'ın yanına yerleştirildi).
+    // KMI-PHASE-1-R2-FIX4: #kmiFloorNavRow2'ye enjekte edilen "Mobil Görünüm"ün
+    // kanonik karşılığı - KMI_NAV_REGISTRY'nin 'mobile' girişiyle AYNI fonksiyon/izin.
     { label:'Mobil Görünüm', icon:'fa-mobile-screen', resolve:function(u){ return (nrCanSafe(u,'mobile.access') && typeof window.kmiOpenMobileHome==='function') ? {fn:'kmiOpenMobileHome'} : null; } },
   ]},
   { title:'ÜRETİM AİLESİ', items:[
@@ -19635,7 +19901,9 @@ const KMI_LEFT_NAV_GROUPS = [
       } },
     { label:'Bakım', icon:'fa-screwdriver-wrench', resolve:function(u){ return hasScreenAccess(u,'bakim') ? {legacyTab:'bakim'} : null; } },
   ]},
-  { title:'TEDARİK & MÜŞTERİ AKIŞI', items:[
+  // KMI-PHASE-1-R3: Reference B başlığı "TEDARİK ZİNCİRİ" (önceki ad "TEDARİK &
+  // MÜŞTERİ AKIŞI" idi) - içerik/hedefler değişmedi, sadece başlık metni eşleşti.
+  { title:'TEDARİK ZİNCİRİ', items:[
     { label:'Satınalma', icon:'fa-cart-shopping', resolve:function(u){ return (nrCanSafe(u,'MANAGEMENT') && typeof window.kmiOpenPurchasing==='function') ? {fn:'kmiOpenPurchasing'} : null; } },
     { label:'Depo & Stok', icon:'fa-warehouse', resolve:function(u){
         if(nrCanSafe(u,'warehouse.*') && typeof window.kmiOpenWarehouse==='function') return {fn:'kmiOpenWarehouse'};
@@ -19648,7 +19916,8 @@ const KMI_LEFT_NAV_GROUPS = [
       } },
     { label:'Sevkiyat & Lojistik', icon:'fa-truck-fast', resolve:function(u){ return hasScreenAccess(u,'sevkiyat') ? {legacyTab:'sevkiyat'} : null; } },
   ]},
-  { title:'DESTEK', items:[
+  // KMI-PHASE-1-R3: Reference B başlığı "DESTEK FONKSİYONLAR" (önceki ad "DESTEK").
+  { title:'DESTEK FONKSİYONLAR', items:[
     { label:'Muhasebe & Finans', icon:'fa-calculator', resolve:function(u){
         if(typeof window.kmiOpenMuhasebeCanonical==='function' && (isBurcuAccountingAuthority(u)||nrCanSafe(u,'MANAGEMENT'))) return {fn:'kmiOpenMuhasebeCanonical'};
         if(hasScreenAccess(u,'muhasebe')) return {legacyTab:'muhasebe'};
@@ -19670,14 +19939,20 @@ const KMI_LEFT_NAV_GROUPS = [
     { label:'Takımhane', icon:'fa-screwdriver-wrench', resolve:function(u){ return (nrCanSafe(u,'tooling.view') && typeof window.kmiOpenToolingIntel==='function') ? {fn:'kmiOpenToolingIntel'} : null; } },
     { label:'İnsan & Yetkinlik', icon:'fa-users', resolve:function(u){ return (nrCanSafe(u,'MANAGEMENT') && typeof window.kmiOpenPeopleTalent==='function') ? {fn:'kmiOpenPeopleTalent'} : null; } },
   ]},
-  { title:'ANALİTİK / GELİŞİM', items:[
+  // KMI-PHASE-1-R3: Reference B başlığı "RAPORLAR & ANALİTİK" (önceki ad
+  // "ANALİTİK / GELİŞİM"), içeriği Raporlar + KMI Academy. "Zirvedekiler" referans
+  // görselinde YOK ama gerçek, çalışan bir ekran - silmek yerine (uydurma yasağı
+  // "silme" anlamına gelmez) aynı grubun sonuna, dürüstçe bırakıldı.
+  { title:'RAPORLAR & ANALİTİK', items:[
     { label:'Raporlar', icon:'fa-chart-line', resolve:function(u){ return nrCanSafe(u,'reporting.view') ? {fn:'kmiOpenReporting'} : null; } },
     { label:'KMI Academy', icon:'fa-graduation-cap', resolve:function(u){ return nrCanSafe(u,'training.access') ? {fn:'kmiOpenAcademy'} : null; } },
     { label:'Zirvedekiler', icon:'fa-trophy', resolve:function(u){ return hasScreenAccess(u,'liderlik') ? {legacyTab:'liderlik'} : null; } },
   ]},
-  // Phase 1B'nin "role/context: KMI LIVE, IT/Software, Management/Settings,
-  // Tüm Alanlar" grubu - başlık ekleniyor (önceden null idi), direktifin
-  // kendi adlandırmasıyla.
+  // Reference B: "role-authorized: Ayarlar / Yönetici / IT functions" - tek, role-
+  // gated bir kapanış grubu. Ayrı bir "Ayarlar" ekranı KODDA YOK (uydurulmadı);
+  // en yakın gerçek karşılığı Yönetici Paneli içindeki "Kullanıcı Ayarları" kutusu
+  // (şifre/roller) - bu KNOWN OPEN ITEM olarak rapora da yazıldı. KMI Live/
+  // Performans/Tüm Alanlar "IT functions" kapsamına gerçek, var olan girişler.
   { title:'IT / YÖNETİM', items:[
     { label:'KMI Live', icon:'fa-satellite-dish', resolve:function(u){ return (nrCanSafe(u,'controltower.*.view') && typeof window.kmiOpenControlTowerHub==='function') ? {fn:'kmiOpenControlTowerHub'} : null; } },
     // KMI-PHASE-1-R2-FIX4 (2026-10-03): eskiden #kmiFloorNavRow2'ye enjekte
@@ -19766,7 +20041,20 @@ window.kmiOpenLeftNav = function(){
             }).join('');
       }).join('')
       : '<div class="text-slate-500 text-sm p-3">VERİ GEREKLİ: görüntülenecek bir alan bulunamadı.</div>')
-    + '</div></div>';
+    + '</div>'
+    // KMI-PHASE-1-R3 (Reference A "At the bottom: compact factory-status summary
+    // if truthful data exists"): kmiMachineBoard() zaten var olan canonical makine
+    // durumu okuyucusu - yeni bir sayım İCAT EDİLMEDİ, sadece drawer altına
+    // taşındı. Hesaplanamazsa (board boş/okunamazsa) dürüstçe gösterilmiyor.
+    + (function(){
+        try{
+          const board=(typeof window.kmiMachineBoard==='function')?window.kmiMachineBoard():[];
+          if(!board.length) return '';
+          const running=board.filter(function(m){return m.status==='RUNNING';}).length;
+          return '<div class="mt-auto sticky bottom-0 bg-slate-950 border-t border-slate-800 p-3 text-[11px] text-slate-400"><span class="text-slate-500 uppercase tracking-widest text-[9px] font-bold">Fabrika Geneli</span><div class="mt-1 flex items-center gap-1.5"><span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>Çalışan <b class="text-white">'+running+' / '+board.length+'</b></div></div>';
+        }catch(e){ return ''; }
+      })()
+    + '</div>';
   document.body.appendChild(d);
   d.querySelectorAll('[data-ln-fn], [data-ln-tab]').forEach(function(btn){
     btn.onclick = function(){
@@ -19810,6 +20098,18 @@ function kmiLegacyNavRetire(){
   try{
     const legacyRow = document.querySelector('nav .flex-wrap.gap-1.text-sm.font-medium.pb-2');
     if(legacyRow) legacyRow.classList.add('kmi-legacy-nav-retired');
+  }catch(e){}
+  // KMI-PHASE-1-R3 (2026-10-03, owner "PHASE 1 + PHASE 2 VISUAL IMPLEMENTATION
+  // CONTRACT", Reference B "ONE coherent top header"): the legacy <nav>'s own
+  // top identity row (logo/build-badge/clock/user/logout) was a SECOND,
+  // simultaneously-visible header sitting right under #kmiShellBar - missed by
+  // R1/R2 because those fix passes only targeted the tab-button row beneath
+  // it. Every real piece of it (clock, user name/role, logout) was moved into
+  // #kmiShellBar's user slot FIRST (see shRenderBar's userSlot) before this
+  // hides it - nothing here is deleted, only retired once proven reachable.
+  try{
+    const topIdRow = document.getElementById('kmiLegacyTopIdRow');
+    if(topIdRow) topIdRow.classList.add('kmi-legacy-nav-retired');
   }catch(e){}
 }
 
