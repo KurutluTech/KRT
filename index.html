@@ -6874,8 +6874,17 @@ setTimeout(()=>{if((typeof getEffectiveRole==='function'?getEffectiveRole(window
 <div id="v61MasterOverlay" class="fixed inset-0 z-[80] hidden bg-slate-950/95 overflow-y-auto">
   <div class="max-w-7xl mx-auto p-4 sm:p-6">
     <div class="flex flex-wrap items-center justify-between gap-3 mb-5 sticky top-0 bg-slate-950/95 py-3 z-10 border-b border-slate-800">
-      <div><div class="text-[10px] tracking-[.28em] text-amber-400 font-bold">KURUTLU CNC · V72 PROCUREMENT GOVERNANCE & MRP INTELLIGENCE</div><h2 class="text-2xl font-black text-white">KURUTLU CNC Entegre Operasyon Platformu</h2><p class="text-xs text-slate-400">V60 kazanımları korunur · üretim, müşteri, ürün, malzeme, satınalma ve takımhane aynı platformda</p></div>
-      <button onclick="closeV61Master()" class="px-4 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-600 text-white"><i class="fa-solid fa-arrow-left mr-2"></i>Üretim Ekranlarına Dön</button>
+      <!-- MASTER #23 OWNER CLOSURE REMEDIATION (2026-10), item 9: this used to
+           show user-facing release-history vocabulary ("V72 PROCUREMENT
+           GOVERNANCE & MRP INTELLIGENCE", "V60 kazanımları korunur...") and a
+           second, competing brand ("KURUTLU CNC ... Platformu"), which read
+           as a separate/legacy/parallel product rather than one more KMI
+           workspace. Converged to the single canonical KMI identity + a
+           functional workspace title (no new brand invented) - business
+           structure/functional tabs/KPI visibility/canonical routing below
+           are completely unchanged, presentation only. -->
+      <div><div class="text-[10px] tracking-[.28em] text-amber-400 font-bold">KURUTLU MANUFACTURING INTELLIGENCE · Performance Center</div><h2 class="text-2xl font-black text-white">Entegre Operasyon</h2><p class="text-xs text-slate-400">Üretim, müşteri, ürün, malzeme, satınalma ve takımhane aynı platformda</p></div>
+      <button onclick="closeV61Master()" class="px-4 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-600 text-white"><i class="fa-solid fa-arrow-left mr-2"></i>KMI Çalışma Alanlarına Dön</button>
     </div>
     <div id="v61Kpis" class="grid grid-cols-2 md:grid-cols-6 gap-3 mb-5"></div>
     <div class="grid grid-cols-2 md:grid-cols-6 gap-2 mb-5">
@@ -7404,7 +7413,16 @@ function supply(){
  const suppliers=D.suppliers.map(s=>`<button onclick="v62OpenSupplier('${s.id}')" class="w-full text-left bg-slate-950 hover:bg-slate-800 border border-slate-700 rounded-xl p-3 mb-2"><div class="flex justify-between"><div><b>${esc(s.name)}</b><div class="text-xs text-slate-500">${esc(s.category)}</div></div><div class="text-emerald-300 font-black">${s.rating||0}/100</div></div><div class="text-[10px] text-cyan-300 mt-2">Tedarikçi kartını aç →</div></button>`).join('');
  const pos=D.purchases.map(p=>{const last=Number(p.unitPrice||0)>0?money(p.unitPrice,p.currency):'Fiyat girilmedi';return `<button onclick="v62OpenPO('${p.id}')" class="w-full text-left bg-slate-950 hover:bg-slate-800 border border-slate-700 rounded-xl p-3 mb-2"><div class="flex justify-between"><b class="text-cyan-300">${esc(p.id)}</b><span class="text-xs text-amber-300">${esc(p.status)}</span></div><div class="font-semibold">${esc(p.item)} · ${p.qty} ${esc(p.unit)}</div><div class="text-xs text-slate-500">${esc(name('suppliers',p.supplier))} · Beklenen ${esc(p.eta)}</div><div class="mt-2 text-xs"><b>Alış:</b> ${last} · <b>Alan:</b> ${esc(p.purchasedBy||'-')}</div></button>`}).join('');
  const items=D.purchaseItems.map(i=>{const m=mrp71(i),crit=Number(i.stockQty||0)<=Number(m.reorderPoint||0);return `<button onclick="v71OpenPurchaseItem('${i.id}')" class="text-left bg-slate-950 hover:bg-slate-800 border ${crit?'border-red-800':'border-slate-700'} rounded-2xl p-4"><div class="flex justify-between gap-2"><div><div class="font-mono text-cyan-300 font-black">${esc(i.code||i.id)}</div><div class="font-black text-white mt-1">${esc(i.name||'')}</div></div><span class="text-[9px] px-2 py-1 h-fit rounded ${crit?'bg-red-950 text-red-300':'bg-emerald-950 text-emerald-300'}">${crit?'SİPARİŞ NOKTASI':'STOK OK'}</span></div><div class="grid grid-cols-3 gap-2 mt-3 text-xs"><div><span class="text-slate-500">Stok</span><br><b>${Number(i.stockQty||0)} ${esc(i.baseUom||'adet')}</b></div><div><span class="text-slate-500">Safety</span><br><b>${Number(i.safetyStock||0)}</b></div><div><span class="text-slate-500">Lead time</span><br><b>${Number(i.leadTimeDays||0)} gün</b></div></div><div class="text-[10px] text-amber-300 mt-3">MRP öneri: ${Number(m.suggestedOrder||0).toFixed(2)} ${esc(i.baseUom||'adet')}</div><div class="text-[10px] text-cyan-300 mt-2">Satınalma ürün kartını aç →</div></button>`}).join('');
- return shell('Satınalma & Tedarik Zinciri','Satınalma ürün ana verisi, MRP, alternatif/muadil, tedarikçi ve fiyat geçmişi ile yönetilir. Takımhane/Lockcell aynı tedarik zinciri altındadır.',`<button onclick="v61AddSupplier()" class="bg-slate-700 px-3 py-2 rounded mr-2">+ Tedarikçi</button><button onclick="v71AddPurchaseItem()" class="bg-amber-700 px-3 py-2 rounded mr-2">+ Satınalma Ürün Kartı</button><button onclick="v61AddPO()" class="bg-blue-600 px-3 py-2 rounded">+ Satınalma Kaydı / PO</button>`,`<div class="flex justify-between items-center mb-3"><h4 class="font-black text-amber-300">Satınalma Ürün Ana Kartları · MRP</h4><div class="text-[10px] text-slate-500">${D.purchaseItems.length} kart</div></div><div class="grid md:grid-cols-2 xl:grid-cols-3 gap-3 mb-7">${items||'<div class="text-slate-500">Henüz satınalma ürün ana kartı yok. + Satınalma Ürün Kartı ile oluşturun.</div>'}</div><div class="grid md:grid-cols-2 gap-4"><div><h4 class="font-bold mb-3">Tedarikçi Kartları</h4>${suppliers||'<div class="text-slate-500">Tedarikçi yok.</div>'}</div><div><h4 class="font-bold mb-3">Satınalma Geçmişi / Açık PO</h4>${pos||'<div class="text-slate-500">Satınalma kaydı yok.</div>'}</div></div><div class="mt-8 border-t border-slate-700 pt-6">${toolIntelligence66()}<div class="mt-8">${toolroom64()}</div></div>`)
+ // MASTER #23 OWNER CLOSURE REMEDIATION (2026-10), item 11: "+ Satınalma Ürün
+ // Kartı" used to use the amber/warning treatment purely to visually
+ // differentiate it from its sibling buttons - amber already means
+ // ATTENTION/WARNING elsewhere in this same workspace (e.g. the QC chip and
+ // the "Kural:" note just below in material()). It carries no genuine
+ // warning meaning here, so it is converged to the SAME normal create-action
+ // treatment (bg-blue-600) already used for the analogous "main entity card"
+ // action one tab over (products()'s "+ Ürün Kimlik Kartı"). No writer/data/
+ // authorization/workflow change - button color only.
+ return shell('Satınalma & Tedarik Zinciri','Satınalma ürün ana verisi, MRP, alternatif/muadil, tedarikçi ve fiyat geçmişi ile yönetilir. Takımhane/Lockcell aynı tedarik zinciri altındadır.',`<button onclick="v61AddSupplier()" class="bg-slate-700 px-3 py-2 rounded mr-2">+ Tedarikçi</button><button onclick="v71AddPurchaseItem()" class="bg-blue-600 px-3 py-2 rounded mr-2">+ Satınalma Ürün Kartı</button><button onclick="v61AddPO()" class="bg-blue-600 px-3 py-2 rounded">+ Satınalma Kaydı / PO</button>`,`<div class="flex justify-between items-center mb-3"><h4 class="font-black text-amber-300">Satınalma Ürün Ana Kartları · MRP</h4><div class="text-[10px] text-slate-500">${D.purchaseItems.length} kart</div></div><div class="grid md:grid-cols-2 xl:grid-cols-3 gap-3 mb-7">${items||'<div class="text-slate-500">Henüz satınalma ürün ana kartı yok. + Satınalma Ürün Kartı ile oluşturun.</div>'}</div><div class="grid md:grid-cols-2 gap-4"><div><h4 class="font-bold mb-3">Tedarikçi Kartları</h4>${suppliers||'<div class="text-slate-500">Tedarikçi yok.</div>'}</div><div><h4 class="font-bold mb-3">Satınalma Geçmişi / Açık PO</h4>${pos||'<div class="text-slate-500">Satınalma kaydı yok.</div>'}</div></div><div class="mt-8 border-t border-slate-700 pt-6">${toolIntelligence66()}<div class="mt-8">${toolroom64()}</div></div>`)
 }
 
 // KMI-FIX (2026-09-25): Ender'in isteği - "kaynak planlamasını yönetimde Planlama ve Hazırlık
@@ -7454,7 +7472,19 @@ window.v66SaveEvent=function(){const iid=document.getElementById('teInst').value
 function costAnalysis66(){const mk=new Date().toISOString().slice(0,7),c=D.costMonths[mk]||{},fixed=Number(c.fixed||0),variable=Number(c.variable||0),revenue=Number(c.revenue||0),target=Number(c.targetRevenue||0),expense=fixed+variable,margin=revenue-expense;const prod=D.products.map(p=>{const tc=productToolCost66(p.id),pc=D.productCosts[p.id]||{},total=tc.total+['material','machine','labor','quality','scrap','rework','energy','other'].reduce((a,k)=>a+Number(pc[k]||0),0);return `<tr class="border-t border-slate-800"><td class="p-2"><b>${esc(p.code)}</b> · ${esc(p.name)}</td><td class="text-right">${tc.total.toFixed(3)}</td><td class="text-right font-black">${total.toFixed(3)}</td><td class="text-right">${arrow66(total,Number(pc.previousTotal||0))}</td></tr>`}).join('');return shell('Cost Analysis & Financial Performance','Finansal maliyet analizi puantaj/primden tamamen ayrıdır. Sabit/değişken gider, ciro hedefi ve ürün bazlı güncel maliyet izlenir.',`<button onclick="v66EditMonthCost('${mk}')" class="bg-amber-700 px-3 py-2 rounded">${mk} Finansal Parametreleri</button>`,`<div class="grid md:grid-cols-5 gap-3 mb-5">${card('Ciro',money(revenue),'gerçekleşen','fa-money-bill-trend-up')}${card('Ciro Hedefi',money(target),'aylık hedef','fa-bullseye')}${card('Sabit Gider',money(fixed),'aylık','fa-building')}${card('Değişken Gider',money(variable),'aylık','fa-arrows-spin')}${card('Katkı / Fark',money(margin),margin>=0?'pozitif':'negatif','fa-chart-line')}</div><div class="kmi-card p-4"><h4 class="font-black mb-3">Ürün Bazlı Güncel Cost Intelligence</h4><div class="overflow-x-auto"><table class="w-full text-sm"><thead class="text-slate-500"><tr><th class="text-left p-2">Ürün</th><th class="text-right">Takım/adet</th><th class="text-right">Toplam/adet</th><th class="text-right">Trend</th></tr></thead><tbody>${prod}</tbody></table></div></div><div class="mt-4 text-xs text-slate-500">Not: Bu V66 prototipinde farklı para birimleri otomatik kur çevrimi yapılmadan kendi para birimlerinde gösterilir. Production sürümünde tarihli döviz kuru ve muhasebe entegrasyonu gerekir.</div>`)}
 window.v66EditMonthCost=function(m){const c=D.costMonths[m]||{};v62Modal('Aylık Cost Analysis · '+m,`<div class="grid md:grid-cols-2 gap-3">${[['fixed','Toplam Sabit Gider TRY'],['variable','Toplam Değişken Gider TRY'],['revenue','Gerçekleşen Ciro TRY'],['targetRevenue','Hedef Ciro TRY']].map(([k,l])=>`<label>${l}<input id="mc_${k}" type="number" step="0.01" value="${Number(c[k]||0)}" class="mt-1 kmi-field"></label>`).join('')}</div><div class="text-right mt-4"><button onclick="v66SaveMonthCost('${m}')" class="bg-emerald-700 px-4 py-2 rounded">Kaydet</button></div>`)};
 window.v66SaveMonthCost=function(m){let c={};['fixed','variable','revenue','targetRevenue'].forEach(k=>c[k]=Number(document.getElementById('mc_'+k)?.value||0));D.costMonths[m]=c;save();v62CloseModal();v61Show('cost')};
-function flow(){return shell('KURUTLU Entegre Veri Akışı','V60 kazanımları ile yeni master modüllerin birleştiği hedef süreç.','',`<div class="grid md:grid-cols-5 gap-3 text-center text-sm">${['Müşteri / Sipariş','Ürün Kartı','Satınalma / Ham Madde','Giriş Kalite / LOT','Kesim / Blank','İş Emri (V60)','Operatör Beyan (V60)','Kalite (V60)','Muhasebe / Yönetim (V60)','Sevkiyat (V60)','Müşteri İadesi','Rework İş Emri','Yeniden Kalite','Yeniden Sevkiyat','Audit / Raporlama'].map((x,i)=>`<div class="rounded-xl border ${i<5?'border-amber-700 bg-amber-950/20':'border-slate-700 bg-slate-950'} p-4"><div class="text-[10px] text-slate-500">${String(i+1).padStart(2,'0')}</div><b>${x}</b></div>`).join('')}</div><div class="mt-5 p-4 rounded-xl bg-blue-950/30 border border-blue-800 text-sm"><b>V71 prototip amacı:</b> ekran ve iş akışını onaylamak. Bu dosya hâlâ tek cihaz/localStorage prototipidir. Onaydan sonra PostgreSQL + kullanıcı güvenliği + merkezi dosya/audit altyapısına geçirilecektir.</div>`)}
+// MASTER #23 OWNER CLOSURE REMEDIATION (2026-10), item 9/14: this flow
+// diagram's title/description and step labels used to carry user-facing
+// release-history vocabulary ("KURUTLU Entegre Veri Akışı" as a second
+// brand-ish title, "V60 kazanımları...", "(V60)" suffixes on 5 of the 15
+// steps) plus a visible engineering/migration-status note ("V71 prototip
+// amacı... localStorage prototipidir... PostgreSQL... geçirilecektir").
+// Converged to plain business language; substance of the engineering note
+// preserved here only: this flow view is a V71 prototype intended to
+// validate the screen/workflow shape - the file is still a single-device/
+// localStorage prototype, and a production build would need a dated
+// PostgreSQL + user-security + centralized file/audit backend. No change
+// to the business steps themselves, their order, or canonical routing.
+function flow(){return shell('Entegre Veri Akışı','Siparişten sevkiyata, uçtan uca üretim ve iade/rework akışının hedef süreç görünümü.','',`<div class="grid md:grid-cols-5 gap-3 text-center text-sm">${['Müşteri / Sipariş','Ürün Kartı','Satınalma / Ham Madde','Giriş Kalite / LOT','Kesim / Blank','İş Emri','Operatör Beyan','Kalite','Muhasebe / Yönetim','Sevkiyat','Müşteri İadesi','Rework İş Emri','Yeniden Kalite','Yeniden Sevkiyat','Audit / Raporlama'].map((x,i)=>`<div class="rounded-xl border ${i<5?'border-amber-700 bg-amber-950/20':'border-slate-700 bg-slate-950'} p-4"><div class="text-[10px] text-slate-500">${String(i+1).padStart(2,'0')}</div><b>${x}</b></div>`).join('')}</div>`)}
 
 function dt64(v){try{return new Date(v||0).toLocaleString('tr-TR')}catch(e){return String(v||'-')}}
 function activities64(type,id){
@@ -14525,7 +14555,15 @@ window.kmiRenderTaskFloor=function(){
  d.innerHTML=`<div class="max-w-7xl mx-auto p-5">
  <div class="flex flex-wrap justify-between gap-3 sticky top-0 bg-[#07101f]/95 backdrop-blur py-4 z-10">
   <div><div class="text-[11px] text-fuchsia-300 tracking-[.28em] font-black">KMI · TASK FLOOR LIVE</div><h1 class="text-4xl font-black">${mgr?'Task Command Center':E(p.name||'Görevlerim')}</h1><div class="text-slate-400 mt-1">${mgr?'Yönetimsel · organizasyonel · destek · idari görevler':'Atanan süreli görevlerim'}</div></div>
-  <div class="flex gap-2">${mgr?`<button onclick="kmiOpenTaskCreate()" class="bg-fuchsia-600 hover:bg-fuchsia-500 px-5 py-3 rounded-xl font-black">＋ YENİ TASK</button>`:''}<button onclick="document.getElementById('kmiTaskFloor').remove()" class="bg-slate-800 px-5 py-3 rounded-xl font-black">Kapat</button></div>
+  <!-- MASTER #23 OWNER CLOSURE REMEDIATION (2026-10), item 3: fuchsia/magenta
+       carries no canonical business-state meaning anywhere in Task Floor's
+       own state() function (ERKEN/GEÇ/ZAMANINDA TAMAMLANDI, ONAY BEKLİYOR,
+       GECİKMİŞ, BEKLEMEDE, ÇALIŞIYOR, AÇIK - emerald/red/blue/violet/amber/
+       cyan/slate only) - it was purely a historical/decorative ACTION
+       accent on this one button. Converged to the canonical kmi-btn-primary
+       action grammar. ONAY BEKLİYOR distinction, overdue/waiting treatment
+       and all workflow/state are completely unchanged. -->
+  <div class="flex gap-2">${mgr?`<button onclick="kmiOpenTaskCreate()" class="kmi-btn kmi-btn-primary px-5 py-3 rounded-xl font-black">＋ YENİ TASK</button>`:''}<button onclick="document.getElementById('kmiTaskFloor').remove()" class="bg-slate-800 px-5 py-3 rounded-xl font-black">Kapat</button></div>
  </div>
  <div class="grid grid-cols-2 md:grid-cols-4 gap-3 my-5">
   <div class="kmi-card p-4"><div class="text-xs text-slate-400">AÇIK</div><div class="text-3xl font-black">${open}</div></div>
@@ -16353,9 +16391,19 @@ window.kmiRenderQualityWorkspace=function(){
  try{ pendingDecl=(typeof declarations!=='undefined'&&Array.isArray(declarations)) ? declarations.filter(function(d){ return d.status==='Kalite Bekliyor'; }).length : 0; }catch(e){}
 
  function kpiTile(label,r,suffix){
-  const cls=r.status==='OK'?'text-emerald-300':(r.status==='PARTIAL'?'text-amber-300':'text-slate-500');
+  // MASTER #23 OWNER CLOSURE REMEDIATION (2026-10), item 4.1: CANNOT_CALCULATE
+  // (TRUTH MODE - "Hesaplanamıyor" is never converted to 0/fabricated/inferred)
+  // used to render in the same muted text-slate-500 used for a merely
+  // disabled control, which read as "broken/off" rather than "this is a
+  // genuine, clearly-labeled unknown". It now uses the existing canonical
+  // --kmi-info tint (the same info color already used elsewhere in KMI,
+  // e.g. kmi-card-tint-info/kmi-chip-tint-info) plus a small info icon, so
+  // it reads as a legible INFORMATION state, not a faded/disabled one. The
+  // underlying value/truth is completely unchanged.
+  const cls=r.status==='OK'?'text-emerald-300':(r.status==='PARTIAL'?'text-amber-300':(r.status==='CANNOT_CALCULATE'?'text-sky-300':'text-slate-500'));
+  const icon=r.status==='CANNOT_CALCULATE'?'<i class="fa-solid fa-circle-info mr-1 text-sm align-middle"></i>':'';
   const val=r.status==='CANNOT_CALCULATE'?'Hesaplanamıyor':(r.value+(suffix||''));
-  return '<div class="kmi-card p-3"><div class="text-[10px] text-slate-500 uppercase font-bold tracking-wide">'+esc(label)+'</div><div class="text-xl font-black '+cls+' mt-1">'+esc(val)+'</div></div>';
+  return '<div class="kmi-card p-3"><div class="text-[10px] text-slate-500 uppercase font-bold tracking-wide">'+esc(label)+'</div><div class="text-xl font-black '+cls+' mt-1">'+icon+esc(val)+'</div></div>';
  }
 
  const header='<div class="flex flex-wrap items-center justify-between gap-3 mb-4">'
@@ -16385,9 +16433,16 @@ window.kmiRenderQualityWorkspace=function(){
  // mevcut fonksiyonlar) halihazırda bu workspace'ten AYRILMADAN açılan bir
  // overlay (modal) - owner'ın bu düzeltmesi bunu hedeflemiyor, SADECE
  // "Onay Kuyruğu" tab-jump düğmesini hedefliyor (aşağıda kaldırıldı/gömüldü).
+ // MASTER #23 OWNER CLOSURE REMEDIATION (2026-10), item 4: this button used
+ // to be a large, visually-dominant standalone violet treatment that read
+ // like a separate action system rather than part of KMI's own action
+ // grammar. Converged to the canonical kmi-btn/kmi-btn-primary primitive
+ // (same primitive used elsewhere for primary workspace actions) - no
+ // change to HOLD/NCR/CAPA/First-Piece/Quality-approval/authorization
+ // semantics, only the button's visual treatment.
  const actions=canQuality ? ('<div class="bg-slate-900/60 border border-slate-800 rounded-2xl p-4 mb-4">'
   + '<b class="text-sm text-white">Araçlar</b><div class="mt-2 flex flex-wrap gap-2">'
-  + '<button data-qw-fn="kmiOpenQualityTower" class="bg-violet-700 hover:bg-violet-600 text-white text-xs font-black px-3 py-2 rounded-lg"><i class="fa-solid fa-tower-observation mr-1"></i>Kalite Kontrol Kulesi <span class="opacity-80">(HOLD/NCR/CAPA · İlk Parça Onayı · Kalibrasyon Vade · Kontrol Planı)</span></button>'
+  + '<button data-qw-fn="kmiOpenQualityTower" class="kmi-btn kmi-btn-primary text-xs"><i class="fa-solid fa-tower-observation mr-1"></i>Kalite Kontrol Kulesi <span class="opacity-80">(HOLD/NCR/CAPA · İlk Parça Onayı · Kalibrasyon Vade · Kontrol Planı)</span></button>'
   + '</div></div>') : '';
 
  // KMI-R5 R16-Q: "Üretim Onay Kuyruğu (Sağlam/Hurda/Tahsis)" artık standalone
@@ -16501,8 +16556,14 @@ window.kmiRenderMaintenanceWorkspace=function(){
   + '<div class="kmi-card p-3"><div class="text-[10px] text-slate-500 uppercase font-bold tracking-wide">Kritik Bakım Emri</div><div class="text-xl font-black '+(criticalOrders.length?'text-red-400':'text-slate-400')+' mt-1">'+criticalOrders.length+'</div></div>'
   + '</div>';
 
+ // MASTER #23 OWNER CLOSURE REMEDIATION (2026-10), item 5: m.downSince was
+ // being shown as a raw ISO timestamp (e.g. "2026-09-26T21:19:21.548Z")
+ // instead of the human-readable local date/time convention used
+ // everywhere else in KMI (new Date(...).toLocaleString('tr-TR')). No data
+ // mutation, no timezone invention, no machine-state change - presentation
+ // only.
  const exceptions=downMachines.length ? ('<div class="kmi-card-tint kmi-card-tint-critical mb-4"><b class="text-sm text-white">Duran Makineler</b><div class="mt-2 text-xs text-slate-300">'
-  + downMachines.map(function(m){ return esc(m.name||m.id||'-')+(m.downSince?' · '+esc(m.downSince):''); }).join('<br>')
+  + downMachines.map(function(m){ return esc(m.name||m.id||'-')+(m.downSince?' · '+esc(new Date(m.downSince).toLocaleString('tr-TR')):''); }).join('<br>')
   + '</div></div>') : '';
 
  const actions='<div class="bg-slate-900/60 border border-slate-800 rounded-2xl p-4">'
@@ -16668,10 +16729,20 @@ window.kmiPeopleMountModules=function(){
  if(!window.__kmiPeopleHome){
   window.__kmiPeopleHome=[];
   document.querySelectorAll(selectors.join(',')).forEach(function(node){
-   window.__kmiPeopleHome.push({ node:node, parent:node.parentNode, next:node.nextSibling });
+   // MASTER #23 OWNER CLOSURE REMEDIATION (2026-10), item 12.3: these panels
+   // carry the existing CSS contract ".admin-module-panel{display:none}" /
+   // ".admin-module-panel.admin-module-open{display:block}" (same primitive
+   // the legacy Yönetici admin-module switcher uses, see openAdminModule()).
+   // Relocating them here without that class left them genuinely invisible
+   // on a fresh session (nobody had clicked the legacy switcher yet) - this
+   // was the real cause of the "large empty area" the owner saw below the
+   // workspace intro. Record whether each was already open so unmounting
+   // can restore it exactly as found, rather than permanently mutating the
+   // legacy Yönetici module-switcher's own state.
+   window.__kmiPeopleHome.push({ node:node, parent:node.parentNode, next:node.nextSibling, hadOpen:node.classList.contains('admin-module-open') });
   });
  }
- window.__kmiPeopleHome.forEach(function(rec){ mount.appendChild(rec.node); });
+ window.__kmiPeopleHome.forEach(function(rec){ mount.appendChild(rec.node); rec.node.classList.add('admin-module-open'); });
  try{ window.renderPersonnelFileCards&&window.renderPersonnelFileCards(); }catch(e){}
  try{ window.renderPuantajAdmin&&window.renderPuantajAdmin(); }catch(e){}
  try{ window.renderBonusAdminTable&&window.renderBonusAdminTable(); }catch(e){}
@@ -16680,6 +16751,7 @@ window.kmiPeopleUnmountModules=function(){
  const home=window.__kmiPeopleHome; if(!home) return;
  home.forEach(function(rec){
   if(!rec.node||!rec.parent) return;
+  if(!rec.hadOpen) rec.node.classList.remove('admin-module-open');
   if(rec.next&&rec.next.parentNode===rec.parent) rec.parent.insertBefore(rec.node,rec.next);
   else rec.parent.appendChild(rec.node);
  });
@@ -16703,19 +16775,32 @@ window.kmiRenderPeopleWorkspace=function(){
  window.kmiPeopleUnmountModules();
  const page=document.getElementById('tab-insan-workspace'); if(!page) return;
 
+ // MASTER #23 OWNER CLOSURE REMEDIATION (2026-10): the persistent global
+ // #pageTitle band (set above in kmiOpenPeopleWorkspace) already shows
+ // "İnsan & Yetkinlik" as the single primary heading for this tab, so this
+ // workspace no longer renders its own duplicate large <h1> with the same
+ // text - that was producing the "İnsan & Yetkinlik" / "İnsan & Yetkinlik"
+ // double-heading the owner flagged. The useful subtitle/context line is
+ // preserved standalone. (Domain-identity icon color (amber/yellow) is a
+ // separate concept from operational severity color per owner directive
+ // 12.4 - not recolored; it simply no longer repeats next to a duplicate
+ // title here.)
  const header='<div class="flex flex-wrap items-center justify-between gap-3 mb-4">'
-  + '<div><h1 class="text-2xl sm:text-3xl font-black text-white"><i class="fa-solid fa-users text-amber-400 mr-2"></i>İnsan &amp; Yetkinlik</h1>'
-  + '<div class="text-xs sm:text-sm text-slate-400 mt-1">Kurutlu Manufacturing Intelligence · Personel, Vardiya, Kabiliyet &amp; Puantaj/Prim Çalışma Alanı</div></div></div>';
+  + '<div><div class="text-xs sm:text-sm text-slate-400">Kurutlu Manufacturing Intelligence · Personel, Vardiya, Kabiliyet &amp; Puantaj/Prim Çalışma Alanı</div></div></div>';
 
- const missing='<div class="bg-amber-950/20 border border-amber-800/50 rounded-2xl p-4 mb-4 text-xs text-amber-200">'
-  + '<b class="text-white">Bu çalışma alanının kapsamı:</b> Personel Yönetim Merkezi (vardiya/kabiliyet/rozet-pin kendi katlanır bölümleriyle), Aylık Puantaj Algoritması ve Prim Kuyruğu. '
-  + 'Maaş/ücret verisi bu workspace\'te YOK (önceden de yoktu) - KMI Academy ayrı, kendi gerçek ekranında kalıyor, burada tekrar edilmiyor.'
-  + '</div>';
+ // HONESTY NOTE (owner directive, kept in engineering comments only - the
+ // visible amber disclosure box this used to render was removed from the
+ // operational UI per MASTER #23 OWNER CLOSURE REMEDIATION; removing it is
+ // NOT license to add salary/payroll visibility, which stays exactly as-is):
+ // Bu çalışma alanının kapsamı: Personel Yönetim Merkezi (vardiya/kabiliyet/
+ // rozet-pin kendi katlanır bölümleriyle), Aylık Puantaj Algoritması ve Prim
+ // Kuyruğu. Maaş/ücret verisi bu workspace'te YOK (önceden de yoktu) - KMI
+ // Academy ayrı, kendi gerçek ekranında kalıyor, burada tekrar edilmiyor.
 
  const mount='<div id="kmiPeopleModulesMount" class="space-y-4"></div>';
 
  page.innerHTML='<div class="max-w-[1400px] mx-auto p-4 sm:p-6">'
-  + header + missing + mount
+  + header + mount
   + '</div>';
 
  window.kmiPeopleMountModules();
@@ -16827,9 +16912,15 @@ window.kmiRenderCommandCenterWorkspace=function(){
  window.kmiCcUnmountSections();
  const page=document.getElementById('tab-command-center-workspace'); if(!page) return;
 
+ // MASTER #23 OWNER CLOSURE REMEDIATION (2026-10): the persistent global
+ // #pageTitle band (set above in kmiOpenCommandCenterWorkspace) already
+ // shows "Command Center" as the single primary heading for this tab, so
+ // this workspace no longer renders its own duplicate large <h1> with the
+ // same text - that was producing the "Command Center" / "Command Center"
+ // double-heading the owner flagged. The useful subtitle/context line is
+ // preserved standalone.
  const header='<div class="flex flex-wrap items-center justify-between gap-3 mb-4">'
-  + '<div><h1 class="text-2xl sm:text-3xl font-black text-white"><i class="fa-solid fa-table-list text-violet-400 mr-2"></i>Command Center</h1>'
-  + '<div class="text-xs sm:text-sm text-slate-400 mt-1">Kurutlu Manufacturing Intelligence · Tüm İş Emirleri + Tüm Alanlar (cross-domain) tek çalışma alanında</div></div></div>';
+  + '<div><div class="text-xs sm:text-sm text-slate-400">Kurutlu Manufacturing Intelligence · Tüm İş Emirleri + Tüm Alanlar (cross-domain) tek çalışma alanında</div></div></div>';
 
  // HONESTY NOTE (owner's explicit MASTER #18 instruction: "Command Center
  // must remain an orchestration/action surface, never a second database,
@@ -16838,15 +16929,15 @@ window.kmiRenderCommandCenterWorkspace=function(){
  // 10 alan ailesini okuyan read-only cross-domain projection) kendi özel
  // çalışma alanına taşır - hiçbiri burada yeniden yazılmadı/birleştirilmedi,
  // yeni bir veritabanı/defter/iş akışı motoru YOK.
- const missing='<div class="bg-amber-950/20 border border-amber-800/50 rounded-2xl p-4 mb-4 text-xs text-amber-200">'
-  + '<b class="text-white">Bu çalışma alanının kapsamı:</b> aşağıdaki iki pano - "Tüm İş Emirleri" (Onayla/Reddet aksiyonu burada) ve "Tüm Alanlar" (10 alan ailesinin read-only cross-domain görünümü). '
-  + 'İkisi de önceden var olan, kanonik motor/veriden okuyan panolardır - burada yeni bir veritabanı/defter/iş akışı motoru oluşturulmadı.'
-  + '</div>';
+ // (MASTER #23 OWNER CLOSURE REMEDIATION 2026-10: this note used to also
+ // render as a visible amber engineering-disclosure box in the operational
+ // UI - removed from the UI per owner directive; the substance is kept
+ // here, in engineering comments, only.)
 
  const mount='<div id="kmiCcSectionsMount" class="space-y-6"></div>';
 
  page.innerHTML='<div class="max-w-[1400px] mx-auto p-4 sm:p-6">'
-  + header + missing + mount
+  + header + mount
   + '</div>';
 
  window.kmiCcMountSections();
@@ -21032,6 +21123,35 @@ window.addEventListener('load',function(){
 (function(){
 'use strict';
 function puE(v){ return String(v==null?'':v).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+// MASTER #23 OWNER CLOSURE REMEDIATION (2026-10), item 6: manager-facing PULSE
+// presentation (Alert Kuralları list) was showing raw internal vocabulary
+// (sourceType enum IDs, "Grace:0dk", "Eskalasyon:120dk") directly to managers.
+// This is PRESENTATION ONLY - the canonical sourceType values stored/compared
+// everywhere else (puRules/puEvalTaskOverdue/puEvalMachineFaultCritical/
+// puEvalShipmentOverdue/the sourceType validation list, etc.) are completely
+// untouched; only this manager-facing label text is rephrased into Turkish
+// business language. Technical IDs remain available wherever audit/detail
+// code already shows them.
+function puSourceTypeLabel(sourceType){
+  return ({
+    TASK_OVERDUE:'Görev gecikmesi',
+    MACHINE_FAULT_CRITICAL:'Kritik makine arızası',
+    SHIPMENT_OVERDUE:'Sevkiyat gecikmesi',
+    QUALITY_HOLD_AGED:'Kalite HOLD süresi aşımı',
+    NCR_AGING:'NCR süresi aşımı',
+    PURCHASING_OBLIGATION_AGING:'Satınalma yükümlülüğü gecikmesi',
+    READINESS_BLOCKED:'Hazırlık engeli',
+    MANUAL:'Manuel kural'
+  })[sourceType] || sourceType;
+}
+function puGraceLabel(min){
+  const n=Number(min)||0;
+  return n<=0 ? 'Anında uyar' : (n+' dk sonra uyar');
+}
+function puEscalationLabel(min){
+  const n=Number(min)||0;
+  return n<=0 ? 'Anında eskale et' : (n+' dk sonra eskale et');
+}
 function puNow(){ return new Date().toISOString(); }
 function puLoad(k,d){ try{ const v=JSON.parse(localStorage.getItem(k)); return v==null?(d!==undefined?d:null):v; }catch(e){ return d!==undefined?d:null; } }
 function puSave(k,v){ localStorage.setItem(k, JSON.stringify(v)); }
@@ -21440,7 +21560,7 @@ window.kmiRenderPulse=function(){
     </div>
     <div class="bg-slate-900/60 border border-slate-700 rounded-2xl p-4">
      <h3 class="font-black mb-2">Alert Kuralları</h3>
-     <div class="space-y-1 text-xs max-h-40 overflow-y-auto mb-2">${puListRules().map(r=>`<div class="border-b border-slate-800 py-1">${puE(r.name)} · ${puE(r.sourceType)} · Grace:${r.graceMinutes}dk · Eskalasyon:${r.escalationMinutes}dk</div>`).join('')}</div>
+     <div class="space-y-1 text-xs max-h-40 overflow-y-auto mb-2">${puListRules().map(r=>`<div class="border-b border-slate-800 py-1">${puE(r.name)} · ${puE(puSourceTypeLabel(r.sourceType))} · ${puE(puGraceLabel(r.graceMinutes))} · ${puE(puEscalationLabel(r.escalationMinutes))}</div>`).join('')}</div>
      ${canManageRules?'<div class="text-slate-500 text-[11px]">Yeni kural tipleri Master Program\'ın ileri fazlarında (kapasite/hedef/maliyet motorları kurulunca) eklenecek.</div>':''}
     </div>
    </div>
