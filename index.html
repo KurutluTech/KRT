@@ -17,9 +17,9 @@
          `git blame`/diffs on this file quiet between releases and avoid a
          commit-hash feedback loop (the source commit's SHA cannot depend on
          a value computed from that same SHA). See docs/KMI_DEPLOY_ID.md. -->
-    <meta name="kmi-source-commit" content="__KMI_BUILD_SOURCE_COMMIT__">
-    <meta name="kmi-build-id" content="__KMI_BUILD_ID__">
-    <meta name="kmi-built-at" content="__KMI_BUILD_BUILT_AT__">
+    <meta name="kmi-source-commit" content="de80d54d942d0c83f1f47574e45580d4fd8ca0d1">
+    <meta name="kmi-build-id" content="de80d54d942d-20261006T190252Z">
+    <meta name="kmi-built-at" content="2026-10-06T19:02:52.855Z">
     <script>
       // Derived from the meta tags above at runtime, so there is exactly one
       // place (the meta tags) where the build script substitutes real
@@ -5324,9 +5324,32 @@ function kmiMachineActiveRun(machineName){
  // önce (daha canlı/detaylı olan) Shop Floor oturumlarına bakıyoruz, sonra eski taslak akışına.
  try{
   if(typeof window.kmiMachinesRunningNow==='function'){
-   const running=window.kmiMachinesRunningNow().find(r=>r.machine===machineName&&r.job&&!r.job.finishedAt);
+   // MASTER #23 ADDENDUM - GATE C (2026-10, Canonical Truth Consistency
+   // Sweep): this used to additionally require `r.job&&!r.job.finishedAt`
+   // (the JOB's own finishedAt field) on top of the session-level check
+   // kmiMachinesRunningNow() already performs (`s.startedAt&&!s.finishedAt`).
+   // Root cause of a real, owner-reported contradiction (machine shown
+   // RUNNING on Home/KURUTLU LIVE, READY/Boşta on the Maintenance/Machine
+   // Digital File surface for the SAME machine at the SAME time): when a
+   // job is finished short of target and then restarted on a NEW session
+   // via kmiStartWork, that job object's OWN `finishedAt` from the previous
+   // run is never cleared, even though a brand-new, genuinely active
+   // session now exists. kmiMachineBoard()/kmiMachinesRunningNow() (which
+   // feed Home/KURUTLU LIVE) only ever trusted the SESSION's own
+   // startedAt/finishedAt pair - the one already-canonical "active
+   // production session" signal - and were therefore already correct; this
+   // function alone re-derived its own, stricter, and wrong second opinion
+   // from a stale field on a DIFFERENT object. Converging this reader to
+   // the same canonical session-only signal (no second evaluator created,
+   // no new store) makes every current-machine-state consumer of this
+   // function (Maintenance workspace, Machine File, Machine Digital File)
+   // agree with Home/KURUTLU LIVE/Live Floor again. A session whose job
+   // record cannot be found (orphaned/deleted job id) is still correctly
+   // reported as running - it was never safe to silently report an active
+   // session as idle just because its job lookup failed.
+   const running=window.kmiMachinesRunningNow().find(r=>r.machine===machineName);
    if(running){
-    return {job:running.job,operatorName:running.operator||'-',startedAt:running.startedAt||null,paused:!!running.paused,source:'shopfloor'};
+    return {job:running.job||null,operatorName:running.operator||'-',startedAt:running.startedAt||null,paused:!!running.paused,source:'shopfloor'};
    }
   }
  }catch(e){}
@@ -5381,13 +5404,18 @@ function kmiMachineRunBadgeHtml(machineName){
  if(!run)return {label:'HAZIR · Boşta',sub:'Arıza yok, iş emri atanınca çalışmaya hazır.',idle:true};
  const dur=run.startedAt?kmiFmtHoursMin((Date.now()-new Date(run.startedAt))/60000):'';
  const statusWord=run.paused?'DURUŞTA':'ÇALIŞIYOR';
- return {label:`${statusWord} · ${v33e(run.job.id)}`,sub:`${v33e(run.job.item||'')} · ${v33e(run.operatorName)}${dur?' · '+dur:''}`,paused:!!run.paused,startedAt:run.startedAt||null};
+ // MASTER #23 ADDENDUM - GATE C: run.job can now legitimately be null (an
+ // active session whose job record could not be resolved) - this used to be
+ // impossible because kmiMachineActiveRun() required a truthy job before
+ // returning a run at all. Guarded here so an orphaned-but-genuinely-active
+ // session still correctly reports ÇALIŞIYOR/DURUŞTA instead of throwing.
+ return {label:`${statusWord} · ${v33e(run.job?run.job.id:'-')}`,sub:`${v33e(run.job?(run.job.item||''):'')} · ${v33e(run.operatorName)}${dur?' · '+dur:''}`,paused:!!run.paused,startedAt:run.startedAt||null};
 }
 function kmiMachineProductionPanelHtml(machineName){
  const s=kmiMachineProductionStats(machineName);
  const trend=d=>d===0?'<span class="text-slate-500 text-[10px] ml-1">—</span>':(d>0?`<span class="text-emerald-400 text-[10px] ml-1"><i class="fa-solid fa-arrow-up"></i> ${d}</span>`:`<span class="text-red-400 text-[10px] ml-1"><i class="fa-solid fa-arrow-down"></i> ${Math.abs(d)}</span>`);
  return `<section class="bg-slate-950/55 border border-slate-800 rounded-xl p-4"><h4 class="font-black text-white">Üretim Performansı</h4>
- ${s.run?`<div class="text-[10px] text-emerald-300 mt-2"><i class="fa-solid fa-play"></i> Şu an: ${v33e(s.run.job.id)} · ${v33e(s.run.job.item||'-')} · ${v33e(s.run.operatorName)} · ${kmiFmtHoursMin(s.liveMinutes)}</div>`:'<div class="text-[10px] text-slate-500 mt-2">Şu anda aktif iş emri yok.</div>'}
+ ${s.run?`<div class="text-[10px] text-emerald-300 mt-2"><i class="fa-solid fa-play"></i> Şu an: ${v33e(s.run.job?s.run.job.id:'-')} · ${v33e(s.run.job?(s.run.job.item||'-'):'-')} · ${v33e(s.run.operatorName)} · ${kmiFmtHoursMin(s.liveMinutes)}</div>`:'<div class="text-[10px] text-slate-500 mt-2">Şu anda aktif iş emri yok.</div>'}
  <dl class="text-xs mt-3 space-y-2">
  <div><dt class="text-slate-500">Bu ay çalışma saati</dt><dd class="text-white">${kmiFmtHoursMin(s.monthRunMinutes)}</dd></div>
  <div><dt class="text-slate-500">Toplam üretilen adet</dt><dd class="text-white">${s.totalAllTime.toLocaleString('tr-TR')} adet</dd></div>
@@ -5974,7 +6002,7 @@ function fileHTML(m){const oo=openOrders(m.id),hist=closedOrders(m.id),plan=next
  const techAct=(typeof window.kmiMachineTechnicalActivity==='function')?window.kmiMachineTechnicalActivity(m.name):null;
  const techBadge=(isDown&&techAct&&techAct.active)?`<div class="text-[10px] font-black ${m.status==='DOWN'?'text-red-200':'text-amber-200'} mt-1 border border-dashed ${m.status==='DOWN'?'border-red-500':'border-amber-500'} rounded px-1.5 py-0.5 inline-block">🧪 TEST ÇALIŞIYOR · ${esc(techAct.testTypeLabel||techAct.testType||'')}</div>`:'';
  const photoCard=`<div class="v35-kpi flex items-center gap-3"><div class="w-16 h-16 rounded-xl overflow-hidden bg-slate-900 border border-slate-700 flex items-center justify-center shrink-0">${mPhoto?`<img src="${mPhoto}" class="w-full h-full object-cover" alt="">`:'<i class="fa-solid fa-industry text-2xl text-slate-600"></i>'}</div><div class="flex-1"><div class="text-[9px] text-slate-500 uppercase font-bold">Künye Fotoğrafı</div><div class="flex flex-wrap gap-1.5 mt-1">${typeof kmiUploadMachinePhoto==='function'?`<button onclick="kmiUploadMachinePhoto('${esc(m.code)}','${String(m.name).replace(/'/g,"\\'")}')" class="v35-btn bg-blue-700 text-[10px] py-1 px-2">${mPhoto?'Değiştir':'Yükle'}</button>`:''}${mPhoto&&typeof kmiRemoveMachinePhotoConfirm==='function'?`<button onclick="kmiRemoveMachinePhotoConfirm('${esc(m.code)}','${String(m.name).replace(/'/g,"\\'")}')" class="v35-btn bg-slate-800 text-[10px] py-1 px-2">Kaldır</button>`:''}</div></div></div>`;
- return `<div class="space-y-4"><div class="grid grid-cols-2 lg:grid-cols-6 gap-3">${photoCard}<div class="v35-kpi lg:col-span-2"><small class="text-slate-500">GÜNCEL DURUM</small><div class="text-xl font-black ${isDown?condColor:((!runBadge||runBadge.idle)?'text-blue-300':'text-emerald-300')}">${isDown?condLabel+' · '+downAge(m):((!runBadge||runBadge.idle)?'🔵 '+(runBadge?runBadge.label:'HAZIR · Boşta'):'🟢 '+runBadge.label)}</div>${techBadge}${isDown?`<div class="text-[10px] ${condColor} mt-1 opacity-80">Üretime kapalı: ${m.downSince?new Date(m.downSince).toLocaleString('tr-TR'):'—'} tarihinden beri</div>`:(runBadge&&runBadge.sub?`<div class="text-[10px] ${runBadge.idle?'text-blue-200':'text-emerald-200'} mt-1">${runBadge.sub}</div>`:'')}</div><div class="v35-kpi"><small class="text-slate-500">OEE</small><b class="block text-xl text-cyan-300">${oee(m)==null?'—':oee(m)+'%'}</b></div><div class="v35-kpi"><small class="text-slate-500">Sağlık</small><b class="block text-xl text-emerald-300">${health(m)}/100</b></div><div class="v35-kpi"><small class="text-slate-500">Toplam DOWN</small><b class="block text-xl text-red-300">${fmtMin(currentDownMinutes(m))}</b></div></div><div class="flex flex-wrap gap-2">${canMaintain()?`<button id="v35ToggleDown" class="v35-btn ${isDown?'bg-emerald-700':'bg-red-700'}">${isDown?'Makineyi Üretime AÇ (Yetkili Release)':'Makineyi Üretime KAPAT (DOWN)'}</button>${!isDown?`<button id="v35SetMaintenance" class="v35-btn bg-amber-700">Bakıma Al (MAINTENANCE)</button><button id="v35SetHold" class="v35-btn bg-violet-700">Üretime Kapat (HOLD)</button>`:''}${isDown&&(!techAct||!techAct.active)?`<button id="v35OpenTestMode" class="v35-btn bg-cyan-800"><i class="fa-solid fa-vial mr-1"></i>MAKİNEYİ TEST ET / TEST MODU</button>`:''}${isDown&&techAct&&techAct.active?`<button id="v35FinishTestMode" class="v35-btn bg-slate-700">Test Modunu Bitir</button>`:''}<button id="v35NewFault" class="v35-btn bg-red-700">+ Arıza / Alarm Kaydı</button><button id="v35NewPlan" class="v35-btn bg-indigo-700">+ Planlı Bakım</button><button id="v35NewMissing" class="v35-btn bg-amber-700">+ Eksiklik / İyileştirme</button>${typeof kmiOpenMachineMaterialModal==='function'?`<button onclick="kmiOpenMachineMaterialModal('${String(m.name).replace(/'/g,"\\'")}')" class="v35-btn bg-cyan-700"><i class="fa-solid fa-boxes-stacked mr-1"></i>Malzeme/Parça Kullan</button>`:''}${typeof kmiOpenServiceCallModal==='function'?`<button onclick="kmiOpenServiceCallModal('${String(m.name).replace(/'/g,"\\'")}')" class="v35-btn bg-red-800"><i class="fa-solid fa-truck-medical mr-1"></i>Dış Servis Çağır</button>`:''}`:''}${canAdmin()?'<button id="v35EditMachine" class="v35-btn bg-slate-700">Makine Künyesini Düzenle</button>':''}</div><div class="grid grid-cols-1 xl:grid-cols-3 gap-4"><div class="xl:col-span-2 space-y-4">${typeof kmiMachineProductionPanelHtml==='function'?kmiMachineProductionPanelHtml(m.name):''}<section class="bg-slate-950/55 border border-slate-800 rounded-xl p-4"><h4 class="font-black text-white">Açık Arıza / Bakım / Eksiklikler</h4><div class="space-y-2 mt-3">${oo.map(o=>detailOrder(o)).join('')||'<div class="text-xs text-slate-500">Açık kayıt yok.</div>'}</div></section><section class="bg-slate-950/55 border border-slate-800 rounded-xl p-4"><h4 class="font-black text-white">Arıza & Bakım Geçmişi</h4><div class="space-y-2 mt-3">${hist.map(o=>historyOrder(o)).join('')||'<div class="text-xs text-slate-500">Henüz kapanmış kayıt yok.</div>'}</div></section><section class="bg-slate-950/55 border border-slate-800 rounded-xl p-4"><div class="flex justify-between"><h4 class="font-black text-white">Makine Günlüğü / Yorumlar</h4>${canMaintain()?'<button id="v35AddComment" class="text-xs text-cyan-300">+ Yorum</button>':''}</div><div class="space-y-2 mt-3">${journal.filter(j=>j.machineId===m.id).sort((a,b)=>new Date(b.at)-new Date(a.at)).slice(0,30).map(j=>`<div class="v35-row"><b class="text-xs text-white">${esc(j.type)}</b><div class="text-xs text-slate-300 mt-1">${esc(j.text)}</div><small class="text-slate-500">${esc(j.by)} · ${new Date(j.at).toLocaleString('tr-TR')}</small></div>`).join('')||'<div class="text-xs text-slate-500">Günlük kaydı yok.</div>'}</div></section></div><aside class="space-y-4"><section class="bg-slate-950/55 border border-slate-800 rounded-xl p-4"><h4 class="font-black text-white">Makine Künyesi</h4><dl class="text-xs mt-3 space-y-2"><div><dt class="text-slate-500">Kod</dt><dd class="text-white">${esc(m.code)}</dd></div><div><dt class="text-slate-500">Departman</dt><dd class="text-white">${canAdmin()?`<select data-v35-dept="${esc(m.id)}" class="bg-slate-950 border border-slate-700 rounded text-xs px-2 py-1 ${deptBadgeColor(guessDepartment(m))}">${DEPARTMENTS.map(d=>`<option value="${d}" ${d===guessDepartment(m)?'selected':''}>${d}</option>`).join('')}</select>`:esc(guessDepartment(m))}</dd></div><div><dt class="text-slate-500">Marka / Model</dt><dd class="text-white">${esc(m.brand||'-')} ${esc(m.model||'')}</dd></div><div><dt class="text-slate-500">Seri No</dt><dd class="text-white">${esc(m.serial||'-')}</dd></div><div><dt class="text-slate-500">Yıl / Lokasyon</dt><dd class="text-white">${esc(m.year||'-')} · ${esc(m.location||'-')}</dd></div><div><dt class="text-slate-500">Teknik Özellikler</dt><dd class="text-white whitespace-pre-wrap">${esc(m.specs||'-')}</dd></div></dl></section><section class="bg-slate-950/55 border border-slate-800 rounded-xl p-4"><h4 class="font-black text-white">Bakım Özeti</h4><div class="text-xs mt-3 space-y-2"><div>Son bakım: <b>${lastMaintenance(m.id)?new Date(lastMaintenance(m.id).closedAt).toLocaleDateString('tr-TR'):'—'}</b></div><div>Sonraki planlı bakım: <b>${plan?new Date(plan.plannedAt).toLocaleDateString('tr-TR'):'—'}</b></div><div>Açık kayıt: <b>${oo.length}</b></div><div>Bu ay bakım açık süresi: <b class="text-amber-300">${fmtMin(mm.serviceMinutes)}</b></div><div>Bu ay arızaya bağlı DOWN: <b class="text-red-300">${fmtMin(mm.downMinutes)}</b></div><div>Toplam DOWN: <b class="text-red-300">${fmtMin(currentDownMinutes(m))}</b></div></div></section></aside></div></div>`}
+ return `<div class="space-y-4"><div class="grid grid-cols-2 lg:grid-cols-6 gap-3">${photoCard}<div class="v35-kpi lg:col-span-2"><small class="text-slate-500">GÜNCEL DURUM</small><div class="text-xl font-black ${isDown?condColor:((!runBadge||runBadge.idle)?'text-blue-300':'text-emerald-300')}">${isDown?condLabel+' · '+downAge(m):((!runBadge||runBadge.idle)?'🔵 '+(runBadge?runBadge.label:'HAZIR · Boşta'):'🟢 '+runBadge.label)}</div>${techBadge}${isDown?`<div class="text-[10px] ${condColor} mt-1 opacity-80">Üretime kapalı: ${m.downSince?new Date(m.downSince).toLocaleString('tr-TR'):'—'} tarihinden beri</div>`:(runBadge&&runBadge.sub?`<div class="text-[10px] ${runBadge.idle?'text-blue-200':'text-emerald-200'} mt-1">${runBadge.sub}</div>`:'')}</div><div class="v35-kpi"><small class="text-slate-500">OEE</small><b class="block text-xl text-cyan-300">${oee(m)==null?'—':oee(m)+'%'}</b></div><div class="v35-kpi"><small class="text-slate-500">Sağlık</small><b class="block text-xl text-emerald-300">${health(m)}/100</b></div><div class="v35-kpi"><small class="text-slate-500">Toplam DOWN</small><b class="block text-xl text-red-300">${fmtMin(currentDownMinutes(m))}</b></div></div><div class="flex flex-wrap gap-2">${canMaintain()?`<button id="v35ToggleDown" class="v35-btn ${isDown?'bg-emerald-700':'bg-red-700'}">${isDown?'Makineyi Üretime AÇ (Yetkili Release)':'Makineyi Üretime KAPAT (DOWN)'}</button>${!isDown?`<button id="v35SetMaintenance" class="v35-btn bg-amber-700">Bakıma Al (MAINTENANCE)</button><button id="v35SetHold" class="v35-btn bg-violet-700">Üretime Kapat (HOLD)</button>`:''}${isDown&&(!techAct||!techAct.active)?`<button id="v35OpenTestMode" class="v35-btn bg-cyan-800"><i class="fa-solid fa-vial mr-1"></i>MAKİNEYİ TEST ET / TEST MODU</button>`:''}${isDown&&techAct&&techAct.active?`<button id="v35FinishTestMode" class="v35-btn bg-slate-700">Test Modunu Bitir</button>`:''}<button id="v35NewFault" class="v35-btn bg-red-700">+ Arıza / Alarm Kaydı</button><button id="v35NewPlan" class="v35-btn bg-indigo-700">+ Planlı Bakım</button><button id="v35NewMissing" class="v35-btn bg-amber-700">+ Eksiklik / İyileştirme</button>${typeof kmiOpenMachineMaterialModal==='function'?`<button onclick="kmiOpenMachineMaterialModal('${String(m.name).replace(/'/g,"\\'")}')" class="v35-btn bg-cyan-700"><i class="fa-solid fa-boxes-stacked mr-1"></i>Malzeme/Parça Kullan</button>`:''}${typeof kmiOpenServiceCallModal==='function'?`<button onclick="kmiOpenServiceCallModal('${String(m.name).replace(/'/g,"\\'")}')" class="v35-btn bg-red-800"><i class="fa-solid fa-truck-medical mr-1"></i>Dış Servis Çağır</button>`:''}`:''}${canAdmin()?'<button id="v35EditMachine" class="v35-btn bg-slate-700">Makine Künyesini Düzenle</button>':''}</div><div class="grid grid-cols-1 xl:grid-cols-3 gap-4"><div class="xl:col-span-2 space-y-4">${typeof kmiMachineProductionPanelHtml==='function'?kmiMachineProductionPanelHtml(m.name):''}<section class="bg-slate-950/55 border border-slate-800 rounded-xl p-4"><h4 class="font-black text-white">Açık Arıza / Bakım / Eksiklikler</h4><div class="space-y-2 mt-3">${oo.map(o=>detailOrder(o)).join('')||'<div class="text-xs text-slate-500">Açık kayıt yok.</div>'}</div></section><section class="bg-slate-950/55 border border-slate-800 rounded-xl p-4"><h4 class="font-black text-white">Arıza & Bakım Geçmişi</h4><div class="space-y-2 mt-3">${hist.map(o=>historyOrder(o)).join('')||'<div class="text-xs text-slate-500">Henüz kapanmış kayıt yok.</div>'}</div></section><section class="bg-slate-950/55 border border-slate-800 rounded-xl p-4"><h4 class="font-black text-white">Test Modu Geçmişi</h4><div class="space-y-2 mt-3">${(typeof window.kmiMachineTestHistory==='function'?window.kmiMachineTestHistory(m.id):[]).map(t=>`<div class="v35-row"><div class="flex justify-between"><b class="text-white text-xs">${esc(t.testTypeLabel||t.testType||'Test')}</b><span class="text-[10px] ${t.result==='TEST PASSED'?'text-emerald-300':t.result==='TEST FAILED'?'text-red-300':t.finishedAt?'text-amber-300':'text-cyan-300'}">${esc(t.result||(t.finishedAt?'—':'DEVAM EDİYOR'))}</span></div><small class="text-slate-500">Başlangıç: ${new Date(t.startedAt).toLocaleString('tr-TR')}${t.finishedAt?' · Bitiş: '+new Date(t.finishedAt).toLocaleString('tr-TR'):''} · ${esc(t.actorName||'-')}</small>${t.notes?`<div class="text-xs text-slate-300 mt-1">${esc(t.notes)}</div>`:''}</div>`).join('')||'<div class="text-xs text-slate-500">Henüz test oturumu kaydı yok.</div>'}</div></section><section class="bg-slate-950/55 border border-slate-800 rounded-xl p-4"><div class="flex justify-between"><h4 class="font-black text-white">Makine Günlüğü / Yorumlar</h4>${canMaintain()?'<button id="v35AddComment" class="text-xs text-cyan-300">+ Yorum</button>':''}</div><div class="space-y-2 mt-3">${journal.filter(j=>j.machineId===m.id).sort((a,b)=>new Date(b.at)-new Date(a.at)).slice(0,30).map(j=>`<div class="v35-row"><b class="text-xs text-white">${esc(j.type)}</b><div class="text-xs text-slate-300 mt-1">${esc(j.text)}</div><small class="text-slate-500">${esc(j.by)} · ${new Date(j.at).toLocaleString('tr-TR')}</small></div>`).join('')||'<div class="text-xs text-slate-500">Günlük kaydı yok.</div>'}</div></section></div><aside class="space-y-4"><section class="bg-slate-950/55 border border-slate-800 rounded-xl p-4"><h4 class="font-black text-white">Makine Künyesi</h4><dl class="text-xs mt-3 space-y-2"><div><dt class="text-slate-500">Kod</dt><dd class="text-white">${esc(m.code)}</dd></div><div><dt class="text-slate-500">Departman</dt><dd class="text-white">${canAdmin()?`<select data-v35-dept="${esc(m.id)}" class="bg-slate-950 border border-slate-700 rounded text-xs px-2 py-1 ${deptBadgeColor(guessDepartment(m))}">${DEPARTMENTS.map(d=>`<option value="${d}" ${d===guessDepartment(m)?'selected':''}>${d}</option>`).join('')}</select>`:esc(guessDepartment(m))}</dd></div><div><dt class="text-slate-500">Marka / Model</dt><dd class="text-white">${esc(m.brand||'-')} ${esc(m.model||'')}</dd></div><div><dt class="text-slate-500">Seri No</dt><dd class="text-white">${esc(m.serial||'-')}</dd></div><div><dt class="text-slate-500">Yıl / Lokasyon</dt><dd class="text-white">${esc(m.year||'-')} · ${esc(m.location||'-')}</dd></div><div><dt class="text-slate-500">Teknik Özellikler</dt><dd class="text-white whitespace-pre-wrap">${esc(m.specs||'-')}</dd></div></dl></section><section class="bg-slate-950/55 border border-slate-800 rounded-xl p-4"><h4 class="font-black text-white">Bakım Özeti</h4><div class="text-xs mt-3 space-y-2"><div>Son bakım: <b>${lastMaintenance(m.id)?new Date(lastMaintenance(m.id).closedAt).toLocaleDateString('tr-TR'):'—'}</b></div><div>Sonraki planlı bakım: <b>${plan?new Date(plan.plannedAt).toLocaleDateString('tr-TR'):'—'}</b></div><div>Açık kayıt: <b>${oo.length}</b></div><div>Bu ay bakım açık süresi: <b class="text-amber-300">${fmtMin(mm.serviceMinutes)}</b></div><div>Bu ay arızaya bağlı DOWN: <b class="text-red-300">${fmtMin(mm.downMinutes)}</b></div><div>Toplam DOWN: <b class="text-red-300">${fmtMin(currentDownMinutes(m))}</b></div></div></section></aside></div></div>`}
 function detailOrder(o){const age=(Date.now()-new Date(o.openedAt).getTime())/3600000;return `<div class="v35-row"><div class="flex flex-wrap justify-between gap-2"><div><b class="text-white text-xs">${esc(o.id)} · ${esc(o.kindLabel||o.kind)}</b><div class="text-[10px] text-slate-500">Açılış: ${new Date(o.openedAt).toLocaleString('tr-TR')} · ${esc(o.reportedBy||'-')}</div>${o.assignedTo?`<div class="text-[10px] text-violet-300 mt-0.5"><i class="fa-solid fa-user-gear"></i> Atanan: ${esc(o.assignedToName||'-')}</div>`:''}</div><span class="v35-chip ${age>=72?'bg-red-500/15 text-red-300':'bg-amber-500/15 text-amber-300'}">${age.toFixed(1)} saat açık</span></div><div class="mt-2 text-xs"><b class="text-red-300">Alarm / Semptom:</b> ${esc(o.symptom||'-')}</div><div class="text-xs text-slate-300 mt-1">${esc(o.description||'')}</div>${o.plannedAt?`<div class="text-[10px] text-indigo-300 mt-1">Planlanan: ${new Date(o.plannedAt).toLocaleString('tr-TR')}</div>`:''}${canMaintain()?`<div class="mt-3 flex gap-2"><button class="v35-btn bg-indigo-700" onclick="window.v35AssignOrder('${esc(o.id)}')">${o.assignedTo?'Yeniden Ata':'Ata'}</button><button class="v35-btn bg-emerald-700" data-v35-close="${esc(o.id)}">Çöz & Kapat</button></div>`:''}</div>`}
 function historyOrder(o){return `<div class="v35-row"><div class="flex justify-between"><b class="text-white text-xs">${esc(o.kindLabel||o.kind)} · ${new Date(o.closedAt).toLocaleDateString('tr-TR')}</b><span class="text-[10px] text-emerald-300">KAPANDI</span></div><div class="text-xs mt-2"><span class="text-red-300">Başlangıç:</span> ${esc(o.symptom||'-')}</div><div class="text-xs"><span class="text-emerald-300">Çözüm:</span> ${esc(o.resolution||'-')}</div>${o.parts?`<div class="text-xs"><span class="text-amber-300">Parça:</span> ${esc(o.parts)}</div>`:''}<small class="text-slate-500">Kapatan: <b>${esc(o.closedBy||'-')}</b> · İş emri açık kalma: <b>${fmtMin(o.serviceDurationMinutes||0)}</b>${o.downtimeMinutes!=null?' · Gerçek DOWN: <b>'+fmtMin(o.downtimeMinutes)+'</b>':''}</small></div>`}
 function bindFile(m){document.querySelectorAll('[data-v35-dept]').forEach(s=>s.onchange=()=>setDepartment(s.dataset.v35Dept,s.value));document.getElementById('v35ToggleDown')?.addEventListener('click',()=>toggleDown(m.id));document.getElementById('v35SetMaintenance')?.addEventListener('click',()=>setMaintenance(m.id));document.getElementById('v35SetHold')?.addEventListener('click',()=>setHold(m.id));document.getElementById('v35OpenTestMode')?.addEventListener('click',()=>{if(typeof window.kmiOpenMaintenanceTestModal==='function')window.kmiOpenMaintenanceTestModal(m.id);else alert('Test Modu modülü yüklenemedi.')});document.getElementById('v35FinishTestMode')?.addEventListener('click',()=>{if(typeof window.kmiOpenMaintenanceTestFinishModal==='function')window.kmiOpenMaintenanceTestFinishModal(m.id);else alert('Test Modu modülü yüklenemedi.')});document.getElementById('v35NewFault')?.addEventListener('click',()=>newOrder(m.id,'FAULT'));document.getElementById('v35NewPlan')?.addEventListener('click',()=>newOrder(m.id,'PLANNED'));document.getElementById('v35NewMissing')?.addEventListener('click',()=>newOrder(m.id,'MISSING'));document.getElementById('v35EditMachine')?.addEventListener('click',()=>editMachine(m.id));document.getElementById('v35AddComment')?.addEventListener('click',()=>addComment(m.id));document.querySelectorAll('[data-v35-close]').forEach(b=>b.onclick=()=>closeOrder(b.dataset.v35Close))}
@@ -7462,6 +7490,12 @@ function productCostPanel66(p){const tc=productToolCost66(p.id),cfg=D.productCos
 window.v66EditProductCosts=function(id){const c=D.productCosts[id]||{};v62Modal('Ürün Maliyet Parametreleri',`<div class="grid md:grid-cols-3 gap-3">${[['material','Ham madde / adet'],['machine','Makine / adet'],['labor','İşçilik / adet'],['quality','Kalite / adet'],['scrap','Hurda etkisi / adet'],['rework','Rework / adet'],['energy','Enerji / adet'],['other','Diğer / adet'],['previousTotal','Karşılaştırma için önceki toplam / adet']].map(([k,l])=>`<label>${l}<input id="pc_${k}" type="number" step="0.001" value="${Number(c[k]||0)}" class="mt-1 kmi-field"></label>`).join('')}</div><div class="text-right mt-4"><button onclick="v66SaveProductCosts('${id}')" class="bg-emerald-700 px-4 py-2 rounded">Kaydet</button></div>`)};
 window.v66SaveProductCosts=function(id){let c={};['material','machine','labor','quality','scrap','rework','energy','other','previousTotal'].forEach(k=>c[k]=Number(document.getElementById('pc_'+k)?.value||0));D.productCosts[id]=c;save();v62CloseModal();v62OpenProduct(id)};
 function toolIntelligence66(){const masters=D.toolMasters.map(tm=>{const st=toolStats66(tm);return `<button onclick="v66OpenToolMaster('${tm.id}')" class="text-left bg-slate-950 hover:bg-slate-800 border border-slate-700 rounded-xl p-3"><div class="flex justify-between"><b class="text-cyan-300">${esc(tm.code)}</b><span class="text-xs ${Number(tm.stock)<=Number(tm.minStock)?'text-red-400':'text-emerald-400'}">${tm.stock||0} stok</span></div><div class="font-bold">${esc(tm.name)}</div><div class="text-[10px] text-slate-500 mt-1">Ø${tm.diameter||'-'} · ${tm.flutes||'-'} ağız · ${esc(tm.coating||'-')} · ${esc(tm.manufacturer||'-')}</div><div class="grid grid-cols-3 gap-1 mt-3 text-[10px]"><span>Ort. ömür <b>${st.avgLife.toFixed(0)}</b></span><span>/100 <b>${st.cost100.toFixed(2)}</b></span><span>/1000 <b>${st.cost1000.toFixed(2)}</b></span></div></button>`}).join('');return `<div class="mt-8 border-t border-slate-700 pt-6"><div class="flex flex-wrap justify-between gap-2 mb-3"><div><h4 class="font-black text-amber-300">Takım Yönetimi & Lockcell · Yaşam Döngüsü</h4><p class="text-xs text-slate-500">Satınalma → Lockcell → Nikken Presetter → Tezgah/Yedek → TAK/SÖK → Ömür → Hurda/Kırılma → ürün maliyeti</p></div><div><button onclick="v66AddToolMaster()" class="bg-blue-700 px-3 py-2 rounded text-xs">+ Kesici Takım Ana Kartı</button> <button onclick="v66QuickEvent()" class="bg-amber-700 px-3 py-2 rounded text-xs">Barkodlu TAK / SÖK / Preset</button></div></div><div class="grid md:grid-cols-3 gap-3">${masters||'<div class="text-slate-500">Takım ana kartı yok.</div>'}</div></div>`}
+// MASTER #23 ADDENDUM Batch 2, Domain 11 (Toolroom/Tooling): this was
+// closure-private (declared with bare `function`, never attached to
+// window), only ever reachable inlined into supply()'s own template. The
+// new dedicated Toolroom canonical workspace calls it directly from a
+// different <script> closure, so it must be exposed.
+window.toolIntelligence66=toolIntelligence66;
 window.v66AddToolMaster=function(){const id='TM-'+Date.now();D.toolMasters.push({id,code:'YENI-'+String(D.toolMasters.length+1).padStart(3,'0'),name:'Yeni Kesici Takım',category:'',manufacturer:'',manufacturerCode:'',diameter:0,totalLength:0,cutLength:0,plungeLength:0,helixLength:0,shankDiameter:0,flutes:0,coating:'',grade:'',coolant:'',supplier:'',lastPrice:0,currency:'EUR',barcode:id,minStock:0,stock:0});save();v66OpenToolMaster(id)};
 window.v66OpenToolMaster=function(id){const t=toolMaster66(id);if(!t)return;const inst=D.toolInstances.filter(i=>i.toolMasterId===id);const st=toolStats66(t);v62Modal('Kesici Takım Ana Kartı · '+esc(t.code),`<div class="grid md:grid-cols-4 gap-3">${[['tmCode','Takım Kodu','code'],['tmName','Detaylı Ad','name'],['tmCat','Kategori','category'],['tmMfr','Üretici','manufacturer'],['tmMfrCode','Üretici Parça Kodu','manufacturerCode'],['tmDia','Çap mm','diameter'],['tmTotal','Toplam Boy mm','totalLength'],['tmCut','Kesici Boy mm','cutLength'],['tmPlunge','Dalma Boyu mm','plungeLength'],['tmHelix','Helis Boyu mm','helixLength'],['tmShank','Şaft Çapı mm','shankDiameter'],['tmFlutes','Ağız Sayısı','flutes'],['tmCoat','Kaplama','coating'],['tmGrade','Karbür / Grade','grade'],['tmCool','Soğutma','coolant'],['tmBarcode','Tedarikçi / İç Barkod','barcode'],['tmStock','Lockcell Stok','stock'],['tmMin','Min. Stok','minStock'],['tmPrice','Son Alış Fiyatı','lastPrice'],['tmCur','Para Birimi','currency']].map(([eid,l,k])=>`<label>${l}<input id="${eid}" value="${esc(t[k]??'')}" class="mt-1 kmi-field"></label>`).join('')}</div><div class="grid md:grid-cols-4 gap-2 mt-4">${card('Fiziksel Instance',inst.length,'seri kayıt','fa-barcode')}${card('Ort. Gerçek Ömür',st.avgLife.toFixed(0),'adet','fa-gauge')}${card('100 Parça Takım',st.cost100.toFixed(2)+' '+esc(t.currency),'gerçek ömür','fa-coins')}${card('1000 Parça Takım',st.cost1000.toFixed(2)+' '+esc(t.currency),'gerçek ömür','fa-chart-line')}</div><div class="mt-4"><b>Fiziksel Takımlar / Etiketler</b>${inst.map(i=>{const l=life66(i);return `<button onclick="v66OpenInstance('${i.id}')" class="w-full text-left bg-slate-950 rounded p-2 mt-2 text-xs"><b class="text-cyan-300">${esc(i.id)}</b> · ${esc(i.nikkenLabel||'-')} · ${esc(i.status)} · gerçek ${l.qty||0} adet / ${l.minutes.toFixed(0)} dk</button>`}).join('')||'<div class="text-slate-500 text-xs mt-2">Instance yok.</div>'}</div><div class="mt-5 flex justify-between"><div class="flex gap-2"><button onclick="v69DeleteDRecord('toolMasters','${id}','Takım ana kartı')" class="bg-red-950 text-red-300 px-4 py-2 rounded">Takım Kartını Sil</button><button onclick="v66NewInstance('${id}')" class="bg-blue-700 px-4 py-2 rounded">+ Fiziksel Takım / Instance</button></div><button onclick="v66SaveToolMaster('${id}')" class="bg-emerald-700 px-4 py-2 rounded">Kartı Kaydet</button></div>`)};
 window.v66SaveToolMaster=function(id){const t=toolMaster66(id);const mp={tmCode:'code',tmName:'name',tmCat:'category',tmMfr:'manufacturer',tmMfrCode:'manufacturerCode',tmDia:'diameter',tmTotal:'totalLength',tmCut:'cutLength',tmPlunge:'plungeLength',tmHelix:'helixLength',tmShank:'shankDiameter',tmFlutes:'flutes',tmCoat:'coating',tmGrade:'grade',tmCool:'coolant',tmBarcode:'barcode',tmStock:'stock',tmMin:'minStock',tmPrice:'lastPrice',tmCur:'currency'};Object.entries(mp).forEach(([e,k])=>{let v=document.getElementById(e)?.value??'';if(['diameter','totalLength','cutLength','plungeLength','helixLength','shankDiameter','flutes','stock','minStock','lastPrice'].includes(k))v=Number(v||0);t[k]=v});save();v62CloseModal();v61Show('supply')};
@@ -7515,6 +7549,11 @@ window.v64PrintObject=function(type,id,i){const x=activities64(type,id)[i];if(x)
 function purchaseProducts64(){const keys=new Map();D.purchases.forEach(p=>{const k=p.productId||p.item;if(!k)return;if(!keys.has(k))keys.set(k,{id:k,name:p.productId?name('products',p.productId):p.item,productId:p.productId});});return [...keys.values()];}
 window.v64OpenPurchaseProduct=function(id){const x=purchaseProducts64().find(z=>z.id===id);if(!x)return;const a=activities64('purchaseProduct',id),last=a[0]?.raw;v62Modal('Satınalma Ürün Kartı · '+esc(x.name),`<div class="grid md:grid-cols-4 gap-3"><div class="bg-slate-950 rounded-xl p-3"><div class="text-[10px] text-slate-500">SON TEDARİKÇİ</div><b>${esc(last?name('suppliers',last.supplier):'-')}</b></div><div class="bg-slate-950 rounded-xl p-3"><div class="text-[10px] text-slate-500">SON FİYAT</div><b class="text-emerald-300">${last?money(last.unitPrice,last.currency):'-'}</b></div><div class="bg-slate-950 rounded-xl p-3"><div class="text-[10px] text-slate-500">SATIN ALAN</div><b>${esc(last?.purchasedBy||'-')}</b></div><div class="bg-slate-950 rounded-xl p-3"><div class="text-[10px] text-slate-500">SON TARİH</div><b>${esc(last?.orderDate||'-')}</b></div></div>${activityPanel64('purchaseProduct',id)}`)};
 function toolroom64(){const rows=D.toolroom.map(t=>{const val=Number(t.stock||0)*Number(t.avgCost||0);return `<tr class="border-b border-slate-800"><td class="p-3"><button onclick="v64OpenTool('${t.id}')" class="text-cyan-300 font-mono font-bold">${esc(t.code)}</button><div class="text-xs text-white">${esc(t.name)}</div></td><td>${esc(t.category||'-')}</td><td>${esc(t.lockcell||'-')} / ${esc(t.cell||'-')}</td><td class="font-bold ${Number(t.stock)<=Number(t.minStock)?'text-red-300':'text-emerald-300'}">${Number(t.stock||0)} ${esc(t.unit||'adet')}</td><td>${Number(t.avgCost||0).toLocaleString('tr-TR',{minimumFractionDigits:2})} ${esc(t.currency||'TRY')}</td><td>${val.toLocaleString('tr-TR',{minimumFractionDigits:2})} ${esc(t.currency||'TRY')}</td><td><button onclick="v64ToolMove('${t.id}','OUT')" class="bg-amber-700 px-2 py-1 rounded text-xs">Sarf</button> <button onclick="v64ToolMove('${t.id}','IN')" class="bg-emerald-700 px-2 py-1 rounded text-xs">Giriş</button></td></tr>`}).join('');return shell('Takımhane · Lockcell','Kesici takım, tutucu ve sarf malzemeleri; Lockcell dolap/hücre konumu, stok, minimum stok, ortalama maliyet ve sarf hareketleri.',`<button onclick="v64AddTool()" class="bg-blue-600 px-3 py-2 rounded">+ Takım / Sarf Kartı</button>`,`<div class="grid md:grid-cols-4 gap-3 mb-4">${card('Takım/Sarf',D.toolroom.length,'kart','fa-screwdriver-wrench')}${card('Stok Değeri',D.toolroom.reduce((a,t)=>a+Number(t.stock||0)*Number(t.avgCost||0),0).toLocaleString('tr-TR',{maximumFractionDigits:2})+' TL','yaklaşık','fa-coins')}${card('Kritik Stok',D.toolroom.filter(t=>Number(t.stock)<=Number(t.minStock)).length,'kalem','fa-triangle-exclamation')}${card('Hareket',D.toolTransactions.length,'giriş/sarf','fa-right-left')}</div><div class="overflow-x-auto"><table class="w-full text-sm"><thead class="text-left text-slate-500"><tr><th class="p-3">Takım / Sarf</th><th>Kategori</th><th>Lockcell</th><th>Stok</th><th>Ort. Maliyet</th><th>Stok Değeri</th><th>Hareket</th></tr></thead><tbody>${rows||'<tr><td colspan="7" class="p-6 text-center text-slate-500">Takım kartı yok.</td></tr>'}</tbody></table></div>`)}
+// MASTER #23 ADDENDUM Batch 2, Domain 11 (Toolroom/Tooling): same
+// exposure gap as toolIntelligence66 above - closure-private, only ever
+// reachable inlined into supply()'s own template. Exposed for the new
+// dedicated Toolroom canonical workspace.
+window.toolroom64=toolroom64;
 window.v64AddTool=function(){const code=prompt('Takım / sarf kodu');if(!code)return;const namex=prompt('Takım / sarf adı');if(!namex)return;D.toolroom.unshift({id:'TL-'+Date.now(),code,name:namex,category:'Kesici Takım',lockcell:'LOCKCELL-1',cell:'',stock:0,minStock:0,unit:'adet',avgCost:0,currency:'TRY',supplier:'',lastPurchaseDate:'',lastPurchasePrice:0,barcode:code,notes:''});save();v61Show('supply')};
 window.v64OpenTool=function(id){const t=D.toolroom.find(x=>x.id===id);if(!t)return;activeV62={type:'toolroom',id};v62Modal('Takım / Sarf Kimlik Kartı · '+esc(t.code),`<div class="grid md:grid-cols-3 gap-3"><label>Kod<input id="tlCode" value="${esc(t.code)}" class="mt-1 kmi-field"></label><label>Ad<input id="tlName" value="${esc(t.name)}" class="mt-1 kmi-field"></label><label>Kategori<input id="tlCat" value="${esc(t.category||'')}" class="mt-1 kmi-field"></label><label>Lockcell Dolap<input id="tlLock" value="${esc(t.lockcell||'')}" class="mt-1 kmi-field"></label><label>Hücre / Göz<input id="tlCell" value="${esc(t.cell||'')}" class="mt-1 kmi-field"></label><label>Barkod<input id="tlBarcode" value="${esc(t.barcode||t.code)}" class="mt-1 kmi-field"></label><label>Stok<input id="tlStock" type="number" value="${Number(t.stock||0)}" class="mt-1 kmi-field"></label><label>Minimum Stok<input id="tlMin" type="number" value="${Number(t.minStock||0)}" class="mt-1 kmi-field"></label><label>Birim<input id="tlUnit" value="${esc(t.unit||'adet')}" class="mt-1 kmi-field"></label><label>Ort. Maliyet<input id="tlCost" type="number" step="0.01" value="${Number(t.avgCost||0)}" class="mt-1 kmi-field"></label><label>Para Birimi<input id="tlCur" value="${esc(t.currency||'TRY')}" class="mt-1 kmi-field"></label><label>Tedarikçi<input id="tlSupplier" value="${esc(t.supplier||'')}" class="mt-1 kmi-field"></label><label>Son Alış Tarihi<input id="tlLastDate" type="date" value="${esc(t.lastPurchaseDate||'')}" class="mt-1 kmi-field"></label><label>Son Alış Fiyatı<input id="tlLastPrice" type="number" step="0.01" value="${Number(t.lastPurchasePrice||0)}" class="mt-1 kmi-field"></label><label class="md:col-span-3">Notlar<textarea id="tlNotes" class="mt-1 kmi-field">${esc(t.notes||'')}</textarea></label></div><div class="mt-5"><b>Son Hareketler</b><div class="mt-2 space-y-2">${D.toolTransactions.filter(x=>x.toolId===id).slice().sort((a,b)=>String(b.date).localeCompare(String(a.date))).slice(0,30).map(x=>`<div class="bg-slate-950 rounded p-2 text-xs">${esc(dt64(x.date))} · <b>${esc(x.type)}</b> · ${x.qty} · ${esc(x.by||'-')} · ${esc(x.note||'')}</div>`).join('')||'<div class="text-slate-500 text-xs">Hareket yok.</div>'}</div></div><div class="mt-5 text-right"><button onclick="v64SaveTool()" class="bg-emerald-700 px-5 py-2 rounded font-bold">Kartı Kaydet</button></div>`)};
 window.v64SaveTool=function(){const t=D.toolroom.find(x=>x.id===activeV62?.id);if(!t)return;Object.assign(t,{code:document.getElementById('tlCode').value.trim(),name:document.getElementById('tlName').value.trim(),category:document.getElementById('tlCat').value.trim(),lockcell:document.getElementById('tlLock').value.trim(),cell:document.getElementById('tlCell').value.trim(),barcode:document.getElementById('tlBarcode').value.trim(),stock:Number(document.getElementById('tlStock').value||0),minStock:Number(document.getElementById('tlMin').value||0),unit:document.getElementById('tlUnit').value.trim(),avgCost:Number(document.getElementById('tlCost').value||0),currency:document.getElementById('tlCur').value.trim(),supplier:document.getElementById('tlSupplier').value.trim(),lastPurchaseDate:document.getElementById('tlLastDate').value,lastPurchasePrice:Number(document.getElementById('tlLastPrice').value||0),notes:document.getElementById('tlNotes').value.trim()});save();v62CloseModal();v61Show('supply')};
@@ -7522,7 +7561,34 @@ window.v64ToolMove=function(id,type){const t=D.toolroom.find(x=>x.id===id);if(!t
 
 window.openV61Master=function(section='products'){document.getElementById('v61MasterOverlay').classList.remove('hidden');document.body.style.overflow='hidden';renderKpis();v61Show(section)};
 window.closeV61Master=function(){document.getElementById('v61MasterOverlay').classList.add('hidden');document.body.style.overflow=''};
-window.v61Show=function(k){document.querySelectorAll('.v61tab').forEach(b=>{b.classList.remove('bg-blue-700');b.classList.add('bg-slate-800')});const map={products,material,rework,supply,planning:planlama75,cost:costAnalysis66,flow};document.getElementById('v61Workspace').innerHTML=(map[k]||products)();const idx={products:0,material:1,rework:2,supply:3,planning:4,flow:5,cost:4}[k]??0;const b=document.querySelectorAll('.v61tab')[idx];b.classList.remove('bg-slate-800');b.classList.add('bg-blue-700')};
+window.v61Show=function(k){document.querySelectorAll('.v61tab').forEach(b=>{b.classList.remove('bg-blue-700');b.classList.add('bg-slate-800')});const map={products,material,rework,supply,planning:planlama75,cost:costAnalysis66,flow};
+  // DEFENSIVE GUARD (MASTER #23 ADDENDUM Batch 2, Domain 11 - Toolroom):
+  // this is the hard-coded post-save refresh every v64*/v66* writer calls.
+  // It assumes the legacy #v61Workspace overlay (openV61Master) is the
+  // active surface. That is no longer always true now that
+  // toolIntelligence66()/toolroom64() are ALSO reused, unchanged, inside
+  // the new dedicated Toolroom canonical workspace - where #v61Workspace
+  // does not exist. Previously this would throw
+  // (`Cannot set properties of null`) if called from anywhere else;
+  // guarded here rather than touching any of the writer call sites.
+  const v61el=document.getElementById('v61Workspace'); if(v61el) v61el.innerHTML=(map[k]||products)();
+  const idx={products:0,material:1,rework:2,supply:3,planning:4,flow:5,cost:4}[k]??0;const b=document.querySelectorAll('.v61tab')[idx];if(b){b.classList.remove('bg-slate-800');b.classList.add('bg-blue-700')}};
+// Additive refresh wrap (same pattern as window.v73RenderQueues above): if
+// the new Toolroom canonical workspace tab is the active surface when a
+// v64*/v66* writer finishes (and calls v61Show('supply') out of habit),
+// also refresh THIS workspace's own mount with the same canonical data.
+// No writer behavior changes; this only adds a second, independent
+// refresh target.
+(function(){
+  const prevV61Show=window.v61Show;
+  if(typeof prevV61Show==='function'){
+    window.v61Show=function(k){
+      const r=prevV61Show.apply(this,arguments);
+      try{ if(document.getElementById('tab-toolroom-workspace')?.classList.contains('active') && typeof window.kmiRenderToolroomWorkspace==='function') window.kmiRenderToolroomWorkspace(); }catch(e){}
+      return r;
+    };
+  }
+})();
 window.v61AddCustomer=function(){const c={id:'M-'+Date.now(),name:'Yeni Müşteri',active:true,fields:[]};D.customers.push(c);save();v62OpenCustomer(c.id)};
 window.v61AddProduct=function(){const p={id:'URN-'+Date.now(),code:'YENİ-'+String(Date.now()).slice(-5),name:'Yeni Ürün',revision:'A',drawingNo:'',customerPartNo:'',customer:D.customers[0]?.id||'',material:'',rawKgPerBlank:0,unit:'adet',route:'',routeSteps:[],description:'',qualityPlan:'',packaging:'',active:true,fields:[],rawSupplyMode:'',rawSupplyNote:'',setupTeardownMin:0,camCycleEstimateSec:0,allowedMachines:[],toolList:[],docCategories:[]};D.products.push(p);save();v62OpenProduct(p.id)};
 // KMI-FIX (2026-09-25): v61AddLot artık tam kart (v62Modal) açan sürümle material() fonksiyonunun
@@ -7871,7 +7937,18 @@ window.kmiMachineCapacityReport=function(){
 function mrp71(i){
  const monthly=(i.usageRules||[]).reduce((sum,r)=>{const p=D.products.find(x=>x.id===r.productId);const forecast=Number(r.monthlyDemand||0)||(Number(p?.annualForecast||0)/12);return sum+forecast*Number(r.qtyPer||0)*(1+Number(r.scrapPct||0)/100)},0);
  const daily=monthly/30, rop=Number(i.reorderPoint||0)>0?Number(i.reorderPoint):Number(i.safetyStock||0)+daily*Number(i.leadTimeDays||0);
- const open=D.purchases.filter(p=>p.purchaseItemId===i.id&&!['Teslim Alındı','Kapandı','İptal'].includes(p.status)).reduce((a,p)=>a+Number(p.qty||0),0);
+ // GATE C (MASTER #23 ADDENDUM §11, 2026-10-06): ESKİ davranış p.status
+ // (serbest metin, asla 'Teslim Alındı'/'Kapandı'/'İptal' değeriyle
+ // yazılmıyor - bu üç string D.purchases'ta hiç kullanılmıyor, başka bir
+ // modülden kalma) alanına bakıyordu, bu yüzden STOCKED/QC_REJECTED/
+ // MANAGEMENT_REJECTED/LEGACY (kapalı) PO'lar dahil HER PO "açık miktar"a
+ // dahil ediliyordu - Komuta Merkezi/PULSE/Satınalma çalışma alanının AYNI
+ // PO'yu AYNI anda kapalı saymasıyla çelişerek, hayalet "openPO" miktarı
+ // reorder önerisini bastırabiliyordu. FIX: gerçek kanonik alan
+ // workflowStatus + mevcut açık-PO beyaz listesine (OPEN_PO_STATES ile
+ // AYNI, 4. kopyası İCAT EDİLMEDİ) yakınsatıldı.
+ const OPEN_PO_STATES_MRP71=['PENDING_MANAGEMENT','PENDING_ACCOUNTING','PAID','INCOMING_QC','ORDERED','DRAFT'];
+ const open=D.purchases.filter(p=>p.purchaseItemId===i.id&&OPEN_PO_STATES_MRP71.indexOf(String(p.workflowStatus||''))!==-1).reduce((a,p)=>a+Number(p.qty||0),0);
  const target=Math.max(Number(i.maxStock||0),rop+monthly), shortage=Math.max(0,target-Number(i.stockQty||0)-open), moq=Number(i.moq||0), mult=Number(i.orderMultiple||0)||1;
  let suggested=shortage?Math.max(shortage,moq):0;if(suggested)suggested=Math.ceil(suggested/mult)*mult;
  return {monthly,daily,reorderPoint:rop,openPO:open,target,suggestedOrder:suggested};
@@ -7885,6 +7962,7 @@ function usageRows71(i){return (i.usageRules||[]).map((r,n)=>`<div class="grid m
 window.v71AddPurchaseItem=function(){const code='SKU-'+String(Date.now()).slice(-6);const x={id:'PI-'+Date.now(),code,name:'Yeni Satınalma Ürünü',description:'',category:'Genel',manufacturer:'',manufacturerPartNo:'',gtin:'',barcode:code.trim(),qrCode:code.trim(),baseUom:'adet',purchaseUom:'adet',uomFactor:1,stockQty:0,reservedQty:0,safetyStock:0,reorderPoint:0,maxStock:0,leadTimeDays:7,moq:1,orderMultiple:1,abcClass:'C',xyzClass:'Z',procurementType:'Satınalma',planner:'',buyer:'',warehouse:'',bin:'',lotTracking:false,serialTracking:false,shelfLifeDays:0,inspectionRequired:true,preferredSupplier:'',supplierIds:[],currency:'TRY',hsCode:'',countryOfOrigin:'',incoterm:'',qualitySpec:'',certificateRequirement:'',alternatives:[],equivalents:[],usageRules:[],documents:[],fields:[],active:true};D.purchaseItems.unshift(x);save();v71OpenPurchaseItem(x.id)};
 window.v71OpenPurchaseItem=function(id){const i=D.purchaseItems.find(x=>x.id===id);if(!i)return;activeV62={type:'purchaseItems',id};const m=mrp71(i),prices=lastPrices71(i),sup=D.suppliers.map(s=>`<option value="${s.id}" ${i.preferredSupplier===s.id?'selected':''}>${esc(s.name)}</option>`).join('');v62Modal('Satınalma Ürün Ana Kartı · '+esc(i.code),`
 <div class="grid md:grid-cols-5 gap-3 mb-5">${[['Mevcut Stok',Number(i.stockQty||0)+' '+esc(i.baseUom||'')],['Safety Stock',Number(i.safetyStock||0)+' '+esc(i.baseUom||'')],['Reorder Point',m.reorderPoint.toFixed(2)],['Açık PO',m.openPO.toFixed(2)],['MRP Sipariş Önerisi',m.suggestedOrder.toFixed(2)]].map(x=>`<div class="bg-slate-950 border border-slate-700 rounded-xl p-3"><div class="text-[9px] text-slate-500">${x[0]}</div><div class="text-lg font-black text-white">${x[1]}</div></div>`).join('')}</div>
+<div class="text-[10px] text-amber-300/80 mb-5"><i class="fa-solid fa-circle-info mr-1"></i>Bu satınalma kalemi stok kaydı (stockQty) bağımsız bir kaynaktır - Depo & Stok (KMI_WMS), LOT (hammadde) ve Satış Stok kayıtlarıyla OTOMATİK senkronize değildir (MASTER #8 kapsamında, burada çözülmedi). Depo &amp; Stok ekranına da bakın.</div>
 <div class="grid md:grid-cols-4 gap-3"><label>SKU / Ürün Kodu *<input id="piCode" value="${esc(i.code)}" class="mt-1 kmi-field"></label><label>Ürün Adı *<input id="piName" value="${esc(i.name)}" class="mt-1 kmi-field"></label><label>Kategori<input id="piCat" value="${esc(i.category||'')}" class="mt-1 kmi-field"></label><label>Durum<select id="piActive" class="mt-1 kmi-field"><option value="1" ${i.active!==false?'selected':''}>Aktif</option><option value="0" ${i.active===false?'selected':''}>Pasif</option></select></label><label>Üretici<input id="piMfr" value="${esc(i.manufacturer||'')}" class="mt-1 kmi-field"></label><label>Üretici Parça No<input id="piMpn" value="${esc(i.manufacturerPartNo||'')}" class="mt-1 kmi-field"></label><label>GTIN / EAN / UPC<input id="piGtin" value="${esc(i.gtin||'')}" class="mt-1 kmi-field"></label><label>Barkod<input id="piBarcode" value="${esc(i.barcode||i.code)}" class="mt-1 kmi-field"></label><label class="md:col-span-4">Detaylı Teknik Tanım<textarea id="piDesc" class="mt-1 kmi-field">${esc(i.description||'')}</textarea></label></div>
 ${identityPanel('purchase-item',i,i.barcode||i.code)}
 <div class="mt-6 border-t border-slate-700 pt-5"><h4 class="font-black text-amber-300 mb-3">Stok Politikası · MRP Parametreleri</h4><div class="grid md:grid-cols-4 gap-3"><label>Mevcut Stok<input id="piStock" type="number" step="0.001" value="${Number(i.stockQty||0)}" class="mt-1 kmi-field"></label><label>Rezerve Stok<input id="piReserved" type="number" step="0.001" value="${Number(i.reservedQty||0)}" class="mt-1 kmi-field"></label><label>Safety Stock<input id="piSafety" type="number" step="0.001" value="${Number(i.safetyStock||0)}" class="mt-1 kmi-field"></label><label>Reorder Point (0=otomatik)<input id="piROP" type="number" step="0.001" value="${Number(i.reorderPoint||0)}" class="mt-1 kmi-field"></label><label>Maksimum Stok<input id="piMax" type="number" step="0.001" value="${Number(i.maxStock||0)}" class="mt-1 kmi-field"></label><label>Lead Time (gün)<input id="piLead" type="number" value="${Number(i.leadTimeDays||0)}" class="mt-1 kmi-field"></label><label>MOQ<input id="piMOQ" type="number" step="0.001" value="${Number(i.moq||0)}" class="mt-1 kmi-field"></label><label>Sipariş Katı<input id="piMultiple" type="number" step="0.001" value="${Number(i.orderMultiple||1)}" class="mt-1 kmi-field"></label><label>Temel Birim<input id="piUom" value="${esc(i.baseUom||'adet')}" class="mt-1 kmi-field"></label><label>Satınalma Birimi<input id="piPUom" value="${esc(i.purchaseUom||'adet')}" class="mt-1 kmi-field"></label><label>Dönüşüm Katsayısı<input id="piFactor" type="number" step="0.0001" value="${Number(i.uomFactor||1)}" class="mt-1 kmi-field"></label><label>ABC / XYZ<input id="piABC" value="${esc(i.abcClass||'C')}" class="mt-1 kmi-field"><input id="piXYZ" value="${esc(i.xyzClass||'Z')}" class="mt-1 kmi-field"></label></div></div>
@@ -7962,6 +8040,13 @@ window.v72ConvertRequest=function(id){const r=D.purchaseRequests.find(x=>x.id===
 window.v72NewRequest=function(){v62Modal('Basit Satınalma Talebi',`<div class="space-y-3 text-sm"><label>Lazım Olan Malzeme / Ürün *<input id="reqMat" class="mt-1 kmi-field" placeholder="Örn. Ø10 karbür freze, eldiven, sensör..."></label><div class="grid grid-cols-2 gap-3"><label>Miktar<input id="reqQty" type="number" min="0" step="0.001" value="1" class="mt-1 kmi-field"></label><label>Birim<input id="reqUnit" value="adet" class="mt-1 kmi-field"></label></div><label>Ne İçin Lazım? *<textarea id="reqPurpose" class="mt-1 kmi-field" placeholder="Makine / iş emri / bakım / üretim ihtiyacı..."></textarea></label><label>Öncelik<select id="reqPriority" class="mt-1 kmi-field"><option>Normal</option><option>Yüksek</option><option>Acil</option></select></label><label>Ek Açıklama<textarea id="reqNotes" class="mt-1 kmi-field"></textarea></label><button onclick="v72SubmitRequest()" class="w-full bg-amber-600 hover:bg-amber-500 text-slate-950 font-black py-3 rounded">Talep Et</button></div>`)};
 window.v72SubmitRequest=function(){const mat=document.getElementById('reqMat')?.value.trim(),purpose=document.getElementById('reqPurpose')?.value.trim();if(!mat||!purpose)return alert('Malzeme adı ve ne için lazım olduğu zorunludur.');D.purchaseRequests.unshift({id:'REQ-'+String(Date.now()).slice(-8),materialName:mat,qty:Number(document.getElementById('reqQty')?.value||1),unit:document.getElementById('reqUnit')?.value.trim()||'adet',purpose,priority:document.getElementById('reqPriority')?.value||'Normal',notes:document.getElementById('reqNotes')?.value.trim()||'',requestedBy:currentUser?.name||'-',requestedUserId:currentUser?.id||'',createdAt:new Date().toISOString(),status:'NEW',response:''});save();v62CloseModal();alert('Satınalma talebiniz satınalma talepleri kuyruğuna gönderildi.')};
 const supply71=supply;supply=function(){const base=supply71();return base.replace('Satınalma Geçmişi / Açık PO','Satınalma Geçmişi / Açık PO').replace('<div class="mt-8 border-t border-slate-700 pt-6">',`<div class="mt-8 border-t border-slate-700 pt-6"><div class="grid lg:grid-cols-2 gap-5 mb-8"><div><div class="flex justify-between items-center mb-3"><h4 class="font-black text-amber-300">Satınalma Talepleri</h4><span class="text-[10px] text-slate-500">Operatör / personel talepleri</span></div>${v72RequestRows()}</div><div class="kmi-card p-4"><h4 class="font-black text-cyan-300">Satınalma Kontrol Standardı</h4><div class="text-xs text-slate-400 mt-2 space-y-2"><div>✓ Miktar × birim fiyat ve TL ödeme karşılığı</div><div>✓ 3 tedarikçi teklifi veya gerekçeli istisna</div><div>✓ Proforma / teklif dokümanı</div><div>✓ Seçilen teklif + seçim gerekçesi</div><div>✓ Ürün kartında kronolojik hareket dosyası</div></div></div></div>`)};
+// MASTER #23 ADDENDUM BATCH 2 (Gate B, Domain 03): expose the FINAL
+// (monkey-patched) supply - same reasoning as the v73QueueCard exposure
+// above. Must be assigned HERE (after the patch), not next to the original
+// function declaration, so window.supply always resolves to the complete,
+// current version (base cards + Satınalma Talepleri + Satınalma Kontrol
+// Standardı), not a stale pre-patch copy.
+window.supply=supply;
 // KMI-FIX (2026-09-25): Operatör Beyanı sekmesinde "Basit Satınalma Talebi" kutusu 2 KERE
 // görünüyordu (Ender fark etti). Sebep: #v74OperatorPurchaseRequest zaten HTML'de sabit
 // olarak duruyordu, ama bu fonksiyon 300ms sonra AYNI kutuyu (#v72OperatorPurchaseRequest)
@@ -8021,6 +8106,16 @@ function v73QueueCard(p,mode){
  }
  return `<div class="kmi-card p-3"><div class="flex justify-between gap-2"><b class="text-cyan-300">${esc(p.id)}</b><span class="text-[10px] text-amber-300">${esc(v73StatusText(p.workflowStatus))}</span></div><div class="font-bold mt-1">${esc(p.item)} · ${Number(p.qty||0)} ${esc(p.unit||'')}</div><div class="text-xs text-slate-400 mt-1">${esc(name('suppliers',p.supplier))} · Satınalan: ${esc(p.purchasedBy||'-')}</div><div class="text-xs mt-2"><b>${tl} TL</b> · ETA: ${esc(p.eta||'-')} · Depo: ${esc(p.warehouseLocation||'-')}</div>${mode==='management'?`<div class="flex gap-2 mt-3"><button onclick="v73ManagementDecision('${p.id}',true)" class="bg-emerald-700 px-3 py-2 rounded text-xs font-bold">Onayla → Muhasebe</button><button onclick="v73ManagementDecision('${p.id}',false)" class="bg-red-800 px-3 py-2 rounded text-xs">Reddet</button></div>`:mode==='accounting'?`<button onclick="v73MarkPaid('${p.id}')" class="mt-3 bg-emerald-700 px-3 py-2 rounded text-xs font-bold">Ödemeyi Yaptım · Ödendi</button>`:qualityBody}</div>`;
 }
+// MASTER #23 ADDENDUM BATCH 2 (Gate B, Domain 03): v73QueueCard was only a
+// local function inside this IIFE (never window.*), so the new canonical
+// Purchasing workspace (defined in a LATER, separate script block) could not
+// call it at all - every call silently failed inside a try/catch, which is
+// why the workspace's queue columns rendered empty. Exposing the SAME,
+// UNCHANGED function on window (same pattern already used for mrp71/
+// v72RequestRows/v61AddSupplier/v71AddPurchaseItem/v61AddPO above) is not a
+// second implementation - it is making an existing pure render function
+// reachable from its new, additional authorized caller.
+window.v73QueueCard=v73QueueCard;
 window.v73AssignReceiverInline=function(id){
  const p=D.purchases.find(x=>x.id===id); if(!p) return;
  if(!v73IsManagement()){alert('Mal kabul için kişi ataması yalnız Yönetim tarafından yapılabilir.');return;}
@@ -9653,9 +9748,34 @@ window.kmiR5CommercialReleaseEvaluate=function(declId){
   const managementReleased=!!d.managementApprover;
   let qualityBlocked=false; const qualityReasons=[];
   if(jo){
+    // GATE C FIX (MASTER #23 ADDENDUM system-wide canonical truth sweep,
+    // Fact Domain B - Quality): this used to re-derive its own hold check
+    // (holds.find(h=>h.active && h.refId===jo.id)) instead of calling the
+    // existing canonical window.kmiQmsIsHoldActive(refType,refId)
+    // evaluator already used by approveShipment/v118Ship/kmiStockGetLot.
+    // Two real gaps in the old local re-derivation: (1) no `refType`
+    // filter at all (could in principle match a hold of a different
+    // refType with the same refId), and (2) it NEVER checked
+    // jo.materialLotId, so a LOT-level Quality HOLD on the job's raw
+    // material was invisible to Command Center's Commercial Release
+    // family while the Quality Tower/Workspace correctly showed that
+    // same LOT hold active. CONFIRMED NOT a live shipment-bypass: v118Ship
+    // already runs its own correct, canonical kmiQmsIsHoldActive('LOT',...)
+    // check before commercial-release classification, so no action was
+    // ever actually unblocked - this was a display/reporting divergence
+    // on this evaluator's own output only. FIX: converged to the SAME
+    // canonical evaluator, both ref types, no new engine.
+    const canonicalHoldActive=(typeof window.kmiQmsIsHoldActive==='function')
+      ? (window.kmiQmsIsHoldActive('JOB_ORDER',jo.id) || !!(jo.materialLotId && window.kmiQmsIsHoldActive('LOT',jo.materialLotId)))
+      : null;
     const holds=(window.QMS&&Array.isArray(window.QMS.holds))?window.QMS.holds:[];
-    const activeHold=holds.find(function(h){return h.active && String(h.refId)===String(jo.id);});
-    if(activeHold){ qualityBlocked=true; qualityReasons.push('QUALITY_HOLD_ACTIVE:'+(activeHold.id||'')); }
+    // Same refType-aware match as the canonical evaluator, kept local only
+    // to cite the specific hold's id in the diagnostic reason string
+    // (evidence.qualityReasons) - the canonicalHoldActive boolean above is
+    // what actually decides qualityBlocked, converged to kmiQmsIsHoldActive.
+    const activeHold=holds.find(function(h){return h.active && ((h.refType==='JOB_ORDER'&&String(h.refId)===String(jo.id)) || (h.refType==='LOT'&&jo.materialLotId&&String(h.refId)===String(jo.materialLotId))); });
+    const holdActive=(canonicalHoldActive!==null)?canonicalHoldActive:!!activeHold;
+    if(holdActive){ qualityBlocked=true; qualityReasons.push('QUALITY_HOLD_ACTIVE:'+(activeHold?activeHold.id||'':'')); }
     if(typeof window.kmiQmsFirstPieceGateCheck==='function'){
       const fp=window.kmiQmsFirstPieceGateCheck(jo);
       if(!fp.allowed){ qualityBlocked=true; qualityReasons.push(fp.reasonCode); }
@@ -12122,7 +12242,7 @@ window.kmiV121Render=function(){
  <div class="grid grid-cols-2 md:grid-cols-5 gap-2">${kpis.join('')}</div>
  <div class="grid grid-cols-1 xl:grid-cols-2 gap-3 mt-3">
   <div class="bg-slate-900/60 border border-slate-700 rounded-xl p-3"><b class="text-xs text-white">Riskli / Bloke Siparişler</b><div class="space-y-2 mt-2">${riskList}</div></div>
-  <div class="bg-slate-900/60 border border-slate-700 rounded-xl p-3"><b class="text-xs text-white">Alacak Yaşlandırma (Aging)</b><div class="mt-2">${bucketRow('Vadesinde',d.buckets.cur,'text-emerald-300')}${bucketRow('1-30 gün',d.buckets.b30,'text-amber-300')}${bucketRow('31-60 gün',d.buckets.b60,'text-orange-300')}${bucketRow('61-90 gün',d.buckets.b90,'text-red-300')}${bucketRow('90+ gün',d.buckets.b90p,'text-red-400')}</div><div class="mt-2 space-y-1.5">${arList}</div></div>
+  <div class="bg-slate-900/60 border border-slate-700 rounded-xl p-3"><b class="text-xs text-white">Alacak Yaşlandırma (Aging)</b><div class="text-[9px] text-amber-300/80 mt-1"><i class="fa-solid fa-circle-info mr-1"></i>Bu tutarlar önceki sistemden (V118) alınmıştır; Muhasebe defterine (GL) senkronize edilmiş resmi bakiye için Muhasebe &amp; Finans → Cari Ekstre'ye bakın.</div><div class="mt-2">${bucketRow('Vadesinde',d.buckets.cur,'text-emerald-300')}${bucketRow('1-30 gün',d.buckets.b30,'text-amber-300')}${bucketRow('31-60 gün',d.buckets.b60,'text-orange-300')}${bucketRow('61-90 gün',d.buckets.b90,'text-red-300')}${bucketRow('90+ gün',d.buckets.b90p,'text-red-400')}</div><div class="mt-2 space-y-1.5">${arList}</div></div>
  </div></div>`;
 };
 function paintRiskChips(){
@@ -12468,7 +12588,7 @@ function allSearch(q){
  // Stok / LOT - open (see policy note: already exposed unrestricted in the Work Order editor).
  try{
   const Dd=window.D||{};
-  (Dd.lots||[]).forEach(l=>add('Stok/LOT',l.id,`${l.material||''} · ${Number(l.blankAvailable||0)} adet`,l.id,null,[l.id,l.material,l.supplier,l.qc].join(' ')));
+  (Dd.lots||[]).forEach(l=>add('Stok/LOT',l.id,`${l.material||''} · ${Number(l.blankAvailable||0)} adet (bildirilen - kg tüketimi otomatik düşülmez)`,l.id,null,[l.id,l.material,l.supplier,l.qc].join(' ')));
  }catch(e){}
 
  // Kalite (HOLD / First Piece / NCR-CAPA) - requires the real QUALITY capability.
@@ -12756,7 +12876,29 @@ window.kmiOpenLive=function(){
  // olmayan "scrapQty/rejectQty" alanlarına bakıp hep 0 dönüyordu.
  const today=new Date().toISOString().slice(0,10),todayRows=ds.filter(d=>kmiDeclDateKey(d)===today),todayQty=todayRows.reduce((a,d)=>a+Math.max(0,N(d.qty)),0),scrap=todayRows.reduce((a,d)=>a+Math.max(0,N(d.qualityScrap??d.scrap)),0);
  const {week,month}=kmiLiveWeekMonth(ds);
- const riskOrders=orders.filter(o=>{if(['PAID','CANCELLED','SHIPPED'].includes(o.status))return false;const x=new Date(o.dueDate),dd=(x-Date.now())/86400000;return dd<=3});
+ // GATE C (MASTER #23 ADDENDUM, Fact Domain C - Shipping/Delivery, 2026-10):
+ // ESKİ DAVRANIŞ: status PAID/CANCELLED/SHIPPED ise doğrudan hariç tutuluyordu -
+ // KMI-DATA-REMEDIATION-SLICE-05'in window.kmiV121Risk için zaten düzelttiği aynı
+ // hata tekrar ediyordu (bkz. L12114-12135): PAID (tahsilat yapılmış) bir sipariş,
+ // hâlâ sevk edilmemiş (unshipped) kalanı varsa ve termini geçtiyse, Sipariş Komuta
+ // Merkezi'nde (kmiV121Risk→BLOCKED) ve Reporting/PULSE'da doğru şekilde gecikmiş
+ // görünürken, KURUTLU LIVE'ın bu "Termin Riski" kutusunda SESSİZCE kayboluyordu
+ // (finansal tahsilat ≠ fiziksel teslimat gerçeği). YENİ: aynı TEK canonical
+ // evaluator'a (window.kmiShipmentEvaluateOrder) bağlanıyor - yeni bir motor
+ // İCAT EDİLMEDİ, sadece bu kutunun kendi, bayatlamış yerel status-blacklist'i
+ // terk edildi. Evaluator yoksa/hata verirse eski ham davranışa fail-safe düşülür.
+ const riskOrders=orders.filter(o=>{
+  let shipEval=null;
+  try{ if(typeof window.kmiShipmentEvaluateOrder==='function') shipEval=window.kmiShipmentEvaluateOrder(o); }catch(e){ shipEval=null; }
+  if(shipEval){
+   if(shipEval.fulfillmentState==='COMPLETED') return false;
+   if(o.status==='CANCELLED') return false;
+   if(shipEval.scheduleState==='OVERDUE'||shipEval.scheduleState==='DUE_TODAY') return true;
+   const dd2=(shipEval.evidence&&shipEval.evidence.daysDiff!=null)?shipEval.evidence.daysDiff:null;
+   return dd2!=null && dd2<=3;
+  }
+  if(['PAID','CANCELLED','SHIPPED'].includes(o.status))return false;const x=new Date(o.dueDate),dd=(x-Date.now())/86400000;return dd<=3;
+ });
  const openIssues=(()=>{try{return maintenanceRecords.filter(r=>r.status!=='Kapalı')}catch(e){return []}})();
  const d=document.createElement('div');d.id='kmiLiveModal';d.className='fixed inset-0 z-[160] bg-gradient-to-b from-[#050b16] to-[#0a1628] p-4 md:p-6 overflow-y-auto';
  const tile=(label,val,detailTitle,detailHtml,accent='text-cyan-300')=>`<button onclick='kmiLiveExpand(${JSON.stringify(detailTitle)},${JSON.stringify(detailHtml)})' class="text-left bg-slate-900/80 border border-slate-700 hover:border-cyan-600 rounded-2xl p-5 transition"><div class="flex justify-between items-start"><div class="text-xs text-slate-500 tracking-wide">${E(label)}</div><i class="fa-solid fa-expand text-slate-600 text-[10px]"></i></div><div class="text-3xl md:text-4xl font-black ${accent} mt-2">${val}</div></button>`;
@@ -16289,9 +16431,25 @@ function renderCPForm(){
   refreshExisting();
  };
 }
+// MASTER #23 ADDENDUM BATCH 2 (Gate B, Domain 10 - CAM/Manufacturing
+// Engineering): renderCPForm was only closure-private (never window.*), so
+// the new canonical CAM workspace (a later, separate script block) could
+// not reuse the EXISTING control-plan/first-piece editor at all. Same
+// exposure pattern already used for window.supply/window.v73QueueCard in
+// the Purchasing workspace convergence - no behavior change, no second
+// control-plan engine, just making an existing function reachable from an
+// additional authorized caller.
+window.renderCPForm=renderCPForm;
 window.kmiOpenQualityTower=function(){
  if(!isQualityUser()){ qToast('Kalite Kontrol Kulesi yalnızca Kalite/Admin içindir.','warn'); return; }
  const old=document.getElementById('kmiQTowerModal'); if(old) old.remove();
+ // DUPLICATE-ID SAFETY (MASTER #23 ADDENDUM BATCH 2, Domain 10): this modal
+ // creates #kmiCPForm - the SAME fixed id the new CAM/Manufacturing
+ // Engineering workspace's Quality/Process Relationships section reuses
+ // (same renderCPForm function, intentionally). Clear the workspace's copy
+ // (if its tab is still present but inactive) before this modal creates
+ // its own, so only one element with that id exists at a time.
+ try{ const camPage=document.getElementById('tab-cam-workspace'); if(camPage){ const el=camPage.querySelector('#kmiCPForm'); if(el) el.removeAttribute('id'); } }catch(e){}
  const m=document.createElement('div'); m.id='kmiQTowerModal'; m.className='fixed inset-0 z-[270] bg-black/70 flex items-start justify-center overflow-y-auto py-8';
  m.innerHTML='<div class="w-full max-w-3xl mx-auto bg-slate-950 border border-slate-700 rounded-2xl p-5">'+
   '<div class="flex justify-between items-center mb-4"><h3 class="text-lg font-black text-white"><i class="fa-solid fa-shield-halved text-violet-400 mr-2"></i>Kalite Kontrol Kulesi</h3><button onclick="document.getElementById(\'kmiQTowerModal\').remove()" class="text-slate-400">✕</button></div>'+
@@ -16723,7 +16881,18 @@ window.kmiRenderPlanningWorkspace=function(){
 
 window.__kmiPeopleHome=null;
 window.kmiPeopleMountModules=function(){
- const selectors=['[data-admin-module="personnel"]','[data-admin-module="puantaj"]','[data-admin-module="bonuslist"]'];
+ // MASTER #23 ADDENDUM (Gate B, 2026-10): "Yetkiler/Permissions" (granular
+ // module×action matrix, window.kmiOpenPermissions) was confirmed
+ // IMPLEMENTED_NOT_WIRED - a real, working engine only reachable via the
+ // legacy #tab-yonetici admin shell. Composed here using the SAME
+ // relocation technique already used for personnel/puantaj/bonuslist - no
+ // new engine, no new writer, no permission widening: kmiOpenPermissions
+ // keeps its own kmiCan('management','edit') gate, and this module is only
+ // relocated into the People workspace for a user who already has that
+ // capability (otherwise it stays in its original legacy-shell location,
+ // unreachable from here, exactly as before).
+ const canManagePerms=(typeof kmiCan==='function')&&(function(){try{return kmiCan('management','edit');}catch(e){return false;}})();
+ const selectors=['[data-admin-module="personnel"]','[data-admin-module="puantaj"]','[data-admin-module="bonuslist"]'].concat(canManagePerms?['[data-admin-module="users"]']:[]);
  const mount=document.getElementById('kmiPeopleModulesMount');
  if(!mount) return;
  if(!window.__kmiPeopleHome){
@@ -16746,6 +16915,7 @@ window.kmiPeopleMountModules=function(){
  try{ window.renderPersonnelFileCards&&window.renderPersonnelFileCards(); }catch(e){}
  try{ window.renderPuantajAdmin&&window.renderPuantajAdmin(); }catch(e){}
  try{ window.renderBonusAdminTable&&window.renderBonusAdminTable(); }catch(e){}
+ try{ if(canManagePerms) window.renderUserAdminTable&&window.renderUserAdminTable(); }catch(e){}
 };
 window.kmiPeopleUnmountModules=function(){
  const home=window.__kmiPeopleHome; if(!home) return;
@@ -17161,10 +17331,30 @@ window.kmiPC = {
   darbogazRiski: function(){
     const jobs=pJobs().filter(j=>!j.deleted && ['Açık','Üretimde'].includes(String(j.status||'')));
     const byMachine={};
+    // GATE C (MASTER #23 ADDENDUM, "second machine suspect" re-investigation,
+    // 2026-10-06): ESKİ DAVRANIŞ, j.status==='Üretimde' tek başına "bu makine
+    // şu an fiilen çalışıyor" sayılıyordu. Ama window.kmiPause (gerçek
+    // yazıcı) j.status'u HİÇ değiştirmez - sadece session'ın kendi
+    // pauses[] dizisine açık bir kayıt ekler; bu yüzden PAUSED bir iş emri
+    // de status='Üretimde' kalır. Sonuç: bir makine GERÇEKTEN duraklatılmış
+    // olsa da (Home/KURUTLU LIVE/Machine Board doğru şekilde PAUSED/turuncu
+    // gösterirken), bu darboğaz hesaplaması onu hâlâ "çalışıyor, sırada
+    // bekleyen yok" (risk=false) sayabiliyordu - AYNI fiziksel makine için
+    // çelişkili bir "şu an çalışıyor mu" iddiası. FIX: artık TEK canonical
+    // oturum kaynağına (window.kmiMachineBoard→activity) bakılıyor - yeni
+    // bir motor İCAT EDİLMEDİ; evaluator yoksa/hata verirse eski ham
+    // status-bazlı davranışa fail-safe düşülür (hiçbir gerçek risk sessizce
+    // gizlenmez).
+    let board=null; try{ board=(typeof window.kmiMachineBoard==='function')?window.kmiMachineBoard():null; }catch(e){ board=null; }
     jobs.forEach(function(j){
       const m=String(j.machine||'').trim()||'Atanmamış';
       byMachine[m]=byMachine[m]||{running:0,queued:0};
-      if(String(j.status)==='Üretimde') byMachine[m].running++; else byMachine[m].queued++;
+      let countsAsRunning=(String(j.status)==='Üretimde');
+      if(countsAsRunning && board){
+        const row=board.find(function(b){return b && b.name===m;});
+        if(row && row.activity==='PAUSED') countsAsRunning=false; // fiilen çalışmıyor, duraklatılmış
+      }
+      if(countsAsRunning) byMachine[m].running++; else byMachine[m].queued++;
     });
     const rows=Object.keys(byMachine).filter(m=>m!=='Atanmamış').map(function(m){
       const x=byMachine[m];
@@ -18022,6 +18212,15 @@ window.kmiContributionDedupe = function(candidates){
 function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
 function ieRole(){ try{ return typeof getEffectiveRole==='function'?getEffectiveRole((typeof currentUser!=='undefined'&&currentUser)?currentUser:window.currentUser):'USER'; }catch(e){ return 'USER'; } }
 function isMgmtUser(){ try{ if(window.KMI_AUTH) return window.KMI_AUTH.can((typeof currentUser!=='undefined'&&currentUser)||window.currentUser,'MANAGEMENT'); }catch(e){} return ['ADMIN','MUHASEBE'].indexOf(ieRole())!==-1 || /YÖNET|YONET/.test(ieRole()); }
+// MASTER #23 ADDENDUM BATCH 2 (Gate B, Domain 10 - CAM/Manufacturing
+// Engineering): isMgmtUser() was only closure-private here (never
+// window.*), so the new canonical CAM workspace's authorization guard (a
+// later, separate script block) could not actually call it - the guard
+// silently did nothing because `typeof window.isMgmtUser` was 'undefined'.
+// Exposing the SAME, UNCHANGED function fixes that - no new/second
+// authorization check, no widening or narrowing, the workspace now enforces
+// the EXACT SAME rule kmiIeOpenPanel already enforced.
+window.isMgmtUser=isMgmtUser;
 function ieJobs(){ try{ if(typeof jobOrders!=='undefined'&&Array.isArray(jobOrders)) return jobOrders; }catch(e){} return Array.isArray(window.jobOrders)?window.jobOrders:[]; }
 function ieDecls(){ try{ if(typeof declarations!=='undefined'&&Array.isArray(declarations)) return declarations; }catch(e){} return Array.isArray(window.declarations)?window.declarations:[]; }
 function ieProducts(){ try{ return (window.D&&Array.isArray(window.D.products))?window.D.products:[]; }catch(e){ return []; } }
@@ -18263,6 +18462,14 @@ window.kmiIeRenderPlanTab=function(){
 window.kmiIeOpenPanel=function(tab){
   if(!isMgmtUser()){ try{toast?.('Üretim Mühendisliği paneli yalnız yönetim içindir.','warn');}catch(e){alert('Yetki yok.');} return; }
   const old=document.getElementById('kmiIeModal'); if(old) old.remove();
+  // DUPLICATE-ID SAFETY (MASTER #23 ADDENDUM BATCH 2, Domain 10): this
+  // modal creates #kmiIeDataBody/#kmiIeTimeBody/#kmiIePlanBody - the SAME
+  // fixed ids the new CAM/Manufacturing Engineering workspace reuses (same
+  // functions, intentionally). If that workspace's tab is still present in
+  // the DOM (merely inactive, not reopened) when this legacy modal opens on
+  // top of it, clear its copies first so only one of each id exists at a
+  // time - scoped to the workspace tab only, its own tab/data are untouched.
+  try{ const camPage=document.getElementById('tab-cam-workspace'); if(camPage){ ['kmiIeDataBody','kmiIeTimeBody','kmiIePlanBody'].forEach(function(id){ const el=camPage.querySelector('#'+id); if(el) el.removeAttribute('id'); }); } }catch(e){}
   const m=document.createElement('div'); m.id='kmiIeModal'; m.className='fixed inset-0 z-[272] bg-black/70 flex items-start justify-center overflow-y-auto py-8';
   m.innerHTML='<div class="w-full max-w-3xl mx-auto bg-slate-950 border border-slate-700 rounded-2xl p-5">'+
    '<div class="flex justify-between items-center mb-3"><h3 class="text-lg font-black text-white"><i class="fa-solid fa-ruler-combined text-cyan-400 mr-2"></i>Üretim Mühendisliği (IE)</h3><button onclick="document.getElementById(\'kmiIeModal\').remove()" class="text-slate-400">✕</button></div>'+
@@ -19535,7 +19742,7 @@ window.kmiRenderWarehouse=function(){
     </div>
     <div class="bg-slate-900/60 border border-slate-700 rounded-2xl p-4">
      <h3 class="font-black mb-2">Malzeme Bakiyeleri (ON HAND / AVAILABLE / RESERVED)</h3>
-     ${items.length?`<div class="space-y-1 text-sm">${items.map(id=>{const b=window.KMI_WMS.balance(id);return `<div class="border-b border-slate-800 py-1"><div class="font-bold">${E(id)}</div><div class="text-[11px] text-slate-400">On Hand: ${b.onHand} · Available: ${b.available} · Reserved: ${b.reserved} · Karantina: ${b.quarantine}</div></div>`;}).join('')}</div>`:`<div class="text-slate-500 text-sm">Henüz bu ledger üzerinden hareket girilmedi.</div>`}
+     ${items.length?`<div class="space-y-1 text-sm">${items.map(id=>{const b=window.KMI_WMS.balance(id);let stagingGapHtml='';try{const gap=(typeof window.kmiStockCheckWmsShippingStagingGap==='function')?window.kmiStockCheckWmsShippingStagingGap(id):null;if(gap&&gap.classification==='CONFLICT'){stagingGapHtml='<div class="text-[10px] text-amber-300 mt-1"><i class="fa-solid fa-triangle-exclamation mr-1"></i>Sevkiyata hazırlanmış ('+gap.stagedTotal+' birim STAGING) miktar hâlâ Available içinde görünüyor olabilir - bu ledger\'in kendi bilinen bir sınırlaması, düzeltilmedi.</div>';}}catch(e){}return `<div class="border-b border-slate-800 py-1"><div class="flex justify-between items-center"><span class="font-bold">${E(id)}</span><button class="wmsHistBtn text-[10px] text-cyan-300 hover:text-cyan-200" data-item-id="${E(id)}">Hareket Geçmişi</button></div><div class="text-[11px] text-slate-400">On Hand: ${b.onHand} · Available: ${b.available} · Reserved: ${b.reserved} · Karantina: ${b.quarantine}${b.quarantine>0?' <span class="text-amber-300">(bu ledgere özgü - sevkiyatı otomatik engellemez)</span>':''}</div>${stagingGapHtml}<div class="wmsHistOut text-[11px] text-slate-400 mt-1" data-item-id="${E(id)}"></div></div>`;}).join('')}</div>`:`<div class="text-slate-500 text-sm">Henüz bu ledger üzerinden hareket girilmedi.</div>`}
     </div>
    </div>
    ${canReceive?`<div class="bg-slate-900/60 border border-slate-700 rounded-2xl p-4 mt-4">
@@ -19548,6 +19755,7 @@ window.kmiRenderWarehouse=function(){
       <select id="wmsToState" class="bg-slate-950 border border-slate-700 rounded p-2">${window.KMI_WMS_STATES.map(s=>`<option value="${s}"${s==='AVAILABLE'?' selected':''}>${s}</option>`).join('')}</select>
       <input id="wmsReason" placeholder="Açıklama / kaynak" class="bg-slate-950 border border-slate-700 rounded p-2">
      </div>
+     <div class="text-[10px] text-amber-300 mt-2"><i class="fa-solid fa-triangle-exclamation mr-1"></i>QUALITY_HOLD / QUARANTINE hareketi bu ekranın KENDİ bakiyesinde "Karantina" olarak görünür, ancak Satış/Sevkiyat onay akışını (v118Ship) OTOMATİK OLARAK ENGELLEMEZ. Gerçek sevkiyat engeli için Giriş Kalite / Kalite Kontrol Kulesi'ndeki HOLD işlemini kullanın.</div>
      <button id="wmsSaveMove" class="mt-3 bg-emerald-700 hover:bg-emerald-600 px-4 py-2 rounded-lg font-bold text-sm">Hareketi Kaydet</button>
      <div id="wmsMoveErr" class="text-red-400 text-xs mt-2"></div>
     </div>`:''}
@@ -19555,6 +19763,19 @@ window.kmiRenderWarehouse=function(){
   if(canAdmin) document.getElementById('wmsAddWh').onclick=function(){
     try{ window.KMI_WMS.addWarehouse(document.getElementById('wmsNewWhName').value); window.kmiRenderWarehouse(); }catch(e){ alert(e.message); }
   };
+  document.querySelectorAll('.wmsHistBtn').forEach(function(btn){
+    btn.onclick=function(){
+      const itemId=this.getAttribute('data-item-id');
+      const out=document.querySelector('.wmsHistOut[data-item-id="'+CSS.escape(itemId)+'"]');
+      if(!out) return;
+      if(out.dataset.open==='1'){ out.innerHTML=''; out.dataset.open='0'; return; }
+      const rows=window.KMI_WMS.movements(itemId);
+      out.dataset.open='1';
+      out.innerHTML=rows.length? rows.map(function(m){
+        return '<div class="border-t border-slate-800 pt-1 mt-1">'+new Date(m.at).toLocaleString('tr-TR')+' · '+E(m.movementType)+' · '+m.quantity+' '+E(m.unit)+' → '+E(m.toState)+(m.reason?' · '+E(m.reason):'')+(m.personName?' · '+E(m.personName):'')+'</div>';
+      }).join('') : '<div class="border-t border-slate-800 pt-1 mt-1">Bu malzeme için hareket kaydı yok.</div>';
+    };
+  });
   if(canReceive) document.getElementById('wmsSaveMove').onclick=function(){
     try{
       window.KMI_WMS.move({
@@ -20010,9 +20231,11 @@ window.kmiRenderAccounting=function(queueOnlyArg){
   const canPost=window.KMI_AUTH.can(undefined,'finance.gl.post');
   const canSync=window.KMI_AUTH.can(undefined,'finance.legacy.sync');
   const canClosePeriod=window.KMI_AUTH.can(undefined,'finance.period.close');
+  const canViewSupplier=window.KMI_AUTH.can(undefined,'finance.supplier.view');
   const curPeriod=acctPeriodId();
   window.KMI_ACCOUNTING_PERIODS.ensure(curPeriod);
   const custOpts=(function(){ try{ return (window.D&&window.D.customers)||[]; }catch(e){ return []; } })();
+  const suppOpts=(function(){ try{ return (window.D&&window.D.suppliers)||[]; }catch(e){ return []; } })();
   // KMI-R5 R16-1 FIX (2026-10-05): #tab-muhasebe may already be mounted
   // (a child of #kmiAcctQueueMount, itself inside `el`) from a PRIOR render -
   // overwriting el.innerHTML below would otherwise DESTROY it permanently
@@ -20050,6 +20273,12 @@ window.kmiRenderAccounting=function(queueOnlyArg){
      <select id="acctCustSel" class="w-full bg-slate-950 border border-slate-700 rounded p-2 text-sm mb-2"><option value="">Müşteri seç...</option>${custOpts.map(c=>`<option value="${acctE(c.id)}">${acctE(c.legalName||c.name)}</option>`).join('')}</select>
      <div id="acctCustOut" class="text-xs text-slate-400"></div>
     </div>
+    ${canViewSupplier?`<div class="bg-slate-900/60 border border-slate-700 rounded-2xl p-4">
+     <h3 class="font-black mb-2">Cari Ekstre (Tedarikçi)</h3>
+     <div class="text-[10px] text-amber-300 mb-2"><i class="fa-solid fa-triangle-exclamation mr-1"></i>Satınalma (D.purchases/workflowStatus) tarafı için henüz bir muhasebe senkron köprüsü yok - yukarıdaki "Önceki Sistem (V118) Fatura/Tahsilat Senkronu" düğmesi SADECE satış tarafını (V.invoices/V.payments) işler. Bu bakiye bu nedenle her zaman 0 görünecektir - bu bir senkron eksikliği değil, hiç bağlanmamış bir kaynaktır.</div>
+     <select id="acctSuppSel" class="w-full bg-slate-950 border border-slate-700 rounded p-2 text-sm mb-2"><option value="">Tedarikçi seç...</option>${suppOpts.map(s=>`<option value="${acctE(s.id)}">${acctE(s.legalName||s.name)}</option>`).join('')}</select>
+     <div id="acctSuppOut" class="text-xs text-slate-400"></div>
+    </div>`:''}
    </div>
    ${canPost?`<div class="bg-slate-900/60 border border-slate-700 rounded-2xl p-4 mt-4">
      <h3 class="font-black mb-2">Manuel Muhasebe Fişi (Borç = Alacak zorunlu)</h3>
@@ -20060,6 +20289,18 @@ window.kmiRenderAccounting=function(queueOnlyArg){
      <input id="acctVoucherDesc" placeholder="Fiş açıklaması" class="w-full bg-slate-950 border border-slate-700 rounded p-2 text-sm mt-2">
      <button id="acctPostVoucher" class="mt-3 bg-emerald-700 hover:bg-emerald-600 px-4 py-2 rounded-lg font-bold text-sm">Fişi Postala</button>
      <div id="acctPostErr" class="text-red-400 text-xs mt-2"></div>
+   </div>
+   <div class="bg-slate-900/60 border border-slate-700 rounded-2xl p-4 mt-4">
+     <h3 class="font-black mb-2">Defter-i Kebir (Postalanmış Kayıtlar)</h3>
+     <div id="acctGlList" class="space-y-1 text-xs max-h-64 overflow-y-auto">${window.KMI_GL.list().slice().reverse().map(function(e){
+       return `<div class="border-b border-slate-800 py-1 flex justify-between items-start gap-2" data-entry-id="${acctE(e.id)}">
+         <div><div>${new Date(e.entryDate).toLocaleDateString('tr-TR')} · ${acctE(e.voucherType)} · ${acctE(e.description)}</div>
+         <div class="text-slate-500">${e.lines.map(l=>acctE(l.accountCode)+':B'+l.debit+'/A'+l.credit).join(' · ')}</div></div>
+         <div class="text-right shrink-0">
+           <div class="${e.status==='REVERSED'?'text-red-400':'text-emerald-400'}">${e.status==='REVERSED'?'TERS KAYITLA KAPALI':'POSTED'}</div>
+           ${e.status!=='REVERSED'&&e.sourceType!=='REVERSAL'?`<button class="acctReverseBtn mt-1 bg-red-900/60 hover:bg-red-800 px-2 py-0.5 rounded text-[10px]" data-entry-id="${acctE(e.id)}">Ters Kayıt</button>`:''}
+         </div></div>`;
+     }).join('')||'<div class="text-slate-500">Henüz postalanmış kayıt yok.</div>'}</div>
    </div>`:''}
   `}
   </div>`;
@@ -20075,6 +20316,20 @@ window.kmiRenderAccounting=function(queueOnlyArg){
     const rows=window.KMI_LEDGER.customerEntries(id); const bal=window.KMI_LEDGER.customerBalance(id);
     document.getElementById('acctCustOut').innerHTML='<div class="font-bold mb-1">Bakiye: '+bal+' TRY</div>'+rows.map(r=>`<div class="border-b border-slate-800 py-1">${new Date(r.at).toLocaleDateString('tr-TR')} · ${acctE(r.description)} · B:${r.debit} A:${r.credit}</div>`).join('');
   };
+  if(document.getElementById('acctSuppSel')) document.getElementById('acctSuppSel').onchange=function(){
+    const id=this.value; if(!id){ document.getElementById('acctSuppOut').innerHTML=''; return; }
+    const rows=window.KMI_LEDGER.supplierEntries(id); const bal=window.KMI_LEDGER.supplierBalance(id);
+    document.getElementById('acctSuppOut').innerHTML='<div class="font-bold mb-1">Bakiye (biz borçluyuz): '+bal+' TRY</div>'+rows.map(r=>`<div class="border-b border-slate-800 py-1">${new Date(r.at).toLocaleDateString('tr-TR')} · ${acctE(r.description)} · B:${r.debit} A:${r.credit}</div>`).join('');
+  };
+  if(canPost) document.querySelectorAll('.acctReverseBtn').forEach(function(btn){
+    btn.onclick=function(){
+      const id=this.getAttribute('data-entry-id');
+      const reason=prompt('Ters kayıt nedeni (zorunlu):','');
+      if(reason===null) return;
+      if(!reason.trim()){ alert('Ters kayıt nedeni zorunludur.'); return; }
+      try{ window.KMI_GL.reverse(id, reason.trim()); window.kmiRenderAccounting(queueOnly); }catch(e){ alert(e.message); }
+    };
+  });
   if(canPost && document.getElementById('acctPostVoucher')) document.getElementById('acctPostVoucher').onclick=function(){
     try{
       const lines=Array.from(document.querySelectorAll('.acct-line')).map(row=>({
@@ -21360,8 +21615,22 @@ function puEscalate(incidentId){
 function puEvalTaskOverdue(rule){
   let list=[]; try{ list=(typeof kmiTasksRaw==='function')?kmiTasksRaw():JSON.parse(localStorage.getItem('KMI_TASKS_V1192')||'[]'); }catch(e){ list=[]; }
   const now=Date.now();
-  list.filter(t=>t && t.dueAt && !['COMPLETED','CANCELLED'].includes(t.status)).forEach(function(t){
-    const graceMs=(rule.graceMinutes||0)*60000;
+  const graceMs=(rule.graceMinutes||0)*60000;
+  // GATE C (MASTER #23 ADDENDUM, Fact Domain G - Task Floor, 2026-10): ESKİ
+  // DAVRANIŞ yalnız status COMPLETED/CANCELLED hariç tutup dueAt'i doğrudan
+  // "now" ile karşılaştırıyordu - Task Floor/Yönetici Özeti/Komuta Merkezi'nin
+  // zaten kullandığı TEK canonical evaluator'daki (window.kmiTaskIsOverdueNow,
+  // bkz. L4411-4418) "WAITING + beklenen tarih (expectedAt) henüz geçmedi ->
+  // kişinin aleyhine SAYILMAZ" istisnasını UYGULAMIYORDU. Sonuç: başka birini
+  // bekleyen (WAITING) ama kendi beklenen tarihi henüz geçmemiş bir görev,
+  // orijinal dueAt'i geçtiği anda burada SESSİZCE kalıcı bir "Görev süresi
+  // geçti" PULSE olayı açıyordu - Task Floor/Yönetici Özeti/Komuta Merkezi'nin
+  // AYNI görev için doğru şekilde "Beklemede" (gecikmiş DEĞİL) göstermesiyle
+  // çelişen bir olay. YENİ: aynı TEK canonical evaluator'a bağlanıyor - yeni
+  // bir motor İCAT EDİLMEDİ; rule.graceMinutes, canonical "artık gecikmiş"
+  // durumunun ÜZERİNE eklenen ek bir bekleme süresi olarak korunuyor (istisnayı
+  // atlamak için değil).
+  list.filter(t=>t && t.dueAt && (typeof window.kmiTaskIsOverdueNow==='function') && window.kmiTaskIsOverdueNow(t)).forEach(function(t){
     if(new Date(t.dueAt).getTime()+graceMs < now){
       puOpenIncident(rule, 'TASK', t.id, 'Görev süresi geçti: '+(t.title||t.id), {dueAt:t.dueAt, assigneeId:t.assigneeId});
     }
@@ -22814,7 +23083,7 @@ const KMI_NAV_ENTRIES = [
   // Manufacturing Engineering, not Production, per the owner's 14-domain
   // list; it was only ever tagged ÜRETİM because that taxonomy didn't exist
   // in the registry before this pass.
-  { id:'ieengineering',  label:'IE Mühendislik',         icon:'fa-ruler-combined',        area:'CAM / İMALAT MÜHENDİSLİĞİ', requiredPermission:'MANAGEMENT', opens:'kmiIeOpenPanel' },
+  { id:'ieengineering',  label:'IE Mühendislik',         icon:'fa-ruler-combined',        area:'CAM / İMALAT MÜHENDİSLİĞİ', requiredPermission:'MANAGEMENT', opens:'kmiOpenCam' },
   { id:'kmilive',        label:'KMI Live',               icon:'fa-satellite-dish',        area:'YÖNETİM',   requiredPermission:'controltower.*.view', opens:'kmiOpenControlTowerHub' },
   { id:'warehouse',      label:'Depo & Stok',            icon:'fa-warehouse',             area:'DEPO & STOK',requiredPermission:'warehouse.*',        opens:'kmiOpenWarehouse' },
   { id:'accounting',     label:'Muhasebe & Finans',      icon:'fa-book',                  area:'MUHASEBE & FİNANS', requiredPermission:'finance.*',    opens:'kmiOpenAccounting' },
@@ -22833,9 +23102,24 @@ const KMI_NAV_ENTRIES = [
   // string), no new engine, opens/requiredPermission unchanged.
   { id:'issuereporter',  label:'Sorun Bildir',           icon:'fa-bug',                   area:'SOFTWARE & IT', requiredPermission:'pilot.issue.report', opens:'kmiOpenIssueReporter' },
   { id:'academy',        label:'KMI Academy',            icon:'fa-graduation-cap',        area:'YARDIM / ÖĞRENME', requiredPermission:'training.access', opens:'kmiOpenAcademy' },
-  { id:'tooling',        label:'Takım Zekası',           icon:'fa-screwdriver-wrench',    area:'TAKIM & TOOLING', requiredPermission:'tooling.view',   opens:'kmiOpenToolingIntel' },
+  { id:'tooling',        label:'Takım Zekası',           icon:'fa-screwdriver-wrench',    area:'TAKIM & TOOLING', requiredPermission:'tooling.view',   opens:'kmiOpenToolroom' },
   { id:'performance',    label:'Sayfa Performansı (Teknik)', icon:'fa-gauge-high',       area:'SOFTWARE & IT', requiredPermission:'perf.view',       opens:'kmiOpenPerf' },
   { id:'mobile',         label:'Mobil Görünüm',          icon:'fa-mobile-screen',         area:'SOFTWARE & IT', requiredPermission:'mobile.access',      opens:'kmiOpenMobileHome' },
+  // MASTER #23 ADDENDUM Batch 2, Domain 14 (IT/Sistem Yönetimi): ADDITIVE
+  // new hub entry, does not replace/narrow the 4 entries above - each
+  // keeps its own existing requiredPermission unchanged. This one is
+  // gated MANAGEMENT (same as kmiOpenIT's internal isMgmtUser() check) -
+  // not widened beyond what MANAGEMENT already effectively has via the
+  // legacy Yönetici Paneli/Permissions grid it links out to.
+  { id:'itworkspace',   label:'IT / Sistem Yönetimi',   icon:'fa-server',                area:'SOFTWARE & IT', requiredPermission:'MANAGEMENT',         opens:'kmiOpenIT' },
+  // MASTER #23 ADDENDUM, Domain 13 (Yönetim/İşletme Kontrolü) - REOPENED
+  // per owner directive (2026-10-06, "GATE C FULL CONSISTENCY SWEEP +
+  // DOMAIN 13 CORRECTION" §3-4), superseding the Batch 2 "no real gap"
+  // verdict. ADDITIVE new workspace entry - does not replace/narrow the
+  // existing "Yönetici Paneli" legacy nav-list entry (ADMIN-gated via
+  // hasScreenAccess, broader population), gated MANAGEMENT same as
+  // kmiOpenManagement's internal isMgmtUser() check.
+  { id:'managementworkspace', label:'Yönetim / İşletme Kontrolü', icon:'fa-building-shield', area:'YÖNETİM',    requiredPermission:'MANAGEMENT',         opens:'kmiOpenManagement' },
   // KMI-NEXTGEN-FAZ3-SLICE3-FIX (2026-09-28): Ender'in Faz 3 - Slice 3 (Business
   // Area Registry Completion) direktifi gereği eklendi. Bu 4 giriş YENİ bir motor/
   // ekran değil - mevcut, gerçek kod bulunan alanlara (bkz. SLICE3_AREA_MAP.md)
@@ -23180,8 +23464,20 @@ function asComputeKpis(){
     out.activeOrders = (st.orders||[]).filter(function(o){ return !['PAID','CANCELLED'].includes(o.status); }).length;
   }catch(e){ out.activeOrders=null; }
   try{
-    const jos = (Array.isArray(window.jobOrders) ? window.jobOrders : []);
-    out.activeWOs = jos.filter(function(j){ return !j.deleted && !['Silindi','Kapalı','Tamamlandı','COMPLETED','CANCELLED'].includes(String(j.status||'')); }).length;
+    // GATE C FIX (MASTER #23 ADDENDUM system-wide canonical truth sweep,
+    // Fact Domain A - Work Order): this used to blacklist status strings
+    // ('Kapalı','Tamamlandı','COMPLETED','CANCELLED') that DO NOT EXIST in
+    // the real write-side vocabulary (the real "closed" strings are
+    // 'Sevk Edildi / Kapandı' and 'Tamamlandı (Yönetim Onaylı)' - see
+    // syncJobOrderWorkflowStatuses/finishShipmentV28/approveShipment).
+    // Confirmed contradiction: a fully-shipped WO ('Sevk Edildi / Kapandı')
+    // was still counted here as an "active" work order while KURUTLU LIVE
+    // (window.kmiAllProductionJobs), Command Center and Reporting/PULSE
+    // all correctly excluded it via the shared {Açık,Üretimde} whitelist.
+    // FIX: converged to call that SAME existing canonical reader -
+    // kmiAllProductionJobs() - instead of a second, stale local
+    // interpretation of the same fact. No new evaluator created.
+    out.activeWOs = (typeof window.kmiAllProductionJobs==='function') ? window.kmiAllProductionJobs().length : (Array.isArray(window.jobOrders)?window.jobOrders:[]).filter(function(j){ return !j.deleted && ['Açık','Üretimde'].includes(String(j.status||'')); }).length;
   }catch(e){ out.activeWOs=null; }
   try{
     // KMI-R5 CORRECTION (14-domain mapping pass): an earlier pass in this
@@ -23230,6 +23526,12 @@ function asComputeKpis(){
   }catch(e){ out.operatorsOnFloor=null; out.operatorsTotal=null; }
   return out;
 }
+// GATE C (MASTER #23 ADDENDUM system-wide canonical truth sweep): exposed
+// so a cross-surface consistency test can call it directly, and so other
+// closures can verify Home's own computed KPIs against other canonical
+// readers (same exposure pattern already used for toolIntelligence66/
+// toolroom64/renderCPForm/isMgmtUser elsewhere in this file).
+window.asComputeKpis=asComputeKpis;
 function asTile(label,valHtml,sub,icon,valCls){
   return '<div class="bg-slate-900 border border-slate-700 rounded-xl p-3"><div class="flex items-center justify-between"><div class="text-[10px] text-slate-500 uppercase font-bold tracking-wide">'+asE(label)+'</div><i class="fa-solid '+asE(icon)+' text-slate-600 text-xs"></i></div><div class="text-xl sm:text-2xl font-black '+(valCls||'text-white')+' mt-1">'+valHtml+'</div>'+(sub?'<div class="text-[10px] text-slate-500 mt-0.5">'+sub+'</div>':'')+'</div>';
 }
@@ -23499,7 +23801,25 @@ function asRenderUpcoming(u){
   const asCanSeeCustomer = (function(){ try{ return window.KMI_AUTH.can(u,'MANAGEMENT')===true; }catch(e){ return false; } })();
   try{
     const st=(window.V118_STATE&&Array.isArray(window.V118_STATE.orders))?window.V118_STATE:(typeof core==='function'?core():{orders:[]});
-    (st.orders||[]).filter(function(o){ return !['PAID','CANCELLED','SHIPPED'].includes(o.status) && o.dueDate; }).forEach(function(o){
+    // GATE C (MASTER #23 ADDENDUM, Fact Domain C - Shipping/Delivery, 2026-10):
+    // ESKİ DAVRANIŞ: bu liste yukarıdaki "riskOrders ile aynı pencere" olacak
+    // şekilde bilerek KOPYALANMIŞTI (bkz. yorum) - dolayısıyla KURUTLU LIVE'ın
+    // Termin Riski kutusundaki AYNI bayatlamış status-blacklist hatasını miras
+    // aldı: PAID (tahsilat yapılmış) ama hâlâ sevk edilmemiş kalanı olan, termini
+    // geçmiş bir sipariş burada da SESSİZCE kayboluyordu. YENİ: aynı TEK
+    // canonical evaluator'a (window.kmiShipmentEvaluateOrder) bağlanıyor - yeni
+    // bir motor İCAT EDİLMEDİ. Evaluator yoksa/hata verirse eski ham davranışa
+    // fail-safe düşülür.
+    (st.orders||[]).filter(function(o){
+      let shipEval=null;
+      try{ if(typeof window.kmiShipmentEvaluateOrder==='function') shipEval=window.kmiShipmentEvaluateOrder(o); }catch(e){ shipEval=null; }
+      if(shipEval){
+       if(shipEval.fulfillmentState==='COMPLETED') return false;
+       if(o.status==='CANCELLED') return false;
+       return !!o.dueDate;
+      }
+      return !['PAID','CANCELLED','SHIPPED'].includes(o.status) && o.dueDate;
+    }).forEach(function(o){
       const dd=(new Date(o.dueDate)-Date.now())/86400000;
       const who = asCanSeeCustomer ? (o.customer||o.id||'Sipariş') : ('Sipariş #'+(o.id||'-'));
       if(dd<=7) items.push({at:o.dueDate, label:'Sevkiyat/Termin · '+who, kind:'Sipariş'});
@@ -23519,6 +23839,13 @@ function asRenderUpcoming(u){
   }).join('') : '<div class="text-slate-500 text-xs py-4 text-center">Önümüzdeki 7 gün için bilinen bir yükümlülük yok.</div>';
   return '<div class="bg-slate-900/60 border border-slate-800 rounded-2xl p-4"><b class="text-sm text-white">Yaklaşanlar</b><div class="mt-2">'+body+'</div></div>';
 }
+// GATE C (MASTER #23 ADDENDUM, Fact Domain C - Shipping/Delivery, 2026-10):
+// exposed for cross-script-block test access (asRenderUpcoming is declared
+// inside this file's enclosing IIFE, so it is not visible as a bare
+// identifier from an unrelated <script> tag's test evaluation context -
+// same pattern already used for window.asComputeKpis a few hundred lines
+// above).
+window.asRenderUpcoming=asRenderUpcoming;
 
 // --- ANA SAYFA: gerçek sayfa (modal değil), diğer tüm .tab-content ile AYNI
 //     switchTab mekanizmasıyla gösterilir/gizlenir - arkada eski Admin sayfası
@@ -23962,8 +24289,8 @@ const KMI_LEFT_NAV_GROUPS = [
     // #kmiFloorNavRow2'ye enjekte ediliyordu, kanonik sol navda YOKTU. Şimdi
     // DESTEK'e (direktifin kendi "Muhasebe & Finans / CAM-Üretim Mühendisliği /
     // Takımhane / İnsan & Yetkinlik" sırasıyla) eklendi, AYNI gerçek izin.
-    { label:'CAM / Üretim Müh.', icon:'fa-ruler-combined', resolve:function(u){ return (nrCanSafe(u,'MANAGEMENT') && typeof window.kmiIeOpenPanel==='function') ? {fn:'kmiIeOpenPanel'} : null; } },
-    { label:'Takımhane', icon:'fa-screwdriver-wrench', resolve:function(u){ return (nrCanSafe(u,'tooling.view') && typeof window.kmiOpenToolingIntel==='function') ? {fn:'kmiOpenToolingIntel'} : null; } },
+    { label:'CAM / Üretim Müh.', icon:'fa-ruler-combined', resolve:function(u){ return (nrCanSafe(u,'MANAGEMENT') && typeof window.kmiOpenCam==='function') ? {fn:'kmiOpenCam'} : null; } },
+    { label:'Takımhane', icon:'fa-screwdriver-wrench', resolve:function(u){ return (nrCanSafe(u,'tooling.view') && typeof window.kmiOpenToolroom==='function') ? {fn:'kmiOpenToolroom'} : null; } },
     // KMI-R5 MASTER#16 FAST CLOSURE (2026-10-05): same gap class, same fix as
     // Planlama above - "İnsan & Yetkinlik" now lands on a dedicated canonical
     // workspace (window.kmiOpenPeopleWorkspace) composing the SAME existing
@@ -23994,6 +24321,19 @@ const KMI_LEFT_NAV_GROUPS = [
     // kendi 'performance' girişiyle AYNI fonksiyon/izin (kmiOpenPerf/perf.view,
     // area:'SOFTWARE & IT' - bu yüzden bu IT/Yönetim grubuna eklendi).
     { label:'Sayfa Performansı (Teknik)', icon:'fa-gauge-high', resolve:function(u){ return (nrCanSafe(u,'perf.view') && typeof window.kmiOpenPerf==='function') ? {fn:'kmiOpenPerf'} : null; } },
+    // MASTER #23 ADDENDUM Batch 2, Domain 14 (IT/Sistem Yönetimi): ADDITIVE
+    // hub entry mirroring the KMI_NAV_ENTRIES 'itworkspace' id above - same
+    // MANAGEMENT gate, does not replace any of the individual entries in
+    // this group (each keeps resolving independently, unchanged).
+    { label:'IT / Sistem Yönetimi', icon:'fa-server', resolve:function(u){ return (nrCanSafe(u,'MANAGEMENT') && typeof window.kmiOpenIT==='function') ? {fn:'kmiOpenIT'} : null; } },
+    // MASTER #23 ADDENDUM, Domain 13 - REOPENED per owner directive
+    // (2026-10-06, "GATE C FULL CONSISTENCY SWEEP + DOMAIN 13 CORRECTION"
+    // §3-4). ADDITIVE hub entry mirroring the KMI_NAV_ENTRIES
+    // 'managementworkspace' id above - same MANAGEMENT gate, does not
+    // replace the "Yönetici Paneli" entry immediately below (that one
+    // keeps resolving independently via its own broader ADMIN-oriented
+    // hasScreenAccess check, unchanged).
+    { label:'Yönetim / İşletme Kontrolü', icon:'fa-building-shield', resolve:function(u){ return (nrCanSafe(u,'MANAGEMENT') && typeof window.kmiOpenManagement==='function') ? {fn:'kmiOpenManagement'} : null; } },
     { label:'Yönetici Paneli', icon:'fa-user-tie', resolve:function(u){ return hasScreenAccess(u,'yonetici') ? {legacyTab:'yonetici'} : null; } },
     { label:'Tüm Alanlar', icon:'fa-table-cells-large', resolve:function(){ return {fn:'kmiOpenTumAlanlar'}; } },
   ]},
@@ -24303,6 +24643,11 @@ window.addEventListener('load', function(){
 (function(){
 'use strict';
 function s3Toast(msg){ try{ window.kmiToast(msg,'warn'); }catch(e){} }
+// This script block is its own closure (separate from the many other
+// private `function esc(){}` helpers elsewhere in the file) - needed here
+// for the CAM workspace composition added below (MASTER #23 ADDENDUM
+// BATCH 2, Domain 10). Identical implementation, not a new/competing one.
+function esc(v){return String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
 
 // SATIŞ & SİPARİŞ -> mevcut 'siparis' sekmesi (müşteri/ürün/sipariş komposeri/
 // Sipariş Komuta Merkezi zaten bu sekmenin içinde - STATUS: ACTIVE).
@@ -24315,12 +24660,21 @@ function s3Toast(msg){ try{ window.kmiToast(msg,'warn'); }catch(e){} }
 // ('customer','view'), YENİ bir mantık/izin YOK) Satış & Müşteri'ye de kendi
 // gerçek, odaklı Müşteri & Ürün overlay'i eklendi - Satınalma ile AYNI
 // derinlikte composition, yeni bir ekran/motor İCAT EDİLMEDİ.
+// MASTER #23 ADDENDUM (Gate B, 2026-10) - "Sales legacy-overlay override":
+// discovery confirmed normal Sales & Customer navigation was landing on the
+// real canonical System-C workspace (#tab-siparis, v118Render/v118Orders -
+// the genuine order/order-item truth) but then IMMEDIATELY burying it under
+// the legacy v61MasterOverlay's products() tab 60ms later, so the user never
+// actually saw the canonical workspace as their normal experience. The
+// canonical page ALREADY has an explicit, bounded "Müşteri & Ürün" entry
+// point into that legacy master-data surface (#v120MasterDataPanel button,
+// openV61Master('products')) for the one real capability (customer/product
+// master-data CRUD) that currently has no other home - that stays, as an
+// explicit user action, not an automatic one. No new workspace, no new
+// writer: this only stops the forced auto-open.
 window.kmiOpenSalesOrders = function(){
   if(typeof window.switchTab!=='function'){ s3Toast('Satış & Sipariş ekranı bulunamadı.'); return; }
   window.switchTab('siparis');
-  setTimeout(function(){
-    if(typeof window.openV61Master==='function') window.openV61Master('products');
-  }, 60);
 };
 
 // PLANLAMA -> KMI-R5 MASTER#16 FAST CLOSURE (2026-10-05): prefers the real
@@ -24342,7 +24696,16 @@ window.kmiOpenPlanning = function(){
 
 // SATINALMA -> mevcut, gerçek Tedarikçi/PO/RFQ/Talep ekranı (openV61Master('supply'),
 // kendi kmiPermissionGuard('purchasing','view') kontrolü VAR - STATUS: ACTIVE).
+// MASTER #23 ADDENDUM BATCH 2 (Gate B, Domain 03, 2026-10): discovery proved
+// substantial real purchasing functionality (requests/approval queue/
+// suppliers/purchase items/RFQ/PO/receiving) but the normal entry point still
+// depended on the legacy v61MasterOverlay full-screen shell as the department
+// experience. window.kmiOpenPurchasingWorkspace below composes the SAME real
+// functions (supply(), v72RequestRows(), v73QueueCard, mrp71 - none rewritten,
+// none duplicated) into a dedicated canonical workspace tab. Kept as the
+// fallback only if that workspace function is somehow unavailable.
 window.kmiOpenPurchasing = function(){
+  if(typeof window.kmiOpenPurchasingWorkspace==='function'){ window.kmiOpenPurchasingWorkspace(); return; }
   try{
     if(typeof window.switchTab==='function') window.switchTab('siparis');
     setTimeout(function(){
@@ -24350,6 +24713,589 @@ window.kmiOpenPurchasing = function(){
       else s3Toast('Satınalma ekranı bulunamadı.');
     }, 60);
   }catch(e){ s3Toast('Satınalma açılamadı: '+e.message); }
+};
+
+// MASTER #23 ADDENDUM BATCH 2 (Gate B, Domain 03 - Purchasing & Supply)
+// canonical workspace. Composition only - no new array, no new writer, no
+// new calculation. Reused as-is: supply() (master data: purchase items/MRP,
+// suppliers, PO history, purchase requests - already monkey-patched at
+// L7964), v73QueueCard (the SAME pure render function v73RenderQueues uses
+// for the Management/Accounting/Receiving queue cards - called a SECOND time
+// here into this workspace's own mount, not duplicated/rewritten), and the
+// existing v73Management Decision/v73MarkPaid/v73Arrival/v73IncomingQC
+// writers (unchanged, still gated by their own kmiPermissionGuard/
+// v73IsManagement/v73IsAccounting/v73CanReceive checks - no new permission).
+window.kmiOpenPurchasingWorkspace = function(){
+  const u=window.currentUser; if(!u) return;
+  if(!kmiPermissionGuard('purchasing','view')) return;
+  document.querySelectorAll('.tab-content').forEach(function(el){ el.classList.remove('active'); });
+  document.querySelectorAll('.nav-btn').forEach(function(el){ el.classList.remove('bg-slate-700','text-blue-400'); });
+  let page=document.getElementById('tab-satinalma-workspace');
+  if(!page){
+    page=document.createElement('div'); page.id='tab-satinalma-workspace'; page.className='tab-content';
+    const mainSys=document.getElementById('mainSystem');
+    (mainSys||document.body).appendChild(page);
+  }
+  page.classList.add('active');
+  const pt=document.getElementById('pageTitle'); if(pt) pt.innerText='Satınalma & Tedarik';
+  document.getElementById('kmiGlobalPageHeaderBand')?.classList.remove('hidden');
+  window.kmiRenderPurchasingWorkspace();
+};
+window.kmiRenderPurchasingWorkspace = function(){
+  const page=document.getElementById('tab-satinalma-workspace'); if(!page) return;
+  const reqs=(typeof window.D!=='undefined'&&window.D.purchases)?window.D.purchases:[];
+  const header='<div class="flex flex-wrap items-center justify-between gap-3 mb-4">'
+   + '<div><h1 class="text-2xl sm:text-3xl font-black text-white"><i class="fa-solid fa-cart-flatbed text-cyan-400 mr-2"></i>Satınalma &amp; Tedarik</h1>'
+   + '<div class="text-xs sm:text-sm text-slate-400 mt-1">Kurutlu Manufacturing Intelligence · Tedarikçi, Satınalma Ürünleri, PO Onay/Ödeme/Mal Kabul Zinciri</div></div></div>';
+  // Internal submenu grammar (same OVERVIEW/OPERATIONS/MASTER DATA/HISTORY
+  // groups used system-wide) - anchor-jump strip, same lightweight pattern
+  // already used on the canonical Sales page (#tab-siparis numbered strip).
+  // Only groups with real, proven content are rendered: a separate
+  // "Exceptions/Readiness" anchor is deliberately omitted here because that
+  // signal (SİPARİŞ NOKTASI badge, mrp71-driven) is already inline inside
+  // the Ana Veri cards below - a separate empty-looking section would not
+  // add a real capability, just a duplicate view of the same badge.
+  const submenu='<div class="grid grid-cols-2 md:grid-cols-4 gap-2 text-[10px] font-bold mb-4">'
+   + '<button type="button" onclick="document.getElementById(\'kmiPurchOverviewSection\')?.scrollIntoView({behavior:\'smooth\',block:\'start\'})" class="bg-blue-950/50 border border-blue-800 rounded p-2 text-left hover:border-blue-500">GENEL BAKIŞ</button>'
+   + '<button type="button" onclick="document.getElementById(\'kmiPurchOpsSection\')?.scrollIntoView({behavior:\'smooth\',block:\'start\'})" class="bg-amber-950/50 border border-amber-800 rounded p-2 text-left hover:border-amber-500">OPERASYONLAR · Talep &amp; Onay Kuyrukları</button>'
+   + '<button type="button" onclick="document.getElementById(\'kmiPurchDataSection\')?.scrollIntoView({behavior:\'smooth\',block:\'start\'})" class="bg-emerald-950/50 border border-emerald-800 rounded p-2 text-left hover:border-emerald-500">ANA VERİ · Tedarikçi &amp; Ürün</button>'
+   + '<button type="button" onclick="document.getElementById(\'kmiPurchDataSection\')?.scrollIntoView({behavior:\'smooth\',block:\'end\'})" class="bg-slate-800 border border-slate-600 rounded p-2 text-left hover:border-slate-400">GEÇMİŞ · Satınalma/PO</button>'
+   + '</div>';
+  // GATE C (MASTER #23 ADDENDUM §11, 2026-10-06): ESKİ davranış bir
+  // kara liste kullanıyordu ('PAID','QC_RECEIVED','CLOSED') - ama
+  // 'QC_RECEIVED' ve 'CLOSED' gerçek workflowStatus değerleri DEĞİL
+  // (gerçek terminal durumlar: STOCKED/QC_REJECTED/MANAGEMENT_REJECTED/
+  // LEGACY), bu yüzden bu kara liste PAID dışında hiçbir durumu hariç
+  // tutmuyordu - STOCKED/MANAGEMENT_REJECTED/LEGACY (kapalı) PO'lar bile
+  // "AÇIK PO" sayısına dahil oluyordu, Komuta Merkezi/PULSE'ın AYNI anda
+  // AYNI PO'yu kapalı saymasıyla çelişerek. FIX: src/index.html ~12099/
+  // ~10324/~20812'deki AYNI (zaten 3 kopya halinde var olan, burada 4.
+  // kopyası İCAT EDİLMEYEN) açık-PO beyaz listesine yakınsatıldı.
+  const OPEN_PO_STATES_PURCHWS=['PENDING_MANAGEMENT','PENDING_ACCOUNTING','PAID','INCOMING_QC','ORDERED','DRAFT'];
+  const openCount=reqs.filter(function(p){return OPEN_PO_STATES_PURCHWS.indexOf(String(p.workflowStatus||''))!==-1;}).length;
+  const pendingMgmt=reqs.filter(function(p){return p.workflowStatus==='PENDING_MANAGEMENT';}).length;
+  const pendingAcct=reqs.filter(function(p){return p.workflowStatus==='PENDING_ACCOUNTING';}).length;
+  const pendingRecv=reqs.filter(function(p){return ['PAID','INCOMING_QC','QC_REJECTED'].indexOf(p.workflowStatus)!==-1;}).length;
+  const overview='<section id="kmiPurchOverviewSection" class="bg-slate-900 border border-slate-700 rounded-2xl p-4 mb-4">'
+   + '<h3 class="font-black mb-3 text-white">Genel Bakış</h3>'
+   + '<div class="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">'
+   + '<div class="bg-slate-950/60 rounded-xl p-3"><div class="text-[10px] text-slate-500">AÇIK PO</div><b class="text-xl text-white">'+openCount+'</b></div>'
+   + '<div class="bg-slate-950/60 rounded-xl p-3"><div class="text-[10px] text-slate-500">YÖNETİM ONAYI BEKLİYOR</div><b class="text-xl text-amber-300">'+pendingMgmt+'</b></div>'
+   + '<div class="bg-slate-950/60 rounded-xl p-3"><div class="text-[10px] text-slate-500">ÖDEME BEKLİYOR</div><b class="text-xl text-amber-300">'+pendingAcct+'</b></div>'
+   + '<div class="bg-slate-950/60 rounded-xl p-3"><div class="text-[10px] text-slate-500">MAL KABUL BEKLİYOR</div><b class="text-xl text-amber-300">'+pendingRecv+'</b></div>'
+   + '</div></section>';
+  const ops='<section id="kmiPurchOpsSection" class="bg-slate-900 border border-slate-700 rounded-2xl p-4 mb-4">'
+   + '<h3 class="font-black mb-3 text-white">Operasyonlar · Satınalma Talepleri &amp; Onay Kuyrukları</h3>'
+   + '<div id="kmiPurchOpsMount" class="space-y-5"></div></section>';
+  const dataMount='<section id="kmiPurchDataSection" class="bg-slate-900/40 rounded-2xl">'
+   + '<div id="kmiPurchDataMount"></div></section>';
+  page.innerHTML='<div class="max-w-[1400px] mx-auto p-4 sm:p-6">'
+   + header + submenu + overview + ops + dataMount
+   + '</div>';
+  // Ana Veri & Geçmiş: existing supply() shell, reused wholesale (its own
+  // suppliers/purchase-item/PO-history composition, including its
+  // established Takımhane sub-panel at the bottom - that EXISTING function
+  // is also independently given its own dedicated canonical home by the
+  // Toolroom/Tooling workspace convergence; this is the same real read, not
+  // a second engine, reachable from two coherent places - "MANY AUTHORIZED
+  // VIEWS" over one canonical source).
+  try{ document.getElementById('kmiPurchDataMount').innerHTML = (typeof window.supply==='function'?window.supply():''); }catch(e){}
+  window.kmiPurchasingRenderQueues();
+};
+// Renders the SAME v73QueueCard the legacy queues use, a second time, into
+// this workspace's own mount. Pure render call, not a new writer: clicking
+// any action button inside still calls the existing v73ManagementDecision/
+// v73MarkPaid/v73Arrival/v73IncomingQC writers unchanged.
+window.kmiPurchasingRenderQueues = function(){
+  const mount=document.getElementById('kmiPurchOpsMount'); if(!mount) return;
+  const D=window.D||{purchases:[],purchaseRequests:[]};
+  const mgmt=(D.purchases||[]).filter(function(p){return p.workflowStatus==='PENDING_MANAGEMENT';});
+  const acct=(D.purchases||[]).filter(function(p){return p.workflowStatus==='PENDING_ACCOUNTING';});
+  const recv=(D.purchases||[]).filter(function(p){return ['PAID','INCOMING_QC','QC_REJECTED'].indexOf(p.workflowStatus)!==-1;}).sort(function(x,y){return String(x.eta||'').localeCompare(String(y.eta||''));});
+  const col=function(title,items,mode){
+    return '<div><h4 class="font-bold text-sm mb-2 text-slate-200">'+title+'</h4><div class="grid md:grid-cols-2 xl:grid-cols-3 gap-3">'
+     + (items.map(function(p){return (typeof window.v73QueueCard==='function')?window.v73QueueCard(p,mode):'';}).join('')
+        || '<div class="text-slate-500 text-xs">Kayıt yok.</div>')
+     + '</div></div>';
+  };
+  mount.innerHTML = '<div><h4 class="font-bold text-sm mb-2 text-slate-200">Satınalma Talepleri</h4>'
+   + (typeof window.v72RequestRows==='function'?window.v72RequestRows():'<div class="text-slate-500 text-xs">Talep yok.</div>')
+   + '</div>'
+   + col('Yönetim Onayı Bekleyen PO', mgmt, 'management')
+   + col('Ödeme Bekleyen PO (Muhasebe)', acct, 'accounting')
+   + col('Beklenen Mal Kabul &amp; Giriş Kalite', recv, 'quality');
+};
+// Wrap the existing v73RenderQueues (which only refreshes the legacy
+// #tab-yonetici/#tab-muhasebe/#tab-kalite mounts) so an action taken inside
+// THIS workspace also refreshes THIS workspace's own queue view - same
+// additive wrap pattern already used elsewhere in this file (e.g.
+// renderUserAdminTable, window.switchTab at L8180). No behavior of the
+// original function is changed; this only adds a second, independent
+// refresh target.
+(function(){
+  const prevV73RenderQueues=window.v73RenderQueues;
+  if(typeof prevV73RenderQueues==='function'){
+    window.v73RenderQueues=function(){
+      const r=prevV73RenderQueues.apply(this,arguments);
+      try{ if(document.getElementById('tab-satinalma-workspace')?.classList.contains('active')) window.kmiPurchasingRenderQueues(); }catch(e){}
+      return r;
+    };
+  }
+})();
+
+// MASTER #23 ADDENDUM BATCH 2 (Gate B, Domain 10 - CAM/Manufacturing
+// Engineering) canonical workspace. Discovery proved real IE/CAM
+// functionality existed (kmiIeOpenPanel's Data/Time/Plan tabs - machine
+// economics, cost standards, per-operation standard time, OEE time-
+// waterfall, WO plan-vs-actual variance), PLUS the existing product routing
+// editor (routeStepsPanel73), machine-suitability editor (machinesPanel73),
+// tool-list editor (toolListPanel73) and the Quality control-plan/first-
+// piece editor (renderCPForm) - but the normal nav entry only ever opened
+// kmiIeOpenPanel's bare, non-KMI_OVERLAY-registered floating modal as the
+// WHOLE department experience, with no product/process-engineering context
+// at all. This composes ALL of the above - unchanged, reused wholesale -
+// into one dedicated canonical workspace tab. kmiIeOpenPanel itself is left
+// completely untouched and still independently reachable (its own floor-nav
+// button, and as this workspace's fallback).
+//
+// STANDARD-TIME OWNERSHIP (per the MASTER #23 Batch 2 directive's explicit
+// requirement to investigate before exposing any editable standard-time
+// control): confirmed NOT ambiguous. p.standardCycleSec (whole-product
+// level, written by v62SaveProduct) and p.routeSteps[i].standardCycleSec
+// (per-operation-step level, written by kmiIeSetOperationStandard) are
+// DISTINCT concepts by design, not two copies of one fact - the existing
+// kmiIeOperationStandard() already implements an explicit, documented
+// priority chain (ROUTE_STEP -> PRODUCT_LEVEL -> CAM_ESTIMATE) rather than
+// picking one as canonical. This workspace reuses that same existing
+// evaluator/editor as-is (via the embedded IE Data/Plan tabs) - no new
+// synchronizer, no silent merge, no second engine. The one real, pre-
+// existing data hazard (the IE panel's free-text operation-name field can
+// create a second, unmatched routeStep instead of updating an existing one)
+// is NOT fixed here - it predates this workspace and is out of this
+// convergence's scope; it is logged in the capability register, not hidden.
+window.kmiOpenCam=function(){
+  if(typeof window.kmiOpenCamWorkspace==='function'){ window.kmiOpenCamWorkspace(); return; }
+  if(typeof window.kmiIeOpenPanel==='function'){ window.kmiIeOpenPanel('data'); return; }
+};
+window.kmiOpenCamWorkspace=function(){
+  const u=window.currentUser; if(!u) return;
+  // Same authorization kmiIeOpenPanel already enforced (isMgmtUser) -
+  // unchanged, not widened, not narrowed.
+  if(typeof window.isMgmtUser==='function' && !window.isMgmtUser()){ try{window.kmiToast?.('CAM / Üretim Mühendisliği yalnız yönetim içindir.','warn');}catch(e){} return; }
+  // DUPLICATE-ID SAFETY: this workspace reuses kmiIeOpenPanel's/
+  // kmiOpenQualityTower's EXACT render functions, which look up fixed ids
+  // (#kmiIeDataBody/#kmiIeTimeBody/#kmiIePlanBody/#kmiCPForm) - the SAME
+  // ids those two legacy floating modals also create internally. If either
+  // legacy modal were still open underneath when this workspace mounts,
+  // the document would briefly hold two elements sharing an id, and
+  // getElementById() would pick whichever is first, which is unsafe. Both
+  // modals remain independently reachable (not deleted), so this workspace
+  // closes them first, the same "unmount before mount" defensive pattern
+  // already used for Gantt/Personnel (kmiPlanningUnmountGantt).
+  document.getElementById('kmiIeModal')?.remove();
+  document.getElementById('kmiQTowerModal')?.remove();
+  document.querySelectorAll('.tab-content').forEach(function(el){ el.classList.remove('active'); });
+  document.querySelectorAll('.nav-btn').forEach(function(el){ el.classList.remove('bg-slate-700','text-blue-400'); });
+  let page=document.getElementById('tab-cam-workspace');
+  if(!page){
+    page=document.createElement('div'); page.id='tab-cam-workspace'; page.className='tab-content';
+    const mainSys=document.getElementById('mainSystem');
+    (mainSys||document.body).appendChild(page);
+  }
+  page.classList.add('active');
+  const pt=document.getElementById('pageTitle'); if(pt) pt.innerText='CAM / Üretim Mühendisliği';
+  document.getElementById('kmiGlobalPageHeaderBand')?.classList.remove('hidden');
+  window.kmiRenderCamWorkspace();
+};
+window.kmiRenderCamWorkspace=function(){
+  const page=document.getElementById('tab-cam-workspace'); if(!page) return;
+  const products=(window.D&&Array.isArray(window.D.products))?window.D.products:[];
+  const header='<div class="flex flex-wrap items-center justify-between gap-3 mb-4">'
+   + '<div><h1 class="text-2xl sm:text-3xl font-black text-white"><i class="fa-solid fa-ruler-combined text-cyan-400 mr-2"></i>CAM / Üretim Mühendisliği</h1>'
+   + '<div class="text-xs sm:text-sm text-slate-400 mt-1">Kurutlu Manufacturing Intelligence · Rota, Standart Süre, Kurulum/Takım, Kontrol Planı, OEE &amp; Plan vs Actual</div></div></div>';
+  const withRouting=products.filter(function(p){return Array.isArray(p.routeSteps)&&p.routeSteps.length>0;}).length;
+  const withCp=(function(){try{return new Set((window.QMS&&window.QMS.controlPlans||[]).map(function(x){return String(x.productId);})).size;}catch(e){return 0;}})();
+  const submenu='<div class="grid grid-cols-2 md:grid-cols-4 gap-2 text-[10px] font-bold mb-4">'
+   + '<button type="button" onclick="document.getElementById(\'kmiCamOverviewSection\')?.scrollIntoView({behavior:\'smooth\',block:\'start\'})" class="bg-blue-950/50 border border-blue-800 rounded p-2 text-left hover:border-blue-500">GENEL BAKIŞ</button>'
+   + '<button type="button" onclick="document.getElementById(\'kmiCamProcessSection\')?.scrollIntoView({behavior:\'smooth\',block:\'start\'})" class="bg-amber-950/50 border border-amber-800 rounded p-2 text-left hover:border-amber-500">SÜREÇ MÜHENDİSLİĞİ · Rota</button>'
+   + '<button type="button" onclick="document.getElementById(\'kmiCamStandardsSection\')?.scrollIntoView({behavior:\'smooth\',block:\'start\'})" class="bg-emerald-950/50 border border-emerald-800 rounded p-2 text-left hover:border-emerald-500">STANDARTLAR · Kurulum/Takım/Süre</button>'
+   + '<button type="button" onclick="document.getElementById(\'kmiCamQualitySection\')?.scrollIntoView({behavior:\'smooth\',block:\'start\'})" class="bg-violet-950/50 border border-violet-800 rounded p-2 text-left hover:border-violet-500">KALİTE İLİŞKİSİ · Kontrol Planı</button>'
+   + '</div><div class="grid grid-cols-1 md:grid-cols-2 gap-2 text-[10px] font-bold mb-4">'
+   + '<button type="button" onclick="document.getElementById(\'kmiCamAnalysisSection\')?.scrollIntoView({behavior:\'smooth\',block:\'start\'})" class="bg-slate-800 border border-slate-600 rounded p-2 text-left hover:border-slate-400">ANALİZ/GEÇMİŞ · OEE &amp; Plan vs Actual</button>'
+   + '</div>';
+  const overview='<section id="kmiCamOverviewSection" class="bg-slate-900 border border-slate-700 rounded-2xl p-4 mb-4">'
+   + '<h3 class="font-black mb-3 text-white">Genel Bakış</h3>'
+   + '<div class="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">'
+   + '<div class="bg-slate-950/60 rounded-xl p-3"><div class="text-[10px] text-slate-500">TOPLAM ÜRÜN</div><b class="text-xl text-white">'+products.length+'</b></div>'
+   + '<div class="bg-slate-950/60 rounded-xl p-3"><div class="text-[10px] text-slate-500">ROTASI TANIMLI</div><b class="text-xl text-cyan-300">'+withRouting+'</b></div>'
+   + '<div class="bg-slate-950/60 rounded-xl p-3"><div class="text-[10px] text-slate-500">KONTROL PLANI OLAN ÜRÜN</div><b class="text-xl text-violet-300">'+withCp+'</b></div>'
+   + '<div class="bg-slate-950/60 rounded-xl p-3"><div class="text-[10px] text-slate-500">CNC PROGRAM BAĞLANTISI</div><b class="text-sm text-amber-300">MISSING / FUTURE</b></div>'
+   + '</div><div class="text-[10px] text-slate-500 mt-3">CNC Program bağlantısı (makine kontrolü/konnektivite) bu kapsamda YOK - bkz. kapasite kaydı; burada uydurulmuş bir modül oluşturulmadı.</div></section>';
+  const processSel='<select id="kmiCamProductSel" class="bg-slate-950 border border-slate-700 rounded p-2 text-xs w-full mb-3"><option value="">Ürün seçin...</option>'
+   + products.map(function(p){return '<option value="'+esc(p.id)+'">'+esc(p.code||p.id)+' · '+esc(p.name||'')+'</option>';}).join('')+'</select>';
+  const process='<section id="kmiCamProcessSection" class="bg-slate-900 border border-slate-700 rounded-2xl p-4 mb-4">'
+   + '<h3 class="font-black mb-3 text-white">Süreç Mühendisliği · Operasyon Rotası</h3>'
+   + '<div class="text-[10px] text-slate-500 mb-2">Mevcut Ürün Künyesi rota editörü (routeStepsPanel73) - aynı veri, aynı motor, ikinci bir rota deposu yok.</div>'
+   + processSel + '<div id="kmiCamProcessMount"></div></section>';
+  const standards='<section id="kmiCamStandardsSection" class="bg-slate-900 border border-slate-700 rounded-2xl p-4 mb-4">'
+   + '<h3 class="font-black mb-3 text-white">Standartlar/Kaynaklar</h3>'
+   + '<div class="text-[10px] text-slate-500 mb-2">Seçilen ürün için makine uygunluğu ve takım listesi (mevcut editörler) + mevcut IE panelinin Veri Temelleri sekmesi (makine ekonomik profili, maliyet standartları, ürün/operasyon standart süresi - aynı fonksiyonlar, ikinci bir motor yok). Standart süre kaynağı önceliği: ROTA ADIMI → ÜRÜN GENELİ → CAM TAHMİNİ (mevcut kmiIeOperationStandard önceliği; iki ayrı depo BİRLEŞTİRİLMEDİ, çünkü ayrı iki kavram - bkz. docs/KMI_CANONICAL_TRUTH_CONSISTENCY_REGISTER.md).</div>'
+   + '<div id="kmiCamStandardsProductMount" class="mb-4"></div>'
+   + '<div id="kmiIeDataBody"></div></section>';
+  const quality='<section id="kmiCamQualitySection" class="bg-slate-900 border border-slate-700 rounded-2xl p-4 mb-4">'
+   + '<h3 class="font-black mb-3 text-white">Kalite İlişkisi · Kontrol Planı &amp; İlk Parça</h3>'
+   + '<div class="text-[10px] text-slate-500 mb-2">Mevcut Kalite kontrol planı editörü (renderCPForm/kmiQmsUpsertControlPlan) - aynı canonical kayıt, Kalite Kontrol Kulesi ile AYNI veri. İkinci bir kontrol planı deposu yok.</div>'
+   + '<div id="kmiCPForm"></div></section>';
+  const analysis='<section id="kmiCamAnalysisSection" class="bg-slate-900 border border-slate-700 rounded-2xl p-4 mb-4">'
+   + '<h3 class="font-black mb-3 text-white">Analiz/Geçmiş · OEE &amp; Plan vs Actual</h3>'
+   + '<div class="text-[10px] text-slate-500 mb-2">Mevcut IE panelinin Zaman/OEE ve Plan vs Actual sekmeleri (aynı fonksiyonlar, ikinci bir hesap motoru yok).</div>'
+   + '<div id="kmiIeTimeBody"></div><div class="mt-4"></div><div id="kmiIePlanBody"></div></section>';
+  page.innerHTML='<div class="max-w-[1400px] mx-auto p-4 sm:p-6">'
+   + header + submenu + overview + process + standards + quality + analysis
+   + '</div>';
+  function renderForProduct(pid){
+    const p=products.find(function(x){return String(x.id)===String(pid);});
+    const pm=document.getElementById('kmiCamProcessMount'), sm=document.getElementById('kmiCamStandardsProductMount');
+    if(!p){ if(pm) pm.innerHTML='<div class="text-slate-500 text-xs">Rota görmek için bir ürün seçin.</div>'; if(sm) sm.innerHTML=''; return; }
+    try{ if(pm) pm.innerHTML=(typeof window.routeStepsPanel73==='function'?window.routeStepsPanel73(p):''); }catch(e){}
+    try{ if(sm) sm.innerHTML='<div class="grid md:grid-cols-2 gap-3"><div><div class="text-[10px] text-slate-500 mb-1">Makine Uygunluğu</div><div class="grid grid-cols-2 gap-1">'+(typeof window.machinesPanel73==='function'?window.machinesPanel73(p):'')+'</div></div><div><div class="text-[10px] text-slate-500 mb-1">Takım Listesi</div>'+(typeof window.toolListPanel73==='function'?window.toolListPanel73(p):'')+'</div></div>'; }catch(e){}
+  }
+  const sel=document.getElementById('kmiCamProductSel');
+  if(sel){ sel.onchange=function(){ renderForProduct(sel.value); }; }
+  renderForProduct('');
+  try{ window.kmiIeRenderDataTab && window.kmiIeRenderDataTab(); }catch(e){}
+  try{ window.kmiIeRenderTimeTab && window.kmiIeRenderTimeTab(); }catch(e){}
+  try{ window.kmiIeRenderPlanTab && window.kmiIeRenderPlanTab(); }catch(e){}
+  try{ window.renderCPForm && window.renderCPForm(); }catch(e){}
+};
+
+// MASTER #23 ADDENDUM Batch 2 (Gate B, Domain 11 - Toolroom/Tooling)
+// canonical workspace. Discovery proved real, working toolroom
+// functionality already existed (toolIntelligence66 - cutting-tool master
+// cards + physical-instance lifecycle TAK/SÖK/Preset/Scrap; toolroom64 -
+// Lockcell stock cards + IN/OUT transaction ledger) but it was reachable
+// ONLY inlined at the bottom of supply()'s own Purchasing template - no
+// dedicated Toolroom department home at all. The only two existing nav
+// entries for this domain ("Takım Zekası" / "Takımhane") both opened a
+// THIRD, separate, read-only screen (kmiOpenToolingIntel) that never
+// exposed the real CRUD. This composes the real, existing CRUD views -
+// unchanged, reused wholesale - into one dedicated canonical workspace
+// tab. kmiOpenToolingIntel itself is left completely untouched and still
+// independently reachable (its own button inside this workspace, and as
+// this workspace's fallback for non-management tooling.view users - see
+// authorization note below).
+//
+// GATE C OBSERVATION (logged, NOT fixed here - MASTER #39 Toolroom
+// rebuild is a Frozen-54 boundary, and unifying/migrating data is
+// explicitly out of scope for a convergence-only pass): D.toolMasters
+// (+D.toolInstances/D.toolLifeEvents, "Lockcell Stok" per tool-type) and
+// D.toolroom (+D.toolTransactions, "Takımhane · Lockcell" cards) are TWO
+// independently-entered, independently-costed, UNLINKED stock stores for
+// what is plausibly the same physical-tool-quantity fact - no field links
+// a toolroom record to a toolMasters record. This is a genuine candidate
+// P1/P2 canonical-truth duplication for the Gate C system-wide fact sweep
+// (directive §9/§10), but RECONCILING or MERGING the two stores is a data
+// migration decision outside this convergence's authority - this
+// workspace presents BOTH, clearly separated and clearly labeled as
+// distinct, rather than silently picking one or fabricating a merge.
+//
+// AUTHORIZATION (no permission widening): toolIntelligence66/toolroom64's
+// writers (v66*/v64*) were previously reachable ONLY via Purchasing,
+// which requires MANAGEMENT (nav gate) + kmiPermissionGuard('purchasing',
+// 'view')/isMgmtUser(). The existing "Takım Zekası"/"Takımhane" nav
+// entries instead use the broader 'tooling.view' capability (can include
+// a non-management TOOLING org assignment). Routing those same nav
+// entries straight into full CRUD would WIDEN access beyond what those
+// users have today. So: a MANAGEMENT user gets the new composed canonical
+// workspace (same effective write-access they already had via
+// Purchasing); anyone else (tooling.view but not MANAGEMENT) gets exactly
+// what they get today - the existing read-only kmiOpenToolingIntel screen,
+// completely unchanged - preserving current behavior exactly.
+window.kmiOpenToolroom=function(){
+  if(typeof window.isMgmtUser==='function' && window.isMgmtUser() && typeof window.kmiOpenToolroomWorkspace==='function'){ window.kmiOpenToolroomWorkspace(); return; }
+  if(typeof window.kmiOpenToolingIntel==='function'){ window.kmiOpenToolingIntel(); return; }
+};
+window.kmiOpenToolroomWorkspace=function(){
+  const u=window.currentUser; if(!u) return;
+  if(typeof window.isMgmtUser==='function' && !window.isMgmtUser()){
+    // Not widened: falls back to the SAME read-only screen this user could
+    // already reach today via the "Takım Zekası"/"Takımhane" nav entries.
+    if(typeof window.kmiOpenToolingIntel==='function'){ window.kmiOpenToolingIntel(); return; }
+    try{window.kmiToast?.('Takımhane / Toolroom yalnız yönetim içindir.','warn');}catch(e){}
+    return;
+  }
+  document.querySelectorAll('.tab-content').forEach(function(el){ el.classList.remove('active'); });
+  document.querySelectorAll('.nav-btn').forEach(function(el){ el.classList.remove('bg-slate-700','text-blue-400'); });
+  let page=document.getElementById('tab-toolroom-workspace');
+  if(!page){
+    page=document.createElement('div'); page.id='tab-toolroom-workspace'; page.className='tab-content';
+    const mainSys=document.getElementById('mainSystem');
+    (mainSys||document.body).appendChild(page);
+  }
+  page.classList.add('active');
+  const pt=document.getElementById('pageTitle'); if(pt) pt.innerText='Takımhane / Toolroom';
+  document.getElementById('kmiGlobalPageHeaderBand')?.classList.remove('hidden');
+  window.kmiRenderToolroomWorkspace();
+};
+window.kmiRenderToolroomWorkspace=function(){
+  const page=document.getElementById('tab-toolroom-workspace'); if(!page) return;
+  const D=window.D||{toolMasters:[],toolInstances:[],toolroom:[],toolTransactions:[]};
+  const masters=Array.isArray(D.toolMasters)?D.toolMasters:[], instances=Array.isArray(D.toolInstances)?D.toolInstances:[];
+  const room=Array.isArray(D.toolroom)?D.toolroom:[], txns=Array.isArray(D.toolTransactions)?D.toolTransactions:[];
+  const header='<div class="flex flex-wrap items-center justify-between gap-3 mb-4">'
+   + '<div><h1 class="text-2xl sm:text-3xl font-black text-white"><i class="fa-solid fa-screwdriver-wrench text-cyan-400 mr-2"></i>Takımhane / Toolroom</h1>'
+   + '<div class="text-xs sm:text-sm text-slate-400 mt-1">Kurutlu Manufacturing Intelligence · Kesici Takım Ana Kartları, Fiziksel Instance/Yaşam Döngüsü, Lockcell Stok, Veri Kalitesi</div></div>'
+   + '<button type="button" onclick="window.kmiOpenToolingIntel && window.kmiOpenToolingIntel()" class="bg-slate-800 border border-slate-600 px-3 py-2 rounded text-xs hover:border-slate-400"><i class="fa-solid fa-magnifying-glass-chart mr-1"></i>Takım Zekası (Veri Kalitesi)</button>'
+   + '</div>';
+  const submenu='<div class="grid grid-cols-2 md:grid-cols-3 gap-2 text-[10px] font-bold mb-4">'
+   + '<button type="button" onclick="document.getElementById(\'kmiToolroomOverviewSection\')?.scrollIntoView({behavior:\'smooth\',block:\'start\'})" class="bg-blue-950/50 border border-blue-800 rounded p-2 text-left hover:border-blue-500">GENEL BAKIŞ</button>'
+   + '<button type="button" onclick="document.getElementById(\'kmiToolroomMastersSection\')?.scrollIntoView({behavior:\'smooth\',block:\'start\'})" class="bg-amber-950/50 border border-amber-800 rounded p-2 text-left hover:border-amber-500">TAKIM YÖNETİMİ · Yaşam Döngüsü</button>'
+   + '<button type="button" onclick="document.getElementById(\'kmiToolroomStockSection\')?.scrollIntoView({behavior:\'smooth\',block:\'start\'})" class="bg-emerald-950/50 border border-emerald-800 rounded p-2 text-left hover:border-emerald-500">TAKIMHANE · Lockcell Stok</button>'
+   + '</div>';
+  const overview='<section id="kmiToolroomOverviewSection" class="bg-slate-900 border border-slate-700 rounded-2xl p-4 mb-4">'
+   + '<h3 class="font-black mb-3 text-white">Genel Bakış</h3>'
+   + '<div class="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">'
+   + '<div class="bg-slate-950/60 rounded-xl p-3"><div class="text-[10px] text-slate-500">TAKIM ANA KARTI</div><b class="text-xl text-white">'+masters.length+'</b></div>'
+   + '<div class="bg-slate-950/60 rounded-xl p-3"><div class="text-[10px] text-slate-500">FİZİKSEL INSTANCE</div><b class="text-xl text-cyan-300">'+instances.length+'</b></div>'
+   + '<div class="bg-slate-950/60 rounded-xl p-3"><div class="text-[10px] text-slate-500">TAKIMHANE KARTI</div><b class="text-xl text-emerald-300">'+room.length+'</b></div>'
+   + '<div class="bg-slate-950/60 rounded-xl p-3"><div class="text-[10px] text-slate-500">TAKIMHANE HAREKETİ</div><b class="text-xl text-amber-300">'+txns.length+'</b></div>'
+   + '</div><div class="text-[10px] text-slate-500 mt-3">GATE C: "Takım Ana Kartı" (D.toolMasters) ve "Takımhane Kartı" (D.toolroom) İKİ AYRI, BİRBİRİNE BAĞLANMAMIŞ stok deposudur - aynı fiziksel takım miktarı gerçeğinin birleştirilmemiş iki kaydı olabilir. Burada birleştirilmedi/uydurulmadı; her ikisi de kendi gerçek verisiyle, ayrı ayrı gösterilir - bkz. docs/KMI_CANONICAL_TRUTH_CONSISTENCY_REGISTER.md.</div></section>';
+  const mastersSection='<section id="kmiToolroomMastersSection" class="bg-slate-900 border border-slate-700 rounded-2xl p-4 mb-4">'
+   + '<h3 class="font-black mb-3 text-white">Takım Yönetimi &amp; Lockcell · Yaşam Döngüsü</h3>'
+   + '<div class="text-[10px] text-slate-500 mb-2">Mevcut toolIntelligence66() görünümü (aynı veri, aynı motor, ikinci bir takım ana kart deposu yok).</div>'
+   + '<div id="kmiToolroomMastersMount"></div></section>';
+  const stockSection='<section id="kmiToolroomStockSection" class="bg-slate-900 border border-slate-700 rounded-2xl p-4 mb-4">'
+   + '<h3 class="font-black mb-3 text-white">Takımhane · Lockcell Stok</h3>'
+   + '<div class="text-[10px] text-slate-500 mb-2">Mevcut toolroom64() görünümü (aynı veri, aynı motor, ikinci bir stok deposu yok).</div>'
+   + '<div id="kmiToolroomStockMount"></div></section>';
+  page.innerHTML='<div class="max-w-[1400px] mx-auto p-4 sm:p-6">'
+   + header + submenu + overview + mastersSection + stockSection
+   + '</div>';
+  try{ const m=document.getElementById('kmiToolroomMastersMount'); if(m) m.innerHTML=(typeof window.toolIntelligence66==='function'?window.toolIntelligence66():''); }catch(e){}
+  try{ const s=document.getElementById('kmiToolroomStockMount'); if(s) s.innerHTML=(typeof window.toolroom64==='function'?window.toolroom64():''); }catch(e){}
+};
+
+// MASTER #23 ADDENDUM Batch 2 (Gate B, Domain 14 - IT/System Management)
+// canonical workspace. Discovery (dedicated investigation) found this is
+// NOT a clean CAM/Toolroom-style convergence: the 4 real "SOFTWARE & IT"
+// pieces (Users/Identity table, Roles/Permissions grid, Pilot Manager,
+// Sayfa Performansı) are each either DOM-coupled to the always-present
+// legacy #tab-yonetici static markup (Users table's #userAdminTableBody
+// is static HTML, never removed, unlike CAM/Toolroom's legacy MODALS
+// which could be closed first - embedding a second copy here would be a
+// PERMANENT duplicate id, not a transient one, so it is NOT done) or are
+// each already their OWN self-contained, full-screen modal (Permissions/
+// Pilot/Perf/Issue Reporter/Mobile Home all create their own
+// document.body-appended overlay). None of them expose a reusable
+// "render into my container" function the way routeStepsPanel73/
+// toolIntelligence66/toolroom64 did. So this workspace is a thin,
+// honest LAUNCHER/HUB - link-cards that call the EXISTING, UNCHANGED
+// open functions - not a merged content composition. This matches the
+// addendum's own instruction to mark rather than fake a capability: the
+// genuinely MISSING pieces (audit/security-log viewer, integration-
+// status dashboard, system/master-data config screen) are reported as
+// MISSING in the Overview, not fabricated.
+//
+// AUTHORIZATION (no permission widening, no narrowing): this hub is an
+// ADDITIVE new nav entry, not a replacement for the 4 existing
+// "SOFTWARE & IT" nav entries (pilotmanager/issuereporter/performance/
+// mobile), which are left completely untouched with their own existing,
+// independent requiredPermission gates (pilot.view/pilot.issue.report/
+// perf.view/mobile.access respectively) - an ordinary employee who
+// already has e.g. mobile.access keeps reaching Mobil Görünüm exactly as
+// before, whether or not they can see this hub. The hub itself (and the
+// Users table / Permissions grid link-cards, which are genuinely
+// MANAGEMENT-oriented tools, unlike Mobile Home/Issue Reporter) is gated
+// with isMgmtUser() - the same gate already used for the other Batch 2
+// canonical workspaces - and each link-card, when clicked, still
+// re-invokes its OWN existing, independently-gated open function
+// unchanged (so a MANAGEMENT user without a specific finer-grained
+// capability, e.g. pilot.view, still gets that function's own existing
+// denial, exactly as today).
+window.kmiOpenIT=function(){
+  if(typeof window.kmiOpenITWorkspace==='function'){ window.kmiOpenITWorkspace(); return; }
+};
+window.kmiOpenITWorkspace=function(){
+  const u=window.currentUser; if(!u) return;
+  if(typeof window.isMgmtUser==='function' && !window.isMgmtUser()){ try{window.kmiToast?.('IT / Sistem Yönetimi yalnız yönetim içindir.','warn');}catch(e){} return; }
+  document.querySelectorAll('.tab-content').forEach(function(el){ el.classList.remove('active'); });
+  document.querySelectorAll('.nav-btn').forEach(function(el){ el.classList.remove('bg-slate-700','text-blue-400'); });
+  let page=document.getElementById('tab-it-workspace');
+  if(!page){
+    page=document.createElement('div'); page.id='tab-it-workspace'; page.className='tab-content';
+    const mainSys=document.getElementById('mainSystem');
+    (mainSys||document.body).appendChild(page);
+  }
+  page.classList.add('active');
+  const pt=document.getElementById('pageTitle'); if(pt) pt.innerText='IT / Sistem Yönetimi';
+  document.getElementById('kmiGlobalPageHeaderBand')?.classList.remove('hidden');
+  window.kmiRenderITWorkspace();
+};
+window.kmiRenderITWorkspace=function(){
+  const page=document.getElementById('tab-it-workspace'); if(!page) return;
+  const personCount=(Array.isArray(window.PERSONNEL_LIST)?window.PERSONNEL_LIST.length:0);
+  let perfSummaryTxt='-';
+  try{ const s=window.KMI_PERF&&typeof window.KMI_PERF.summary==='function'?window.KMI_PERF.summary():null; if(s&&typeof s.avgLoadMs==='number') perfSummaryTxt=s.avgLoadMs.toFixed(0)+' ms'; }catch(e){}
+  const header='<div class="flex flex-wrap items-center justify-between gap-3 mb-4">'
+   + '<div><h1 class="text-2xl sm:text-3xl font-black text-white"><i class="fa-solid fa-server text-cyan-400 mr-2"></i>IT / Sistem Yönetimi</h1>'
+   + '<div class="text-xs sm:text-sm text-slate-400 mt-1">Kurutlu Manufacturing Intelligence · Kullanıcılar, Roller/İzinler, Pilot Yönetimi, Sayfa Performansı, Sorun Bildir, Mobil Görünüm</div></div></div>';
+  const overview='<section class="bg-slate-900 border border-slate-700 rounded-2xl p-4 mb-4">'
+   + '<h3 class="font-black mb-3 text-white">Genel Bakış</h3>'
+   + '<div class="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">'
+   + '<div class="bg-slate-950/60 rounded-xl p-3"><div class="text-[10px] text-slate-500">PERSONEL / KULLANICI</div><b class="text-xl text-white">'+personCount+'</b></div>'
+   + '<div class="bg-slate-950/60 rounded-xl p-3"><div class="text-[10px] text-slate-500">ORT. SAYFA YÜKLEME</div><b class="text-xl text-cyan-300">'+perfSummaryTxt+'</b></div>'
+   + '<div class="bg-slate-950/60 rounded-xl p-3"><div class="text-[10px] text-slate-500">DENETİM/GÜVENLİK GÖRÜNTÜLEYİCİ</div><b class="text-sm text-amber-300">EKSİK / HENÜZ YOK</b></div>'
+   + '<div class="bg-slate-950/60 rounded-xl p-3"><div class="text-[10px] text-slate-500">ENTEGRASYON DURUM PANOSU</div><b class="text-sm text-amber-300">EKSİK / HENÜZ YOK</b></div>'
+   + '</div><div class="text-[10px] text-slate-500 mt-3">Denetim günlüğü (audit_log) sadece sunucu tarafında YAZILIYOR, hiçbir ekran OKUMUYOR; entegrasyon durum panosu ve genel sistem/ana veri yapılandırma ekranı da bu dosyada hiçbir yerde yok - burada UYDURULMADI, dürüstçe EKSİK olarak işaretlendi.</div></section>';
+  // MASTER #23 ADDENDUM §5 (owner directive, 2026-10-06, "GATE C FULL
+  // CONSISTENCY SWEEP + DOMAIN 13 CORRECTION"): a flat grid of six
+  // unrelated buttons opening six old standalone modals is NOT sufficient
+  // convergence - the domain must establish context/hierarchy. Regrouped
+  // the SAME six existing, unchanged cards (no new function invented - no
+  // Audit Viewer/Integration Status/Device Manager/Session Manager/System
+  // Health backend) into labeled sections, matching the Domain 13 pattern:
+  // KİMLİK & ERİŞİM (Users, Permissions), SİSTEM / PİLOT KONTROLÜ (Pilot
+  // Manager), TANI / PERFORMANS (existing performance diagnostics), and a
+  // DİĞER ARAÇLAR group for the two remaining existing tools.
+  function cardGroup(title,cards){
+   return '<section class="bg-slate-900 border border-slate-700 rounded-2xl p-4 mb-4">'
+    + '<h3 class="font-black mb-3 text-white">'+title+'</h3>'
+    + '<div class="grid md:grid-cols-3 gap-3">'
+    + cards.map(function(c){ return '<button type="button" onclick="'+c.action+'" class="text-left bg-slate-950 hover:bg-slate-800 border border-slate-700 rounded-xl p-4"><i class="fa-solid '+c.icon+' text-cyan-400 text-lg"></i><div class="font-bold text-white mt-2">'+c.title+'</div><div class="text-[10px] text-slate-500 mt-1">'+c.desc+'</div></button>'; }).join('')
+    + '</div></section>';
+  }
+  const identityHtml=cardGroup('Kimlik &amp; Erişim',[
+   {icon:'fa-key',title:'Kullanıcılar &amp; Kimlik',desc:'Kullanıcı rolleri, şifre sıfırlama (mevcut Yönetici Paneli &gt; Kullanıcı Ayarları tablosu, aynı motor, ikinci bir kopya yok).',action:"window.switchTab && window.switchTab('yonetici'); setTimeout(function(){ window.openAdminModule && window.openAdminModule('users'); },50);"},
+   {icon:'fa-user-shield',title:'Roller &amp; İzinler (Granüler)',desc:'Modül × eylem bazında ayrıntılı izin matrisi (mevcut kmiOpenPermissions, aynı motor).',action:"window.kmiOpenPermissions && window.kmiOpenPermissions();"}
+  ]);
+  const systemPilotHtml=cardGroup('Sistem / Pilot Kontrolü',[
+   {icon:'fa-rocket',title:'Pilot Manager (Go-Live)',desc:'P0/P1 engelleyici takibi (mevcut kmiOpenPilotManager, aynı motor).',action:"window.kmiOpenPilotManager && window.kmiOpenPilotManager();"}
+  ]);
+  const diagnosticsHtml=cardGroup('Tanı / Performans',[
+   {icon:'fa-gauge-high',title:'Sayfa Performansı (Teknik)',desc:'Sayfa yükleme süresi ölçümü (mevcut kmiOpenPerf, aynı motor).',action:"window.kmiOpenPerf && window.kmiOpenPerf();"}
+  ]);
+  const otherToolsHtml=cardGroup('Diğer Araçlar',[
+   {icon:'fa-bug',title:'Sorun Bildir',desc:'Hata/öneri bildirim formu (mevcut kmiOpenIssueReporter, aynı motor).',action:"window.kmiOpenIssueReporter && window.kmiOpenIssueReporter();"},
+   {icon:'fa-mobile-screen',title:'Mobil Görünüm',desc:'Kendi iş emirlerinizin mobil özeti (mevcut kmiOpenMobileHome, aynı motor).',action:"window.kmiOpenMobileHome && window.kmiOpenMobileHome();"}
+  ]);
+  page.innerHTML='<div class="max-w-[1400px] mx-auto p-4 sm:p-6">'
+   + header + overview + identityHtml + systemPilotHtml + diagnosticsHtml + otherToolsHtml
+   + '</div>';
+};
+
+// MASTER #23 ADDENDUM - Domain 13 (Management/Business Control), REOPENED
+// AND REMEDIATED per owner directive (2026-10-06, "GATE C FULL CONSISTENCY
+// SWEEP + DOMAIN 13 CORRECTION" §3-4): the prior Batch 2 verdict ("no real
+// gap - Command Center already covers it") was REJECTED by the owner.
+// Domain 13 (management responsibility/governance/approvals/Manager Panel/
+// business performance/economic controls) is explicitly DISTINCT from the
+// cross-functional Command Center (operational obligations + actionable
+// queues across ALL domains) - these are not interchangeable, and this
+// workspace must not duplicate Command Center nor be used as its
+// substitute.
+//
+// Composition approach: the real underlying capabilities (Executive
+// Dashboard, the two-stage accounting->management approval queue +
+// approved-history panel, Gantt/resource planning, org chart, bonus-pool/
+// cost-analysis economic controls) are all DOM-coupled to PERMANENT,
+// always-present legacy markup inside #tab-yonetici (unlike CAM/Toolroom's
+// removable legacy MODALS, which could be safely re-targeted to a new
+// fixed-id container) - physically relocating those live DOM nodes out of
+// #tab-yonetici would risk breaking the legacy shell's own module-toggle
+// behavior for anyone who still opens "Yönetici Paneli" directly, which is
+// exactly the kind of "redesign a working production engine merely for
+// visual convergence" the standing rule forbids. So, matching the Domain 14
+// (IT) precedent AND the owner's explicit requirement that this not be "a
+// grid of six unrelated buttons" but a workspace with real internal
+// hierarchy: this composes FIVE clearly-grouped sections, each a genuine
+// entry point into the REAL existing capability (never a copy, never a new
+// writer, never a second approval engine) - deep-linking into Command
+// Center specifically for the two capabilities that canonically belong
+// there (Commercial Release, Final Production Release), per the directive's
+// own instruction. The GENEL BAKIŞ strip's numbers are computed by calling
+// the EXACT SAME canonical data (PERSONNEL_LIST/maintenanceRecords/
+// MACHINES_LIST/productTargetObject/qualityGoodForMonth) window.
+// renderExecutiveDashboard itself reads - no new business fact, no second
+// KPI engine; the full Executive Dashboard (with its own period selector)
+// remains one click away for complete detail.
+window.kmiOpenManagement=function(){
+  if(typeof window.kmiOpenManagementWorkspace==='function'){ window.kmiOpenManagementWorkspace(); return; }
+};
+window.kmiOpenManagementWorkspace=function(){
+  const u=window.currentUser; if(!u) return;
+  if(typeof window.isMgmtUser==='function' && !window.isMgmtUser()){ try{window.kmiToast?.('Yönetim / İşletme Kontrolü yalnız yönetim içindir.','warn');}catch(e){} return; }
+  document.querySelectorAll('.tab-content').forEach(function(el){ el.classList.remove('active'); });
+  document.querySelectorAll('.nav-btn').forEach(function(el){ el.classList.remove('bg-slate-700','text-blue-400'); });
+  let page=document.getElementById('tab-management-workspace');
+  if(!page){
+    page=document.createElement('div'); page.id='tab-management-workspace'; page.className='tab-content';
+    const mainSys=document.getElementById('mainSystem');
+    (mainSys||document.body).appendChild(page);
+  }
+  page.classList.add('active');
+  const pt=document.getElementById('pageTitle'); if(pt) pt.innerText='Yönetim / İşletme Kontrolü';
+  document.getElementById('kmiGlobalPageHeaderBand')?.classList.remove('hidden');
+  window.kmiRenderManagementWorkspace();
+};
+window.kmiRenderManagementWorkspace=function(){
+  const page=document.getElementById('tab-management-workspace'); if(!page) return;
+  // GENEL BAKIŞ - same canonical calls window.renderExecutiveDashboard uses
+  // (read-only, no new fact/engine); full detail is one click away.
+  let month='-', actual=0, target=0, openMaint=0, activeMachines=0, totalMachines=0;
+  try{
+    month=(typeof getCurrentMonthKey==='function')?getCurrentMonthKey():'-';
+    const t=(typeof productTargetObject==='function')?productTargetObject(month):{total:0};
+    target=Number(t&&t.total||0);
+    actual=(typeof qualityGoodForMonth==='function')?Number(qualityGoodForMonth(month)||0):0;
+    const mr=(typeof maintenanceRecords!=='undefined'&&Array.isArray(maintenanceRecords))?maintenanceRecords:[];
+    openMaint=mr.filter(function(r){return r.status!=='Kapalı';}).length;
+    const ml=(typeof MACHINES_LIST!=='undefined'&&Array.isArray(MACHINES_LIST))?MACHINES_LIST:[];
+    totalMachines=ml.length;
+    activeMachines=(typeof machineOeeMetrics==='function')?ml.filter(function(m){return machineOeeMetrics(m.code+' - '+m.name,month).rows>0;}).length:0;
+  }catch(e){}
+  const personCount=(Array.isArray(window.PERSONNEL_LIST)?window.PERSONNEL_LIST.filter(function(p){return p.active!==false;}).length:0);
+  const header='<div class="flex flex-wrap items-center justify-between gap-3 mb-4">'
+   + '<div><h1 class="text-2xl sm:text-3xl font-black text-white"><i class="fa-solid fa-building-shield text-cyan-400 mr-2"></i>Yönetim / İşletme Kontrolü</h1>'
+   + '<div class="text-xs sm:text-sm text-slate-400 mt-1">Kurutlu Manufacturing Intelligence · Yönetim sorumluluğu, onaylar/serbest bırakmalar, geçmiş/yönetişim, ekonomik kontrol - Komuta Merkezi\'nin YERİNE değil, onun YANINDA</div></div></div>';
+  const overview='<section class="bg-slate-900 border border-slate-700 rounded-2xl p-4 mb-4">'
+   + '<div class="flex justify-between items-center mb-3"><h3 class="font-black text-white">Genel Bakış</h3><button type="button" onclick="window.switchTab && window.switchTab(\'yonetici\'); setTimeout(function(){ window.openAdminModule && window.openAdminModule(\'reports\'); },80);" class="text-[10px] text-cyan-300 font-bold">Tam Executive Dashboard →</button></div>'
+   + '<div class="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-6 gap-3 text-sm">'
+   + '<div class="bg-slate-950/60 rounded-xl p-3"><div class="text-[10px] text-slate-500">AYLIK ÜRETİM</div><b class="text-lg text-white">'+actual.toLocaleString('tr-TR')+'</b></div>'
+   + '<div class="bg-slate-950/60 rounded-xl p-3"><div class="text-[10px] text-slate-500">AYLIK HEDEF</div><b class="text-lg text-white">'+target.toLocaleString('tr-TR')+'</b></div>'
+   + '<div class="bg-slate-950/60 rounded-xl p-3"><div class="text-[10px] text-slate-500">HEDEF GERÇEKLEŞME</div><b class="text-lg text-cyan-300">'+(target?('%'+(actual/target*100).toFixed(1)):'-')+'</b></div>'
+   + '<div class="bg-slate-950/60 rounded-xl p-3"><div class="text-[10px] text-slate-500">ÇALIŞAN/ÜRETEN MAKİNE</div><b class="text-lg text-white">'+activeMachines+'/'+totalMachines+'</b></div>'
+   + '<div class="bg-slate-950/60 rounded-xl p-3"><div class="text-[10px] text-slate-500">AÇIK BAKIM/ARIZA</div><b class="text-lg '+(openMaint>0?'text-amber-300':'text-white')+'">'+openMaint+'</b></div>'
+   + '<div class="bg-slate-950/60 rounded-xl p-3"><div class="text-[10px] text-slate-500">AKTİF PERSONEL</div><b class="text-lg text-white">'+personCount+'</b></div>'
+   + '</div></section>';
+  function cardGroup(title,cards){
+   return '<section class="bg-slate-900 border border-slate-700 rounded-2xl p-4 mb-4">'
+    + '<h3 class="font-black mb-3 text-white">'+title+'</h3>'
+    + '<div class="grid md:grid-cols-3 gap-3">'
+    + cards.map(function(c){ return '<button type="button" onclick="'+c.action+'" class="text-left bg-slate-950 hover:bg-slate-800 border border-slate-700 rounded-xl p-4"><i class="fa-solid '+c.icon+' text-cyan-400 text-lg"></i><div class="font-bold text-white mt-2">'+c.title+'</div><div class="text-[10px] text-slate-500 mt-1">'+c.desc+'</div></button>'; }).join('')
+    + '</div></section>';
+  }
+  const controlsHtml=cardGroup('Yönetim Kontrolleri',[
+   {icon:'fa-grid-2',title:'Yönetici Paneli (Tüm Modüller)',desc:'Mevcut, tam Yönetici Paneli - burada gruplananlar dahil tüm modüller (mevcut #tab-yonetici, aynı motor).',action:"window.switchTab && window.switchTab('yonetici');"},
+   {icon:'fa-users-gear',title:'Personel Yönetimi',desc:'Personel · Vardiya · Rozet/PIN · Kabiliyet (mevcut openAdminModule(\'personnel\'), aynı motor).',action:"window.switchTab && window.switchTab('yonetici'); setTimeout(function(){ window.openAdminModule && window.openAdminModule('personnel'); },80);"},
+   {icon:'fa-diagram-project',title:'Kaynak Planlama · Gantt',desc:'Makine + personel doluluk, önümüzdeki 7 gün (mevcut renderKmiGantt, aynı motor).',action:"window.switchTab && window.switchTab('yonetici'); setTimeout(function(){ window.openAdminModule && window.openAdminModule('gantt'); },80);"},
+   {icon:'fa-sitemap',title:'Organizasyon Şeması',desc:'Kim kime bağlı - task/bakım/iş emri atama hiyerarşisi (mevcut kmiOpenOrgChart, aynı motor).',action:"window.kmiOpenOrgChart && window.kmiOpenOrgChart();"},
+   {icon:'fa-trash-can',title:'Veri Yönetimi',desc:'Yalnız Yönetim - kayıt silme merkezi (mevcut openAdminModule(\'datamanagement\'), aynı motor/aynı yetki kontrolü).',action:"window.switchTab && window.switchTab('yonetici'); setTimeout(function(){ window.openAdminModule && window.openAdminModule('datamanagement'); },80);"}
+  ]);
+  const approvalsHtml=cardGroup('Onaylar / Serbest Bırakmalar',[
+   {icon:'fa-stamp',title:'Yönetim Son Onayı (Bekleyenler)',desc:'Muhasebe onayı sonrası yönetim son onay kuyruğu (mevcut renderProductionApprovals/approveManagementRecord, aynı motor - ikinci bir onay motoru yok).',action:"window.switchTab && window.switchTab('yonetici'); setTimeout(function(){ window.openAdminModule && window.openAdminModule('approvals'); },80);"},
+   {icon:'fa-truck-ramp-box',title:'Commercial Release',desc:'Kanonik ticari serbest bırakma değerlendirmesi - bu eylem kanonik olarak Komuta Merkezi\'ne aittir, buradan KOPYALANMADI (mevcut r5ccCommercialRelease/kmiR5CommercialReleaseEvaluate, Komuta Merkezi\'ne derin bağlantı).',action:"window.kmiOpenCommandCenterWorkspace && window.kmiOpenCommandCenterWorkspace();"},
+   {icon:'fa-industry',title:'Final Production Release',desc:'Üretimi serbest bırakma yetkisi - bu eylem kanonik olarak Komuta Merkezi\'ne aittir, buradan KOPYALANMADI (mevcut r5ccFinalProductionRelease/kmiR5FinalProductionReleaseGrant, Komuta Merkezi\'ne derin bağlantı).',action:"window.kmiOpenCommandCenterWorkspace && window.kmiOpenCommandCenterWorkspace();"}
+  ]);
+  const historyHtml=cardGroup('Geçmiş / Yönetişim',[
+   {icon:'fa-clock-rotate-left',title:'Son Yönetim Onayları (Geçmiş)',desc:'En yeniden eskiye onaylanmış kayıtlar (mevcut renderManagementApprovedHistory - aynı panelin, onay kuyruğunun altındaki bölümü, ikinci bir geçmiş kaydı yok).',action:"window.switchTab && window.switchTab('yonetici'); setTimeout(function(){ window.openAdminModule && window.openAdminModule('approvals'); },80);"}
+  ]);
+  const economicHtml=cardGroup('Ekonomik Kontrol',[
+   {icon:'fa-scale-balanced',title:'Puantaj & Prim Bütçesi',desc:'Prim algoritması ve bütçe ayarları - yalnız yetkili yönetim (mevcut openAdminModule(\'puantaj\'), aynı motor/aynı yetki kontrolü).',action:"window.switchTab && window.switchTab('yonetici'); setTimeout(function(){ window.openAdminModule && window.openAdminModule('puantaj'); },80);"},
+   {icon:'fa-chart-pie',title:'Cost Analysis & P&L',desc:'Maliyet · P&L · BEP · nakit projeksiyonu - yalnız yetkili yönetim (mevcut openAdminModule(\'costanalysis\'), aynı motor/aynı yetki kontrolü, kendi parola kilidi dahil değişmedi).',action:"window.switchTab && window.switchTab('yonetici'); setTimeout(function(){ window.openAdminModule && window.openAdminModule('costanalysis'); },80);"}
+  ]);
+  page.innerHTML='<div class="max-w-[1400px] mx-auto p-4 sm:p-6">'
+   + header + overview + controlsHtml + approvalsHtml + historyHtml + economicHtml
+   + '</div>';
 };
 
 // İNSAN & YETENEK -> KMI-R5 MASTER#16 FAST CLOSURE (2026-10-05): prefers the
@@ -24394,12 +25340,18 @@ window.kmiOpenShipping = function(){
 
 // KMI-R5 MASTER #16 (owner numbering: Slice 5, 2026-10-04,
 // docs/KMI_R5_MASTER16_CONVERGENCE_DISCOVERY.md Part B §12 - People &
-// Capability): same gap class already closed for Maintenance/Shipping
-// (Slice 1) - Puantaj & Prim (admin-module 'puantaj'/'bonuslist') is a
+// Capability): Puantaj & Prim (admin-module 'puantaj'/'bonuslist') is a
 // real, already-working screen with no window.KMI_NAV_REGISTRY entry.
-// Thin wrapper only, same pattern as window.kmiOpenPeopleTalent above - no
-// new engine, no new permission string.
+// MASTER #23 ADDENDUM (Gate B, 2026-10): discovery flagged that this
+// wrapper still routed through the legacy Yönetici shell instead of the
+// SAME converged canonical People workspace that kmiOpenPeopleTalent
+// already uses (both 'puantaj'/'bonuslist' admin-modules are ALREADY
+// composed into window.kmiRenderPeopleWorkspace via kmiPeopleMountModules,
+// so the canonical workspace shows the real, identical content) - closing
+// the same gap class already closed for kmiOpenPeopleTalent. No new
+// engine, no new permission string; legacy fallback preserved unchanged.
 window.kmiOpenPuantaj = function(){
+  if(typeof window.kmiOpenPeopleWorkspace==='function'){ window.kmiOpenPeopleWorkspace(); return; }
   try{
     if(typeof window.switchTab==='function') window.switchTab('yonetici');
     setTimeout(function(){
