@@ -17,9 +17,9 @@
          `git blame`/diffs on this file quiet between releases and avoid a
          commit-hash feedback loop (the source commit's SHA cannot depend on
          a value computed from that same SHA). See docs/KMI_DEPLOY_ID.md. -->
-    <meta name="kmi-source-commit" content="de80d54d942d0c83f1f47574e45580d4fd8ca0d1">
-    <meta name="kmi-build-id" content="de80d54d942d-20261006T190252Z">
-    <meta name="kmi-built-at" content="2026-10-06T19:02:52.855Z">
+    <meta name="kmi-source-commit" content="__KMI_BUILD_SOURCE_COMMIT__">
+    <meta name="kmi-build-id" content="__KMI_BUILD_ID__">
+    <meta name="kmi-built-at" content="__KMI_BUILD_BUILT_AT__">
     <script>
       // Derived from the meta tags above at runtime, so there is exactly one
       // place (the meta tags) where the build script substitutes real
@@ -531,7 +531,12 @@ ead>
                     <button onclick="if(typeof window.kmiOpenQualityWorkspace==='function'){window.kmiOpenQualityWorkspace();}else{switchTab('kalite');}" class="nav-btn px-3 py-2 rounded-md hover:bg-slate-700 text-slate-300" id="btn-kalite"><i class="fa-solid fa-circle-check mr-1"></i> Kalite Onay</button>
                     <button onclick="switchTab('sevkiyat')" class="nav-btn px-3 py-2 rounded-md hover:bg-slate-700 text-slate-300" id="btn-sevkiyat"><i class="fa-solid fa-truck-fast mr-1"></i> Sevkiyat</button>
                     <button id="btn-bakim" onclick="switchTab('bakim')" class="nav-btn px-4 py-2 rounded-lg font-semibold text-slate-300 hover:bg-slate-700"><i class="fa-solid fa-screwdriver-wrench mr-2"></i>Bakım & Makine</button>
-                    <button onclick="switchTab('siparis')" class="nav-btn px-3 py-2 rounded-md hover:bg-slate-700 text-slate-300" id="btn-siparis"><i class="fa-solid fa-file-invoice mr-1"></i> Sipariş & Stok</button>
+                    <!-- KMI-R5 OWNER REVIEW DEFECT ROUND 1 ("CONTINUE - SALES/CUSTOMER ORDER +
+                         PLANNING CANONICAL COMPLETION"): same fallback precedent as btn-kalite
+                         above - prefers the canonical Satış & Müşteri workspace; #tab-siparis
+                         itself and all its functions are unchanged and still reachable (now
+                         composed INSIDE that workspace, not standalone). -->
+                    <button onclick="if(typeof window.kmiOpenSalesWorkspace==='function'){window.kmiOpenSalesWorkspace();}else{switchTab('siparis');}" class="nav-btn px-3 py-2 rounded-md hover:bg-slate-700 text-slate-300" id="btn-siparis"><i class="fa-solid fa-file-invoice mr-1"></i> Sipariş & Stok</button>
                     <!-- KMI-NEXTGEN-FAZ3-SLICE4-FIX (2026-09-28): Ender'in Faz 3 - Slice 4
                          (Accounting Consolidation) direktifi gereği, bu buton artık ESKİ
                          switchTab('muhasebe') yerine YENİ kanonik Muhasebe & Finans ekranını
@@ -900,7 +905,7 @@ ead>
     </button>
   </div>
 </div>
-<div class="bg-slate-800 border border-cyan-700/40 rounded-xl p-5 shadow-lg"><div class="flex flex-wrap justify-between gap-3"><div><h2 class="text-xl font-black text-white"><i class="fa-solid fa-diagram-project text-cyan-400 mr-2"></i>KURUTLU LIVE · Order & Flow Center</h2><p class="text-xs text-slate-400 mt-1">Performance Center · Paperless Machining · Every movement measured. Every decision informed.</p></div><div class="flex flex-wrap gap-2"><button onclick="kmiOpenScan()" class="bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2 rounded-lg text-xs font-black"><i class="fa-solid fa-qrcode mr-1"></i> SCAN</button><button onclick="kmiOpenLive()" class="bg-violet-600 hover:bg-violet-500 text-white px-4 py-2 rounded-lg text-xs font-black"><i class="fa-solid fa-tower-broadcast mr-1"></i> KURUTLU LIVE</button><button onclick="v118OpenOrder()" class="bg-cyan-600 hover:bg-cyan-500 text-white px-4 py-2 rounded-lg text-xs font-black"><i class="fa-solid fa-plus mr-1"></i> Yeni Müşteri Siparişi</button></div></div><div id="v118CloudStatus" class="mt-3"></div><div id="v118Kpis" class="grid grid-cols-2 md:grid-cols-5 gap-3 mt-4"></div><div id="kmiV121Dashboard" class="mt-4"></div></div>
+<div id="v118FlowCenterPanel" class="bg-slate-800 border border-cyan-700/40 rounded-xl p-5 shadow-lg"><div class="flex flex-wrap justify-between gap-3"><div><h2 class="text-xl font-black text-white"><i class="fa-solid fa-diagram-project text-cyan-400 mr-2"></i>KURUTLU LIVE · Order & Flow Center</h2><p class="text-xs text-slate-400 mt-1">Performance Center · Paperless Machining · Every movement measured. Every decision informed.</p></div><div class="flex flex-wrap gap-2"><button onclick="kmiOpenScan()" class="bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2 rounded-lg text-xs font-black"><i class="fa-solid fa-qrcode mr-1"></i> SCAN</button><button onclick="kmiOpenLive()" class="bg-violet-600 hover:bg-violet-500 text-white px-4 py-2 rounded-lg text-xs font-black"><i class="fa-solid fa-tower-broadcast mr-1"></i> KURUTLU LIVE</button><button onclick="v118OpenOrder()" class="bg-cyan-600 hover:bg-cyan-500 text-white px-4 py-2 rounded-lg text-xs font-black"><i class="fa-solid fa-plus mr-1"></i> Yeni Müşteri Siparişi</button></div></div><div id="v118CloudStatus" class="mt-3"></div><div id="v118Kpis" class="grid grid-cols-2 md:grid-cols-5 gap-3 mt-4"></div><div id="kmiV121Dashboard" class="mt-4"></div></div>
 <!-- KMI-FIX (2026-09-25): "3 · ÜRETİM" etiketi burada sadece dekoratif bir kutuydu; hiçbir
      gerçek üretim/iş emri verisi göstermiyordu (bu ekranın "Müşteri Siparişleri" tablosu ayrı
      bir veri kümesidir - sadece bu ekrandan "Yeni Müşteri Siparişi" ile açılan siparişleri
@@ -1064,7 +1069,7 @@ ead>
                 <!-- MAKİNE SAĞLIĞI & BAKIM -->
                 <div data-admin-module="maintenance" class="admin-module-panel admin-card p-5 shadow-lg space-y-4 border border-red-700/40">
                   <div class="flex flex-wrap justify-between items-center gap-3 border-b border-slate-700 pb-3"><div><h3 class="text-base font-bold text-white"><i class="fa-solid fa-heart-pulse text-red-400 mr-2"></i>Makine Sağlığı · TPM / Bakım Merkezi</h3><p class="text-[11px] text-slate-500">Makine bazında sağlık, planlı bakım, operatör kusur bildirimleri, yapılacak değişimler/kontroller ve bakım SLA takibi.</p></div><button onclick="openMaintenancePlanPrompt()" class="bg-red-600 hover:bg-red-500 text-white px-3 py-2 rounded text-xs font-bold"><i class="fa-solid fa-plus mr-1"></i>Planlı Bakım / Kontrol Ekle</button></div>
-                  <div id="machineHealthCards" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3"><button type="button" class="machine-fleet-card text-left" onclick="openMachineFileV33('101 - Kesmak 280 Şerit Testere')"><div class="flex justify-between gap-2"><div><span class="machine-status-dot bg-emerald-500"></span> <b class="text-white text-sm">101 - Kesmak 280 Şerit Testere</b><div class="text-[9px] text-emerald-400">Çalışabilir / durum bekleniyor</div></div><span class="text-lg font-black text-slate-400">—</span></div><div class="grid grid-cols-3 gap-2 mt-3"><div class="bg-slate-900 rounded-lg p-2"><small class="text-slate-500">OEE</small><b class="block text-cyan-300">—</b></div><div class="bg-slate-900 rounded-lg p-2"><small class="text-slate-500">Açık kayıt</small><b class="block text-amber-300">0</b></div><div class="bg-slate-900 rounded-lg p-2"><small class="text-slate-500">DOWN</small><b class="block text-red-300">0 dk</b></div></div><div class="text-[9px] text-cyan-300 mt-3">Makine dosyasını aç →</div></button><button type="button" class="machine-fleet-card text-left" onclick="openMachineFileV33('102 - HAAS ST 10 Y')"><div class="flex justify-between gap-2"><div><span class="machine-status-dot bg-emerald-500"></span> <b class="text-white text-sm">102 - HAAS ST 10 Y</b><div class="text-[9px] text-emerald-400">Çalışabilir / durum bekleniyor</div></div><span class="text-lg font-black text-slate-400">—</span></div><div class="grid grid-cols-3 gap-2 mt-3"><div class="bg-slate-900 rounded-lg p-2"><small class="text-slate-500">OEE</small><b class="block text-cyan-300">—</b></div><div class="bg-slate-900 rounded-lg p-2"><small class="text-slate-500">Açık kayıt</small><b class="block text-amber-300">0</b></div><div class="bg-slate-900 rounded-lg p-2"><small class="text-slate-500">DOWN</small><b class="block text-red-300">0 dk</b></div></div><div class="text-[9px] text-cyan-300 mt-3">Makine dosyasını aç →</div></button><button type="button" class="machine-fleet-card text-left" onclick="openMachineFileV33('103 - DMG MORI SEIKI NHX 5000')"><div class="flex justify-between gap-2"><div><span class="machine-status-dot bg-emerald-500"></span> <b class="text-white text-sm">103 - DMG MORI SEIKI NHX 5000</b><div class="text-[9px] text-emerald-400">Çalışabilir / durum bekleniyor</div></div><span class="text-lg font-black text-slate-400">—</span></div><div class="grid grid-cols-3 gap-2 mt-3"><div class="bg-slate-900 rounded-lg p-2"><small class="text-slate-500">OEE</small><b class="block text-cyan-300">—</b></div><div class="bg-slate-900 rounded-lg p-2"><small class="text-slate-500">Açık kayıt</small><b class="block text-amber-300">0</b></div><div class="bg-slate-900 rounded-lg p-2"><small class="text-slate-500">DOWN</small><b class="block text-red-300">0 dk</b></div></div><div class="text-[9px] text-cyan-300 mt-3">Makine dosyasını aç →</div></button><button type="button" class="machine-fleet-card text-left" onclick="openMachineFileV33('107 - HAAS VF\' SE 4 Eksen Divizörlü')"><div class="flex justify-between gap-2"><div><span class="machine-status-dot bg-emerald-500"></span> <b class="text-white text-sm">107 - HAAS VF' SE 4 Eksen Divizörlü</b><div class="text-[9px] text-emerald-400">Çalışabilir / durum bekleniyor</div></div><span class="text-lg font-black text-slate-400">—</span></div><div class="grid grid-cols-3 gap-2 mt-3"><div class="bg-slate-900 rounded-lg p-2"><small class="text-slate-500">OEE</small><b class="block text-cyan-300">—</b></div><div class="bg-slate-900 rounded-lg p-2"><small class="text-slate-500">Açık kayıt</small><b class="block text-amber-300">0</b></div><div class="bg-slate-900 rounded-lg p-2"><small class="text-slate-500">DOWN</small><b class="block text-red-300">0 dk</b></div></div><div class="text-[9px] text-cyan-300 mt-3">Makine dosyasını aç →</div></button><button type="button" class="machine-fleet-card text-left" onclick="openMachineFileV33('108 - HAAS VF\' SE 4 Eksen Divizörlü')"><div class="flex justify-between gap-2"><div><span class="machine-status-dot bg-emerald-500"></span> <b class="text-white text-sm">108 - HAAS VF' SE 4 Eksen Divizörlü</b><div class="text-[9px] text-emerald-400">Çalışabilir / durum bekleniyor</div></div><span class="text-lg font-black text-slate-400">—</span></div><div class="grid grid-cols-3 gap-2 mt-3"><div class="bg-slate-900 rounded-lg p-2"><small class="text-slate-500">OEE</small><b class="block text-cyan-300">—</b></div><div class="bg-slate-900 rounded-lg p-2"><small class="text-slate-500">Açık kayıt</small><b class="block text-amber-300">0</b></div><div class="bg-slate-900 rounded-lg p-2"><small class="text-slate-500">DOWN</small><b class="block text-red-300">0 dk</b></div></div><div class="text-[9px] text-cyan-300 mt-3">Makine dosyasını aç →</div></button><button type="button" class="machine-fleet-card text-left" onclick="openMachineFileV33('109 - HAAS VF\' SE 4 Eksen Divizörlü')"><div class="flex justify-between gap-2"><div><span class="machine-status-dot bg-emerald-500"></span> <b class="text-white text-sm">109 - HAAS VF' SE 4 Eksen Divizörlü</b><div class="text-[9px] text-emerald-400">Çalışabilir / durum bekleniyor</div></div><span class="text-lg font-black text-slate-400">—</span></div><div class="grid grid-cols-3 gap-2 mt-3"><div class="bg-slate-900 rounded-lg p-2"><small class="text-slate-500">OEE</small><b class="block text-cyan-300">—</b></div><div class="bg-slate-900 rounded-lg p-2"><small class="text-slate-500">Açık kayıt</small><b class="block text-amber-300">0</b></div><div class="bg-slate-900 rounded-lg p-2"><small class="text-slate-500">DOWN</small><b class="block text-red-300">0 dk</b></div></div><div class="text-[9px] text-cyan-300 mt-3">Makine dosyasını aç →</div></button><button type="button" class="machine-fleet-card text-left" onclick="openMachineFileV33('110 - HAAS VF\' SE 4 Eksen Divizörlü')"><div class="flex justify-between gap-2"><div><span class="machine-status-dot bg-emerald-500"></span> <b class="text-white text-sm">110 - HAAS VF' SE 4 Eksen Divizörlü</b><div class="text-[9px] text-emerald-400">Çalışabilir / durum bekleniyor</div></div><span class="text-lg font-black text-slate-400">—</span></div><div class="grid grid-cols-3 gap-2 mt-3"><div class="bg-slate-900 rounded-lg p-2"><small class="text-slate-500">OEE</small><b class="block text-cyan-300">—</b></div><div class="bg-slate-900 rounded-lg p-2"><small class="text-slate-500">Açık kayıt</small><b class="block text-amber-300">0</b></div><div class="bg-slate-900 rounded-lg p-2"><small class="text-slate-500">DOWN</small><b class="block text-red-300">0 dk</b></div></div><div class="text-[9px] text-cyan-300 mt-3">Makine dosyasını aç →</div></button><button type="button" class="machine-fleet-card text-left" onclick="openMachineFileV33('111 - DMU 60 P')"><div class="flex justify-between gap-2"><div><span class="machine-status-dot bg-emerald-500"></span> <b class="text-white text-sm">111 - DMU 60 P</b><div class="text-[9px] text-emerald-400">Çalışabilir / durum bekleniyor</div></div><span class="text-lg font-black text-slate-400">—</span></div><div class="grid grid-cols-3 gap-2 mt-3"><div class="bg-slate-900 rounded-lg p-2"><small class="text-slate-500">OEE</small><b class="block text-cyan-300">—</b></div><div class="bg-slate-900 rounded-lg p-2"><small class="text-slate-500">Açık kayıt</small><b class="block text-amber-300">0</b></div><div class="bg-slate-900 rounded-lg p-2"><small class="text-slate-500">DOWN</small><b class="block text-red-300">0 dk</b></div></div><div class="text-[9px] text-cyan-300 mt-3">Makine dosyasını aç →</div></button><button type="button" class="machine-fleet-card text-left" onclick="openMachineFileV33('112 - HAAS SL 30')"><div class="flex justify-between gap-2"><div><span class="machine-status-dot bg-emerald-500"></span> <b class="text-white text-sm">112 - HAAS SL 30</b><div class="text-[9px] text-emerald-400">Çalışabilir / durum bekleniyor</div></div><span class="text-lg font-black text-slate-400">—</span></div><div class="grid grid-cols-3 gap-2 mt-3"><div class="bg-slate-900 rounded-lg p-2"><small class="text-slate-500">OEE</small><b class="block text-cyan-300">—</b></div><div class="bg-slate-900 rounded-lg p-2"><small class="text-slate-500">Açık kayıt</small><b class="block text-amber-300">0</b></div><div class="bg-slate-900 rounded-lg p-2"><small class="text-slate-500">DOWN</small><b class="block text-red-300">0 dk</b></div></div><div class="text-[9px] text-cyan-300 mt-3">Makine dosyasını aç →</div></button><button type="button" class="machine-fleet-card text-left" onclick="openMachineFileV33('113 - DMU 60 P')"><div class="flex justify-between gap-2"><div><span class="machine-status-dot bg-emerald-500"></span> <b class="text-white text-sm">113 - DMU 60 P</b><div class="text-[9px] text-emerald-400">Çalışabilir / durum bekleniyor</div></div><span class="text-lg font-black text-slate-400">—</span></div><div class="grid grid-cols-3 gap-2 mt-3"><div class="bg-slate-900 rounded-lg p-2"><small class="text-slate-500">OEE</small><b class="block text-cyan-300">—</b></div><div class="bg-slate-900 rounded-lg p-2"><small class="text-slate-500">Açık kayıt</small><b class="block text-amber-300">0</b></div><div class="bg-slate-900 rounded-lg p-2"><small class="text-slate-500">DOWN</small><b class="block text-red-300">0 dk</b></div></div><div class="text-[9px] text-cyan-300 mt-3">Makine dosyasını aç →</div></button><button type="button" class="machine-fleet-card text-left" onclick="openMachineFileV33('CMM - Hexagon 5 eksen CMM')"><div class="flex justify-between gap-2"><div><span class="machine-status-dot bg-emerald-500"></span> <b class="text-white text-sm">CMM - Hexagon 5 eksen CMM</b><div class="text-[9px] text-emerald-400">Çalışabilir / durum bekleniyor</div></div><span class="text-lg font-black text-slate-400">—</span></div><div class="grid grid-cols-3 gap-2 mt-3"><div class="bg-slate-900 rounded-lg p-2"><small class="text-slate-500">OEE</small><b class="block text-cyan-300">—</b></div><div class="bg-slate-900 rounded-lg p-2"><small class="text-slate-500">Açık kayıt</small><b class="block text-amber-300">0</b></div><div class="bg-slate-900 rounded-lg p-2"><small class="text-slate-500">DOWN</small><b class="block text-red-300">0 dk</b></div></div><div class="text-[9px] text-cyan-300 mt-3">Makine dosyasını aç →</div></button><button type="button" class="machine-fleet-card text-left" onclick="openMachineFileV33('OPT - In size ISD-V Manuel Video Optik')"><div class="flex justify-between gap-2"><div><span class="machine-status-dot bg-emerald-500"></span> <b class="text-white text-sm">OPT - In size ISD-V Manuel Video Optik</b><div class="text-[9px] text-emerald-400">Çalışabilir / durum bekleniyor</div></div><span class="text-lg font-black text-slate-400">—</span></div><div class="grid grid-cols-3 gap-2 mt-3"><div class="bg-slate-900 rounded-lg p-2"><small class="text-slate-500">OEE</small><b class="block text-cyan-300">—</b></div><div class="bg-slate-900 rounded-lg p-2"><small class="text-slate-500">Açık kayıt</small><b class="block text-amber-300">0</b></div><div class="bg-slate-900 rounded-lg p-2"><small class="text-slate-500">DOWN</small><b class="block text-red-300">0 dk</b></div></div><div class="text-[9px] text-cyan-300 mt-3">Makine dosyasını aç →</div></button></div><div class="text-[10px] text-slate-500">Her makine kartına tıklayarak canlı durum, DOWN süresi, alarm/semptom, arıza çözümü, bakım, güncelleme, yorum ve yedek parça geçmişini açabilirsiniz.</div>
+                  <div id="machineHealthCards" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3"><button type="button" class="machine-fleet-card text-left" onclick="openMachineFileV33('101 - Kesmak 280 Şerit Testere')"><div class="flex justify-between gap-2"><div class="min-w-0 flex-1"><span class="machine-status-dot bg-emerald-500"></span> <b class="text-white text-sm break-words">101 - Kesmak 280 Şerit Testere</b><div class="text-[9px] text-emerald-400">Çalışabilir / durum bekleniyor</div></div><span class="text-lg font-black text-slate-400 shrink-0">—</span></div><div class="grid grid-cols-3 gap-2 mt-3"><div class="bg-slate-900 rounded-lg p-2"><small class="text-slate-500">OEE</small><b class="block text-cyan-300">—</b></div><div class="bg-slate-900 rounded-lg p-2"><small class="text-slate-500">Açık kayıt</small><b class="block text-amber-300">0</b></div><div class="bg-slate-900 rounded-lg p-2"><small class="text-slate-500">DOWN</small><b class="block text-red-300">0 dk</b></div></div><div class="text-[9px] text-cyan-300 mt-3">Makine dosyasını aç →</div></button><button type="button" class="machine-fleet-card text-left" onclick="openMachineFileV33('102 - HAAS ST 10 Y')"><div class="flex justify-between gap-2"><div class="min-w-0 flex-1"><span class="machine-status-dot bg-emerald-500"></span> <b class="text-white text-sm break-words">102 - HAAS ST 10 Y</b><div class="text-[9px] text-emerald-400">Çalışabilir / durum bekleniyor</div></div><span class="text-lg font-black text-slate-400 shrink-0">—</span></div><div class="grid grid-cols-3 gap-2 mt-3"><div class="bg-slate-900 rounded-lg p-2"><small class="text-slate-500">OEE</small><b class="block text-cyan-300">—</b></div><div class="bg-slate-900 rounded-lg p-2"><small class="text-slate-500">Açık kayıt</small><b class="block text-amber-300">0</b></div><div class="bg-slate-900 rounded-lg p-2"><small class="text-slate-500">DOWN</small><b class="block text-red-300">0 dk</b></div></div><div class="text-[9px] text-cyan-300 mt-3">Makine dosyasını aç →</div></button><button type="button" class="machine-fleet-card text-left" onclick="openMachineFileV33('103 - DMG MORI SEIKI NHX 5000')"><div class="flex justify-between gap-2"><div class="min-w-0 flex-1"><span class="machine-status-dot bg-emerald-500"></span> <b class="text-white text-sm break-words">103 - DMG MORI SEIKI NHX 5000</b><div class="text-[9px] text-emerald-400">Çalışabilir / durum bekleniyor</div></div><span class="text-lg font-black text-slate-400 shrink-0">—</span></div><div class="grid grid-cols-3 gap-2 mt-3"><div class="bg-slate-900 rounded-lg p-2"><small class="text-slate-500">OEE</small><b class="block text-cyan-300">—</b></div><div class="bg-slate-900 rounded-lg p-2"><small class="text-slate-500">Açık kayıt</small><b class="block text-amber-300">0</b></div><div class="bg-slate-900 rounded-lg p-2"><small class="text-slate-500">DOWN</small><b class="block text-red-300">0 dk</b></div></div><div class="text-[9px] text-cyan-300 mt-3">Makine dosyasını aç →</div></button><button type="button" class="machine-fleet-card text-left" onclick="openMachineFileV33('107 - HAAS VF\' SE 4 Eksen Divizörlü')"><div class="flex justify-between gap-2"><div class="min-w-0 flex-1"><span class="machine-status-dot bg-emerald-500"></span> <b class="text-white text-sm break-words">107 - HAAS VF' SE 4 Eksen Divizörlü</b><div class="text-[9px] text-emerald-400">Çalışabilir / durum bekleniyor</div></div><span class="text-lg font-black text-slate-400 shrink-0">—</span></div><div class="grid grid-cols-3 gap-2 mt-3"><div class="bg-slate-900 rounded-lg p-2"><small class="text-slate-500">OEE</small><b class="block text-cyan-300">—</b></div><div class="bg-slate-900 rounded-lg p-2"><small class="text-slate-500">Açık kayıt</small><b class="block text-amber-300">0</b></div><div class="bg-slate-900 rounded-lg p-2"><small class="text-slate-500">DOWN</small><b class="block text-red-300">0 dk</b></div></div><div class="text-[9px] text-cyan-300 mt-3">Makine dosyasını aç →</div></button><button type="button" class="machine-fleet-card text-left" onclick="openMachineFileV33('108 - HAAS VF\' SE 4 Eksen Divizörlü')"><div class="flex justify-between gap-2"><div class="min-w-0 flex-1"><span class="machine-status-dot bg-emerald-500"></span> <b class="text-white text-sm break-words">108 - HAAS VF' SE 4 Eksen Divizörlü</b><div class="text-[9px] text-emerald-400">Çalışabilir / durum bekleniyor</div></div><span class="text-lg font-black text-slate-400 shrink-0">—</span></div><div class="grid grid-cols-3 gap-2 mt-3"><div class="bg-slate-900 rounded-lg p-2"><small class="text-slate-500">OEE</small><b class="block text-cyan-300">—</b></div><div class="bg-slate-900 rounded-lg p-2"><small class="text-slate-500">Açık kayıt</small><b class="block text-amber-300">0</b></div><div class="bg-slate-900 rounded-lg p-2"><small class="text-slate-500">DOWN</small><b class="block text-red-300">0 dk</b></div></div><div class="text-[9px] text-cyan-300 mt-3">Makine dosyasını aç →</div></button><button type="button" class="machine-fleet-card text-left" onclick="openMachineFileV33('109 - HAAS VF\' SE 4 Eksen Divizörlü')"><div class="flex justify-between gap-2"><div class="min-w-0 flex-1"><span class="machine-status-dot bg-emerald-500"></span> <b class="text-white text-sm break-words">109 - HAAS VF' SE 4 Eksen Divizörlü</b><div class="text-[9px] text-emerald-400">Çalışabilir / durum bekleniyor</div></div><span class="text-lg font-black text-slate-400 shrink-0">—</span></div><div class="grid grid-cols-3 gap-2 mt-3"><div class="bg-slate-900 rounded-lg p-2"><small class="text-slate-500">OEE</small><b class="block text-cyan-300">—</b></div><div class="bg-slate-900 rounded-lg p-2"><small class="text-slate-500">Açık kayıt</small><b class="block text-amber-300">0</b></div><div class="bg-slate-900 rounded-lg p-2"><small class="text-slate-500">DOWN</small><b class="block text-red-300">0 dk</b></div></div><div class="text-[9px] text-cyan-300 mt-3">Makine dosyasını aç →</div></button><button type="button" class="machine-fleet-card text-left" onclick="openMachineFileV33('110 - HAAS VF\' SE 4 Eksen Divizörlü')"><div class="flex justify-between gap-2"><div class="min-w-0 flex-1"><span class="machine-status-dot bg-emerald-500"></span> <b class="text-white text-sm break-words">110 - HAAS VF' SE 4 Eksen Divizörlü</b><div class="text-[9px] text-emerald-400">Çalışabilir / durum bekleniyor</div></div><span class="text-lg font-black text-slate-400 shrink-0">—</span></div><div class="grid grid-cols-3 gap-2 mt-3"><div class="bg-slate-900 rounded-lg p-2"><small class="text-slate-500">OEE</small><b class="block text-cyan-300">—</b></div><div class="bg-slate-900 rounded-lg p-2"><small class="text-slate-500">Açık kayıt</small><b class="block text-amber-300">0</b></div><div class="bg-slate-900 rounded-lg p-2"><small class="text-slate-500">DOWN</small><b class="block text-red-300">0 dk</b></div></div><div class="text-[9px] text-cyan-300 mt-3">Makine dosyasını aç →</div></button><button type="button" class="machine-fleet-card text-left" onclick="openMachineFileV33('111 - DMU 60 P')"><div class="flex justify-between gap-2"><div class="min-w-0 flex-1"><span class="machine-status-dot bg-emerald-500"></span> <b class="text-white text-sm break-words">111 - DMU 60 P</b><div class="text-[9px] text-emerald-400">Çalışabilir / durum bekleniyor</div></div><span class="text-lg font-black text-slate-400 shrink-0">—</span></div><div class="grid grid-cols-3 gap-2 mt-3"><div class="bg-slate-900 rounded-lg p-2"><small class="text-slate-500">OEE</small><b class="block text-cyan-300">—</b></div><div class="bg-slate-900 rounded-lg p-2"><small class="text-slate-500">Açık kayıt</small><b class="block text-amber-300">0</b></div><div class="bg-slate-900 rounded-lg p-2"><small class="text-slate-500">DOWN</small><b class="block text-red-300">0 dk</b></div></div><div class="text-[9px] text-cyan-300 mt-3">Makine dosyasını aç →</div></button><button type="button" class="machine-fleet-card text-left" onclick="openMachineFileV33('112 - HAAS SL 30')"><div class="flex justify-between gap-2"><div class="min-w-0 flex-1"><span class="machine-status-dot bg-emerald-500"></span> <b class="text-white text-sm break-words">112 - HAAS SL 30</b><div class="text-[9px] text-emerald-400">Çalışabilir / durum bekleniyor</div></div><span class="text-lg font-black text-slate-400 shrink-0">—</span></div><div class="grid grid-cols-3 gap-2 mt-3"><div class="bg-slate-900 rounded-lg p-2"><small class="text-slate-500">OEE</small><b class="block text-cyan-300">—</b></div><div class="bg-slate-900 rounded-lg p-2"><small class="text-slate-500">Açık kayıt</small><b class="block text-amber-300">0</b></div><div class="bg-slate-900 rounded-lg p-2"><small class="text-slate-500">DOWN</small><b class="block text-red-300">0 dk</b></div></div><div class="text-[9px] text-cyan-300 mt-3">Makine dosyasını aç →</div></button><button type="button" class="machine-fleet-card text-left" onclick="openMachineFileV33('113 - DMU 60 P')"><div class="flex justify-between gap-2"><div class="min-w-0 flex-1"><span class="machine-status-dot bg-emerald-500"></span> <b class="text-white text-sm break-words">113 - DMU 60 P</b><div class="text-[9px] text-emerald-400">Çalışabilir / durum bekleniyor</div></div><span class="text-lg font-black text-slate-400 shrink-0">—</span></div><div class="grid grid-cols-3 gap-2 mt-3"><div class="bg-slate-900 rounded-lg p-2"><small class="text-slate-500">OEE</small><b class="block text-cyan-300">—</b></div><div class="bg-slate-900 rounded-lg p-2"><small class="text-slate-500">Açık kayıt</small><b class="block text-amber-300">0</b></div><div class="bg-slate-900 rounded-lg p-2"><small class="text-slate-500">DOWN</small><b class="block text-red-300">0 dk</b></div></div><div class="text-[9px] text-cyan-300 mt-3">Makine dosyasını aç →</div></button><button type="button" class="machine-fleet-card text-left" onclick="openMachineFileV33('CMM - Hexagon 5 eksen CMM')"><div class="flex justify-between gap-2"><div class="min-w-0 flex-1"><span class="machine-status-dot bg-emerald-500"></span> <b class="text-white text-sm break-words">CMM - Hexagon 5 eksen CMM</b><div class="text-[9px] text-emerald-400">Çalışabilir / durum bekleniyor</div></div><span class="text-lg font-black text-slate-400 shrink-0">—</span></div><div class="grid grid-cols-3 gap-2 mt-3"><div class="bg-slate-900 rounded-lg p-2"><small class="text-slate-500">OEE</small><b class="block text-cyan-300">—</b></div><div class="bg-slate-900 rounded-lg p-2"><small class="text-slate-500">Açık kayıt</small><b class="block text-amber-300">0</b></div><div class="bg-slate-900 rounded-lg p-2"><small class="text-slate-500">DOWN</small><b class="block text-red-300">0 dk</b></div></div><div class="text-[9px] text-cyan-300 mt-3">Makine dosyasını aç →</div></button><button type="button" class="machine-fleet-card text-left" onclick="openMachineFileV33('OPT - In size ISD-V Manuel Video Optik')"><div class="flex justify-between gap-2"><div class="min-w-0 flex-1"><span class="machine-status-dot bg-emerald-500"></span> <b class="text-white text-sm break-words">OPT - In size ISD-V Manuel Video Optik</b><div class="text-[9px] text-emerald-400">Çalışabilir / durum bekleniyor</div></div><span class="text-lg font-black text-slate-400 shrink-0">—</span></div><div class="grid grid-cols-3 gap-2 mt-3"><div class="bg-slate-900 rounded-lg p-2"><small class="text-slate-500">OEE</small><b class="block text-cyan-300">—</b></div><div class="bg-slate-900 rounded-lg p-2"><small class="text-slate-500">Açık kayıt</small><b class="block text-amber-300">0</b></div><div class="bg-slate-900 rounded-lg p-2"><small class="text-slate-500">DOWN</small><b class="block text-red-300">0 dk</b></div></div><div class="text-[9px] text-cyan-300 mt-3">Makine dosyasını aç →</div></button></div><div class="text-[10px] text-slate-500">Her makine kartına tıklayarak canlı durum, DOWN süresi, alarm/semptom, arıza çözümü, bakım, güncelleme, yorum ve yedek parça geçmişini açabilirsiniz.</div>
                   <div id="machineTopList"></div>
                   <div class="bg-slate-950/55 border border-cyan-900/50 rounded-xl p-4 space-y-3">
                     <div class="flex flex-wrap justify-between gap-2"><div><b class="text-cyan-200"><i class="fa-solid fa-chart-column mr-1"></i>OEE & Kayıp Merkezi</b><div class="text-[10px] text-slate-500">Kalite onaylı üretim ve operatörün gerçek duruş kayıtlarından makine bazında hesaplanır.</div></div><div class="text-[10px] text-slate-400">OEE = Kullanılabilirlik × Performans × Kalite</div></div>
@@ -3066,6 +3071,59 @@ ead>
             try{ return window.kmiRoutingEvaluateFinalOperation(jo).status==='FINAL'; }
             catch(e){ return false; }
         };
+        // KMI-FIX (SUNSHINE-1507, 2026-10-07): Owner-approved manufacturing-quantity-semantics
+        // model (bkz. docs/KMI_R5_SUNSHINE1507_*.md) - "QUANTITY-DEFINING OPERATION" (fiziksel
+        // İYİ adedin AUTORİTATİF hale geldiği operasyon) kavramını kmiRoutingEvaluateFinalOperation
+        // ile AYNI fail-closed disiplinle ekler: hiçbir koşulda operasyon adı/makine/sıradan ÇIKARILMAZ,
+        // sadece ürün kartındaki AÇIK p.quantityDefiningOperation alanından okunur (bkz. kmiPatchM3500V4,
+        // yukarıda) ve bu alan routeSteps'teki bir adımın op metniyle (case-insensitive/trim) TAM
+        // eşleşmelidir. Alan tanımsız/boş veya eşleşen adım yoksa UNKNOWN döner - bu durumda hiçbir
+        // yeni PRODUCED GOOD kredisi verilmez (fail-CLOSED), mevcut SON-OPERASYON tabanlı akış
+        // (v118CreditProduction/kmiIsFinalOperationJobOrder) bundan etkilenmeden aynen çalışır.
+        // NOT: Bu değerlendirme "iş emri ŞU AN bu adımda mı" sorusuna cevap vermez (o, yalnızca
+        // kalite onayının HANGİ operasyon için verildiğini zaten bilir - approveKalite çağrı yeri) -
+        // sadece "ürünün rotasında TANIMLI quantity-defining adım, iş emrinin kalite onayı aldığı
+        // adımla aynı mı" sorusuna cevap verir, kmiRoutingEvaluateFinalOperation'daki "matches" eşleme
+        // mantığının birebir aynısını (machine/op eşleşmesi) kullanarak.
+        window.kmiRoutingEvaluateQuantityDefiningOperation=function(jobOrder){
+            try{
+                if(!jobOrder) return {status:'UNKNOWN',reasonCode:'NO_JOB_ORDER',message:'İş emri verilmedi.',evidence:{}};
+                if(!jobOrder.productId) return {status:'UNKNOWN',reasonCode:'NO_PRODUCT_LINK',message:'İş emrinde ürün bağlantısı (productId) yok - quantity-defining operasyon çözülemez.',evidence:{jobOrderId:jobOrder.id||null}};
+                const prod=(window.D?.products||[]).find(p=>String(p.id)===String(jobOrder.productId));
+                if(!prod) return {status:'UNKNOWN',reasonCode:'PRODUCT_NOT_FOUND',message:'İş emrinin bağlı olduğu ürün (productId='+jobOrder.productId+') bulunamadı.',evidence:{jobOrderId:jobOrder.id||null,productId:jobOrder.productId}};
+                const qdoText=String(prod.quantityDefiningOperation||'').trim();
+                if(!qdoText) return {status:'UNKNOWN',reasonCode:'NO_QUANTITY_DEFINING_OPERATION_DEFINED',message:'Bu ürün için Owner tarafından onaylı bir quantity-defining operasyon tanımlı değil - PRODUCED GOOD kredisi bu yoldan verilmez (varsayılan/mevcut SON-OPERASYON akışı etkilenmez).',evidence:{jobOrderId:jobOrder.id||null,productId:jobOrder.productId}};
+                const steps=(Array.isArray(prod.routeSteps)?prod.routeSteps:[]).filter(s=>s&&String(s.op||'').trim());
+                if(steps.length===0) return {status:'UNKNOWN',reasonCode:'NO_ROUTING_DEFINED',message:'Ürün için tanımlı bir rota (routeSteps) yok veya boş.',evidence:{jobOrderId:jobOrder.id||null,productId:jobOrder.productId}};
+                const qdoNorm=qdoText.toLocaleUpperCase('tr-TR');
+                const qdoIdx=steps.findIndex(s=>String(s.op||'').trim().toLocaleUpperCase('tr-TR')===qdoNorm);
+                if(qdoIdx===-1) return {status:'UNKNOWN',reasonCode:'QUANTITY_DEFINING_OPERATION_NOT_IN_ROUTE',message:'Üründe tanımlı quantity-defining operasyon metni ("'+qdoText+'"), ürünün güncel routeSteps rotasındaki hiçbir adımla eşleşmiyor - veri tutarsızlığı, fail-CLOSED.',evidence:{jobOrderId:jobOrder.id||null,productId:jobOrder.productId,quantityDefiningOperation:qdoText,routeSteps:steps.map(s=>({op:s.op,machine:s.machine||null}))}};
+                const codeOf=s=>String(s).split('-')[0].trim().toLocaleUpperCase('tr-TR');
+                const jm=String(jobOrder.machine||'').trim();
+                const jop=String(jobOrder.operation||'').trim().toLocaleUpperCase('tr-TR');
+                const matches=[];
+                steps.forEach((s,i)=>{
+                    const sm=String(s.machine||'').trim();
+                    const sop=String(s.op||'').trim().toLocaleUpperCase('tr-TR');
+                    const machineMatch = jm && sm && (jm===sm || codeOf(jm)===codeOf(sm));
+                    const opMatch = jop && sop && jop===sop;
+                    if(machineMatch || opMatch) matches.push(i);
+                });
+                if(matches.length===0) return {status:'UNKNOWN',reasonCode:'CURRENT_OPERATION_NOT_RESOLVED',message:'İş emrinin (makine='+(jm||'-')+', operasyon='+(jobOrder.operation||'-')+') ürünün rota tanımındaki hangi adıma karşılık geldiği güvenilir biçimde belirlenemedi.',evidence:{jobOrderId:jobOrder.id||null,productId:jobOrder.productId}};
+                if(matches.length>1) return {status:'UNKNOWN',reasonCode:'CURRENT_OPERATION_AMBIGUOUS',message:'İş emri rota tanımındaki birden fazla adımla eşleşiyor - konum belirsiz.',evidence:{jobOrderId:jobOrder.id||null,productId:jobOrder.productId,matchedIndices:matches}};
+                const idx=matches[0];
+                if(idx===qdoIdx){
+                    return {status:'QUANTITY_DEFINING',reasonCode:'MATCHED_QUANTITY_DEFINING_STEP',message:'İş emri, üründe Owner tarafından tanımlı quantity-defining adımla ("'+qdoText+'") eşleşti.',evidence:{jobOrderId:jobOrder.id||null,productId:jobOrder.productId,matchedIndex:idx,quantityDefiningIndex:qdoIdx,matchedStep:steps[idx]}};
+                }
+                return {status:'NOT_QUANTITY_DEFINING',reasonCode:'DIFFERENT_STEP_MATCHED',message:'İş emri, quantity-defining adımdan farklı bir rota adımıyla eşleşti.',evidence:{jobOrderId:jobOrder.id||null,productId:jobOrder.productId,matchedIndex:idx,quantityDefiningIndex:qdoIdx,matchedStep:steps[idx]}};
+            }catch(e){
+                return {status:'UNKNOWN',reasonCode:'QDO_EVAL_ERROR',message:'Quantity-defining operasyon durumu değerlendirilirken beklenmeyen bir hata oluştu - güvenlik nedeniyle UNKNOWN.',evidence:{error:String(e&&e.message||e)}};
+            }
+        };
+        window.kmiIsQuantityDefiningOperationJobOrder=function(jo){
+            try{ return window.kmiRoutingEvaluateQuantityDefiningOperation(jo).status==='QUANTITY_DEFINING'; }
+            catch(e){ return false; }
+        };
         // Salt-okunur keşif yardımcısı: mevcut açık iş emirlerinden hangilerinin son-operasyon
         // durumu UNKNOWN olduğunu (yani otomatik üretim kredisi/sevkiyatın artık sessizce
         // atlandığını) listeler - "manuel onay gerektiren durum" için görünürlük sağlar, hiçbir
@@ -3165,6 +3223,26 @@ ead>
                         }
                     }
                 }catch(e){ console.error('[Sipariş üretim kredisi]',e); }
+                // KMI-FIX (SUNSHINE-1507, 2026-10-07): Owner-approved "Choose B" mimari kararı - PRODUCED
+                // GOOD QTY, ROUTING/SON OPERASYON tamamlanmasından BAĞIMSIZ, ayrı/kanonik bir gerçektir
+                // (ORDERED != PRODUCED GOOD != FINISHED GOODS != RELEASED != SHIPPED != REMAINING DELIVERY
+                // OBLIGATION). Bu çağrı, yukarıdaki SON-OPERASYON tabanlı v118CreditProduction çağrısına
+                // EK/BAĞIMSIZ olarak çalışır - onu DEĞİŞTİRMEZ, yerini almaz, taşımaz. v118CreditProducedGood
+                // SADECE yeni l.producedGood alanına yazar - l.produced, stockRow().onHand ve V.movements'a
+                // ASLA dokunmaz (Owner'ın "Do not credit Finished Goods at the quantity-defining CNC
+                // operation" kısıtı) - yani WIP hiçbir koşulda Bitmiş Ürün stoğu/teslimat yükümlülüğü
+                // olarak yanlış sınıflandırılmaz (bkz. kmiShipmentEvaluateOrder - l.produced okumaz,
+                // l.producedGood'u da okumayacak şekilde bırakıldı). Owner onayı olmayan ürünlerde
+                // (p.quantityDefiningOperation tanımsız) kmiIsQuantityDefiningOperationJobOrder her zaman
+                // false döner - bu ürünler için hiçbir davranış değişmez.
+                try{
+                    if(jo && jo.salesOrderId && Number(d.qualityGood||0)>0){
+                        const isQdo = window.kmiIsQuantityDefiningOperationJobOrder ? window.kmiIsQuantityDefiningOperationJobOrder(jo) : false;
+                        if(isQdo && window.v118CreditProducedGood){
+                            window.v118CreditProducedGood(jo.salesOrderId, jo.productId, Number(d.qualityGood||0));
+                        }
+                    }
+                }catch(e){ console.error('[Sipariş PRODUCED GOOD kredisi - SUNSHINE-1507]',e); }
                 // KMI-FIX (2026-09-25): Operasyonlar arası sevk beyanı (bkz. confirmMachineTransfer).
                 // Bu beyan Muhasebe/Sevkiyat akışına GİRMEZ - iş emri henüz bitmedi, sadece bir
                 // operasyondan diğerine geçiyor. Kalite onayı burada iş emrini gerçekten hedef
@@ -3432,7 +3510,16 @@ ead>
             if(!window.currentUser || !window.KMI_AUTH || !window.KMI_AUTH.can(window.currentUser,'PRODUCTION_MANAGER')){ alert('Üretim Serbest Bırakma yalnız yetkili Üretim Müdürü/Yönetim tarafından verilebilir.'); return; }
             if(typeof window.kmiR5FinalProductionReleaseEvaluate!=='function'||typeof window.kmiR5FinalProductionReleaseGrant!=='function'){ alert('Üretim Serbest Bırakma modülü bu oturumda yüklenemedi.'); return; }
             const ev=window.kmiR5FinalProductionReleaseEvaluate(jobOrderId);
-            if(ev.status!=='FINAL_PRODUCTION_RELEASABLE'){ alert('Üretim serbest bırakılamaz.\nDurum: '+ev.status+' ('+ev.reasonCode+')\n'+ev.message); return; }
+            if(ev.status!=='FINAL_PRODUCTION_RELEASABLE'){
+                // KMI-R5 OWNER REVIEW DEFECT ROUND 1 (2026-10-06, §6 "UX DEFECT"): no more
+                // raw ROUTING_UNKNOWN/CURRENT_OPERATION_NOT_RESOLVED-style codes shown
+                // directly to the Owner/user - see window.kmiR5FinalProductionReleaseFriendlyMessage.
+                const fm=(typeof window.kmiR5FinalProductionReleaseFriendlyMessage==='function')?window.kmiR5FinalProductionReleaseFriendlyMessage(ev,jobOrderId):null;
+                if(fm) alert(fm.headline+'\n\n'+fm.detail+'\n\nİş Emri: '+fm.woLabel+'\nMakine: '+fm.machineLabel+'\nDurum: '+fm.statusLabel);
+                else alert('Üretim serbest bırakılamaz.\nDurum: '+ev.status+' ('+ev.reasonCode+')\n'+ev.message);
+                console.warn('[kmiR5FinalProductionReleaseGrantUI] blocked', ev.status, ev.reasonCode, ev.evidence);
+                return;
+            }
             const reason=prompt('Üretim Serbest Bırakma notu (opsiyonel):','');
             const res=window.kmiR5FinalProductionReleaseGrant(jobOrderId, reason||null);
             if(res.status==='FINAL_PRODUCTION_RELEASED'){ alert('Üretim serbest bırakıldı: '+jobOrderId); try{renderManagementApprovalQueue();}catch(e){} try{refreshAllViews();}catch(e){} }
@@ -4790,7 +4877,7 @@ function openMachineFileV30(machine){selectedMachineFileV30=machine;const modal=
 function closeMachineFileV30(){const m=document.getElementById('machineFileModal');m.classList.add('hidden');m.classList.remove('flex');selectedMachineFileV30=null;}
 // KMI-DEAD-CODE-UYARI (2026-09-27): renderMaintenanceCenter bu satırda da tanımlanıyor ama
 // dosyada daha sonra birkaç kez daha tanımlanıyor - BU KOPYA ÖLÜ KODDUR.
-renderMaintenanceCenter=function(){const cards=document.getElementById('machineHealthCards');if(!cards)return;const month=document.getElementById('productionTargetMonth')?.value||getCurrentMonthKey();cards.innerHTML=MACHINES_LIST.map(m=>{const name=`${m.code} - ${m.name}`,st=machineStateV30(name),h=machineHealth(name),o=machineOeeMetrics(name,month),open=maintenanceRecords.filter(r=>r.machine===name&&r.status!=='Kapalı').length,last=maintenanceRecords.filter(r=>r.machine===name).sort((a,b)=>new Date(b.openedAt||0)-new Date(a.openedAt||0))[0],down=machineDownMinutesV30(name);return `<div class="machine-fleet-card ${st.down?'machine-down':''}" onclick="openMachineFileV30('${name.replace(/'/g,"\\'")}')"><div class="flex justify-between gap-2"><div><span class="machine-status-dot ${st.down?'bg-red-500':'bg-emerald-500'}"></span> <b class="text-white text-sm">${name}</b><div class="text-[9px] ${st.down?'text-red-400 font-black':'text-emerald-400'}">${st.down?'DOWN · '+fmtDurationV30(down):'Çalışabilir / hazır'}</div></div><span class="text-xl font-black ${h>=90?'text-emerald-400':h>=70?'text-amber-300':'text-red-400'}">${h}</span></div><div class="grid grid-cols-3 gap-2 mt-3"><div class="bg-slate-900 rounded-lg p-2"><small class="text-slate-500">OEE</small><b class="block text-cyan-300">${o.rows?(o.oee*100).toFixed(1)+'%':'-'}</b></div><div class="bg-slate-900 rounded-lg p-2"><small class="text-slate-500">Açık kayıt</small><b class="block text-amber-300">${open}</b></div><div class="bg-slate-900 rounded-lg p-2"><small class="text-slate-500">DOWN</small><b class="block text-red-300">${fmtDurationV30(down)}</b></div></div><div class="text-[9px] text-slate-500 mt-3 truncate">Son olay: ${last?(last.symptom||last.description||last.type):'Kayıt yok'}</div><div class="text-[9px] text-cyan-300 mt-2">Makine dosyasını aç →</div></div>`}).join('');renderOeeMachineTable();}
+renderMaintenanceCenter=function(){const cards=document.getElementById('machineHealthCards');if(!cards)return;const month=document.getElementById('productionTargetMonth')?.value||getCurrentMonthKey();cards.innerHTML=MACHINES_LIST.map(m=>{const name=`${m.code} - ${m.name}`,st=machineStateV30(name),h=machineHealth(name),o=machineOeeMetrics(name,month),open=maintenanceRecords.filter(r=>r.machine===name&&r.status!=='Kapalı').length,last=maintenanceRecords.filter(r=>r.machine===name).sort((a,b)=>new Date(b.openedAt||0)-new Date(a.openedAt||0))[0],down=machineDownMinutesV30(name);return `<div class="machine-fleet-card ${st.down?'machine-down':''}" onclick="openMachineFileV30('${name.replace(/'/g,"\\'")}')"><div class="flex justify-between gap-2"><div class="min-w-0 flex-1"><span class="machine-status-dot ${st.down?'bg-red-500':'bg-emerald-500'}"></span> <b class="text-white text-sm break-words">${name}</b><div class="text-[9px] ${st.down?'text-red-400 font-black':'text-emerald-400'}">${st.down?'DOWN · '+fmtDurationV30(down):'Çalışabilir / hazır'}</div></div><span class="text-xl font-black shrink-0 ${h>=90?'text-emerald-400':h>=70?'text-amber-300':'text-red-400'}">${h}</span></div><div class="grid grid-cols-3 gap-2 mt-3"><div class="bg-slate-900 rounded-lg p-2"><small class="text-slate-500">OEE</small><b class="block text-cyan-300">${o.rows?(o.oee*100).toFixed(1)+'%':'-'}</b></div><div class="bg-slate-900 rounded-lg p-2"><small class="text-slate-500">Açık kayıt</small><b class="block text-amber-300">${open}</b></div><div class="bg-slate-900 rounded-lg p-2"><small class="text-slate-500">DOWN</small><b class="block text-red-300">${fmtDurationV30(down)}</b></div></div><div class="text-[9px] text-slate-500 mt-3 truncate">Son olay: ${last?(last.symptom||last.description||last.type):'Kayıt yok'}</div><div class="text-[9px] text-cyan-300 mt-2">Makine dosyasını aç →</div></div>`}).join('');renderOeeMachineTable();}
 const _renderOperatorMotivationPanelV30=renderOperatorMotivationPanel;
 renderOperatorMotivationPanel=function(){_renderOperatorMotivationPanelV30();const top=document.getElementById('operatorTopPerformers');if(top){const rows=getLeaderboardData().slice(0,10);top.innerHTML=rows.map((p,i)=>`<div class="flex items-center justify-between gap-2 border-b border-slate-700/60 py-2"><div class="flex items-center gap-2"><span class="w-5 font-black ${i<3?'text-amber-400':'text-slate-500'}">${i+1}</span>${personPhotoHtml(p.name,'w-7 h-7 rounded-full object-cover')}<span class="text-xs font-semibold text-white">${p.name}</span></div><b class="text-xs text-amber-300">${p.points.toFixed(1)}</b></div>`).join('')||'<div class="text-xs text-slate-500">Henüz sıralama yok.</div>';}}
 const _refreshAllViewsV30=refreshAllViews;
@@ -4980,7 +5067,7 @@ renderMaintenanceCenter=function(){
  const list=Array.isArray(MACHINES_LIST)?MACHINES_LIST:[];
  cards.innerHTML=list.map(m=>{const machine=v32MachineName(m),x=v32State(machine);let oee='-';try{const o=machineOeeMetrics(machine);if(o&&o.rows)oee=(Number(o.oee||0)*100).toFixed(1)+'%';}catch(e){}
  return `<button type="button" onclick="openMachineFileV32('${machine.replace(/'/g,"\\'")}')" class="text-left w-full rounded-2xl border ${x.st.down?'border-red-500/70 bg-red-950/25':'border-slate-700 bg-slate-950/55'} p-4 hover:border-cyan-500 transition shadow-lg">
- <div class="flex justify-between gap-3"><div><div class="text-[10px] uppercase tracking-widest ${x.st.down?'text-red-300':'text-emerald-300'}">${x.st.down?'● DOWN':'● ÇALIŞABİLİR / HAZIR'}</div><div class="text-sm font-black text-white mt-1">${v32esc(machine)}</div></div><div class="text-right"><div class="text-[9px] text-slate-500">SAĞLIK</div><div class="text-2xl font-black ${x.health>=90?'text-emerald-400':x.health>=70?'text-amber-300':'text-red-400'}">${x.health}</div></div></div>
+ <div class="flex justify-between gap-3"><div class="min-w-0 flex-1"><div class="text-[10px] uppercase tracking-widest ${x.st.down?'text-red-300':'text-emerald-300'}">${x.st.down?'● DOWN':'● ÇALIŞABİLİR / HAZIR'}</div><div class="text-sm font-black text-white mt-1 break-words">${v32esc(machine)}</div></div><div class="text-right shrink-0"><div class="text-[9px] text-slate-500">SAĞLIK</div><div class="text-2xl font-black ${x.health>=90?'text-emerald-400':x.health>=70?'text-amber-300':'text-red-400'}">${x.health}</div></div></div>
  <div class="grid grid-cols-3 gap-2 mt-4"><div class="rounded-xl bg-slate-900 p-2"><small class="text-slate-500">OEE</small><b class="block text-cyan-300">${oee}</b></div><div class="rounded-xl bg-slate-900 p-2"><small class="text-slate-500">Açık kayıt</small><b class="block text-amber-300">${x.open.length}</b></div><div class="rounded-xl bg-slate-900 p-2"><small class="text-slate-500">DOWN</small><b class="block text-red-300">${v32Dur(x.mins)}</b></div></div>
  <div class="mt-3 text-[10px] text-slate-400"><b>Son olay:</b> ${v32esc(x.records[0]?.symptom||x.records[0]?.description||'Kayıt yok')}</div><div class="mt-2 text-[10px] font-bold text-cyan-300">Dijital makine dosyasını aç →</div></button>`}).join('')||'<div class="col-span-full p-6 border border-red-700 rounded-xl text-red-200">Makine ana listesi bulunamadı.</div>';
  const body=document.getElementById('maintenanceTableBody');if(body){body.innerHTML=(maintenanceRecords||[]).slice().sort((a,b)=>new Date(b.openedAt||b.plannedAt||0)-new Date(a.openedAt||a.plannedAt||0)).map(r=>`<tr class="border-t border-slate-800"><td class="p-2 font-mono">${v32esc(r.id)}</td><td class="p-2">${v32esc(r.machine)}</td><td class="p-2">${v32esc(r.type)}</td><td class="p-2"><b>${v32esc(r.symptom||r.description||'-')}</b>${r.resolution?`<small class="block text-emerald-300 mt-1">Çözüm: ${v32esc(r.resolution)}</small>`:''}</td><td class="p-2">${r.openedAt?new Date(r.openedAt).toLocaleString('tr-TR'):v32esc(r.plannedAt||'-')}</td><td class="p-2">${v32esc(r.closedBy||r.reportedBy||'-')}</td><td class="p-2">${r.responseHours!=null?Number(r.responseHours).toFixed(1)+' saat':'-'}</td><td class="p-2">${v32esc(r.status||'-')}</td><td class="p-2">${r.status!=='Kapalı'&&getEffectiveRole(currentUser)==='BAKIM'?`<button onclick="closeMaintenanceRecord('${r.id}')" class="bg-emerald-700 px-2 py-1 rounded text-white">Çöz & Kapat</button>`:'-'}</td></tr>`).join('')||'<tr><td colspan="9" class="p-4 text-center text-slate-500">Henüz bakım/arızası kaydı yok.</td></tr>';}
@@ -5766,7 +5853,7 @@ setTimeout(()=>{if(!window.currentUser)return;renderMachineFleetV34();renderPuan
 
     <div id="machineFileModal" class="fixed inset-0 bg-slate-950/85 hidden items-center justify-center z-[85] p-3">
       <div class="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-6xl max-h-[94vh] overflow-y-auto shadow-2xl">
-        <div class="sticky top-0 z-10 bg-slate-900/95 backdrop-blur border-b border-slate-700 p-4 flex justify-between items-center"><div><h3 id="machineFileTitle" class="text-xl font-black text-white">Makine Dosyası</h3><p class="text-[10px] text-slate-400">Canlı sağlık · arıza geçmişi · bakım · değişimler · DOWN analizi</p></div><button onclick="closeMachineFileV30()" class="text-2xl text-slate-400 hover:text-white">&times;</button></div>
+        <div class="sticky top-0 z-10 bg-slate-900/95 backdrop-blur border-b border-slate-700 p-4 flex justify-between items-center gap-3"><div class="min-w-0 flex-1"><h3 id="machineFileTitle" class="text-xl font-black text-white break-words">Makine Dosyası</h3><p class="text-[10px] text-slate-400">Canlı sağlık · arıza geçmişi · bakım · değişimler · DOWN analizi</p></div><button onclick="closeMachineFileV30()" class="text-2xl text-slate-400 hover:text-white shrink-0">&times;</button></div>
         <div id="machineFileContent" class="p-4 space-y-4"></div>
       </div>
     </div>
@@ -5932,7 +6019,37 @@ function lastClosed(id){return closedOrders(id)[0]||null}
 function lastMaintenance(id){return orders.filter(o=>o.machineId===id&&o.status==='CLOSED').sort((a,b)=>new Date(b.closedAt)-new Date(a.closedAt))[0]||null}
 function nextPlan(id){return orders.filter(o=>o.machineId===id&&o.kind==='PLANNED'&&!['CLOSED','CANCELLED'].includes(o.status)&&o.plannedAt).sort((a,b)=>new Date(a.plannedAt)-new Date(b.plannedAt))[0]||null}
 function health(m){let h=100;const oo=openOrders(m.id);h-=oo.filter(o=>o.priority==='CRITICAL').length*12;h-=oo.filter(o=>o.priority==='HIGH').length*7;if(m.status==='DOWN')h-=20;return Math.max(0,Math.min(100,h))}
-function oee(m){try{const r=machineOeeMetrics(m.name);return r&&Number.isFinite(Number(r.oee))?Math.round(Number(r.oee)):null}catch(e){return null}}
+// KMI MASTER #23 OWNER REVIEW DEFECT ROUND 2 (2026-10-07, "MACHINE 103
+// CROSS-SURFACE MATRIX"): root-cause finding, distinct from and in addition
+// to the Part B idealCycleSec wiring fix. This helper feeds the Machine
+// Digital File's own card (line ~5972) and detail (line ~6019) OEE tiles,
+// plus machineTruthById's oeePercent field (line ~6174). `m` here is always
+// one of THIS module's own internal `machines` array entries (confirmed:
+// seedMachines() sets m.name to the FULL "code - name" composite already,
+// e.g. "103 - DMG MORI SEIKI NHX 5000" - unlike the global MACHINES_LIST
+// seed, whose entries keep code/name separate) - so machineOeeMetrics(m.name)
+// was already querying the correct key; that part was NOT a bug. TWO real,
+// compounding defects were found and are now fixed, both composing the SAME
+// real window.machineOeeMetrics engine - no formula change, no new engine:
+//   1) UNKNOWN COLLAPSED TO A FABRICATED ZERO: machineOeeMetrics always
+//      returns a well-formed object with oee:0 when rows=0 (no data) - the
+//      old `Number.isFinite(Number(r.oee))` check is true even for that
+//      zero-rows default, so this helper could never return null/UNKNOWN;
+//      it silently displayed "0%" instead of "—" regardless of whether real
+//      data existed. Fixed to check r.rows (same convention as
+//      kmiMachineScore's own oeeKnown check), consistent with the Owner's
+//      "show UNKNOWN/VERİ GEREKLİ, not a fabricated zero" requirement.
+//   2) MISSING ×100: r.oee is a 0..1 fraction (confirmed by every other
+//      consumer's own `(r.oee*100).toFixed(1)+'%'` pattern) - this helper
+//      returned Math.round(r.oee) with NO ×100, which would have displayed
+//      e.g. a real 85% OEE as "1%". This bug was masked/never observed in
+//      practice because machine 103's real declarations (before the Part B
+//      fix) always had idealCycleSec:0, which keeps oee at exactly 0
+//      regardless of scaling - Math.round(0)===Math.round(0*100).
+// Fixed: treat rows===0 as genuinely unknown (null, renders as "—"), and
+// scale to a real percentage. The key itself (m.name) is unchanged - it was
+// already correct for this module's own machine objects.
+function oee(m){try{const r=machineOeeMetrics(m.name);return (r&&r.rows)?Math.round(Number(r.oee)*100):null}catch(e){return null}}
 function monthlyMaintenanceMetrics(id,month=(new Date()).toISOString().slice(0,7)){const list=orders.filter(o=>o.machineId===id&&String(o.openedAt||'').slice(0,7)===month);let serviceMinutes=0,downMinutes=0,closed=0;list.forEach(o=>{if(o.status==='CLOSED'&&o.closedAt){serviceMinutes+=Number(o.serviceDurationMinutes)||Math.max(0,(new Date(o.closedAt)-new Date(o.openedAt))/60000);downMinutes+=Number(o.downtimeMinutes)||0;closed++;}});return {serviceMinutes,downMinutes,closed,opened:list.length};}
 function deptBadgeColor(d){return d==='Kalite'?'bg-violet-500/15 text-violet-300':d==='Bakım'?'bg-amber-500/15 text-amber-300':d==='Diğer'?'bg-slate-500/15 text-slate-300':'bg-cyan-500/15 text-cyan-300'}
 function card(m){const oo=openOrders(m.id),last=lastClosed(m.id),plan=nextPlan(m.id),isDown=m.status!=='UP',mm=monthlyMaintenanceMetrics(m.id),dept=guessDepartment(m);const deptCtl=canAdmin()?`<select data-v35-dept="${esc(m.id)}" onclick="event.stopPropagation()" class="mt-1 bg-slate-950 border border-slate-700 rounded text-[9px] px-1.5 py-0.5 ${deptBadgeColor(dept)}">${DEPARTMENTS.map(d=>`<option value="${d}" ${d===dept?'selected':''}>${d}</option>`).join('')}</select>`:`<span class="v35-chip ${deptBadgeColor(dept)} mt-1 inline-block">${esc(dept)}</span>`;
@@ -5955,7 +6072,7 @@ function card(m){const oo=openOrders(m.id),last=lastClosed(m.id),plan=nextPlan(m
  const statusChipCls=isDown?condMeta.cls:(isIdle?'bg-blue-500/15 text-blue-300':'bg-emerald-500/15 text-emerald-300');
  const statusIcon=isDown?condMeta.icon:(isIdle?'fa-circle-pause':'fa-circle-play');
  const runSub=(!isDown&&runBadge&&runBadge.sub)?`<div class="text-[9px] ${isIdle?'text-blue-300/80':'text-emerald-300/80'} mt-0.5 truncate">${runBadge.sub}</div>`:'';
- return `<button type="button" class="v35-card ${isDown?'down':''} text-left" data-v35-open="${esc(m.id)}"><div class="flex justify-between gap-3"><div class="flex items-center gap-2"><div class="w-10 h-10 rounded-lg overflow-hidden bg-slate-900 border border-slate-700 flex items-center justify-center shrink-0">${mPhoto?`<img src="${mPhoto}" class="w-full h-full object-cover" alt="">`:'<i class="fa-solid fa-industry text-sm text-slate-600"></i>'}</div><div><div class="text-base font-black text-white">${esc(m.name)}</div><div class="mt-1 flex flex-wrap items-center gap-1.5"><span class="v35-chip ${statusChipCls}"><i class="fa-solid ${statusIcon}"></i>${statusLabel}</span>${deptCtl}</div>${runSub}</div></div><div class="text-right"><div class="text-2xl font-black ${health(m)>=80?'text-emerald-300':health(m)>=60?'text-amber-300':'text-red-300'}">${health(m)}</div><div class="text-[9px] text-slate-500">SAĞLIK</div></div></div><div class="grid grid-cols-3 gap-2 mt-4"><div class="v35-kpi"><small class="text-slate-500">OEE</small><b class="block text-cyan-300">${oee(m)==null?'—':oee(m)+'%'}</b></div><div class="v35-kpi"><small class="text-slate-500">Açık kayıt</small><b class="block text-amber-300">${oo.length}</b></div><div class="v35-kpi"><small class="text-slate-500">Bu ay/DOWN</small><b class="block text-red-300">${fmtMin(currentDownMinutes(m))}</b></div></div><div class="grid grid-cols-2 gap-2 mt-3 text-[10px]"><div><span class="text-slate-500">Son arıza</span><b class="block text-slate-200 truncate">${last?new Date(last.closedAt).toLocaleDateString('tr-TR'):'—'}</b></div><div><span class="text-slate-500">Sonraki bakım</span><b class="block text-slate-200 truncate">${plan?new Date(plan.plannedAt).toLocaleDateString('tr-TR'):'—'}</b></div></div><div class="text-[9px] text-slate-500 mt-2">Bu ay bakım açık süresi: <b class="text-amber-300">${fmtMin(mm.serviceMinutes)}</b> · gerçek DOWN: <b class="text-red-300">${fmtMin(mm.downMinutes)}</b></div><div class="mt-3 text-cyan-300 text-[10px] font-bold">Makine dijital dosyasını aç →</div></button>`}
+ return `<button type="button" class="v35-card ${isDown?'down':''} text-left" data-v35-open="${esc(m.id)}"><div class="flex justify-between gap-3"><div class="flex items-center gap-2 min-w-0"><div class="w-10 h-10 rounded-lg overflow-hidden bg-slate-900 border border-slate-700 flex items-center justify-center shrink-0">${mPhoto?`<img src="${mPhoto}" class="w-full h-full object-cover" alt="">`:'<i class="fa-solid fa-industry text-sm text-slate-600"></i>'}</div><div class="min-w-0"><div class="text-base font-black text-white break-words">${esc(m.name)}</div><div class="mt-1 flex flex-wrap items-center gap-1.5"><span class="v35-chip ${statusChipCls}"><i class="fa-solid ${statusIcon}"></i>${statusLabel}</span>${deptCtl}</div>${runSub}</div></div><div class="text-right shrink-0"><div class="text-2xl font-black ${health(m)>=80?'text-emerald-300':health(m)>=60?'text-amber-300':'text-red-300'}">${health(m)}</div><div class="text-[9px] text-slate-500">SAĞLIK</div></div></div><div class="grid grid-cols-3 gap-2 mt-4"><div class="v35-kpi"><small class="text-slate-500">OEE</small><b class="block text-cyan-300">${oee(m)==null?'—':oee(m)+'%'}</b></div><div class="v35-kpi"><small class="text-slate-500">Açık kayıt</small><b class="block text-amber-300">${oo.length}</b></div><div class="v35-kpi"><small class="text-slate-500">Bu ay/DOWN</small><b class="block text-red-300">${fmtMin(currentDownMinutes(m))}</b></div></div><div class="grid grid-cols-2 gap-2 mt-3 text-[10px]"><div><span class="text-slate-500">Son arıza</span><b class="block text-slate-200 truncate">${last?new Date(last.closedAt).toLocaleDateString('tr-TR'):'—'}</b></div><div><span class="text-slate-500">Sonraki bakım</span><b class="block text-slate-200 truncate">${plan?new Date(plan.plannedAt).toLocaleDateString('tr-TR'):'—'}</b></div></div><div class="text-[9px] text-slate-500 mt-2">Bu ay bakım açık süresi: <b class="text-amber-300">${fmtMin(mm.serviceMinutes)}</b> · gerçek DOWN: <b class="text-red-300">${fmtMin(mm.downMinutes)}</b></div><div class="mt-3 text-cyan-300 text-[10px] font-bold">Makine dijital dosyasını aç →</div></button>`}
 // KMI-FIX (2026-09-25): Ender'in isteği - "bakımcıların hesaplarına düşsün" - giriş yapan bakım
 // personeli kendisine ATANMIŞ bakım emirlerini en üstte, ayrı ve öne çıkan bir bölümde görsün
 // (iş emirlerindeki "Size Atanan İş Emirleri" mantığıyla aynı).
@@ -7085,6 +7202,28 @@ window.KMI_INTERNAL_CUSTOMER_NAME='KURUTLU INTERNAL';
   }
   saveStorage('KMI_M3500_PATCH_V3_DONE',true);
  }catch(e){console.warn('[KMI M3500 patch v3]',e);}
+})();
+// KMI-FIX (SUNSHINE-1507, 2026-10-07): Owner-confirmed manufacturing-quantity-semantics fact
+// (bkz. docs/KMI_R5_SUNSHINE1507_*.md ve Owner'ın "Choose B" mimari kararı) - M3500 için fiziksel
+// iyi adedin AUTORITATIF hale geldiği operasyon CNC'dir, rotanın SON operasyonu DEĞİL (CNC bu
+// üründe 5 operasyonluk rotanın 2.'si). Bu, hiçbir koşulda operasyon adı/makine/sırasından
+// ÇIKARILMAZ (Owner'ın §5 kısıtı) - yalnızca Owner'ın doğrudan onayladığı ürünler için, ürün
+// kartında AÇIK/DENETLENEBİLİR bir alanla (quantityDefiningOperation) işaretlenir. Alan yoksa
+// (varsayılan: tanımsız) hiçbir davranış değişmez - kmiRoutingEvaluateQuantityDefiningOperation
+// her zaman UNKNOWN döner ve mevcut SON-OPERASYON tabanlı üretim kredisi akışı (v118CreditProduction)
+// aynen çalışmaya devam eder. Metin, routeSteps'teki (route'tan türetilen) op alanıyla TAM
+// (case-insensitive, trim'li) eşleşmelidir - bkz. route:'Kesim → CNC (4. Eksen) → ...' (üstte).
+(function kmiPatchM3500V4(){
+ try{
+  if(loadStorage('KMI_M3500_PATCH_V4_DONE',false)) return;
+  const p=D.products.find(x=>String(x.code||'').toLocaleUpperCase('tr-TR')==='M3500');
+  if(p){
+   p.quantityDefiningOperation='CNC (4. Eksen)';
+   p.notes=(p.notes||'')+' [Ender teyidi (SUNSHINE-1507, 2026-10-07): fiziksel üretilen adedin otoriter hale geldiği operasyon CNC (4. Eksen) - rotanın son operasyonu değil.]';
+   save();
+  }
+  saveStorage('KMI_M3500_PATCH_V4_DONE',true);
+ }catch(e){console.warn('[KMI M3500 patch v4 - quantityDefiningOperation]',e);}
 })();
 // KMI-FIX (2026-09-25): routeSteps ve ham madde mm ölçüleri, ilk büyük şema geçişinden (yukarıdaki
 // D.products map) SONRA eklenen/güncellenen ürünlerde (örn. seed/patch ile oluşturulanlar, M3500
@@ -9359,6 +9498,33 @@ window.v118CreditProduction=function(salesOrderId,productId,qty){
   try{v118Render();}catch(e){}
  }catch(e){ console.error('[v118CreditProduction]',e); }
 };
+// KMI-FIX (SUNSHINE-1507, 2026-10-07): Owner-approved "Choose B" mimari kararı (bkz.
+// docs/KMI_R5_SUNSHINE1507_*.md) - v118CreditProduction'ın 3 farklı gerçeği (sipariş kalemi
+// üretildi adedi / Bitmiş Ürün stok artışı / stok hareketi) TEK bir çağrıda birleştirmesi mimari
+// olarak geçersiz bulundu. BU fonksiyon mevcut v118CreditProduction'ı DEĞİŞTİRMEZ, yerini almaz,
+// çağrı noktasını TAŞIMAZ - sadece Owner'ın onayladığı ayrı/ek bir gerçeği (PRODUCED GOOD QTY,
+// quantity-defining operasyonda otoriter hale gelen fiziksel İYİ adet) kanonik hale getirir.
+// KASITLI OLARAK sadece l.producedGood'a yazar: stockRow().onHand/l.produced/V.movements'a ASLA
+// dokunmaz (Owner: "Do not credit Finished Goods at the quantity-defining CNC operation. Do not
+// close delivery obligation from PRODUCED GOOD.") - kmiShipmentEvaluateOrder (remaining teslimat
+// yükümlülüğü) ve mevcut remaining=ordered-shipped hesapları l.producedGood'u OKUMAZ, dolayısıyla
+// bu alan hiçbir koşulda teslimat yükümlülüğünü kapatamaz. MASTER #8 (Canonical Stock Truth) ile
+// kesişmez - WIP/FINISHED_GOODS ayrımı burada YAPILMAZ (bu, ayrı ve henüz çözülmemiş bir adım -
+// bkz. tasarım raporu); bu fonksiyon sadece sipariş kalemi seviyesinde "üretilen İYİ adet, rota
+// tamamlanmadan önce de biliniyor" gerçeğini kayıt altına alır. İkinci bir stok defteri/ledger
+// DEĞİLDİR - mevcut V.orders[].lines[] nesnesine tek bir ek alan eklenmiştir.
+window.v118CreditProducedGood=function(salesOrderId,productId,qty){
+ try{
+  if(!salesOrderId||!productId||!(Number(qty)>0)) return;
+  const o=V.orders.find(x=>String(x.id)===String(salesOrderId)); if(!o) return;
+  const l=(o.lines||[]).find(x=>String(x.productId)===String(productId)); if(!l) return;
+  const q=Number(qty);
+  l.producedGood=Number(l.producedGood||0)+q;
+  audit('PRODUCED_GOOD_CREDIT','SALES_ORDER',o.id,q+' adet (quantity-defining operasyon kalite onayından - WIP, henüz Bitmiş Ürün DEĞİL · SUNSHINE-1507)');
+  persist();
+  try{v118Render();}catch(e){}
+ }catch(e){ console.error('[v118CreditProducedGood]',e); }
+};
 // KMI-FIX (2026-09-27): Ender'in isteği - iş emri kendi zincirinde (Sevkiyat onayı/approveShipment)
 // kapandığında, bağlı müşteri siparişinin sevk edilen adedi ARTIK OTOMATİK güncelleniyor; elle
 // ikinci kez Command'da "Sevkiyat" girmeye gerek yok. v118Ship (manuel/Stok akışı) ile aynı stok
@@ -9892,6 +10058,49 @@ window.kmiR5FinalProductionReleaseEvaluate=function(jobOrderId){
   const producedQty=Math.max(0,Number(d.qualityGood??d.good??d.qty)||0)+Math.max(0,Number(d.qualityScrap??d.scrap)||0)+Math.max(0,Number(d.qualityAllocated??d.allocated)||0);
   if(producedQty<targetQty) return {status:'NOT_RELEASABLE', reasonCode:'PRODUCTION_QUANTITY_INCOMPLETE', message:'Üretilen/dispoze edilen miktar ('+producedQty+') hedef miktara ('+targetQty+') henüz ulaşmadı.', evidence:{jobOrderId:jo.id, producedQty:producedQty, targetQty:targetQty}};
   return {status:'FINAL_PRODUCTION_RELEASABLE', reasonCode:'FINAL_PRODUCTION_RELEASE_CONDITIONS_MET', message:'Rota son operasyonda + kalite engeli yok + ilk parça temiz + üretim miktarı tamam.', evidence:{jobOrderId:jo.id, producedQty:producedQty, targetQty:targetQty}};
+};
+// KMI-R5 OWNER REVIEW DEFECT ROUND 1 (2026-10-06, "P0 GOLDEN THREAD / ROUTING
+// RESOLUTION" §6 "UX DEFECT"): the Owner reported that the real runtime UI
+// exposed raw internal evaluator strings (e.g. "ROUTING_UNKNOWN:
+// CURRENT_OPERATION_NOT_RESOLVED") directly in a browser alert() for
+// WO-2026-780182-1. Confirmed in code: window.kmiR5FinalProductionReleaseGrantUI
+// (below, same file) interpolated ev.status/ev.reasonCode/ev.message straight
+// into alert() text with no translation layer. This formatter is the ONE
+// canonical place that turns a window.kmiR5FinalProductionReleaseEvaluate(...)
+// result into Owner-facing Turkish text - no second evaluator, no UI-side
+// state recalculation, just presentation. Raw status/reasonCode/evidence are
+// preserved unchanged for console/audit/test use; only the user-facing string
+// is reworded. Reused by kmiR5FinalProductionReleaseGrantUI (this file) and by
+// the ÜRETİM SERBEST BIRAKMA queue so every surface agrees.
+window.kmiR5FinalProductionReleaseFriendlyMessage=function(ev, jobOrderId){
+  const jos=(typeof jobOrders!=='undefined'&&Array.isArray(jobOrders))?jobOrders:(Array.isArray(window.jobOrders)?window.jobOrders:[]);
+  const jo=jos.find(function(j){return String(j.id)===String(jobOrderId);});
+  const woLabel=jobOrderId||(jo&&jo.id)||'-';
+  const machineLabel=(jo&&jo.machine)||'-';
+  if(!ev) return {headline:'ÜRETİM SERBEST BIRAKMA YAPILAMADI', statusLabel:'VERİ GEREKLİ', detail:'Değerlendirme sonucu alınamadı.', woLabel:woLabel, machineLabel:machineLabel};
+  if(ev.status==='FINAL_PRODUCTION_RELEASABLE') return {headline:'ÜRETİM SERBEST BIRAKILABİLİR', statusLabel:'SERBEST BIRAKILABİLİR', detail:ev.message, woLabel:woLabel, machineLabel:machineLabel};
+  const rc=String(ev.reasonCode||'');
+  let detail=ev.message||'', statusLabel='VERİ GEREKLİ';
+  if(rc.indexOf('ROUTING_UNKNOWN')===0 || rc==='ROUTING_EVALUATOR_UNAVAILABLE'){
+    statusLabel='VERİ GEREKLİ'; detail='Rota / operasyon bağlantısı doğrulanamadı. Bu iş emrinin ürün rotasında hangi operasyona karşılık geldiği sistemde güvenilir biçimde belirlenemiyor - sonraki adım: Ürün Künyesi\'nde bu operasyon için makine ataması doğrulanmalı.';
+  } else if(rc==='ROUTING_NOT_FINAL_OPERATION'){
+    statusLabel='ROTA TAMAMLANMADI'; detail='Bu iş emri rotanın son operasyonunda değil - sonraki operasyon(lar) tamamlanmadan üretim serbest bırakılamaz.';
+  } else if(rc.indexOf('QUALITY_HOLD_ACTIVE')===0){
+    statusLabel='HOLD'; detail='Aktif bir Kalite HOLD kaydı var - HOLD çözülmeden üretim serbest bırakılamaz.';
+  } else if(rc.indexOf('FIRST_PIECE_NOT_CLEARED')===0){
+    statusLabel='İLK PARÇA BEKLİYOR'; detail='İlk parça durumu henüz temizlenmedi - İlk Parça onayı tamamlanmadan üretim serbest bırakılamaz.';
+  } else if(rc==='FIRST_PIECE_CHECK_ERROR'){
+    statusLabel='VERİ GEREKLİ'; detail='İlk parça durumu değerlendirilirken bir hata oluştu.';
+  } else if(rc==='TARGET_QTY_NOT_DEFINED'){
+    statusLabel='VERİ GEREKLİ'; detail='İş emrinde hedef miktar tanımlı değil.';
+  } else if(rc==='NO_PRODUCTION_DECLARED'){
+    statusLabel='ÜRETİM TAMAMLANMADI'; detail='Bu iş emri için henüz hiç üretim beyanı girilmedi.';
+  } else if(rc==='PRODUCTION_QUANTITY_INCOMPLETE'){
+    statusLabel='ÜRETİM TAMAMLANMADI'; detail='Üretilen/dispoze edilen miktar hedef miktara henüz ulaşmadı.';
+  } else if(rc==='JOB_ORDER_NOT_FOUND'){
+    statusLabel='VERİ GEREKLİ'; detail='İş emri bulunamadı.';
+  }
+  return {headline:'ÜRETİM SERBEST BIRAKMA YAPILAMADI', statusLabel:statusLabel, detail:detail, woLabel:woLabel, machineLabel:machineLabel, _rawStatus:ev.status, _rawReasonCode:ev.reasonCode};
 };
 // GRANT: client-authorized WRITE action with full audit fields. NOTE (honest
 // limitation, standing project rule "no unauthorized DB/RLS/RPC changes"): unlike
@@ -13097,7 +13306,31 @@ function kmiPrevShiftAndOrderHtml(j){
  const target=Number(j.targetQty||0),done=Number(j.completedQty||0),jobRemain=Math.max(0,target-done);
  const jobRemainHtml=`<div><span class="text-[10px] text-slate-500">BU İŞ EMRİNE KALAN</span><div class="text-lg font-black text-emerald-300">${jobRemain} adet</div></div>`;
  let orderHtml='';
- if(j.orderId && window.D && Array.isArray(window.D.orders)){
+ // MASTER #23 OWNER DIRECTIVE (2026-10-06, "CUSTOMER ORDER IS THE GOLDEN
+ // THREAD ENTRY POINT" / "CUSTOMER ORDER IS THE COMMERCIAL ROOT OBJECT"):
+ // GOLDEN THREAD BREAK found and fixed. This widget only ever checked
+ // j.orderId against window.D.orders (legacy System B) - but the sole live
+ // order-creation path today is System C (window.v118SaveOrder ->
+ // V.orders / window.V118_STATE.orders), and its canonical WO-approval
+ // writer (window.kmiApproveReservationAndOpenJobOrderC) sets
+ // j.salesOrderId+j.orderLineId, never j.orderId. So for every Work Order
+ // opened the canonical way since that cutover, "SİPARİŞE KALAN" silently
+ // rendered nothing on this real, operator-facing running-job screen - not
+ // an error, just a quietly missing fact. Converged: check the canonical
+ // System C order/line first (same salesOrderId/orderLineId fields the
+ // Golden Thread tests already prove are populated), fall back to the
+ // legacy System B check unchanged for historical B-path jobs. No new
+ // evaluator, no new writer, no second order truth - reads the SAME
+ // window.V118_STATE.orders every other System C consumer (Search,
+ // kmiShipmentEvaluateOrder, Command Center) already reads.
+ if(j.salesOrderId && window.V118_STATE && Array.isArray(window.V118_STATE.orders)){
+  const o=window.V118_STATE.orders.find(x=>String(x.id)===String(j.salesOrderId));
+  const l=o&&Array.isArray(o.lines)?o.lines.find(x=>String(x.id)===String(j.orderLineId)):null;
+  if(l){const orderRemain=Math.max(0,Number(l.qty||0)-Number(l.shipped||0));
+   orderHtml=`<div><span class="text-[10px] text-slate-500">SİPARİŞE KALAN (${E(o.customerPO||o.id)})</span><div class="text-lg font-black text-cyan-300">${orderRemain} adet</div></div>`;}
+  else if(o){const orderRemain=Math.max(0,(o.lines||[]).reduce((s,x)=>s+Math.max(0,Number(x.qty||0)-Number(x.shipped||0)),0));
+   orderHtml=`<div><span class="text-[10px] text-slate-500">SİPARİŞE KALAN (${E(o.customerPO||o.id)})</span><div class="text-lg font-black text-cyan-300">${orderRemain} adet</div></div>`;}
+ } else if(j.orderId && window.D && Array.isArray(window.D.orders)){
   const o=window.D.orders.find(x=>x.id===j.orderId);
   if(o){const orderRemain=Math.max(0,Number(o.qty||0)-Number(o.shippedQty||o.producedQty||0));
    orderHtml=`<div><span class="text-[10px] text-slate-500">SİPARİŞE KALAN (${E(o.id)})</span><div class="text-lg font-black text-cyan-300">${orderRemain} adet</div></div>`;}
@@ -13549,10 +13782,35 @@ window.kmiFinish=function(id,postOp,vibrationMinutes){
  const categorizedDowntime=kmiCategorizedDowntime(s,finishedAt);
  const downtimeMinutes=Object.values(categorizedDowntime).reduce((a,v)=>a+v,0);
  const postOpStatus={tesviye:'Tesviye Bekliyor',vibrasyon:'Vibrasyon Bekliyor',kalite:'Kalite Bekliyor'}[postOp]||'Kalite Bekliyor';
+ // KMI MASTER #23 OWNER REVIEW DEFECT ROUND 2 (2026-10-07, "MACHINE 103
+ // PERFORMANCE RANKING"): root-cause finding - this declaration write used to
+ // hard-code idealCycleSec:0 for EVERY live Shop Floor declaration, which
+ // forces machineOeeMetrics()'s performance factor (and therefore OEE itself)
+ // to exactly 0 regardless of real throughput, because `performance = run &&
+ // idealSec ? ... : 0` treats idealSec=0 as "no ideal cycle data" and the
+ // multiplication oee=availability*performance*quality then zeroes out OEE
+ // unconditionally. This is a pure wiring defect, not an OEE formula change:
+ // a REAL canonical ideal-cycle-time resolver already exists
+ // (window.kmiIeOperationStandard, built for Cost/Industrial-Engineering
+ // standards, route-step → product-level → CAM-estimate fallback, honestly
+ // reporting CANNOT_CALCULATE when no standard exists anywhere) and was
+ // simply never wired into the live declaration writer. Composing that same
+ // real resolver here - no new engine, no KPI formula redesign (MASTER #27
+ // scope untouched) - lets real products with a known cycle time (e.g. M3500,
+ // camCycleEstimateSec=520s) report a real, non-zero OEE; a product with
+ // genuinely no standard anywhere still gets idealCycleSec:0 (unchanged
+ // behavior, honestly "no data" rather than fabricated).
+ let kmiFinishIdealCycleSec=0;
+ try{
+   if(typeof window.kmiIeOperationStandard==='function'){
+     const std=window.kmiIeOperationStandard(j.productId,j.operation);
+     if(std && std.status==='OK' && Number(std.cycleSec)>0) kmiFinishIdealCycleSec=Number(std.cycleSec);
+   }
+ }catch(e){}
  const d={id:declId,date:new Date().toLocaleString('tr-TR',{dateStyle:'short',timeStyle:'short'}),workDate:new Date().toISOString().slice(0,10),
    operator:s.operator||currentPerson()?.name||window.currentUser?.name||'Operatör',shift:s.shift||j.shift||'',machine:s.machine||j.machine||'',jobOrder:j.id,
    qty:good+scrap+allocated,good:good,scrap:scrap,allocated:allocated,tools:toolRows.length?toolRows.join(' | '):'Değişen Takım Yok',changedTools:s.tools||[],
-   machineCareScore:100,productionMinutes:mins,oeePlannedMinutes:mins,idealCycleSec:0,
+   machineCareScore:100,productionMinutes:mins,oeePlannedMinutes:mins,idealCycleSec:kmiFinishIdealCycleSec,
    downtime:categorizedDowntime,
    status:postOpStatus,postOp:postOp,vibrationTargetMinutes:postOp==='vibrasyon'?(Number(vibrationMinutes)||0):undefined,
    approver:'',shiftClosedAt:finishedAt,bonusFinalized:false,finalizedBonus:0,
@@ -16834,6 +17092,118 @@ window.kmiPlanningUnmountGantt=function(){
  if(home.next&&home.next.parentNode===home.parent) home.parent.insertBefore(node,home.next);
  else home.parent.appendChild(node);
 };
+
+// ---------------------------------------------------------------------------
+// KMI-R5 OWNER REVIEW DEFECT ROUND 1 ("CONTINUE - SALES/CUSTOMER ORDER +
+// PLANNING CANONICAL COMPLETION", then "CORRECTED CONTINUATION DIRECTIVE",
+// then the 2026-10-06 23:xx follow-up locking this exact IA), Part B:
+// the workspace above was READ-ONLY (Gantt only) - Owner-reported defect:
+// "PLANLAMA exists, but the user cannot actually CREATE/ENTER/MANAGE a
+// production plan." Audited every real planning-adjacent writer before
+// building anything (no second planning truth, no invented "Plan" object):
+//
+//   AUDIT RESULT (capability -> real function, already existing, unchanged):
+//   1. Customer-driven demand source: window.V118_STATE.orders (System C,
+//      status OPEN/PARTIAL) - the SAME order list #tab-siparis/the Sales
+//      workspace already render. No second demand universe.
+//   2. Order -> Work Order ("plan creation"): window.v118ProductionNeed(id)
+//      - computes real net need per order line (ordered-reserved-produced-
+//      activeWO) and creates job order(s) with salesOrderId/productId/
+//      customerPO/dueAt set from the order - this IS the real, only
+//      existing "create a plan from demand" writer. There is NO separate
+//      canonical "Plan" entity distinct from the Work Order in the current
+//      system - inventing one would be the forbidden second truth, so
+//      "+ PLAN OLUŞTUR" composes this EXACT writer, and the result is
+//      honestly presented as a Work Order, not a fictional separate record.
+//   3. WO -> machine/operator/shift/start assignment ("scheduling"):
+//      window.kmiOpenSmartAssign/kmiCommitAssignment (existing Smart
+//      Assignment engine, server-RPC-verified via
+//      work_order_assignment_set_verify) - sets j.machine/j.assignedTo/
+//      j.shift/j.plannedStart. NOT reimplemented, NOT a new #34 buildout -
+//      the Owner's "do not start #34 Smart Assignment" forbids building NEW
+//      assignment logic; this engine already fully exists and is reused
+//      exactly as-is.
+//   4. Gantt visibility: window.renderKmiGantt (kmiGanttMachineRows/
+//      kmiGanttPersonRows) filters jobOrders by the EXACT SAME
+//      `${machine.code} - ${machine.name}` string kmiCommitAssignment
+//      writes to j.machine, and by assignedTo matching - confirmed by
+//      direct code read that an assignment made via step 3 appears on the
+//      SAME Gantt automatically on next render, with no bridging code
+//      needed. "Same plan appears in Gantt" is therefore already true,
+//      because the plan and the WO are the same record.
+//   5. Post-WO readiness: window.kmiKpiResolve('URETIME_HAZIRLIK',...) -
+//      the KPI dictionary itself already honestly classifies this as
+//      "EXISTING_CANONICAL (POST-WO) / MISSING (PRE-WO malzeme/takım
+//      hazırlığı - bkz. Golden Thread REQ-GT-05)". This workspace reuses it
+//      ONLY as post-WO readiness and explicitly, separately discloses
+//      pre-WO material/tool readiness as MISSING (Gate-B, unchanged) - it
+//      is NEVER relabeled or presented as pre-WO proof.
+//
+// window.kmiPlanningOpenCreatePlan/kmiPlanningAssign below call ONLY the
+// real writers in steps 2/3 above - no new write path of any kind.
+//
+// esc() is already in scope in this same script block (defined once above,
+// "kmi-qms-v1-quality-gates" IIFE) - reused as-is, not redeclared.
+// ---------------------------------------------------------------------------
+var KMI_PLAN_WS_TABS=[
+  {id:'overview', label:'GENEL BAKIŞ'},
+  {id:'plan', label:'ÜRETİM PLANI'},
+  {id:'gantt', label:'GANTT & KAPASİTE'},
+  {id:'readiness', label:'HAZIRLIK & BLOKAJLAR'},
+  {id:'planned', label:'PLANLANAN İŞLER'},
+  {id:'history', label:'GEÇMİŞ'}
+];
+window.KMI_PLAN_WS_STATE = window.KMI_PLAN_WS_STATE || {tab:'overview'};
+
+// Same read-only duplicate of the real top-level `can()` gate already used
+// by window.v118OpenOrder/v118ProductionNeed (that closure-private `can` is
+// not exposed on window, same situation as the many separately-redeclared
+// `esc()` helpers across this file). This is UI-visibility-only: the real
+// writers below re-check their own `can('sales')` internally and fail
+// closed regardless of what this local copy decides - no authority is
+// delegated to this duplicate.
+function planWsCanSales(){
+  try{
+    var u=window.currentUser; if(!u) return false;
+    var r=String(u.role||'').toLocaleUpperCase('tr-TR');
+    if(['ADMIN','YÖNETİM','YONETIM','MANAGEMENT'].indexOf(r)>=0) return true;
+    var d=String(u.dept||'').toLocaleLowerCase('tr-TR');
+    return d.indexOf('satış')>=0||d.indexOf('satis')>=0||d.indexOf('ofis')>=0;
+  }catch(e){ return false; }
+}
+function planWsJobs(){
+  var list=(typeof jobOrders!=='undefined'&&Array.isArray(jobOrders))?jobOrders:(Array.isArray(window.jobOrders)?window.jobOrders:[]);
+  return list.filter(function(j){ return j&&!j.deleted; });
+}
+function planWsActiveJobs(){ return planWsJobs().filter(function(j){ return ['Açık','Üretimde'].indexOf(String(j.status||''))>=0; }); }
+function planWsOpenOrders(){
+  var st=window.V118_STATE||{}; var orders=Array.isArray(st.orders)?st.orders:[];
+  return orders.filter(function(o){ return o&&['OPEN','PARTIAL'].indexOf(String(o.status||''))>=0; });
+}
+function planWsOrderNeed(o){
+  // READ-ONLY projection mirroring window.v118ProductionNeed's own net-need
+  // formula (ordered-reserved-produced-activeWO) purely for display - the
+  // ONLY write path for turning this into a real WO is still
+  // window.v118ProductionNeed itself, called unchanged by
+  // window.kmiPlanningOpenCreatePlan below. Same precedent as other
+  // workspaces' KPI tiles re-reading (never re-deciding) a canonical value.
+  var jobs=planWsJobs();
+  var total=0;
+  (o.lines||[]).forEach(function(l){
+    var ordered=Number(l.qty||0), reserved=Number(l.reserved||0), produced=Number(l.produced||0);
+    var activeWO=jobs.filter(function(j){ return j.salesOrderId===o.id && String(j.productId)===String(l.productId) && ['Tamamlandı','CANCELLED','İptal'].indexOf(String(j.status||''))<0; }).reduce(function(s,j){ return s+Math.max(0,Number(j.targetQty||0)-Number(j.completedQty||0)); },0);
+    total+=Math.max(0,ordered-reserved-produced-activeWO);
+  });
+  return total;
+}
+function planWsMachines(){ return (typeof MACHINES_LIST!=='undefined'&&Array.isArray(MACHINES_LIST))?MACHINES_LIST:(Array.isArray(window.MACHINES_LIST)?window.MACHINES_LIST:[]); }
+function planWsMachineDown(code){
+  try{
+    var states=(typeof machineRuntimeStates!=='undefined')?machineRuntimeStates:(window.machineRuntimeStates||{});
+    return !!(states && states[code] && states[code].down);
+  }catch(e){ return false; }
+}
+
 window.kmiOpenPlanningWorkspace=function(){
  const u=window.currentUser; if(!u) return;
  document.querySelectorAll('.tab-content').forEach(function(el){ el.classList.remove('active'); });
@@ -16849,34 +17219,150 @@ window.kmiOpenPlanningWorkspace=function(){
  document.getElementById('kmiGlobalPageHeaderBand')?.classList.remove('hidden');
  window.kmiRenderPlanningWorkspace();
 };
+window.kmiPlanningWorkspaceSwitchTab=function(tabId){
+  window.KMI_PLAN_WS_STATE.tab=tabId;
+  window.kmiRenderPlanningWorkspace();
+};
+// "+ PLAN OLUŞTUR": calls the REAL, only existing Order->WO writer
+// (window.v118ProductionNeed) for the chosen order - creates real Work
+// Order(s), nothing else. Internally re-checks its own can('sales') and
+// fail-closes with its own alert if denied - unchanged.
+window.kmiPlanningOpenCreatePlan=function(orderId){
+  if(typeof window.v118ProductionNeed!=='function'){ try{window.kmiToast&&window.kmiToast('Plan oluşturma motoru bulunamadı.','warn');}catch(e){} return; }
+  window.v118ProductionNeed(orderId);
+  window.kmiRenderPlanningWorkspace();
+};
+// "Akıllı Ata": opens the REAL, only existing WO->machine/operator/shift
+// assignment engine (window.kmiOpenSmartAssign) - not reimplemented.
+window.kmiPlanningAssign=function(jobOrderId){
+  if(typeof window.kmiOpenSmartAssign!=='function'){ try{window.kmiToast&&window.kmiToast('Atama motoru bulunamadı.','warn');}catch(e){} return; }
+  window.kmiOpenSmartAssign(jobOrderId);
+};
+
+function kmiPlanWsRenderOverview(){
+  var orders=planWsOpenOrders();
+  var openNeed=0; orders.forEach(function(o){ openNeed+=planWsOrderNeed(o); });
+  var jobs=planWsActiveJobs();
+  var planned=jobs.filter(function(j){ return j.machine; }).length;
+  var unassigned=jobs.filter(function(j){ return !j.machine; }).length;
+  var blocked=0;
+  jobs.forEach(function(j){ try{ var r=window.kmiKpiResolve('URETIME_HAZIRLIK',{jobOrderId:j.id}); if(r&&r.status==='OK'&&r.ready===false) blocked++; }catch(e){} });
+  var machines=planWsMachines();
+  var down=0; machines.forEach(function(m){ if(planWsMachineDown(m.code)) down++; });
+  function kpi(label,value,color,tab){ return '<button onclick="window.kmiPlanningWorkspaceSwitchTab(\''+tab+'\')" class="bg-slate-900/70 border border-slate-700 hover:border-cyan-600 rounded-xl p-3 text-left"><div class="text-2xl font-black '+color+'">'+value+'</div><div class="text-[10px] text-slate-500 uppercase">'+esc(label)+'</div></button>'; }
+  return '<div class="grid grid-cols-2 md:grid-cols-4 gap-2">'+
+    kpi('Açık Sipariş Üretim İhtiyacı', openNeed, 'text-amber-300', 'plan')+
+    kpi('Atanmış İş Emri', planned, 'text-emerald-300', 'planned')+
+    kpi('Atanmamış İş Emri', unassigned, 'text-cyan-300', 'planned')+
+    kpi('Hazırlık Bloke (İş Emri Açıldıktan Sonra)', blocked, 'text-red-400', 'readiness')+
+    kpi('Toplam Makine', machines.length, 'text-slate-300', 'gantt')+
+    kpi('ARIZALI (DOWN) Makine', down, 'text-red-500', 'gantt')+
+    '</div>'+
+    '<div class="text-[10px] text-slate-500 mt-3">Sayılar window.V118_STATE.orders, gerçek jobOrders ve window.kmiKpiResolve(\'URETIME_HAZIRLIK\',...) sonucundan hesaplanır - ayrı bir planlama motoru/veritabanı yoktur. Her kart kendi gerçek sekmesine gider.</div>';
+}
+
+function kmiPlanWsRenderPlan(){
+  var orders=planWsOpenOrders();
+  var canCreate=planWsCanSales();
+  var rows=orders.map(function(o){
+    var need=planWsOrderNeed(o);
+    return '<tr class="border-b border-slate-800 hover:bg-slate-900/50">'+
+      '<td class="p-2"><b class="text-white">'+esc(o.customerPO||o.id)+'</b><div class="text-[9px] text-slate-500">'+esc(o.id)+'</div></td>'+
+      '<td class="p-2">'+esc(o.customerId||'-')+'</td>'+
+      '<td class="p-2">'+esc(o.dueDate||'-')+'</td>'+
+      '<td class="p-2 text-[10px]">'+esc(o.status||'-')+'</td>'+
+      '<td class="p-2 text-right '+(need>0?'text-amber-300':'text-slate-500')+'">'+need+'</td>'+
+      '<td class="p-2 text-right">'+(need>0&&canCreate?'<button onclick="window.kmiPlanningOpenCreatePlan(\''+esc(o.id)+'\')" class="bg-cyan-700 hover:bg-cyan-600 text-white px-3 py-1.5 rounded text-[10px] font-black">+ PLAN OLUŞTUR</button>':(need>0?'<span class="text-[10px] text-slate-600">Yetki gerekir</span>':'<span class="text-[10px] text-slate-600">İhtiyaç yok</span>'))+'</td>'+
+      '</tr>';
+  }).join('') || '<tr><td colspan="6" class="p-4 text-center text-slate-500">Açık sipariş yok.</td></tr>';
+  return '<div class="text-[11px] text-slate-400 mb-3">Bu liste window.V118_STATE.orders (System C, aynı sipariş kaynağı Satış &amp; Müşteri çalışma alanının kullandığı) - ikinci bir talep evreni YOK. "+ PLAN OLUŞTUR" window.v118ProductionNeed\'i çağırır: siparişin karşılanmamış üretim ihtiyacı kadar gerçek iş emri (WO) açar, sipariş/kalem kimliğini (salesOrderId/productId/customerPO) korur.</div>'+
+    '<div class="overflow-x-auto"><table class="w-full text-xs"><thead class="text-slate-500 text-[10px] uppercase"><tr><th class="p-2 text-left">Sipariş</th><th class="p-2 text-left">Müşteri</th><th class="p-2 text-left">Termin</th><th class="p-2 text-left">Durum</th><th class="p-2 text-right">Karşılanmamış İhtiyaç</th><th class="p-2 text-right">Aksiyon</th></tr></thead><tbody>'+rows+'</tbody></table></div>'+
+    (canCreate?'':'<div class="text-[10px] text-amber-300 mt-3">Bu kullanıcının plan oluşturma (Satış/Yönetim) yetkisi yok - buton gizli, gerçek yazıcı (window.v118ProductionNeed) da kendi yetkisini ayrıca denetler.</div>');
+}
+
+function kmiPlanWsRenderReadiness(){
+  var jobs=planWsActiveJobs();
+  var rows=jobs.map(function(j){
+    var r=null; try{ r=window.kmiKpiResolve('URETIME_HAZIRLIK',{jobOrderId:j.id}); }catch(e){}
+    var ready=r&&r.status==='OK'&&r.ready===true;
+    var label=r&&r.status==='OK'?(ready?'HAZIR':'HAZIR DEĞİL'):'VERİ GEREKLİ';
+    var missing=r&&Array.isArray(r.missing)?r.missing.join(', '):(r&&r.reason?r.reason:'');
+    return '<tr class="border-b border-slate-800"><td class="p-2 font-mono text-blue-300">'+esc(j.id)+'</td><td class="p-2">'+esc(j.item||j.productId||'-')+'</td><td class="p-2 text-[10px] '+(ready?'text-emerald-400':(label==='VERİ GEREKLİ'?'text-amber-300':'text-red-400'))+'">'+esc(label)+'</td><td class="p-2 text-[10px] text-slate-500">'+esc(missing)+'</td></tr>';
+  }).join('') || '<tr><td colspan="4" class="p-4 text-center text-slate-500">İş emri yok.</td></tr>';
+  return '<div class="bg-slate-900/70 border border-slate-700 rounded-xl p-4 mb-4">'+
+    '<b class="text-white text-sm">İş Emri Hazırlığı (iş emri açıldıktan sonra)</b>'+
+    '<div class="text-[10px] text-slate-500 mt-1 mb-3">window.kmiKpiResolve(\'URETIME_HAZIRLIK\',...) - EXISTING_CANONICAL, POST-WO. Her iş emri için eksik alan tespiti; tespit edilemiyorsa fail-closed ("HAZIR DEĞİL" varsayılır, asla "HAZIR" UYDURULMAZ).</div>'+
+    '<div class="overflow-x-auto"><table class="w-full text-xs"><thead class="text-slate-500 text-[10px] uppercase"><tr><th class="p-2 text-left">İş Emri</th><th class="p-2 text-left">Ürün</th><th class="p-2 text-left">Durum</th><th class="p-2 text-left">Eksik</th></tr></thead><tbody>'+rows+'</tbody></table></div>'+
+    '</div>'+
+    '<div class="bg-amber-950/20 border border-amber-800/50 rounded-xl p-4 text-xs text-amber-200">'+
+    '<b class="text-white">Sipariş Öncesi (Pre-WO) Malzeme / Takım Hazırlığı: VERİ GEREKLİ</b>'+
+    '<div class="mt-2">Gate-B denetiminde bu iki hazırlık türü bulunamadı ve hâlâ MISSING olarak işaretli (bkz. Golden Thread REQ-GT-05): bir siparişi plana almadan ÖNCE gerekli ham madde/takımın gerçekten müsait olup olmadığını gösteren kanonik bir kaynak yok. Yukarıdaki "İş Emri Hazırlığı" tablosu BUNUN YERİNE GEÇMEZ - o, iş emri AÇILDIKTAN SONRAki bir kontroldür. Burada sahte bir "hazır/değil" sayısı UYDURULMADI.</div>'+
+    '</div>';
+}
+
+function kmiPlanWsRenderPlanned(){
+  var jobs=planWsActiveJobs();
+  var assigned=jobs.filter(function(j){ return j.machine; });
+  var unassigned=jobs.filter(function(j){ return !j.machine; });
+  function row(j,showAssign){
+    return '<div class="bg-slate-900/70 border border-slate-800 rounded-lg p-3 mb-1.5 text-xs flex justify-between items-center">'+
+      '<div><b class="text-white">'+esc(j.id)+'</b> · '+esc(j.item||j.productId||'-')+(j.machine?' · '+esc(j.machine):'')+
+      '<div class="text-[10px] text-slate-500 mt-1">Vardiya: '+esc(j.shift||'-')+' · Başlangıç: '+esc(j.plannedStart||'-')+' · Termin: '+esc(j.dueAt||'-')+'</div></div>'+
+      (showAssign?'<button onclick="window.kmiPlanningAssign(\''+esc(j.id)+'\')" class="bg-cyan-700 hover:bg-cyan-600 text-white px-3 py-1.5 rounded text-[10px] font-bold whitespace-nowrap">Akıllı Ata</button>'
+        :'<button onclick="window.kmiPlanningAssign(\''+esc(j.id)+'\')" class="bg-slate-700 hover:bg-slate-600 text-white px-2 py-1 rounded text-[10px] whitespace-nowrap">Yeniden Ata</button>')+
+      '</div>';
+  }
+  return '<div class="mb-4"><div class="text-xs font-black text-cyan-300 mb-2 uppercase">ATANMAMIŞ ('+unassigned.length+')</div>'+
+    (unassigned.map(function(j){ return row(j,true); }).join('')||'<div class="text-slate-500 text-xs">Atanmamış iş emri yok.</div>')+'</div>'+
+    '<div><div class="text-xs font-black text-emerald-300 mb-2 uppercase">ATANMIŞ ('+assigned.length+')</div>'+
+    (assigned.map(function(j){ return row(j,false); }).join('')||'<div class="text-slate-500 text-xs">Atanmış iş emri yok.</div>')+'</div>'+
+    '<div class="text-[10px] text-slate-500 mt-3">"Akıllı Ata"/"Yeniden Ata" window.kmiOpenSmartAssign\'i açar - aynı, var olan, sunucu tarafında doğrulanan (work_order_assignment_set_verify) atama motoru; burada yeniden yazılmadı.</div>';
+}
+
+function kmiPlanWsRenderHistory(){
+  return '<div class="bg-slate-900/70 border border-slate-700 rounded-xl p-5 text-center text-xs text-slate-400">'+
+    'Geçmiş/analiz için şimdilik mevcut kanonik ekranlara bağlanın: '+
+    '<div class="mt-3 flex flex-wrap gap-2 justify-center">'+
+    (typeof window.kmiOpenCommandCenterWorkspace==='function'?'<button onclick="window.kmiOpenCommandCenterWorkspace()" class="bg-slate-700 hover:bg-slate-600 text-white px-3 py-2 rounded text-[11px]">Komuta Merkezi</button>':'')+
+    '</div>'+
+    '<div class="mt-3 text-[10px] text-slate-600">Yeni bir planlama geçmişi/analiz motoru İCAT EDİLMEDİ - bu alan ileride gerçek bir kanonik kaynak bulununca doldurulacak.</div>'+
+    '</div>';
+}
+
 window.kmiRenderPlanningWorkspace=function(){
- // Unmount BEFORE any innerHTML rewrite of this page (not strictly required
- // today since #tab-planlama-workspace's own innerHTML is only ever set here,
- // but kept as the same defensive first-line safeguard R16-1/R16-Q needed
- // for Accounting/Quality, in case a future change re-renders this page).
- window.kmiPlanningUnmountGantt();
  const page=document.getElementById('tab-planlama-workspace'); if(!page) return;
+ const active=(window.KMI_PLAN_WS_STATE&&window.KMI_PLAN_WS_STATE.tab)||'overview';
+ // Unmount BEFORE any innerHTML rewrite of this page, ALWAYS - even when
+ // re-rendering while already on the 'gantt' subpage (same defensive
+ // first-line safeguard R16-1/R16-Q needed for Accounting/Quality). Skipping
+ // this when active==='gantt' was a real bug caught by
+ // tests/test_r5_master16_r16p_planning_people_workspace_convergence.js's
+ // STEP2b second-render regression check: page.innerHTML=... below destroys
+ // any node still physically inside the page, including the relocated real
+ // Gantt panel, if it was not moved out first.
+ window.kmiPlanningUnmountGantt();
 
- const header='<div class="flex flex-wrap items-center justify-between gap-3 mb-4">'
-  + '<div><h1 class="text-2xl sm:text-3xl font-black text-white"><i class="fa-solid fa-diagram-project text-cyan-400 mr-2"></i>Planlama</h1>'
-  + '<div class="text-xs sm:text-sm text-slate-400 mt-1">Kurutlu Manufacturing Intelligence · Kaynak Planlama &amp; Gantt Çalışma Alanı</div></div></div>';
+ const navHtml='<div class="flex flex-wrap gap-2 mb-4 border-b border-slate-700 pb-3">'+
+   KMI_PLAN_WS_TABS.map(function(t){ return '<button onclick="window.kmiPlanningWorkspaceSwitchTab(\''+t.id+'\')" class="px-3 py-2 rounded-lg text-xs font-bold '+(t.id===active?'bg-cyan-700 text-white':'bg-slate-800 text-slate-400 hover:bg-slate-700')+'">'+esc(t.label)+'</button>'; }).join('')+
+   '</div>';
 
- // STATUS NOTE (honesty, owner "QUALITY CLASSIFICATION CORRECTION" principle
- // applied here too): Smart Assignment ve iş emri ataması ayrı, joborders
- // panelinde kalıyor - burada UYDURULMUŞ bir "birleşik planlama motoru" YOK,
- // mevcut, gerçek Gantt/kaynak doluluk görünümü composed ediliyor.
- const missing='<div class="bg-amber-950/20 border border-amber-800/50 rounded-2xl p-4 mb-4 text-xs text-amber-200">'
-  + '<b class="text-white">Bu çalışma alanının kapsamı:</b> Kaynak Planlama / Gantt (makine ve personel doluluğu, önümüzdeki 7 gün). '
-  + 'Smart Assignment ve iş emri ataması ayrı panellerde kalıyor (Task Floor / Live Floor) - burada tekrar edilmiyor, uydurulmuyor.'
-  + '</div>';
-
- const mount='<div id="kmiPlanningGanttMount"></div>';
+ let body='';
+ try{
+   if(active==='overview') body=kmiPlanWsRenderOverview();
+   else if(active==='plan') body=kmiPlanWsRenderPlan();
+   else if(active==='gantt') body='<div id="kmiPlanningGanttMount"></div>';
+   else if(active==='readiness') body=kmiPlanWsRenderReadiness();
+   else if(active==='planned') body=kmiPlanWsRenderPlanned();
+   else if(active==='history') body=kmiPlanWsRenderHistory();
+ }catch(e){ body='<div class="text-red-400 text-xs">Render hatası: '+esc(String(e&&e.message||e))+'</div>'; console.error('[kmiRenderPlanningWorkspace]',e); }
 
  page.innerHTML='<div class="max-w-[1400px] mx-auto p-4 sm:p-6">'
-  + header + missing + mount
+  + '<h1 class="text-2xl sm:text-3xl font-black text-white mb-1"><i class="fa-solid fa-diagram-project text-cyan-400 mr-2"></i>Planlama</h1>'
+  + '<div class="text-xs sm:text-sm text-slate-400 mb-4">Kurutlu Manufacturing Intelligence · Sipariş → Plan → İş Emri → Üretim Planlama Çalışma Alanı</div>'
+  + navHtml + '<div id="kmiPlanWsBody">'+body+'</div>'
   + '</div>';
 
- window.kmiPlanningMountGantt();
+ if(active==='gantt') window.kmiPlanningMountGantt();
 };
 
 window.__kmiPeopleHome=null;
@@ -17839,6 +18325,19 @@ window.kmiRenderProductionIntel=function(){
 window.kmiOpenProductionIntel=function(){
   if(!isMgmtUser()){ try{toast?.('Üretim Zekası paneli yalnız yönetim içindir.','warn');}catch(e){alert('Yetki yok.');} return; }
   const old=document.getElementById('kmiPIModal'); if(old) old.remove();
+  // KMI-R5 OWNER REVIEW DEFECT ROUND 1 (2026-10-06): the new ÜRETİM workspace's
+  // "ÜRETİM ZEKÂSI" subpage reuses this SAME #kmiPIBody mount id by design (same
+  // pattern already used for CAM's kmiOpenCamWorkspace, see
+  // tests/test_r5_duplicate_scanner_accuracy.js). Mutual exclusion: if that
+  // subpage happens to be active right now, switch it away first so its
+  // #kmiPIBody is removed before this modal creates its own - at no point do
+  // two elements share the id simultaneously.
+  try{
+    if(window.KMI_PROD_WS_STATE && window.KMI_PROD_WS_STATE.tab==='intel'){
+      const wsPage=document.getElementById('tab-production-workspace');
+      if(wsPage && wsPage.classList.contains('active')){ window.KMI_PROD_WS_STATE.tab='overview'; if(typeof window.kmiRenderProductionWorkspace==='function') window.kmiRenderProductionWorkspace(); }
+    }
+  }catch(e){}
   const m=document.createElement('div'); m.id='kmiPIModal'; m.className='fixed inset-0 z-[271] bg-black/70 flex items-start justify-center overflow-y-auto py-8';
   m.innerHTML='<div class="w-full max-w-2xl mx-auto bg-slate-950 border border-slate-700 rounded-2xl p-5">'+
    '<div class="flex justify-between items-center mb-4"><h3 class="text-lg font-black text-white"><i class="fa-solid fa-gauge-high text-cyan-400 mr-2"></i>Üretim Zekası</h3><button onclick="document.getElementById(\'kmiPIModal\').remove()" class="text-slate-400">✕</button></div>'+
@@ -17856,13 +18355,500 @@ window.addEventListener('load',function(){
         const b=document.createElement('button'); b.id='kmiPINavBtn'; b.type='button';
         b.className='px-4 py-3 rounded-xl bg-cyan-700 hover:bg-cyan-600 text-white font-black border border-cyan-500/40';
         b.innerHTML='🏭 ÜRETİM';
-        b.onclick=function(){ window.kmiOpenProductionIntel(); };
+        // KMI-R5 OWNER REVIEW DEFECT ROUND 1 (2026-10-06): primary "ÜRETİM" nav
+        // entry now opens the full canonical workspace (6 subpages, incl. the
+        // previously-missing Üretim Serbest Bırakma) instead of jumping
+        // straight into the Üretim Zekası modal. kmiOpenProductionIntel itself
+        // is unchanged and still reachable from inside the workspace (subpage
+        // "ÜRETİM ZEKÂSI") and from any other existing caller.
+        b.onclick=function(){ if(typeof window.kmiOpenProductionWorkspace==='function') window.kmiOpenProductionWorkspace(); else window.kmiOpenProductionIntel(); };
         row.appendChild(b);
       }
     }catch(e){}
     if(tries>=90) clearInterval(timer);
   },500);
 },{once:true});
+})();
+</script>
+
+<script id="kmi-r5-production-workspace">
+(function(){'use strict';
+// KMI-R5 OWNER REVIEW DEFECT ROUND 1 (2026-10-06, "P0 - PRODUCTION DOMAIN IS
+// NOT OPERATIONALLY COMPLETE", clarified by "OWNER CLARIFICATION - PRODUCTION
+// INTELLIGENCE IS APPROVED"): the Owner's runtime review found that the
+// Production nav entry opened ONLY window.kmiOpenProductionIntel() - a
+// monitoring/intelligence modal - with no canonical place to actually
+// perform Final Production Release. This composes a first-class ÜRETİM
+// workspace with the Owner's locked 6-subpage information architecture:
+//   1. GENEL BAKIŞ  2. İŞ EMİRLERİ  3. CANLI ÜRETİM
+//   4. ÜRETİM SERBEST BIRAKMA  5. ÜRETİM ZEKÂSI  6. GEÇMİŞ & ANALİZ
+//
+// NO NEW ENGINE. Every number/action below calls an EXISTING canonical
+// function:
+//   - release queue: window.kmiR5FinalProductionReleaseEvaluate/Grant/GrantUI
+//     and window.kmiR5FinalProductionReleaseFriendlyMessage (same formatter
+//     fixed under Defect Round 1's routing/UX item - one canonical place,
+//     reused here, not re-implemented)
+//   - job orders: the real jobOrders[] array + window.kmiOpenJobOrderFile
+//     (existing WO digital file/action dispatcher - not duplicated)
+//   - live production: window.kmiOpenShopFloorLive (existing canonical
+//     execution surface - NOT duplicated here, only deep-linked)
+//   - ÜRETİM ZEKÂSI: window.kmiRenderProductionIntel itself (the Owner
+//     explicitly approved this capability and asked it be PRESERVED, not
+//     rebuilt) - mounted inline as subpage 5 instead of a standalone modal.
+//     window.kmiOpenProductionIntel (the modal wrapper) is left completely
+//     UNCHANGED for any other existing caller.
+function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
+var KMI_PROD_WS_TABS=[
+  {id:'overview', label:'GENEL BAKIŞ'},
+  {id:'joborders', label:'İŞ EMİRLERİ'},
+  {id:'live', label:'CANLI ÜRETİM'},
+  {id:'release', label:'ÜRETİM SERBEST BIRAKMA'},
+  {id:'intel', label:'ÜRETİM ZEKÂSI'},
+  {id:'history', label:'GEÇMİŞ & ANALİZ'}
+];
+window.KMI_PROD_WS_STATE = window.KMI_PROD_WS_STATE || {tab:'overview'};
+
+function prodWsJobs(){
+  try{
+    if(typeof window.kmiPiJobs==='function') return window.kmiPiJobs().filter(function(j){return !j.deleted;});
+  }catch(e){}
+  const list=(typeof jobOrders!=='undefined'&&Array.isArray(jobOrders))?jobOrders:(Array.isArray(window.jobOrders)?window.jobOrders:[]);
+  return list.filter(function(j){return !j.deleted;});
+}
+function prodWsMachines(){ return (typeof MACHINES_LIST!=='undefined'&&Array.isArray(MACHINES_LIST))?MACHINES_LIST:(Array.isArray(window.MACHINES_LIST)?window.MACHINES_LIST:[]); }
+function prodWsMachineDown(code){
+  try{
+    const states=(typeof machineRuntimeStates!=='undefined')?machineRuntimeStates:(window.machineRuntimeStates||{});
+    return !!(states && states[code] && states[code].down);
+  }catch(e){ return false; }
+}
+function prodWsMachineRunning(code){
+  try{
+    const sess=(typeof window.loadStorage==='function')?window.loadStorage('kmi_shopfloor_sessions_v1191',{}):(typeof loadStorage==='function'?loadStorage('kmi_shopfloor_sessions_v1191',{}):{});
+    return Object.keys(sess||{}).some(function(jobId){
+      const s=sess[jobId]; if(!s||!s.startedAt||s.finishedAt) return false;
+      return String(s.machine)===String(code);
+    });
+  }catch(e){ return false; }
+}
+// Reuses the SAME evaluator/formatter the Final Production Release gate and
+// its UI action already use - no second evaluation path.
+function prodWsReleaseRows(){
+  const jobs=prodWsJobs().filter(function(j){ return String(j.status||'')!=='Silindi'; });
+  const buckets={}; const order=[];
+  function pushBucket(label){ if(!buckets[label]){ buckets[label]=[]; order.push(label); } return buckets[label]; }
+  jobs.forEach(function(j){
+    if(j.finalProductionReleaseStatus==='RELEASED'){ pushBucket('ZATEN SERBEST BIRAKILDI').push({jo:j, detail:'Üretim serbest bırakıldı: '+(j.finalProductionReleasedAt?new Date(j.finalProductionReleasedAt).toLocaleString('tr-TR'):'-')}); return; }
+    let ev=null; try{ ev=window.kmiR5FinalProductionReleaseEvaluate(j.id); }catch(e){ ev=null; }
+    const fm=(typeof window.kmiR5FinalProductionReleaseFriendlyMessage==='function')?window.kmiR5FinalProductionReleaseFriendlyMessage(ev,j.id):{statusLabel:'VERİ GEREKLİ', detail: ev&&ev.message||'Değerlendirilemedi.'};
+    pushBucket(fm.statusLabel).push({jo:j, detail:fm.detail, ev:ev});
+  });
+  return {buckets:buckets, order:order};
+}
+
+window.kmiOpenProductionWorkspace=function(){
+  const u=window.currentUser; if(!u) return;
+  document.querySelectorAll('.tab-content').forEach(function(el){ el.classList.remove('active'); });
+  document.querySelectorAll('.nav-btn').forEach(function(el){ el.classList.remove('bg-slate-700','text-blue-400'); });
+  let page=document.getElementById('tab-production-workspace');
+  if(!page){
+    page=document.createElement('div'); page.id='tab-production-workspace'; page.className='tab-content';
+    const mainSys=document.getElementById('mainSystem');
+    (mainSys||document.body).appendChild(page);
+  }
+  page.classList.add('active');
+  const pt=document.getElementById('pageTitle'); if(pt) pt.innerText='Üretim';
+  document.getElementById('kmiGlobalPageHeaderBand')?.classList.remove('hidden');
+  window.kmiRenderProductionWorkspace();
+};
+window.kmiProductionWorkspaceSwitchTab=function(tabId){
+  window.KMI_PROD_WS_STATE.tab=tabId;
+  window.kmiRenderProductionWorkspace();
+};
+window.kmiProductionWorkspaceRelease=function(jobOrderId){
+  try{ window.kmiR5FinalProductionReleaseGrantUI(jobOrderId); }catch(e){ console.error('[kmiProductionWorkspaceRelease]',e); }
+  window.kmiRenderProductionWorkspace();
+};
+
+function kmiProdWsRenderOverview(){
+  const jobs=prodWsJobs();
+  const closedStatuses=['Sevk Edildi / Kapandı','Tamamlandı (Yönetim Onaylı)'];
+  const activeJobs=jobs.filter(function(j){return ['Açık','Üretimde'].indexOf(String(j.status||''))>=0;});
+  const waitingJobs=jobs.filter(function(j){return closedStatuses.indexOf(j.status)<0 && activeJobs.indexOf(j)<0;});
+  let blockedCount=0;
+  activeJobs.forEach(function(j){ try{ const r=(typeof window.kmiKpiResolve==='function')?window.kmiKpiResolve('URETIME_HAZIRLIK',{jobOrderId:j.id}):null; if(r&&r.status==='OK'&&r.ready===false) blockedCount++; }catch(e){} });
+  const machines=prodWsMachines();
+  let running=0, down=0;
+  machines.forEach(function(m){ if(prodWsMachineDown(m.code)) down++; else if(prodWsMachineRunning(m.code)) running++; });
+  const idle=Math.max(0, machines.length-running-down);
+  let waitingQuality=0, waitingRelease=0, released=0;
+  jobs.forEach(function(j){
+    if(j.finalProductionReleaseStatus==='RELEASED'){ released++; return; }
+    let ev=null; try{ ev=window.kmiR5FinalProductionReleaseEvaluate(j.id); }catch(e){}
+    if(ev&&ev.status==='FINAL_PRODUCTION_RELEASABLE') waitingRelease++;
+    else if(ev&&String(ev.reasonCode||'').indexOf('QUALITY')>=0) waitingQuality++;
+  });
+  let overdueCount=0; try{ overdueCount=jobs.filter(function(j){return typeof kmiPiOverdue==='function'&&kmiPiOverdue(j);}).length; }catch(e){}
+  function kpi(label,value,color,tab){ return '<button onclick="window.kmiProductionWorkspaceSwitchTab(\''+tab+'\')" class="bg-slate-900/70 border border-slate-700 hover:border-cyan-600 rounded-xl p-3 text-left"><div class="text-2xl font-black '+color+'">'+value+'</div><div class="text-[10px] text-slate-500 uppercase">'+esc(label)+'</div></button>'; }
+  return '<div class="grid grid-cols-2 md:grid-cols-5 gap-2">'+
+    kpi('Aktif İş Emri', activeJobs.length, 'text-emerald-300', 'joborders')+
+    kpi('Bekleyen İş Emri', waitingJobs.length, 'text-amber-300', 'joborders')+
+    kpi('Bloke (Hazırlık)', blockedCount, 'text-red-400', 'joborders')+
+    kpi('Çalışan Makine', running, 'text-emerald-300', 'live')+
+    kpi('Boşta Makine', idle, 'text-slate-300', 'live')+
+    kpi('ARIZALI (DOWN) Makine', down, 'text-red-500', 'live')+
+    kpi('Kalite Bekleyen', waitingQuality, 'text-amber-300', 'joborders')+
+    kpi('Üretim Serbest Bırakma Bekleyen', waitingRelease, 'text-cyan-300', 'release')+
+    kpi('Üretim Serbest Bırakıldı', released, 'text-emerald-400', 'release')+
+    kpi('Gecikmiş / Riskli', overdueCount, 'text-red-500', 'joborders')+
+    '</div>'+
+    '<div class="text-[10px] text-slate-500 mt-3">Sayılar window.kmiR5FinalProductionReleaseEvaluate, window.kmiKpiResolve ve gerçek makine/oturum verisinden hesaplanır - ayrı bir motor yoktur. Her kart kendi gerçek kuyruğuna gider.</div>';
+}
+
+function kmiProdWsRenderJobOrders(){
+  const jobs=prodWsJobs().slice().sort(function(a,b){return String(b.id).localeCompare(String(a.id));});
+  const rows=jobs.map(function(j){
+    const orderRef=j.salesOrderId?('<span class="text-cyan-300">'+esc(j.salesOrderId)+(j.orderLineId?' / '+esc(j.orderLineId):'')+'</span>'):(j.orderId?('<span class="text-slate-400">'+esc(j.orderId)+' (B)</span>'):'<span class="text-slate-600">VERİ GEREKLİ</span>');
+    let fprLabel='-'; try{ const ev=window.kmiR5FinalProductionReleaseEvaluate(j.id); const fm=window.kmiR5FinalProductionReleaseFriendlyMessage(ev,j.id); fprLabel=j.finalProductionReleaseStatus==='RELEASED'?'SERBEST':fm.statusLabel; }catch(e){}
+    return '<tr class="border-b border-slate-800 hover:bg-slate-900/50">'+
+      '<td class="p-2 font-mono text-blue-300">'+esc(j.id)+'</td>'+
+      '<td class="p-2">'+orderRef+'</td>'+
+      '<td class="p-2">'+esc(j.item||j.productId||'-')+'</td>'+
+      '<td class="p-2">'+esc(j.machine||'-')+'</td>'+
+      '<td class="p-2 text-emerald-400">'+(j.completedQty||0)+' / '+(j.targetQty||'-')+'</td>'+
+      '<td class="p-2 text-[10px]">'+esc(j.status||'-')+'</td>'+
+      '<td class="p-2 text-[10px] text-cyan-300">'+esc(fprLabel)+'</td>'+
+      '<td class="p-2 text-right"><button onclick="window.kmiOpenJobOrderFile(\''+esc(j.id)+'\')" class="bg-amber-700 hover:bg-amber-600 text-white px-2 py-1 rounded text-[10px]">Dijital Dosya</button></td>'+
+      '</tr>';
+  }).join('') || '<tr><td colspan="8" class="p-4 text-center text-slate-500">İş emri yok.</td></tr>';
+  return '<div class="overflow-x-auto"><table class="w-full text-xs"><thead class="text-slate-500 text-[10px] uppercase"><tr><th class="p-2 text-left">İş Emri</th><th class="p-2 text-left">Müşteri Siparişi</th><th class="p-2 text-left">Ürün</th><th class="p-2 text-left">Makine</th><th class="p-2 text-left">Üretim</th><th class="p-2 text-left">Durum</th><th class="p-2 text-left">Serbest Bırakma</th><th class="p-2"></th></tr></thead><tbody>'+rows+'</tbody></table></div>';
+}
+
+function kmiProdWsRenderLive(){
+  return '<div class="bg-slate-900/70 border border-slate-700 rounded-xl p-5 text-center">'+
+    '<div class="text-sm text-slate-400 mb-3">Canlı üretim yürütme ekranı Shop Floor Live\'dır - burada tekrarlanmaz.</div>'+
+    '<button onclick="window.kmiOpenShopFloorLive && window.kmiOpenShopFloorLive()" class="bg-emerald-700 hover:bg-emerald-600 text-white font-black px-5 py-3 rounded-xl">▶ SHOP FLOOR LIVE\'I AÇ</button>'+
+    '</div>';
+}
+
+function kmiProdWsRenderReleaseQueue(){
+  const r=prodWsReleaseRows();
+  const order=['SERBEST BIRAKILABİLİR','VERİ GEREKLİ','HOLD','İLK PARÇA BEKLİYOR','ROTA TAMAMLANMADI','ÜRETİM TAMAMLANMADI','ZATEN SERBEST BIRAKILDI'];
+  const labels=order.filter(function(l){return r.buckets[l];}).concat(r.order.filter(function(l){return order.indexOf(l)<0;}));
+  if(!labels.length) return '<div class="text-slate-500 text-xs">Hiç iş emri yok.</div>';
+  const colorOf={'SERBEST BIRAKILABİLİR':'text-emerald-300','VERİ GEREKLİ':'text-amber-300','HOLD':'text-red-400','İLK PARÇA BEKLİYOR':'text-amber-300','ROTA TAMAMLANMADI':'text-slate-400','ÜRETİM TAMAMLANMADI':'text-slate-400','ZATEN SERBEST BIRAKILDI':'text-emerald-500'};
+  return labels.map(function(label){
+    const rows=r.buckets[label];
+    const isReleasable=label==='SERBEST BIRAKILABİLİR';
+    const isAlready=label==='ZATEN SERBEST BIRAKILDI';
+    const shown=rows.slice(0, isAlready?10:50);
+    return '<div class="mb-4"><div class="text-xs font-black '+colorOf[label]+' mb-2 uppercase">'+esc(label)+' ('+rows.length+')</div>'+
+      shown.map(function(row){
+        return '<div class="bg-slate-900/70 border border-slate-800 rounded-lg p-3 mb-1.5 text-xs flex justify-between items-center">'+
+          '<div><b class="text-white">'+esc(row.jo.id)+'</b> · '+esc(row.jo.item||row.jo.productId||'-')+' · '+esc(row.jo.machine||'-')+
+          '<div class="text-[10px] text-slate-500 mt-1">'+esc(row.detail||'')+'</div></div>'+
+          (isReleasable?'<button onclick="window.kmiProductionWorkspaceRelease(\''+esc(row.jo.id)+'\')" class="bg-cyan-700 hover:bg-cyan-600 text-white px-3 py-1.5 rounded text-[10px] font-bold whitespace-nowrap">ÜRETİM SERBEST BIRAK</button>'
+            :'<button onclick="window.kmiOpenJobOrderFile(\''+esc(row.jo.id)+'\')" class="bg-slate-700 hover:bg-slate-600 text-white px-2 py-1 rounded text-[10px] whitespace-nowrap">İş Emrini Aç</button>')+
+          '</div>';
+      }).join('')+
+      (rows.length>shown.length?'<div class="text-[10px] text-slate-600">+ '+(rows.length-shown.length)+' daha</div>':'')+
+      '</div>';
+  }).join('')+
+  '<div class="text-[10px] text-slate-500 mt-2">Bu kuyruk window.kmiR5FinalProductionReleaseEvaluate sonucunu doğrudan okur - durumlar burada yeniden hesaplanmaz. "ÜRETİM SERBEST BIRAK" aynı denetimli window.kmiR5FinalProductionReleaseGrant yazıcısını çağırır.</div>';
+}
+
+function kmiProdWsRenderIntelHost(){
+  return '<div id="kmiPIBody"></div>';
+}
+
+function kmiProdWsRenderHistory(){
+  return '<div class="bg-slate-900/70 border border-slate-700 rounded-xl p-5 text-center text-xs text-slate-400">'+
+    'Geçmiş/analiz için şimdilik mevcut kanonik ekranlara bağlanın: '+
+    '<div class="mt-3 flex flex-wrap gap-2 justify-center">'+
+    (typeof window.kmiOpenManagementWorkspace==='function'?'<button onclick="window.kmiOpenManagementWorkspace()" class="bg-slate-700 hover:bg-slate-600 text-white px-3 py-2 rounded text-[11px]">Yönetim / İşletme Kontrolü</button>':'')+
+    (typeof window.kmiOpenCommandCenterWorkspace==='function'?'<button onclick="window.kmiOpenCommandCenterWorkspace()" class="bg-slate-700 hover:bg-slate-600 text-white px-3 py-2 rounded text-[11px]">Komuta Merkezi</button>':'')+
+    '</div>'+
+    '<div class="mt-3 text-[10px] text-slate-600">Yeni bir geçmiş/analiz motoru İCAT EDİLMEDİ - bu alan ileride gerçek bir kanonik kaynak bulununca doldurulacak.</div>'+
+    '</div>';
+}
+
+window.kmiRenderProductionWorkspace=function(){
+  const page=document.getElementById('tab-production-workspace'); if(!page) return;
+  const active=(window.KMI_PROD_WS_STATE&&window.KMI_PROD_WS_STATE.tab)||'overview';
+  const navHtml='<div class="flex flex-wrap gap-2 mb-4 border-b border-slate-700 pb-3">'+
+    KMI_PROD_WS_TABS.map(function(t){ return '<button onclick="window.kmiProductionWorkspaceSwitchTab(\''+t.id+'\')" class="px-3 py-2 rounded-lg text-xs font-bold '+(t.id===active?'bg-cyan-700 text-white':'bg-slate-800 text-slate-400 hover:bg-slate-700')+'">'+esc(t.label)+'</button>'; }).join('')+
+    '</div>';
+  let body='';
+  try{
+    if(active==='overview') body=kmiProdWsRenderOverview();
+    else if(active==='joborders') body=kmiProdWsRenderJobOrders();
+    else if(active==='live') body=kmiProdWsRenderLive();
+    else if(active==='release') body=kmiProdWsRenderReleaseQueue();
+    else if(active==='intel') body=kmiProdWsRenderIntelHost();
+    else if(active==='history') body=kmiProdWsRenderHistory();
+  }catch(e){ body='<div class="text-red-400 text-xs">Render hatası: '+esc(String(e&&e.message||e))+'</div>'; console.error('[kmiRenderProductionWorkspace]',e); }
+  page.innerHTML='<div class="p-5"><h2 class="text-xl font-black text-white mb-3"><i class="fa-solid fa-industry text-cyan-400 mr-2"></i>Üretim</h2>'+navHtml+'<div id="kmiProdWsBody">'+body+'</div></div>';
+  if(active==='intel'){
+    // Mutual exclusion with window.kmiOpenProductionIntel's own #kmiPIBody
+    // mount (same id, reused by design - see the matching note there).
+    try{ const modal=document.getElementById('kmiPIModal'); if(modal) modal.remove(); }catch(e){}
+    try{ window.kmiRenderProductionIntel(); }catch(e){}
+  }
+};
+})();
+</script>
+
+<script id="kmi-r5-sales-workspace">
+(function(){'use strict';
+// KMI-R5 OWNER REVIEW DEFECT ROUND 1 ("CONTINUE - SALES/CUSTOMER ORDER +
+// PLANNING CANONICAL COMPLETION"): Customer Order is the commercial root
+// object. The real canonical order/order-item truth (System C, V.orders /
+// v118*) and its real "KURUTLU LIVE" composer already lived inside
+// #tab-siparis, but with no dedicated canonical workspace IA matching the
+// Owner's locked 6-subpage grammar used elsewhere (Production/Purchasing/
+// Planning/...). This composes a first-class SATIŞ & MÜŞTERİ workspace:
+//   1. GENEL BAKIŞ  2. MÜŞTERİLER  3. ÜRÜNLER
+//   4. MÜŞTERİ SİPARİŞLERİ  5. SİPARİŞ TAKİBİ  6. GEÇMİŞ
+//
+// NO NEW ENGINE, NO NEW WRITER. Every section below relocates (same
+// mount/unmount DOM-relocation technique already used for Planning/People/
+// Command Center) an EXISTING real #tab-siparis node, or deep-links into an
+// EXISTING real function:
+//   - GENEL BAKIŞ: #v118FlowCenterPanel (SCAN/KURUTLU LIVE/+Yeni Sipariş +
+//     window.v118Kpis/kmiV121Dashboard - unchanged real KPIs)
+//   - MÜŞTERİLER / ÜRÜNLER: openV61Master('products') - the ONE existing
+//     real customer+product master-data screen (kmiPermissionGuard
+//     ('customer','view') unchanged). HONESTY NOTE: customer and product
+//     master data are currently ONE combined screen, not two separate
+//     engines - both subpages deep-link into it rather than pretending a
+//     second screen exists (same "do not invent unavailable truth" rule
+//     applied for Production's GEÇMİŞ &amp; ANALİZ placeholder above).
+//   - MÜŞTERİ SİPARİŞLERİ: #v118OrdersSection (window.v118Render, the real
+//     System C order table + stock, filter, per-order v118OrderCommand/
+//     kmiOpenPassport Golden Thread drill-down - untouched) with
+//     "+ YENİ MÜŞTERİ SİPARİŞİ" (window.v118OpenOrder, the real canonical
+//     System C writer) as the first-class primary action.
+//   - SİPARİŞ TAKİBİ: #v118ProductionSection (the real order-linked
+//     production tracking table, window.renderV118ProductionPanel - same
+//     jobOrders[] source as Operatör Beyanı/Shop Floor/Kalite, already
+//     explicitly distinct from the order table above).
+//   - GEÇMİŞ: #v118FinanceSection (Fatura/Tahsilat + Audit Trail - real,
+//     unchanged).
+// Legacy "Entegre Operasyon" (#v61MasterOverlay / openV61Master) is NOT
+// touched or retired here - still reachable via the MÜŞTERİLER/ÜRÜNLER deep
+// link above and via its own existing entry points, per the Owner's
+// explicit "retire ONLY after proving replacement" sequencing.
+function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
+var KMI_SALES_WS_TABS=[
+  {id:'overview', label:'GENEL BAKIŞ'},
+  {id:'customers', label:'MÜŞTERİLER'},
+  {id:'products', label:'ÜRÜNLER'},
+  {id:'orders', label:'MÜŞTERİ SİPARİŞLERİ'},
+  {id:'tracking', label:'SİPARİŞ TAKİBİ'},
+  {id:'history', label:'GEÇMİŞ'}
+];
+window.KMI_SALES_WS_STATE = window.KMI_SALES_WS_STATE || {tab:'overview'};
+
+// Mount/unmount: same relocation-with-restoration precedent as Planning's
+// Gantt mount (kmiPlanningMountGantt/UnmountGantt) - #tab-siparis is static
+// markup never rebuilt via innerHTML by any render function, so this is the
+// same low-risk relocation already proven safe there.
+var SALES_WS_NODE_IDS=['v118FlowCenterPanel','v118OrdersSection','v118ProductionSection','v118FinanceSection'];
+window.__kmiSalesHome=null;
+window.kmiSalesMountNodes=function(){
+  var mount=document.getElementById('kmiSalesWsMount');
+  if(!mount) return;
+  if(!window.__kmiSalesHome){
+    window.__kmiSalesHome=[];
+    SALES_WS_NODE_IDS.forEach(function(id){
+      var node=document.getElementById(id);
+      if(node) window.__kmiSalesHome.push({ node:node, parent:node.parentNode, next:node.nextSibling });
+    });
+  }
+  var active=(window.KMI_SALES_WS_STATE&&window.KMI_SALES_WS_STATE.tab)||'overview';
+  var showId = active==='overview' ? 'v118FlowCenterPanel'
+    : active==='orders' ? 'v118OrdersSection'
+    : active==='tracking' ? 'v118ProductionSection'
+    : active==='history' ? 'v118FinanceSection'
+    : null;
+  window.__kmiSalesHome.forEach(function(rec){
+    if(!rec.node) return;
+    if(rec.node.id===showId){ mount.appendChild(rec.node); rec.node.classList.remove('hidden'); }
+    else { rec.node.classList.add('hidden'); }
+  });
+  // Re-run the SAME real render functions that already fill these nodes -
+  // no new calculation.
+  try{ if(showId==='v118FlowCenterPanel') window.v118Render&&window.v118Render(); }catch(e){}
+  try{ if(showId==='v118OrdersSection') window.v118Render&&window.v118Render(); }catch(e){}
+  try{ if(showId==='v118ProductionSection') window.renderV118ProductionPanel&&window.renderV118ProductionPanel(); }catch(e){}
+  try{ if(showId==='v118FinanceSection'){ window.v118Render&&window.v118Render(); } }catch(e){}
+};
+window.kmiSalesUnmountNodes=function(){
+  var home=window.__kmiSalesHome; if(!home) return;
+  home.forEach(function(rec){
+    if(!rec.node||!rec.parent) return;
+    rec.node.classList.remove('hidden');
+    if(rec.next&&rec.next.parentNode===rec.parent) rec.parent.insertBefore(rec.node,rec.next);
+    else rec.parent.appendChild(rec.node);
+  });
+};
+
+window.kmiOpenSalesWorkspace=function(){
+  var u=window.currentUser; if(!u) return;
+  document.querySelectorAll('.tab-content').forEach(function(el){ el.classList.remove('active'); });
+  document.querySelectorAll('.nav-btn').forEach(function(el){ el.classList.remove('bg-slate-700','text-blue-400'); });
+  var page=document.getElementById('tab-sales-workspace');
+  if(!page){
+    page=document.createElement('div'); page.id='tab-sales-workspace'; page.className='tab-content';
+    var mainSys=document.getElementById('mainSystem');
+    (mainSys||document.body).appendChild(page);
+  }
+  page.classList.add('active');
+  var pt=document.getElementById('pageTitle'); if(pt) pt.innerText='Satış & Müşteri';
+  document.getElementById('kmiGlobalPageHeaderBand')?.classList.remove('hidden');
+  window.kmiRenderSalesWorkspace();
+};
+window.kmiSalesWorkspaceSwitchTab=function(tabId){
+  window.KMI_SALES_WS_STATE.tab=tabId;
+  window.kmiRenderSalesWorkspace();
+};
+
+// KMI-FIX (2026-10-07, MASTER #23 OWNER REVIEW DEFECT ROUND 1 CONTINUE,
+// Part D - Sales legacy finalization): previously MÜŞTERİLER/ÜRÜNLER were a
+// single static card whose only action was "Aç" -> window.openV61Master
+// ('products'), i.e. every real customer/product master-data action forced
+// a normal Sales user into the legacy multi-domain Entegre Operasyon shell
+// (#v61MasterOverlay). Per the Owner's explicit directive ("MÜŞTERİLER and
+// ÜRÜNLER must become canonical Sales subpages using their existing real
+// capabilities, and normal users must no longer enter the multi-domain
+// Entegre Operasyon shell to perform Sales master-data work... Do not
+// delete legacy code until replacement is proven"), these two subpages now
+// render real, live customer/product list+CRUD INLINE, composing the SAME
+// real functions the legacy screen always used - NO new data model, NO new
+// writer, NO second ledger:
+//   - list source: window.D.customers / window.D.products (the one real
+//     canonical master-data array - same object the legacy products()
+//     function in #v61MasterOverlay reads, same object v118* order writers
+//     reference by customer/product id - confirmed by direct code read,
+//     not inferred).
+//   - create: window.v61AddCustomer() / window.v61AddProduct() - UNCHANGED
+//     real writers (push a real record into D.customers/D.products, call
+//     the real save(), then open the real editor modal).
+//   - edit/delete/documents/custom fields: window.v62OpenCustomer(id) /
+//     window.v62OpenProduct(id) - UNCHANGED real editor modals (confirmed
+//     by direct code read: v62Modal creates its OWN independent, body-level
+//     overlay (#v62Modal, z-[10000]) - it has NO dependency on
+//     #v61MasterOverlay being open at all, so calling these directly from
+//     here never touches the legacy shell).
+// The legacy #v61MasterOverlay / openV61Master('products') screen itself is
+// NOT deleted - it remains reachable for its own still-legitimate internal/
+// historical uses (the QR/URL deep-link resolver at '?v63card=customer|
+// product&id=...', and the "sipariş için müşteri/ürün kartı bulunamadı"
+// recovery prompt) - it is simply no longer the path a normal Sales user
+// takes to do Sales master-data work, which was the Owner's actual concern.
+// v62SaveCustomer/v62DeleteCurrent/v61AddCustomer/v61AddProduct still call
+// the legacy v61Show('products') out of habit after a write (defensive-
+// guarded there already - v61Show no-ops if #v61Workspace doesn't exist,
+// same precedent already established for the Toolroom canonical workspace,
+// see the "additive refresh wrap" comment on window.v61Show below) - this
+// workspace's own re-render is driven by that SAME wrap, not by the legacy
+// overlay being visible.
+function kmiSalesWsCustomerCard(c){
+  var prodCount=(window.D&&Array.isArray(window.D.products))?window.D.products.filter(function(p){return p.customer===c.id;}).length:0;
+  return '<button onclick="window.v62OpenCustomer(\''+esc(c.id)+'\')" class="text-left bg-slate-950 hover:bg-slate-800 border border-slate-700 rounded-2xl p-4 transition">'
+   + '<div class="flex justify-between gap-2"><div class="font-black text-white">'+esc(c.name||c.id)+'</div><span class="text-[10px] '+(c.active===false?'text-red-300':'text-emerald-300')+'">'+(c.active===false?'PASİF':'AKTİF')+'</span></div>'
+   + '<div class="text-xs text-slate-500 mt-1">'+prodCount+' ürün · '+esc(c.id)+'</div>'
+   + '<div class="text-[10px] text-cyan-300 mt-3">Kartı aç / düzenle →</div>'
+   + '</button>';
+}
+function kmiSalesWsProductCard(p){
+  var custName='-'; try{ var c=(window.D&&window.D.customers||[]).find(function(x){return x.id===p.customer;}); custName=c?(c.name||c.id):'-'; }catch(e){}
+  return '<button onclick="window.v62OpenProduct(\''+esc(p.id)+'\')" class="text-left bg-slate-950 hover:bg-slate-800 border border-slate-700 rounded-2xl p-4 transition">'
+   + '<div class="flex justify-between"><span class="font-mono text-cyan-300 font-black">'+esc(p.code||p.id)+'</span><span class="text-[10px] text-slate-500">REV '+esc(p.revision||'-')+'</span></div>'
+   + '<div class="font-black text-white mt-2">'+esc(p.name||'')+'</div>'
+   + '<div class="text-xs text-slate-400 mt-1">'+esc(custName)+'</div>'
+   + '<div class="text-xs text-slate-500 mt-2">'+esc(p.material||'Malzeme tanımsız')+'</div>'
+   + '<div class="text-[10px] text-cyan-300 mt-3">Ürün kimlik kartını aç →</div>'
+   + '</button>';
+}
+function kmiSalesWsRenderCustomers(){
+  var list=(window.D&&Array.isArray(window.D.customers))?window.D.customers:[];
+  var cards=list.map(kmiSalesWsCustomerCard).join('');
+  return '<div class="flex justify-between items-center mb-3"><div class="text-[11px] text-slate-500">'+list.length+' müşteri · canonical kaynak: window.D.customers (Entegre Operasyon ile AYNI kayıt - ikinci bir müşteri deposu yok)</div>'
+   + '<button onclick="window.v61AddCustomer&&window.v61AddCustomer();setTimeout(function(){window.kmiRenderSalesWorkspace&&window.kmiRenderSalesWorkspace();},50);" class="bg-amber-700 hover:bg-amber-600 text-white px-3 py-2 rounded-lg text-xs font-black"><i class="fa-solid fa-plus mr-1"></i> Müşteri Kartı</button></div>'
+   + '<div class="grid md:grid-cols-3 gap-3">'+(cards||'<div class="text-slate-500 text-xs">Müşteri yok.</div>')+'</div>';
+}
+function kmiSalesWsRenderProducts(){
+  var list=(window.D&&Array.isArray(window.D.products))?window.D.products:[];
+  var cards=list.map(kmiSalesWsProductCard).join('');
+  return '<div class="flex justify-between items-center mb-3"><div class="text-[11px] text-slate-500">'+list.length+' ürün · canonical kaynak: window.D.products (Entegre Operasyon ile AYNI kayıt - ikinci bir ürün deposu yok)</div>'
+   + '<button onclick="window.v61AddProduct&&window.v61AddProduct();setTimeout(function(){window.kmiRenderSalesWorkspace&&window.kmiRenderSalesWorkspace();},50);" class="bg-cyan-700 hover:bg-cyan-600 text-white px-3 py-2 rounded-lg text-xs font-black"><i class="fa-solid fa-plus mr-1"></i> Ürün Kimlik Kartı</button></div>'
+   + '<div class="grid md:grid-cols-3 xl:grid-cols-4 gap-3">'+(cards||'<div class="text-slate-500 text-xs">Ürün yok.</div>')+'</div>';
+}
+
+// Additive refresh wrap (SAME precedent already established above for the
+// Toolroom canonical workspace, see v61Show's own "DEFENSIVE GUARD" comment
+// just above it): when a real write finishes inside v62OpenCustomer/
+// v62OpenProduct's modal (save/delete/v61AddCustomer/v61AddProduct), those
+// writers call the legacy v61Show('products') out of habit - already safely
+// no-op'd there if #v61Workspace doesn't exist. This ADDS a second,
+// independent refresh target: if the Sales & Customer canonical workspace
+// is the currently active surface, re-render it too, so the new inline
+// MÜŞTERİLER/ÜRÜNLER list reflects the write immediately. No writer
+// behavior changes.
+(function(){
+  var prevV61ShowForSales=window.v61Show;
+  if(typeof prevV61ShowForSales==='function'){
+    window.v61Show=function(k){
+      var r=prevV61ShowForSales.apply(this,arguments);
+      try{
+        if(document.getElementById('tab-sales-workspace')&&document.getElementById('tab-sales-workspace').classList.contains('active')&&typeof window.kmiRenderSalesWorkspace==='function') window.kmiRenderSalesWorkspace();
+      }catch(e){}
+      return r;
+    };
+  }
+})();
+
+window.kmiRenderSalesWorkspace=function(){
+  var page=document.getElementById('tab-sales-workspace'); if(!page) return;
+  var active=(window.KMI_SALES_WS_STATE&&window.KMI_SALES_WS_STATE.tab)||'overview';
+  var navHtml='<div class="flex flex-wrap gap-2 mb-4 border-b border-slate-700 pb-3">'+
+    KMI_SALES_WS_TABS.map(function(t){ return '<button onclick="window.kmiSalesWorkspaceSwitchTab(\''+t.id+'\')" class="px-3 py-2 rounded-lg text-xs font-bold '+(t.id===active?'bg-cyan-700 text-white':'bg-slate-800 text-slate-400 hover:bg-slate-700')+'">'+esc(t.label)+'</button>'; }).join('')+
+    '<button onclick="window.v118OpenOrder&&window.v118OpenOrder()" class="ml-auto px-3 py-2 rounded-lg text-xs font-black bg-cyan-600 hover:bg-cyan-500 text-white"><i class="fa-solid fa-plus mr-1"></i> YENİ MÜŞTERİ SİPARİŞİ</button>'+
+    '</div>';
+  var body='';
+  try{
+    if(active==='customers') body=kmiSalesWsRenderCustomers();
+    else if(active==='products') body=kmiSalesWsRenderProducts();
+    else body='<div id="kmiSalesWsMount"></div>';
+  }catch(e){ body='<div class="text-red-400 text-xs">Render hatası: '+esc(String(e&&e.message||e))+'</div>'; console.error('[kmiRenderSalesWorkspace]',e); }
+  page.innerHTML='<div class="p-5"><h2 class="text-xl font-black text-white mb-3"><i class="fa-solid fa-file-invoice-dollar text-cyan-400 mr-2"></i>Satış &amp; Müşteri</h2>'+navHtml+'<div id="kmiSalesWsBody">'+body+'</div></div>';
+  if(active==='overview'||active==='orders'||active==='tracking'||active==='history'){
+    window.kmiSalesMountNodes();
+  } else {
+    // Non-relocated tabs: make sure any previously-relocated node is parked
+    // back out of sight (restored to its home) rather than left orphaned.
+    try{ window.kmiSalesUnmountNodes(); }catch(e){}
+  }
+};
+
+// Guard: same restoration-before-switchTab precedent as Planning/People/
+// Command Center above - if the user navigates away through the OLDER
+// switchTab() path (legacyTab nav entry, role-based default landing tab,
+// btn-siparis still calling the legacy path as a fallback) instead of this
+// workspace's own entry point, the relocated #v118* node must be restored
+// first, or #tab-siparis would open missing whichever section was mounted
+// into this workspace. Cheap no-op when nothing is currently relocated.
+(function(){
+ const prevSwitchForSales=window.switchTab;
+ if(typeof prevSwitchForSales==='function'){
+  window.switchTab=function(tab){
+   try{ if(typeof window.kmiSalesUnmountNodes==='function') window.kmiSalesUnmountNodes(); }catch(e){}
+   return prevSwitchForSales.apply(this,arguments);
+  };
+ }
+})();
 })();
 </script>
 
@@ -23074,7 +24060,7 @@ window.addEventListener('load', function(){
 const KMI_NAV_ENTRIES = [
   { id:'shopfloor',      label:'Shop Floor Live',        icon:'fa-industry',              area:'ÜRETİM',    requiredPermission:null,                  opens:'kmiOpenShopFloorLive', legacyRoleCheck:'isProduction||isManagement' },
   { id:'qualitytower',   label:'Kalite Kulesi',          icon:'fa-shield-halved',         area:'KALİTE',    requiredPermission:'QUALITY',             opens:'kmiOpenQualityTower' },
-  { id:'productionintel',label:'Üretim',                 icon:'fa-industry',              area:'ÜRETİM',    requiredPermission:'MANAGEMENT',          opens:'kmiOpenProductionIntel' },
+  { id:'productionintel',label:'Üretim',                 icon:'fa-industry',              area:'ÜRETİM',    requiredPermission:'MANAGEMENT',          opens:'kmiOpenProductionWorkspace' },
   // KMI-R5 MASTER #16 (2026-10-04, docs/KMI_R5_MASTER16_CONVERGENCE_DISCOVERY.md
   // Part B §10): reclassified from area:'ÜRETİM' to the owner's canonical
   // Domain 10 (CAM / Manufacturing Engineering) - metadata-only change
@@ -23673,30 +24659,51 @@ function asRenderLiveFloorSummary(){
 // --- C4: Canlı Operatörler - PERSONNEL_LIST + kmiMachinesRunningNow() +
 //     kmiResolveShift() + kmiTasksRaw() üzerinden, her biri GERÇEK bir sinyal.
 //     Hiçbir "online/oturum açık" bilgisi UYDURULMADI - böyle bir canonical
-//     kaynak yok, bu yüzden MAKİNEDE/VARDİYADA/GÖREVDE'nin hiçbiri tutmazsa
-//     dürüstçe "VERİ YOK" gösterilir.
+//     kaynak yok, bu yüzden MAKİNEDE/VARDİYA ATAMASI VAR/GÖREVDE'nin hiçbiri
+//     tutmazsa dürüstçe "VERİ YOK" gösterilir.
+//
+// KMI MASTER #23 OWNER REVIEW DEFECT ROUND 2 §10 (2026-10-07, "FALSE
+// VARDİYADA"): Owner reported Yunus Emre Saku shown as VARDİYADA on Home
+// while he was confirmed NOT at work that day. Root cause: window.
+// kmiResolveShift(p) only resolves a STANDING TEAM ASSIGNMENT
+// (person.shiftTeam -> '1. Vardiya'/'2. Vardiya'/'Ofis / Destek' - a
+// permanent roster fact with no date dimension), never any attendance/
+// presence evidence - there is no canonical presence source yet (GEÇKO
+// integration is future-only, not current truth). The OLD label
+// "VARDİYADA" ("on shift" / "at work") asserted CURRENT PHYSICAL PRESENCE
+// the data never supported - every operator with a standing team assignment
+// showed this way regardless of whether they clocked in, called in sick, or
+// were on leave that day. Fix (label-only, same priority tier, same
+// evidence, no new data/fields - MAKİNEDE/GÖREVDE are untouched, as both
+// already rest on real activity signals: a live machine session / an active
+// task): rename the displayed state to "VARDİYA ATAMASI VAR" ("has a shift
+// assignment"), which truthfully states what is actually known (a standing
+// team assignment exists) without claiming presence. A person with no team
+// assignment AND no activity signal still correctly falls through to
+// "VERİ YOK".
 function asRenderOperators(){
   let roster=[]; try{ roster=(typeof PERSONNEL_LIST!=='undefined'?PERSONNEL_LIST:[]).filter(function(p){ return p&&p.active!==false; }); }catch(e){}
   let running=[]; try{ running=(typeof window.kmiMachinesRunningNow==='function')?window.kmiMachinesRunningNow():[]; }catch(e){}
   const runningByName={}; running.forEach(function(s){ if(s&&s.operator) runningByName[s.operator]=s.machine; });
   let tasks=[]; try{ tasks=(typeof kmiTasksRaw==='function')?kmiTasksRaw():[]; }catch(e){}
   // KMI-R4.1 (owner §I "Keep current truthful priority: MAKİNEDE > GÖREVDE >
-  // VARDİYADA > VERİ YOK" - this must govern which 8 people are actually
-  // SHOWN, not just how they're colored once shown). Previously state was
-  // computed inside the same .map() that ran AFTER .slice(0,8) had already
-  // cut the roster down in raw array order - a genuinely MAKİNEDE operator
-  // could be silently excluded from the home preview by a VERİ YOK person
-  // earlier in the roster. Fix: compute state for the FULL filtered roster
-  // first, sort by state priority, THEN slice to 8, THEN render HTML - same
-  // pattern as asLiveFloorPriority/boardSorted above. No new data/fields.
-  const asOperatorPriority = { 'MAKİNEDE':0, 'GÖREVDE':1, 'VARDİYADA':2, 'VERİ YOK':3 };
+  // VARDİYA ATAMASI VAR > VERİ YOK" - this must govern which 8 people are
+  // actually SHOWN, not just how they're colored once shown). Previously
+  // state was computed inside the same .map() that ran AFTER .slice(0,8) had
+  // already cut the roster down in raw array order - a genuinely MAKİNEDE
+  // operator could be silently excluded from the home preview by a VERİ YOK
+  // person earlier in the roster. Fix: compute state for the FULL filtered
+  // roster first, sort by state priority, THEN slice to 8, THEN render HTML
+  // - same pattern as asLiveFloorPriority/boardSorted above. No new
+  // data/fields.
+  const asOperatorPriority = { 'MAKİNEDE':0, 'GÖREVDE':1, 'VARDİYA ATAMASI VAR':2, 'VERİ YOK':3 };
   const scored = roster.filter(function(p){
     return /OPERATOR|OPERATÖR|URETIM|ÜRETİM|CNC|BAKIM|MAINTENANCE/.test(String((p.role||'')+' '+(p.job||'')+' '+(p.department||'')).toUpperCase());
   }).map(function(p){
     let state='VERİ YOK', cls='text-slate-500', detail='';
     if(runningByName[p.name]){ state='MAKİNEDE'; cls='text-emerald-300'; detail=runningByName[p.name]; }
     else if(tasks.some(function(t){ return Number(t.assigneeId)===Number(p.id)&&t.status==='ACTIVE'; })){ state='GÖREVDE'; cls='text-cyan-300'; }
-    else { try{ const sh=window.kmiResolveShift(p); if(sh&&sh.assigned){ state='VARDİYADA'; cls='text-amber-300'; detail=sh.label; } }catch(e){} }
+    else { try{ const sh=window.kmiResolveShift(p); if(sh&&sh.assigned){ state='VARDİYA ATAMASI VAR'; cls='text-amber-300'; detail=sh.label; } }catch(e){} }
     return { p:p, state:state, cls:cls, detail:detail };
   });
   scored.sort(function(a,b){ return asOperatorPriority[a.state]-asOperatorPriority[b.state]; });
@@ -24194,7 +25201,7 @@ const KMI_LEFT_NAV_GROUPS = [
     { label:'Mobil Görünüm', icon:'fa-mobile-screen', resolve:function(u){ return (nrCanSafe(u,'mobile.access') && typeof window.kmiOpenMobileHome==='function') ? {fn:'kmiOpenMobileHome'} : null; } },
   ]},
   { title:'ÜRETİM AİLESİ', items:[
-    { label:'Üretim', icon:'fa-industry', resolve:function(u){ return (nrCanSafe(u,'MANAGEMENT') && typeof window.kmiOpenProductionIntel==='function') ? {fn:'kmiOpenProductionIntel'} : null; } },
+    { label:'Üretim', icon:'fa-industry', resolve:function(u){ return (nrCanSafe(u,'MANAGEMENT') && typeof window.kmiOpenProductionWorkspace==='function') ? {fn:'kmiOpenProductionWorkspace'} : null; } },
     // KMI-R5 MASTER#16 FAST CLOSURE (2026-10-05): "Planlama" previously
     // resolved to window.kmiOpenPlanning, a thin wrapper that jumped straight
     // into the ENTIRE Yönetici Paneli shell (switchTab('yonetici') +
@@ -24672,7 +25679,15 @@ function esc(v){return String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&l
 // master-data CRUD) that currently has no other home - that stays, as an
 // explicit user action, not an automatic one. No new workspace, no new
 // writer: this only stops the forced auto-open.
+// KMI-R5 OWNER REVIEW DEFECT ROUND 1 ("CONTINUE - SALES/CUSTOMER ORDER +
+// PLANNING CANONICAL COMPLETION", Part A): now prefers the dedicated
+// canonical workspace (window.kmiOpenSalesWorkspace, composed from the SAME
+// real #tab-siparis nodes - see the kmi-r5-sales-workspace script block),
+// falling back to the plain switchTab('siparis') behavior only if that
+// workspace function is somehow unavailable (same fallback precedent as
+// kmiOpenPlanning/kmiOpenPurchasing below).
 window.kmiOpenSalesOrders = function(){
+  if(typeof window.kmiOpenSalesWorkspace==='function'){ window.kmiOpenSalesWorkspace(); return; }
   if(typeof window.switchTab!=='function'){ s3Toast('Satış & Sipariş ekranı bulunamadı.'); return; }
   window.switchTab('siparis');
 };
@@ -24958,7 +25973,23 @@ window.kmiRenderCamWorkspace=function(){
     const pm=document.getElementById('kmiCamProcessMount'), sm=document.getElementById('kmiCamStandardsProductMount');
     if(!p){ if(pm) pm.innerHTML='<div class="text-slate-500 text-xs">Rota görmek için bir ürün seçin.</div>'; if(sm) sm.innerHTML=''; return; }
     try{ if(pm) pm.innerHTML=(typeof window.routeStepsPanel73==='function'?window.routeStepsPanel73(p):''); }catch(e){}
-    try{ if(sm) sm.innerHTML='<div class="grid md:grid-cols-2 gap-3"><div><div class="text-[10px] text-slate-500 mb-1">Makine Uygunluğu</div><div class="grid grid-cols-2 gap-1">'+(typeof window.machinesPanel73==='function'?window.machinesPanel73(p):'')+'</div></div><div><div class="text-[10px] text-slate-500 mb-1">Takım Listesi</div>'+(typeof window.toolListPanel73==='function'?window.toolListPanel73(p):'')+'</div></div>'; }catch(e){}
+    // KMI-FIX (2026-10-07, MASTER #23 Owner Review Round 1 Part C - CAM visual/layout defect only):
+    // Owner-reported defect (narrow machine columns, character-by-character text wrapping, detached
+    // inputs, checkbox/label misalignment, excessive unused canvas) was traced to this nesting: the
+    // previous markup wrapped machinesPanel73's single returned <div> inside an extra
+    // "grid grid-cols-2 gap-1" container that had only ONE child - that child was squeezed into just
+    // the first grid track while the second track sat empty (the "excessive unused canvas"), and the
+    // squeezed width then forced machinesPanel73's OWN internal responsive grids
+    // (md:grid-cols-3 checkbox grid, md:grid-cols-[1fr_140px_170px] detail rows) below their intended
+    // breakpoint, collapsing them to single-column/character-wrapped rendering. The outer section was
+    // also a half-width "md:grid-cols-2" column shared with Takım Listesi, compounding the squeeze.
+    // Fix is layout-only: removed the pointless single-child grid wrapper and stacked Makine
+    // Uygunluğu above Takım Listesi (each full section width) instead of side-by-side half columns,
+    // so machinesPanel73's existing internal grids get the width they were designed for. No change to
+    // v73MachineToggle/v73MachineNoteChange/v73MachinePartsChange/v75SetupAffectsChange, no data/
+    // business-logic change, no CAM->Planning migration - CAM technical ownership unchanged. The
+    // legacy v62OpenProduct full-width modal usage of machinesPanel73/toolListPanel73 is untouched.
+    try{ if(sm) sm.innerHTML='<div><div class="text-[10px] text-slate-500 mb-1">Makine Uygunluğu</div>'+(typeof window.machinesPanel73==='function'?window.machinesPanel73(p):'')+'</div><div class="mt-4"><div class="text-[10px] text-slate-500 mb-1">Takım Listesi</div>'+(typeof window.toolListPanel73==='function'?window.toolListPanel73(p):'')+'</div>'; }catch(e){}
   }
   const sel=document.getElementById('kmiCamProductSel');
   if(sel){ sel.onchange=function(){ renderForProduct(sel.value); }; }
