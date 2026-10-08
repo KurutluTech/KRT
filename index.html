@@ -17,9 +17,9 @@
          `git blame`/diffs on this file quiet between releases and avoid a
          commit-hash feedback loop (the source commit's SHA cannot depend on
          a value computed from that same SHA). See docs/KMI_DEPLOY_ID.md. -->
-    <meta name="kmi-source-commit" content="23ceec520e983e298ed09754bfe01fe3dc9ca2aa">
-    <meta name="kmi-build-id" content="23ceec520e98-20261008T193153Z">
-    <meta name="kmi-built-at" content="2026-10-08T19:31:53.347Z">
+    <meta name="kmi-source-commit" content="e54aec323cf04c8aaa3c86c286cf7f0b3226508e">
+    <meta name="kmi-build-id" content="e54aec323cf0-20261008T225615Z">
+    <meta name="kmi-built-at" content="2026-10-08T22:56:15.761Z">
     <script>
       // Derived from the meta tags above at runtime, so there is exactly one
       // place (the meta tags) where the build script substitutes real
@@ -798,8 +798,8 @@ ead>
                 <!-- Muhasebe Onay Bekleyen İş Emirleri -->
                 <div class="bg-slate-800 border border-slate-700 rounded-lg p-5 shadow-lg space-y-4">
                     <div class="border-b border-slate-700 pb-3">
-                        <h2 class="text-lg font-semibold text-white"><i class="fa-solid fa-file-signature text-amber-400 mr-2"></i>Kalite Onayından Geçen / Muhasebe Onayı Bekleyen Hazır Ürünler</h2>
-                        <p class="text-xs text-slate-400">Kalite tarafından onaylanan ve ürün tipine göre Hazır statüsüne alınan ürünleri burada muhasebe olarak onaylarsınız. Onay sonrası kayıt Yönetim son onayına gider.</p>
+                        <h2 class="text-lg font-semibold text-white"><i class="fa-solid fa-file-signature text-amber-400 mr-2"></i>Kalite Onaylı / Üretim Serbest Bırakma &amp; Yönetim Onayı Bekleyen Ürünler</h2>
+                        <p class="text-xs text-slate-400">Bu liste bilgi amaçlıdır. Kanonik sıra: Kalite &rarr; Üretim Serbest Bırakma &rarr; Yönetim Onayı &rarr; Muhasebe/Ticari Belge Onayı. Bu kayıtlar henüz Muhasebe onayı aşamasında DEĞİLDİR; Muhasebe onayı Yönetim son onayından SONRA, aşağıdaki "Ticari Belge Onayı Bekleyenler" tablosunda yapılır.</p>
                     </div>
                     <div class="overflow-x-auto">
                         <table class="w-full text-left text-xs text-slate-300">
@@ -811,11 +811,44 @@ ead>
                                     <th class="p-2.5">Birim Fiyat</th>
                                     <th class="p-2.5">Toplam Tutar</th>
                                     <th class="p-2.5">Durum</th>
-                                    <th class="p-2.5">Onay İşlemi</th>
+                                    <th class="p-2.5">Sıradaki Adım</th>
                                 </tr>
                             </thead>
                             <tbody id="muhasebePendingJobsTable" class="divide-y divide-slate-700">
                                 <!-- Populated by JS -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- KMI RC-04 item 2 (2026-10-08): the REAL, active Accounting / Commercial
+                     Documentation approval step, at its correct position AFTER Management
+                     Release - NOT a resurrection of the cancelled pre-Management queue above
+                     (which is now informational-only). Lists declarations the server has
+                     already verified as DECLARATION_MANAGEMENT_APPROVE_VERIFIED (reflected
+                     locally by status 'Ticari Belge Onayı Bekliyor', set by
+                     approveManagementRecord) and calls the real, server-gated
+                     approveDeclarationByMuhasebe (declaration_accounting_approve_verify RPC,
+                     fail-closed) on approval. -->
+                <div class="bg-slate-800 border border-emerald-700/40 rounded-lg p-5 shadow-lg space-y-4">
+                    <div class="border-b border-slate-700 pb-3">
+                        <h2 class="text-lg font-semibold text-white"><i class="fa-solid fa-file-invoice-dollar text-emerald-400 mr-2"></i>Ticari Belge Onayı Bekleyenler (Yönetim Onayı Sonrası)</h2>
+                        <p class="text-xs text-slate-400">Yönetim son onayını geçmiş kayıtlar. Burada Muhasebe, irsaliye numarasını girip Ticari Belge/Muhasebe onayını verir - onay sunucuda (declaration_accounting_approve_verify) yeniden doğrulanır. Onay sonrası kayıt Ticari Serbest Bırakma + Sevkiyat aşamasına geçer.</p>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left text-xs text-slate-300">
+                            <thead class="bg-slate-900 text-slate-400 uppercase text-[10px]">
+                                <tr>
+                                    <th class="p-2.5">Beyan ID</th>
+                                    <th class="p-2.5">İş Emri</th>
+                                    <th class="p-2.5">Miktar</th>
+                                    <th class="p-2.5">Yönetim Onayı</th>
+                                    <th class="p-2.5">Durum</th>
+                                    <th class="p-2.5">Onay İşlemi</th>
+                                </tr>
+                            </thead>
+                            <tbody id="ticariBelgeOnayiTable" class="divide-y divide-slate-700">
+                                <!-- Populated by JS: renderTicariBelgeOnayi() -->
                             </tbody>
                         </table>
                     </div>
@@ -1792,7 +1825,13 @@ ead>
         let defaultDeclarations = [];
 
         let declarations = loadStorage('declarations', defaultDeclarations);
-        declarations = declarations.map(d => ({ ...d, machineCareScore: d.machineCareScore == null ? 100 : d.machineCareScore, productionMinutes: d.productionMinutes == null ? 480 : d.productionMinutes, machineHandoverOut: d.machineHandoverOut || '', machineHandoverIn: d.machineHandoverIn || '', ...(d.status === 'Kalite Onayladı' ? { status: 'Hazır - Muhasebe Onayı Bekliyor', readyStatus: 'Hazır' } : {}) }));
+        // KMI RC-04 item 6 fix (2026-10-08): this ancient legacy-data-shape normalizer used to
+        // forward a very old status name ('Kalite Onayladı') into the (now cancelled)
+        // pre-Management Accounting queue status. Under the corrected canonical order, a
+        // quality-approved record with nothing else done yet belongs in the Management
+        // queue ('Yönetim Onayı Bekliyor'), same as any freshly quality-approved declaration -
+        // not in a status no live screen acts on any more.
+        declarations = declarations.map(d => ({ ...d, machineCareScore: d.machineCareScore == null ? 100 : d.machineCareScore, productionMinutes: d.productionMinutes == null ? 480 : d.productionMinutes, machineHandoverOut: d.machineHandoverOut || '', machineHandoverIn: d.machineHandoverIn || '', ...(d.status === 'Kalite Onayladı' ? { status: 'Yönetim Onayı Bekliyor', readyStatus: 'Hazır' } : {}) }));
         declarations = declarations.map(d => {
             if (d.status === 'Muhasebe Onayladı' && !d.accountingApprover) {
                 d.status = 'Yönetim Onayı Bekliyor';
@@ -1944,7 +1983,7 @@ ead>
             const produced = rows.reduce((s,d)=>s+Math.max(0,Number(d.qty)||0),0);
             const target = Math.max(0, Number(job.targetQty)||0);
             const targetRate = target ? produced / target : 0;
-            const qualityPassed = rows.some(d => ['Hazır - Muhasebe Onayı Bekliyor','Muhasebe Onayladı','Yönetim Onayı Bekliyor','Sevk Onayı Bekliyor','Sevk Edildi','Tamamlandı (Yönetim Onaylı)'].includes(d.status));
+            const qualityPassed = rows.some(d => ['Hazır - Muhasebe Onayı Bekliyor','Muhasebe Onayladı','Yönetim Onayı Bekliyor','Ticari Belge Onayı Bekliyor','Sevk Onayı Bekliyor','Sevk Edildi','Tamamlandı (Yönetim Onaylı)'].includes(d.status));
             const eligible = job.targetType === 'production' ? (targetRate >= 1 && qualityPassed) : true;
             let productionMultiplier = 1;
             const pcfg = getPuantajConfig(monthKey);
@@ -1967,7 +2006,7 @@ ead>
             return 1;
         }
         function isQualityPassedDeclaration(d) {
-            return ['Hazır - Muhasebe Onayı Bekliyor','Muhasebe Onayladı','Yönetim Onayı Bekliyor','Sevk Onayı Bekliyor','Sevk Edildi','Tamamlandı (Yönetim Onaylı)'].includes(d.status);
+            return ['Hazır - Muhasebe Onayı Bekliyor','Muhasebe Onayladı','Yönetim Onayı Bekliyor','Ticari Belge Onayı Bekliyor','Sevk Onayı Bekliyor','Sevk Edildi','Tamamlandı (Yönetim Onaylı)'].includes(d.status);
         }
         function getShiftProductionSummary(monthKey=getCurrentMonthKey()) {
             const totals = {'1. Vardiya':0,'2. Vardiya':0,'3. Vardiya':0};
@@ -2428,7 +2467,7 @@ ead>
         function clearAllShiftAssignments(){if(!currentUser||getEffectiveRole(currentUser)!=='ADMIN')return;if(!confirm('TeamK1, TeamK2 ve Ofis/Destek vardiya atamalarının tamamı temizlensin mi?'))return;PERSONNEL_LIST.forEach(p=>p.shiftTeam='');saveStorage('PERSONNEL_LIST',PERSONNEL_LIST);renderShiftTeamManager();}
 
         function monthKeyNow(){return new Date().toISOString().slice(0,7);}
-        function qualityGoodForMonth(month){return declarations.filter(d=>dateKeyOf(d).startsWith(month) && ['Hazır - Muhasebe Onayı Bekliyor','Muhasebe Onayı Bekliyor','Yönetim Onayı Bekliyor','Tamamlandı (Yönetim Onaylı)','Sevke Hazır','Sevk Edildi'].includes(d.status)).reduce((s,d)=>s+Number(d.qualityGood??d.good??d.qty??0),0);}
+        function qualityGoodForMonth(month){return declarations.filter(d=>dateKeyOf(d).startsWith(month) && ['Hazır - Muhasebe Onayı Bekliyor','Muhasebe Onayı Bekliyor','Yönetim Onayı Bekliyor','Ticari Belge Onayı Bekliyor','Tamamlandı (Yönetim Onaylı)','Sevke Hazır','Sevk Edildi'].includes(d.status)).reduce((s,d)=>s+Number(d.qualityGood??d.good??d.qty??0),0);}
         // NOT (2026-09-26): saveProductionTarget ve renderProductionTargetCenter'ın gerçek/güncel
         // sürümleri aşağıda (productTargetObject'in yanında) tanımlıdır - fonksiyon yeniden tanımlama
         // (hoisting) nedeniyle BURADAKİ eski sürümler hiç çalışmaz. Ürün bazlı hedef, barometre,
@@ -2789,7 +2828,7 @@ ead>
                     <td class="p-2 text-emerald-400 font-semibold">${j.completedQty}</td>
                     <td class="p-2 font-mono">${Number(j.price??j.unitPrice??0).toLocaleString('tr-TR')} TL</td>
                     <td class="p-2">
-                        <span class="px-2 py-0.5 text-[10px] rounded ${j.status==='Açık'?'bg-amber-900/60 text-amber-300':(j.status==='Muhasebe Onayı Bekliyor'?'bg-blue-900/60 text-blue-300':'bg-emerald-900/60 text-emerald-300')}">${j.status}</span>
+                        <span class="px-2 py-0.5 text-[10px] rounded ${j.status==='Açık'?'bg-amber-900/60 text-amber-300':((j.status==='Muhasebe Onayı Bekliyor'||j.status==='Ticari Belge Onayı Bekliyor')?'bg-blue-900/60 text-blue-300':'bg-emerald-900/60 text-emerald-300')}">${j.status}</span>
                     </td>
                     <td class="p-2 text-right space-x-1">
                         ${j.transferPending?`<button onclick="openTransferAssignmentModal('${j.id}')" class="bg-amber-600 hover:bg-amber-500 text-white px-2 py-1 rounded text-[10px] font-bold"><i class="fa-solid fa-user-plus"></i> Operatör Ata</button>`:''}<button onclick="kmiOpenJobOrderFile('${j.id}')" class="bg-amber-700 hover:bg-amber-600 text-white px-2 py-1 rounded text-[10px]"><i class="fa-solid fa-qrcode"></i> Dijital Dosya</button><button onclick="editJobOrder('${j.id}')" class="bg-slate-700 hover:bg-slate-600 text-white px-2 py-1 rounded text-[10px]"><i class="fa-solid fa-pen"></i> Düzenle</button><button onclick="deleteJobOrder('${j.id}')" class="bg-red-900/70 hover:bg-red-700 text-red-200 px-2 py-1 rounded text-[10px]"><i class="fa-solid fa-trash"></i> Sil</button>
@@ -2944,16 +2983,16 @@ ead>
             alert('İş emri doğrudan Muhasebeye gönderilemez. Üretim iş emri Operatör Beyanı → Kalite → Burcu/Muhasebe → Yönetim → Sevkiyat sırasını izlemelidir.');
         }
 
+        // KMI RC-04 item 1 closure (2026-10-08): this job-level writer had ZERO live UI
+        // callers (confirmed: zero onclick/invocation sites anywhere in the file, only this
+        // definition and one comment) but remained console-callable with NO server RPC, NO
+        // sequence check, and NO audit_log row at all - a pure local-storage write that would
+        // flip a job order straight to "awaiting Management" on nothing but a client-side
+        // role check. Per "No alternate approval/shipment writer may bypass the canonical
+        // server gates", this is closed the same way the unreachable V98 writers were:
+        // neutralized to a no-op rather than left dormant-but-callable.
         function approveJobByMuhasebe(id) {
-            if (!currentUser || !['MUHASEBE','ADMIN'].includes(getEffectiveRole(currentUser))) { alert('Bu işlem yalnızca Muhasebe yetkilisi tarafından yapılabilir.'); return; }
-            const j = jobOrders.find(x => x.id === id);
-            if(j) {
-                j.status = 'Yönetim Onayı Bekliyor'; j.updatedAt = new Date().toISOString(); j.accountingApprover = currentUser.name;
-                saveStorage('jobOrders', jobOrders);
-                refreshAllViews();
-                queueManagerReport('muhasebe iş emri onayı');
-                alert(`İş Emri (${id}) Muhasebe tarafından onaylandı ve Yönetim son onayına gönderildi.`);
-            }
+            alert('Bu işlem artık kullanılamıyor. İş emri onayları Üretim Beyanı -> Kalite -> Üretim Serbest Bırakma -> Yönetim -> Muhasebe/Ticari Belge -> Ticari Serbest Bırakma -> Sevkiyat kanonik sırasını, ilgili ekranlardaki gerçek onay işlemleriyle izlemelidir.');
         }
 
         function getDeclarationBonusAudit(d){
@@ -3527,9 +3566,23 @@ ead>
                         saveStorage('jobOrders',jobOrders);
                     }
                 }else{
-                    d.status = "Hazır - Muhasebe Onayı Bekliyor";
+                    // KMI RC-04 CRITICAL FIX (2026-10-08): this live Quality-approval success
+                    // path was still writing the CANCELLED pre-Management status ('Hazır -
+                    // Muhasebe Onayı Bekliyor') for every final-operation Quality approval -
+                    // the one status no screen has an active approval action for any more
+                    // (that queue was intentionally retired to inert/informational-only
+                    // earlier in this same pass, per the corrected canonical order). Left
+                    // unfixed, EVERY new Quality approval going forward would have landed in
+                    // a dead end with no way to ever reach Final Production Release/
+                    // Management/Accounting/Shipping - this was found and fixed in the same
+                    // pass that retired the queue's buttons, not left as a silent regression.
+                    // The correct next step after Quality for a final-operation declaration is
+                    // the Management/Final-Production-Release queue ('Yönetim Onayı
+                    // Bekliyor'), same status a server-side-verified declaration_quality_
+                    // approve_verify success has always fed into elsewhere in this function.
+                    d.status = "Yönetim Onayı Bekliyor";
                     d.readyStatus = "Hazır";
-                    if(jo){ jo.status='Muhasebe Onayı Bekliyor'; jo.updatedAt=new Date().toISOString(); saveStorage('jobOrders',jobOrders); }
+                    if(jo){ jo.status='Yönetim Onayı Bekliyor'; jo.updatedAt=new Date().toISOString(); saveStorage('jobOrders',jobOrders); }
                 }
                 saveStorage('declarations', declarations);
                 // KMI-OTS-AUDIT-GAP (2026-10-03, HISTORICAL-DECISIONS-EXECUTION-PASS): Karar 6
@@ -3643,6 +3696,12 @@ ead>
         async function approveDeclarationByMuhasebe(declId) {
             if (!currentUser || !(isBurcuAccountingAuthority(currentUser) || getEffectiveRole(currentUser)==='ADMIN')) { alert('Muhasebe onayı için Muhasebe yetkisi gerekir.'); return; }
             const d=declarations.find(x=>x.id===declId); if(!d)return;
+            // KMI RC-04 item 2 client-side guard (2026-10-08): this is now the post-Management
+            // Accounting/Commercial Documentation step - block the stale pre-Management state
+            // locally too (the server's declaration_accounting_approve_verify precondition is
+            // the real enforcement; this just gives a clear message instead of a raw RPC error
+            // for a record that is not actually at this step yet).
+            if (d.status !== 'Ticari Belge Onayı Bekliyor') { alert('Bu kayıt henüz Ticari Belge/Muhasebe onayı aşamasında değil (durum: '+d.status+'). Önce Yönetim Onayı tamamlanmalıdır.'); return; }
             const irs=prompt('İrsaliye numarasını giriniz:'); if(!irs||!irs.trim()){alert('İrsaliye numarası zorunludur.');return;}
             // KMI-FIX (DEF-013, 2026-10-02): yerel currentUser nesnesi, girişten sonra tarayıcı
             // konsolundan değiştirilebilen salt JS durumudur - isBurcuAccountingAuthority() yukarıda
@@ -3661,13 +3720,24 @@ ead>
                 console.warn('[KMI-DEF-013] declaration_accounting_approve_verify HARD FAIL-CLOSED - yerel onay YAZILMADI:',e);
                 return;
             }
-            d.deliveryNoteNo=irs.trim(); d.status='Yönetim Onayı Bekliyor'; d.accountingApprover=currentUser.name; d.accountingApprovalDate=new Date().toLocaleString('tr-TR'); d.updatedAt=new Date().toISOString();
-            const jo=jobOrders.find(j=>j.id===d.jobOrder); if(jo){jo.status='Yönetim Onayı Bekliyor';jo.deliveryNoteNo=d.deliveryNoteNo;jo.updatedAt=new Date().toISOString();saveStorage('jobOrders',jobOrders);}
+            // KMI RC-04 item 2/4 fix (2026-10-08): Accounting/Commercial Documentation now sits
+            // AFTER Management in the canonical order, so a successful approval here means the
+            // declaration is next in line for Commercial Release + Shipping Readiness ('Sevk
+            // Onayı Bekliyor' - already the status decision #1 maps Shipping Readiness onto),
+            // NOT back to 'Yönetim Onayı Bekliyor' (the old pre-reorder behavior, which would
+            // send an already-Management-approved record back into the Management queue - a
+            // stale/misleading next-step regression this pass corrects). shipmentReady/
+            // shipmentReadyAt are set HERE now (moved from approveManagementRecord) because this
+            // is the step that actually clears the last document precondition before shipment;
+            // the real Commercial Release gate (commercial_release_verify) is still enforced
+            // server-side inside approveShipment immediately before the shipment RPC.
+            d.deliveryNoteNo=irs.trim(); d.status='Sevk Onayı Bekliyor'; d.accountingApprover=currentUser.name; d.accountingApprovalDate=new Date().toLocaleString('tr-TR'); d.shipmentReady=true; d.shipmentReadyAt=new Date().toISOString(); d.updatedAt=new Date().toISOString();
+            const jo=jobOrders.find(j=>j.id===d.jobOrder); if(jo){jo.status='Sevke Hazır';jo.deliveryNoteNo=d.deliveryNoteNo;jo.updatedAt=new Date().toISOString();saveStorage('jobOrders',jobOrders);}
             saveStorage('declarations',declarations);
             // KMI-OTS-AUDIT-GAP (2026-10-03, HISTORICAL-DECISIONS-EXECUTION-PASS): bkz. approveKalite
             // üzerindeki aynı başlıklı not - Muhasebe onayı bugüne kadar KMI.event() üretmiyordu.
-            try{window.KMI?.event?.('ACCOUNTING_APPROVED','JOB_ORDER',d.jobOrder,{label:'Muhasebe onayladı, irsaliye '+d.deliveryNoteNo,source:'APPROVE_FLOW'});}catch(e){}
-            refreshAllViews(); queueManagerReport('muhasebe onayı / irsaliye '+d.deliveryNoteNo);
+            try{window.KMI?.event?.('ACCOUNTING_APPROVED','JOB_ORDER',d.jobOrder,{label:'Muhasebe/ticari belge onayladı, irsaliye '+d.deliveryNoteNo,source:'APPROVE_FLOW'});}catch(e){}
+            refreshAllViews(); queueManagerReport('muhasebe/ticari belge onayı / irsaliye '+d.deliveryNoteNo);
         }
 
         // KMI-FIX (2026-09-24): karşı yön - bu cihazda hiç oluşmamış ama başka bir cihazda üretilip
@@ -3704,11 +3774,36 @@ ead>
                     <td class="p-2.5">${d.date}</td>
                     <td class="p-2.5"><span class="bg-emerald-900/80 text-emerald-300 px-2 py-0.5 rounded text-[10px]">Hazır</span></td>
                     <td class="p-2.5 text-cyan-300">${d.approver || '-'}</td>
-                    <td class="p-2.5">${currentUser && (isBurcuAccountingAuthority(currentUser) || getEffectiveRole(currentUser)==='ADMIN') ? `<div class="flex flex-wrap gap-1"><button onclick="approveDeclarationByMuhasebe('${d.id}')" class="bg-emerald-600 hover:bg-emerald-500 text-white px-2 py-1 rounded text-[10px] font-semibold"><i class="fa-solid fa-check-double mr-1"></i>Muhasebe Onayı</button><button onclick="window.kmiOpenRejectModal('${d.id}','muhasebe')" class="bg-red-800 hover:bg-red-700 text-white px-2 py-1 rounded text-[10px] font-semibold">Reddet</button></div>` : '<span class="text-slate-500">İzleme</span>'}</td>
+                    <td class="p-2.5"><span class="text-amber-300 text-[10px]" title="KMI RC-04: kanonik sıra Kalite'den sonra Üretim Serbest Bırakma ve Yönetim Onayı'nı gerektirir - Muhasebe onayı bu kayıt için henüz sırada değildir.">Üretim Serbest Bırakma / Yönetim Onayı bekleniyor</span></td>
                 </tr>`;
-            }).join('') || '<tr><td colspan="7" class="p-3 text-center text-slate-500">Muhasebe onayı bekleyen hazır ürün yok.</td></tr>';
+            }).join('') || '<tr><td colspan="7" class="p-3 text-center text-slate-500">Üretim Serbest Bırakma / Yönetim Onayı bekleyen kalite onaylı ürün yok.</td></tr>';
+            renderTicariBelgeOnayi();
+            // KMI RC-04 CANONICAL APPROVAL SEQUENCE CORRECTION (2026-10-08): the cancelled
+            // Quality -> Accounting declaration approval queue's ACTIVE WRITE PATH is retired
+            // here - the "Muhasebe Onayı"/"Reddet" buttons that let Accounting approve a
+            // declaration directly after Quality (contradicting the approved canonical
+            // sequence QUALITY -> FINAL PRODUCTION RELEASE -> MANAGEMENT -> ACCOUNTING -> ...)
+            // are removed, not merely hidden: nothing in this render path calls
+            // approveDeclarationByMuhasebe or window.kmiOpenRejectModal(...,'muhasebe') for a
+            // record still at 'Hazır - Muhasebe Onayı Bekliyor' any more. This is additionally
+            // enforced server-side (declaration_accounting_approve_verify's precondition is now
+            // DECLARATION_MANAGEMENT_APPROVE_VERIFIED, not Quality - 20261008c), so even a
+            // stale cached page cannot write a premature accounting approval. The screen itself
+            // (#tab-muhasebe, DOM id muhasebePendingJobsTable) is NOT removed - Accounting
+            // still needs visibility into what is quality-passed and awaiting Production
+            // Release/Management ahead of it; only the premature write action is gone.
 
-            const approved = declarations.filter(d => ['Yönetim Onayı Bekliyor','Sevk Onayı Bekliyor','Sevk Edildi','Tamamlandı (Yönetim Onaylı)'].includes(d.status));
+            // KMI RC-04 item 3 fix (2026-10-08): this list used to mean "already approved by
+            // Accounting", back when Accounting ran BEFORE Management (so 'Yönetim Onayı
+            // Bekliyor' used to imply Accounting was already done). Now Accounting runs AFTER
+            // Management, so 'Yönetim Onayı Bekliyor' means the OPPOSITE (Accounting has NOT
+            // happened yet) - leaving it in this list would show un-approved records in a
+            // "financial detail" screen as if Accounting had already signed off on them.
+            // Ground truth is d.accountingApprover (only ever set by the real, server-verified
+            // approveDeclarationByMuhasebe), not a status string, so that is checked directly;
+            // the status check is kept only to exclude terminal 'Tamamlandı (Yönetim Onaylı)'
+            // timed-job declarations, which never go through Accounting at all.
+            const approved = declarations.filter(d => d.accountingApprover && ['Sevk Onayı Bekliyor','Sevk Edildi'].includes(d.status));
             const detailBody = document.getElementById('muhasebeTableBody');
             detailBody.innerHTML = approved.map(d => {
                 const jo = jobOrders.find(j => j.id === d.jobOrder);
@@ -3718,6 +3813,31 @@ ead>
                 </tr>`;
             }).join('') || '<tr><td colspan="9" class="p-4 text-center text-slate-500">Muhasebe tarafından yönetim onayına aktarılmış kayıt yok.</td></tr>';
         }
+
+        // KMI RC-04 item 2 (2026-10-08): the real, active Accounting / Commercial
+        // Documentation queue, at its correct position AFTER Management Release. Lists
+        // declarations at 'Ticari Belge Onayı Bekliyor' (set by approveManagementRecord only
+        // after declaration_management_approve_verify has been server-verified) and wires a
+        // real approval button to approveDeclarationByMuhasebe (declaration_accounting_
+        // approve_verify RPC, fail-closed). This does not resurrect the cancelled Quality ->
+        // Accounting queue: that queue keyed off 'Hazır - Muhasebe Onayı Bekliyor' (pre-
+        // Management) and remains informational-only above.
+        function renderTicariBelgeOnayi(){
+            const tbody=document.getElementById('ticariBelgeOnayiTable'); if(!tbody)return;
+            const pending=declarations.filter(d=>d.status==='Ticari Belge Onayı Bekliyor');
+            tbody.innerHTML=pending.map(d=>{
+                const jo=jobOrders.find(j=>j.id===d.jobOrder);
+                return `<tr>
+                    <td class="p-2.5 font-mono text-blue-400">${kmiEscXss(d.id)}</td>
+                    <td class="p-2.5">${kmiEscXss(jo?jo.item:d.jobOrder)}<div class="text-[9px] text-slate-500">${kmiEscXss(d.jobOrder||'-')}</div></td>
+                    <td class="p-2.5 font-bold text-emerald-300">${Number(d.qualityGood??d.good??d.qty??0)} Adet</td>
+                    <td class="p-2.5 text-cyan-300">${kmiEscXss(d.managementApprover||'-')}<div class="text-[9px] text-slate-500">${kmiEscXss(d.managementApprovalDate||'-')}</div></td>
+                    <td class="p-2.5"><span class="bg-emerald-900/70 text-emerald-300 px-2 py-0.5 rounded text-[10px]">Yönetim Onaylı</span></td>
+                    <td class="p-2.5"><div class="flex flex-wrap gap-1"><button onclick="approveDeclarationByMuhasebe('${kmiEscXss(d.id)}')" class="bg-emerald-600 hover:bg-emerald-500 text-white px-2 py-1 rounded text-[10px] font-bold"><i class="fa-solid fa-check mr-1"></i>Ticari Belge Onayı</button><button onclick="window.kmiOpenRejectModal('${kmiEscXss(d.id)}','muhasebe')" class="bg-red-800 hover:bg-red-700 text-white px-2 py-1 rounded text-[10px] font-bold">Reddet</button></div></td>
+                </tr>`;
+            }).join('') || '<tr><td colspan="6" class="p-3 text-center text-slate-500">Ticari belge/muhasebe onayı bekleyen kayıt yok.</td></tr>';
+        }
+        window.renderTicariBelgeOnayi=renderTicariBelgeOnayi;
 
         async function approveManagementRecord(id, type='declaration') {
             if (!currentUser || !canManagementApprove(currentUser)) { alert('Bu işlem Yönetim ekranı onay yetkisi olan kullanıcılar içindir.'); return; }
@@ -3768,7 +3888,29 @@ ead>
             // (OTS Migration Plan §3.C'nin "3/5 onay adımı audit üretmiyor" bulgusunun 3. ayağı).
             if (type === 'declaration') {
                 const d = declarations.find(x=>x.id===id);
-                if (d) { const jo=jobOrders.find(j=>j.id===d.jobOrder); d.managementApprover=currentUser.name; d.managementApprovalDate=new Date().toLocaleString('tr-TR'); d.updatedAt=new Date().toISOString(); if(jo?.targetType==='timed'){ d.status='Tamamlandı (Yönetim Onaylı)'; finalizeDeclarationBonus(d); if(jo){jo.status='Tamamlandı (Yönetim Onaylı)';jo.updatedAt=new Date().toISOString();saveStorage('jobOrders',jobOrders);} } else { d.status='Sevk Onayı Bekliyor'; d.shipmentReady=true; d.shipmentReadyAt=new Date().toISOString(); finalizeDeclarationBonus(d); if(jo){jo.status='Sevke Hazır';jo.updatedAt=new Date().toISOString();saveStorage('jobOrders',jobOrders);} } saveStorage('declarations', declarations); try{window.KMI?.event?.('MANAGEMENT_APPROVED','JOB_ORDER',d.jobOrder,{label:'Yönetim son onayı: '+d.id,source:'APPROVE_FLOW'});}catch(e){} refreshAllViews(); queueManagerReport('yönetim son onayı / sevke hazır'); }
+                // KMI RC-04 item 2/4 fix (2026-10-08): before the canonical reorder, Accounting
+                // approval happened BEFORE Management, so by the time Management approved, a
+                // non-timed declaration really was ready to ship ('Sevk Onayı Bekliyor'). Now
+                // that Accounting/Commercial Documentation happens AFTER Management per the
+                // corrected sequence (QUALITY -> FINAL PRODUCTION RELEASE -> MANAGEMENT ->
+                // ACCOUNTING/COMMERCIAL DOCUMENTATION -> COMMERCIAL RELEASE -> SHIPPING
+                // READINESS -> SHIPMENT), jumping straight to 'Sevk Onayı Bekliyor' here would
+                // silently SKIP the real Accounting/Commercial-Documentation step - the server
+                // RPC chain would still correctly block an actual shipment attempt (declaration_
+                // shipment_approve_verify requires COMMERCIAL_RELEASE_VERIFIED, which requires
+                // DECLARATION_ACCOUNTING_APPROVE_VERIFIED), but there would be NO UI left for
+                // Accounting to ever perform that approval, since the only screen that used to
+                // show it (muhasebePendingJobsTable, 'Hazır - Muhasebe Onayı Bekliyor') is for the
+                // CANCELLED pre-Management queue and must not be resurrected. So non-timed
+                // declarations now land in a NEW, distinct status ('Ticari Belge Onayı
+                // Bekliyor') that the real post-Management Accounting/Commercial-Documentation
+                // screen (renderTicariBelgeOnayi, #tab-muhasebe) watches - see
+                // approveDeclarationByMuhasebe for the next transition out of this status.
+                // Timed ("süreli") job orders are unchanged: they represent time-based service
+                // work with nothing physical to ship, so Management approval has always been,
+                // and remains, their real terminal step - there is no goods-shipment leg for
+                // Accounting/Commercial Documentation or Shipping to gate.
+                if (d) { const jo=jobOrders.find(j=>j.id===d.jobOrder); d.managementApprover=currentUser.name; d.managementApprovalDate=new Date().toLocaleString('tr-TR'); d.updatedAt=new Date().toISOString(); if(jo?.targetType==='timed'){ d.status='Tamamlandı (Yönetim Onaylı)'; finalizeDeclarationBonus(d); if(jo){jo.status='Tamamlandı (Yönetim Onaylı)';jo.updatedAt=new Date().toISOString();saveStorage('jobOrders',jobOrders);} } else { d.status='Ticari Belge Onayı Bekliyor'; d.updatedAt=new Date().toISOString(); if(jo){jo.status='Ticari Belge Onayı Bekliyor';jo.updatedAt=new Date().toISOString();saveStorage('jobOrders',jobOrders);} } saveStorage('declarations', declarations); try{window.KMI?.event?.('MANAGEMENT_APPROVED','JOB_ORDER',d.jobOrder,{label:'Yönetim son onayı: '+d.id,source:'APPROVE_FLOW'});}catch(e){} refreshAllViews(); queueManagerReport('yönetim son onayı / ticari belge onayı bekleniyor'); }
             } else {
                 const j = jobOrders.find(x=>x.id===id);
                 if (j) { j.status = 'Tamamlandı (Yönetim Onaylı)'; j.managementApprover = currentUser.name; j.managementApprovalDate = new Date().toLocaleDateString('tr-TR'); j.updatedAt = new Date().toISOString(); saveStorage('jobOrders', jobOrders); try{window.KMI?.event?.('MANAGEMENT_APPROVED','JOB_ORDER',j.id,{label:'Yönetim iş emri son onayı: '+j.id,source:'APPROVE_FLOW'});}catch(e){} refreshAllViews(); queueManagerReport('yönetim iş emri son onayı'); }
@@ -3781,7 +3923,7 @@ ead>
         // to ever satisfy it. Visible/usable only to KMI_AUTH 'PRODUCTION_MANAGER'
         // (ADMIN/MANAGEMENT server role); calls the already-audited, idempotent
         // window.kmiR5FinalProductionReleaseGrant - this is NOT a second grant path.
-        window.kmiR5FinalProductionReleaseGrantUI=function(jobOrderId){
+        window.kmiR5FinalProductionReleaseGrantUI=async function(jobOrderId){
             if(!window.currentUser || !window.KMI_AUTH || !window.KMI_AUTH.can(window.currentUser,'PRODUCTION_MANAGER')){ alert('Üretim Serbest Bırakma yalnız yetkili Üretim Müdürü/Yönetim tarafından verilebilir.'); return; }
             if(typeof window.kmiR5FinalProductionReleaseEvaluate!=='function'||typeof window.kmiR5FinalProductionReleaseGrant!=='function'){ alert('Üretim Serbest Bırakma modülü bu oturumda yüklenemedi.'); return; }
             const ev=window.kmiR5FinalProductionReleaseEvaluate(jobOrderId);
@@ -3796,7 +3938,9 @@ ead>
                 return;
             }
             const reason=prompt('Üretim Serbest Bırakma notu (opsiyonel):','');
-            const res=window.kmiR5FinalProductionReleaseGrant(jobOrderId, reason||null);
+            // KMI RC-04 (2026-10-08): kmiR5FinalProductionReleaseGrant is now async - it
+            // calls the real production_release_verify server RPC before writing locally.
+            const res=await window.kmiR5FinalProductionReleaseGrant(jobOrderId, reason||null);
             if(res.status==='FINAL_PRODUCTION_RELEASED'){ alert('Üretim serbest bırakıldı: '+jobOrderId); try{renderManagementApprovalQueue();}catch(e){} try{refreshAllViews();}catch(e){} }
             else if(res.status==='ALREADY_RELEASED'){ alert('Bu iş emri için üretim zaten serbest bırakılmış.'); }
             else{ alert('Serbest bırakma başarısız: '+(res.message||res.reasonCode||'bilinmeyen hata')); }
@@ -4049,7 +4193,7 @@ ead>
         }
         function renderOperatorMotivationPanel(){const chart=document.getElementById('operatorMonthlyBonusChart'),top=document.getElementById('operatorTopPerformers'),badge=document.getElementById('operatorBonusMonthBadge');if(!chart||!currentUser)return;const month=getCurrentMonthKey();if(badge)badge.textContent=formatMonthLabel(month);const person=PERSONNEL_LIST.find(p=>Number(p.id)===Number(currentUser.id))||currentUser,total=(isPersonBonusApproved(person,month)?getFinalMonthlyBonus(person,month):calculateFairBonus(person,month).bonusTL)||0,my=declarations.filter(d=>d.operator===currentUser.name&&(d.workDate||'').startsWith(month)),w={};my.forEach(d=>{const day=d.workDate||'';w[day]=(w[day]||0)+Math.max(0,d.qualityGood??d.good??0)});const sum=Object.values(w).reduce((a,b)=>a+b,0)||1,days=Object.keys(w).sort(),W=720,H=250,L=42,B=36,max=Math.max(1,...days.map(d=>total*w[d]/sum));const bars=days.map((d,i)=>{const v=total*w[d]/sum,bw=Math.max(12,Math.min(42,(W-L-20)/Math.max(days.length,1)*.55)),x=L+(i+.5)*(W-L-20)/Math.max(days.length,1)-bw/2,y=20+(H-20-B)*(1-v/max);return `<rect x="${x}" y="${y}" width="${bw}" height="${H-B-y}" rx="5" fill="#34d399"><title>${d}: ${Math.round(v).toLocaleString('tr-TR')} TL</title></rect><text x="${x+bw/2}" y="${H-16}" text-anchor="middle" class="bonus-chart-label">${d.slice(8)}</text>`}).join('');chart.innerHTML=`<div class="flex justify-between text-xs mb-2"><span class="text-slate-400">Günlük kişisel prim</span><b class="text-emerald-400">${isPersonBonusApproved(person,month)?'Kesin aylık prim':'Tahmini aylık prim'} ${Math.round(total).toLocaleString('tr-TR')} TL</b></div><svg class="bonus-chart" viewBox="0 0 ${W} ${H}"><line x1="${L}" y1="${H-B}" x2="${W-20}" y2="${H-B}" stroke="#475569"/>${bars}</svg>`;if(top)top.innerHTML='<div class="text-xs text-slate-400">Genel havuz grafiği kaldırıldı. Genel rekabet ve rekorlar Zirvedekiler sayfasındadır.</div>';}
 
-        function renderAllApprovedJobs(){const el=document.getElementById('allApprovedJobsTableBody');if(!el)return;const done=jobOrders.filter(j=>j.status==='Tamamlandı (Yönetim Onaylı)' || j.status==='Yönetim Onayı Bekliyor' || j.status==='Muhasebe Onayı Bekliyor');el.innerHTML=done.map(j=>{const names=(j.assignedTo||[]).map(id=>PERSONNEL_LIST.find(p=>Number(p.id)===Number(id))?.name||id).join(', ')||'Genel';return `<tr><td class="p-2 font-mono">${j.id}</td><td class="p-2">${names}</td><td class="p-2">${j.targetType==='timed'?'Süreli':'Üretim hedefli'}</td><td class="p-2">${j.status}</td><td class="p-2 text-emerald-300">${j.managementApprover||j.accountingApprover||'-'}</td></tr>`}).join('')||'<tr><td colspan="5" class="p-3 text-center text-slate-500">Onaylı iş emri kaydı yok.</td></tr>';}
+        function renderAllApprovedJobs(){const el=document.getElementById('allApprovedJobsTableBody');if(!el)return;const done=jobOrders.filter(j=>j.status==='Tamamlandı (Yönetim Onaylı)' || j.status==='Yönetim Onayı Bekliyor' || j.status==='Muhasebe Onayı Bekliyor' || j.status==='Ticari Belge Onayı Bekliyor' || j.status==='Sevke Hazır');el.innerHTML=done.map(j=>{const names=(j.assignedTo||[]).map(id=>PERSONNEL_LIST.find(p=>Number(p.id)===Number(id))?.name||id).join(', ')||'Genel';return `<tr><td class="p-2 font-mono">${j.id}</td><td class="p-2">${names}</td><td class="p-2">${j.targetType==='timed'?'Süreli':'Üretim hedefli'}</td><td class="p-2">${j.status}</td><td class="p-2 text-emerald-300">${j.managementApprover||j.accountingApprover||'-'}</td></tr>`}).join('')||'<tr><td colspan="5" class="p-3 text-center text-slate-500">Onaylı iş emri kaydı yok.</td></tr>';}
 
         function renderReportOutbox(){const el=document.getElementById('reportOutboxTableBody');if(!el)return;el.innerHTML=(reportOutbox||[]).slice(0,12).map(r=>`<tr><td class="p-2">${new Date(r.createdAt).toLocaleString('tr-TR')}</td><td class="p-2">${kmiEscXss(r.reason)}</td><td class="p-2">${(r.emails||[]).map(kmiEscXss).join(', ')||'-'}</td><td class="p-2">${(r.phones||[]).map(kmiEscXss).join(', ')||'-'}</td><td class="p-2">${kmiEscXss(r.status)}</td></tr>`).join('')||'<tr><td colspan="5" class="p-2 text-center">Henüz rapor kuyruğu oluşmadı.</td></tr>'; }
         function renderPuantajFormula(monthKey=getCurrentMonthKey()){
@@ -4387,7 +4531,7 @@ ead>
         function addPuantajBox(){if(!currentUser||getEffectiveRole(currentUser)!=='ADMIN')return;const month=document.getElementById('puantajMonth').value||getCurrentMonthKey(),cfg=getPuantajConfig(month),name=prompt('Yeni puantaj kutusu adı:');if(!name)return;cfg.customBoxes=cfg.customBoxes||[];cfg.customBoxes.push({id:'C'+Date.now(),name,value:1});puantajMonthlyConfig[month]=cfg;saveStorage('puantajMonthlyConfig',puantajMonthlyConfig);renderPuantajAdmin();}
         function deletePuantajBox(id){const month=document.getElementById('puantajMonth').value||getCurrentMonthKey(),cfg=getPuantajConfig(month);cfg.customBoxes=(cfg.customBoxes||[]).filter(x=>x.id!==id);puantajMonthlyConfig[month]=cfg;saveStorage('puantajMonthlyConfig',puantajMonthlyConfig);renderPuantajAdmin();}
         function renamePuantajLabel(key,val){const month=document.getElementById('puantajMonth').value||getCurrentMonthKey(),cfg=getPuantajConfig(month);cfg.labels={...(cfg.labels||{}),[key]:val};puantajMonthlyConfig[month]=cfg;saveStorage('puantajMonthlyConfig',puantajMonthlyConfig);}
-        function isQualityApprovedRecord(d){ const st=String(d?.status||''); return Boolean(d?.qualityApprovalDate||d?.approver||['Hazır - Muhasebe Onayı Bekliyor','Muhasebe Onayı Bekliyor','Muhasebe Onayladı','Yönetim Onayı Bekliyor','Sevk Onayı Bekliyor','Sevke Hazır','Sevk Edildi','Tamamlandı (Yönetim Onaylı)'].includes(st)); }
+        function isQualityApprovedRecord(d){ const st=String(d?.status||''); return Boolean(d?.qualityApprovalDate||d?.approver||['Hazır - Muhasebe Onayı Bekliyor','Muhasebe Onayı Bekliyor','Muhasebe Onayladı','Yönetim Onayı Bekliyor','Ticari Belge Onayı Bekliyor','Sevk Onayı Bekliyor','Sevke Hazır','Sevk Edildi','Tamamlandı (Yönetim Onaylı)'].includes(st)); }
         function approvedGoodQty(d){ return Math.max(0,Number(d?.qualityGood ?? d?.good ?? d?.qty ?? 0)||0); }
         function approvedScrapQty(d){ return Math.max(0,Number(d?.qualityScrap ?? d?.scrap ?? 0)||0); }
         function qualityApprovedRows(){ return declarations.filter(isQualityApprovedRecord); }
@@ -5038,8 +5182,12 @@ const _refreshAllViews=refreshAllViews;
 refreshAllViews=function(){_refreshAllViews();renderDeletedJobOrders();renderPersonnelFileCards();populatePuantajAuditPeople();renderManagementApprovedHistory();renderLiveMachineAssignments();renderExecutiveDashboard();renderShippingToday();enhanceQualityMeasurementUI();try{renderPersonnelTaskPerformanceBoard();}catch(e){}};
 
 // ===== V28 WORKFLOW CONSISTENCY / MAINTENANCE FILE / OPERATOR STATUS =====
-function workflowRank(status){const a=['Açık','Aktif','Tesviye Bekliyor','Vibrasyon Bekliyor','Kalite Bekliyor','Hazır - Muhasebe Onayı Bekliyor','Muhasebe Onayı Bekliyor','Yönetim Onayı Bekliyor','Sevk Onayı Bekliyor','Sevk Edildi'];return a.indexOf(status);}
-function syncJobOrderWorkflowStatuses(){jobOrders.forEach(j=>{if(j.deleted||j.status==='Silindi')return;const ds=declarations.filter(d=>d.jobOrder===j.id);if(!ds.length)return;const d=ds.slice().sort((a,b)=>workflowRank(b.status)-workflowRank(a.status)||new Date(b.updatedAt||0)-new Date(a.updatedAt||0))[0];const map={'Tesviye Bekliyor':'Tesviye Bekliyor','Vibrasyon Bekliyor':'Vibrasyon Bekliyor','Kalite Bekliyor':'Kalite Onayı Bekliyor','Hazır - Muhasebe Onayı Bekliyor':'Muhasebe Onayı Bekliyor','Muhasebe Onayı Bekliyor':'Muhasebe Onayı Bekliyor','Yönetim Onayı Bekliyor':'Yönetim Onayı Bekliyor','Sevk Onayı Bekliyor':'Sevke Hazır','Sevk Edildi':'Sevk Edildi / Kapandı','Tamamlandı (Yönetim Onaylı)':'Tamamlandı (Yönetim Onaylı)'};
+// KMI RC-04 item 3 fix (2026-10-08): inserted 'Ticari Belge Onayı Bekliyor' between
+// 'Yönetim Onayı Bekliyor' and 'Sevk Onayı Bekliyor' - it is the new real stage that now
+// sits there in the corrected canonical order (Accounting/Commercial Documentation runs
+// AFTER Management, not before it).
+function workflowRank(status){const a=['Açık','Aktif','Tesviye Bekliyor','Vibrasyon Bekliyor','Kalite Bekliyor','Hazır - Muhasebe Onayı Bekliyor','Muhasebe Onayı Bekliyor','Yönetim Onayı Bekliyor','Ticari Belge Onayı Bekliyor','Sevk Onayı Bekliyor','Sevk Edildi'];return a.indexOf(status);}
+function syncJobOrderWorkflowStatuses(){jobOrders.forEach(j=>{if(j.deleted||j.status==='Silindi')return;const ds=declarations.filter(d=>d.jobOrder===j.id);if(!ds.length)return;const d=ds.slice().sort((a,b)=>workflowRank(b.status)-workflowRank(a.status)||new Date(b.updatedAt||0)-new Date(a.updatedAt||0))[0];const map={'Tesviye Bekliyor':'Tesviye Bekliyor','Vibrasyon Bekliyor':'Vibrasyon Bekliyor','Kalite Bekliyor':'Kalite Onayı Bekliyor','Hazır - Muhasebe Onayı Bekliyor':'Muhasebe Onayı Bekliyor','Muhasebe Onayı Bekliyor':'Muhasebe Onayı Bekliyor','Yönetim Onayı Bekliyor':'Yönetim Onayı Bekliyor','Ticari Belge Onayı Bekliyor':'Ticari Belge Onayı Bekliyor','Sevk Onayı Bekliyor':'Sevke Hazır','Sevk Edildi':'Sevk Edildi / Kapandı','Tamamlandı (Yönetim Onaylı)':'Tamamlandı (Yönetim Onaylı)'};
  if(map[d.status]){
    let next=map[d.status];
    // KMI-FIX (2026-09-25): "adet üretim hedefli" (production) iş emirlerinde TEK bir vardiya
@@ -5063,7 +5211,7 @@ function syncJobOrderWorkflowStatuses(){jobOrders.forEach(j=>{if(j.deleted||j.st
    j.status=next;
  }
  if(d.accountingApprover)j.accountingApprover=d.accountingApprover;if(d.managementApprover)j.managementApprover=d.managementApprover;if(d.shippedAt)j.shippedAt=d.shippedAt;});saveStorage('jobOrders',jobOrders);}
-function operatorWorkflowLabel(j){const ds=declarations.filter(d=>d.jobOrder===j.id&&d.operator===currentUser?.name).sort((a,b)=>new Date(b.updatedAt||0)-new Date(a.updatedAt||0));const d=ds[0];if(!d)return j.status;const map={'Kalite Bekliyor':'Kalite Onayı Bekliyor','Hazır - Muhasebe Onayı Bekliyor':'Muhasebe Onayı Bekliyor','Yönetim Onayı Bekliyor':'Yönetim Onayı Bekliyor','Sevk Onayı Bekliyor':'Sevke Hazır / Sevkiyat Bekliyor','Sevk Edildi':'Sevk Edildi · İş Emri Kapandı'};return map[d.status]||d.status||j.status;}
+function operatorWorkflowLabel(j){const ds=declarations.filter(d=>d.jobOrder===j.id&&d.operator===currentUser?.name).sort((a,b)=>new Date(b.updatedAt||0)-new Date(a.updatedAt||0));const d=ds[0];if(!d)return j.status;const map={'Kalite Bekliyor':'Kalite Onayı Bekliyor','Hazır - Muhasebe Onayı Bekliyor':'Muhasebe Onayı Bekliyor','Yönetim Onayı Bekliyor':'Yönetim Onayı Bekliyor','Ticari Belge Onayı Bekliyor':'Muhasebe/Ticari Belge Onayı Bekliyor','Sevk Onayı Bekliyor':'Sevke Hazır / Sevkiyat Bekliyor','Sevk Edildi':'Sevk Edildi · İş Emri Kapandı'};return map[d.status]||d.status||j.status;}
 function renderClosedOperatorJobs(){const tb=document.getElementById('closedOperatorJobOrders');if(!tb||!currentUser)return;const mine=jobOrders.filter(j=>!j.deleted&&(j.assignedTo||[]).map(Number).includes(Number(currentUser.id))&&j.status!=='Açık');mine.sort((a,b)=>new Date(b.updatedAt||b.dueAt||0)-new Date(a.updatedAt||a.dueAt||0));tb.innerHTML=mine.map(j=>{const d=declarations.filter(x=>x.jobOrder===j.id&&x.operator===currentUser.name).sort((a,b)=>new Date(b.updatedAt||0)-new Date(a.updatedAt||0))[0];return `<tr class="border-t border-slate-800"><td class="p-2 font-mono text-blue-300">${j.id}</td><td class="p-2">${escSkill(j.item||'-')}</td><td class="p-2">${escSkill(j.machine||'-')}</td><td class="p-2">${j.dueAt?new Date(j.dueAt).toLocaleString('tr-TR',{hour12:false}):'-'}</td><td class="p-2 font-bold text-emerald-300">${operatorWorkflowLabel(j)}</td><td class="p-2">${d?`<button onclick="showDeclarationBonusDetail('${d.id}')" class="bg-cyan-700 px-2 py-1 rounded text-white">Detay</button>`:'-'}</td></tr>`}).join('')||'<tr><td colspan="6" class="p-3 text-center text-slate-500">Kapanan iş emri yok.</td></tr>';}
 const __renderJobOrdersV28=renderJobOrders;
 renderJobOrders=function(){syncJobOrderWorkflowStatuses();const tb=document.getElementById('jobOrdersTableBody');if(!tb||!currentUser)return;const mine=jobOrders.filter(j=>!j.deleted&&(j.assignedTo||[]).map(Number).includes(Number(currentUser.id))&&j.status==='Açık');tb.innerHTML=mine.map(j=>{const overdue=j.dueAt&&new Date(j.dueAt)<new Date(),active=activeJobDraftId===j.id;return `<tr class="${overdue?'bg-red-950/20':''}"><td class="p-2 font-mono text-blue-400">${j.id}</td><td class="p-2">${escSkill(j.client||'-')} - ${escSkill(j.item||'-')}</td><td class="p-2">${escSkill(j.department||'-')}</td><td class="p-2">${escSkill(j.machine||'-')}</td><td class="p-2 ${overdue?'text-red-400 font-black':'text-amber-300 font-semibold'}">${j.dueAt?new Date(j.dueAt).toLocaleString('tr-TR',{hour12:false}):'-'}${overdue?'<div class="text-[10px] uppercase">SÜRESİ GEÇTİ</div>':''}</td><td class="p-2">${j.targetType==='timed'?j.durationMinutes+' dk':j.targetQty+' Adet'}</td><td class="p-2 text-emerald-400 font-semibold">${j.completedQty||0}</td><td class="p-2"><span class="px-2 py-1 rounded font-bold ${active?'bg-blue-700 text-white':'bg-amber-900/60 text-amber-300'}">${active?'AKTİF · VERİ GİRİŞİ AÇIK':'AÇIK'}</span>${!active?`<button onclick="activateJobOrder('${j.id}')" class="block mt-2 bg-blue-600 text-white px-2 py-1 rounded">İş Emrini Aktif Et</button>`:''}</td></tr>`}).join('')||'<tr><td colspan="8" class="p-4 text-center text-slate-500">Açık iş emri bulunmuyor.</td></tr>';renderClosedOperatorJobs();}
@@ -6050,6 +6198,30 @@ approveShipment=async function(id){if(!currentUser||!(getEffectiveRole(currentUs
      }
    }
  }catch(e){ console.error('[QMS/CR shipment commercial-release gate]',e); return alert('SEVKİYAT ENGELLENDİ: Ticari serbest bırakma durumu doğrulanırken beklenmeyen bir hata oluştu. Güvenlik nedeniyle sevkiyat yapılamadı.'); }
+ // KMI RC-04 CANONICAL APPROVAL SEQUENCE CORRECTION (2026-10-08): the client-side
+ // evaluator just above (kmiR5CommercialReleaseEvaluate) was READ-ONLY - it could warn
+ // but never wrote a real server fact. The canonical chain requires a genuine
+ // COMMERCIAL_RELEASE_VERIFIED audit_log row before shipment (20261008c's
+ // declaration_shipment_approve_verify precondition), and per Owner decision 1
+ // ("Shipping Readiness is a status, not a separate discretionary human approval"),
+ // Commercial Release itself stays system-evaluated here too - this calls the real
+ // commercial_release_verify RPC now, right where the client already decided shipment
+ // is commercially releasable, instead of adding a second human click. Same
+ // fail-closed pattern as every other server gate in this chain: if the server
+ // disagrees (e.g. the real Accounting/Management facts this RPC checks do not both
+ // exist yet, even though local state looked ready), shipment stops here for real.
+ {
+   const __crClient=window.kurutluSupabase;
+   if(!__crClient || typeof __crClient.rpc!=='function'){ return alert('SEVKİYAT ENGELLENDİ: sunucu bağlantısı (Supabase) bu oturumda kullanılamıyor - Ticari Serbest Bırakma doğrulanamadı.'); }
+   try{
+     const __crRes=await __crClient.rpc('commercial_release_verify',{p_declaration_id:String(d.id),p_job_order_id:String(d.jobOrder)});
+     if(__crRes.error) throw new Error(__crRes.error.message||'Sunucu Ticari Serbest Bırakma koşullarını doğrulamadı.');
+     if(!__crRes.data || !__crRes.data.verified) throw new Error('Sunucudan geçersiz Ticari Serbest Bırakma doğrulama yanıtı alındı.');
+   }catch(e){
+     console.warn('[KMI-RC04] commercial_release_verify HARD FAIL-CLOSED - sevkiyat YAZILMADI:', e);
+     return alert('SEVKİYAT ENGELLENDİ: Ticari Serbest Bırakma sunucuda doğrulanamadı ('+(e&&e.message||'bilinmeyen hata')+'). Muhasebe/Yönetim onaylarının sunucuda tamamlandığından emin olun.');
+   }
+ }
  // BACKLOG-3.1 (Master Entegrasyon): bu GERÇEK/canlı approveShipment kopyası (yukarıdaki
  // KMI-QMS-FAZ1 KRİTİK BULGU notuna bakınız - dosyada bundan önceki 3 kopya ölü koddur).
  // Sevkiyat Kalite Serbest Belgesi burada, HOLD kontrolü temiz geçtikten hemen sonra kesilir.
@@ -9568,7 +9740,18 @@ function renderMuhasebeV98(){
  const tb=document.getElementById('muhasebePendingJobsTable');
  if(tb){
   const pending=S.quality.filter(q=>!accountingFor(q.id));
-  const dbRows=pending.map(q=>`<tr><td class="p-2.5 font-mono text-blue-400">${esc(String(q.id).slice(0,8))}</td><td class="p-2.5">${esc(woNo(q.work_order_id))}</td><td class="p-2.5">${Number(q.quantity||0)} Adet</td><td class="p-2.5">${q.approved_at?new Date(q.approved_at).toLocaleString('tr-TR'):'-'}</td><td class="p-2.5"><span class="bg-emerald-900/80 text-emerald-300 px-2 py-0.5 rounded text-[10px]">Kalite Onaylı</span></td><td class="p-2.5">-</td><td class="p-2.5"><button onclick="v98AccountingApprove('${q.id}')" class="bg-emerald-600 text-white px-2 py-1 rounded text-[10px] font-semibold">Muhasebe Onayı</button></td></tr>`).join('');
+  // KMI RC-04 CANONICAL APPROVAL SEQUENCE CORRECTION (2026-10-08): v98AccountingApprove's
+  // button is retired here - it is a SEPARATE, parallel legacy writer (inserts directly
+  // into production_accounting_approvals with NO role/sequence check of any kind, not
+  // even client-side) that implemented the SAME cancelled Quality -> Accounting
+  // transition this directive names, on this same screen. Unlike the declarations-based
+  // path, this V98 table pipeline (production_accounting_approvals /
+  // production_management_approvals / production_shipments) has no Final Production
+  // Release or Commercial Release gate equivalent and is NOT otherwise touched by this
+  // migration/pass - v98ManagementApprove/v98Ship below are left as-is, reported as a
+  // pre-existing, separate, still-open gap (no canonical server RPC at all), not
+  // newly introduced or newly discovered-but-ignored here.
+  const dbRows=pending.map(q=>`<tr><td class="p-2.5 font-mono text-blue-400">${esc(String(q.id).slice(0,8))}</td><td class="p-2.5">${esc(woNo(q.work_order_id))}</td><td class="p-2.5">${Number(q.quantity||0)} Adet</td><td class="p-2.5">${q.approved_at?new Date(q.approved_at).toLocaleString('tr-TR'):'-'}</td><td class="p-2.5"><span class="bg-emerald-900/80 text-emerald-300 px-2 py-0.5 rounded text-[10px]">Kalite Onaylı</span></td><td class="p-2.5">-</td><td class="p-2.5"><span class="text-amber-300 text-[10px]">Üretim Serbest Bırakma / Yönetim Onayı bekleniyor</span></td></tr>`).join('');
   // KMI-FIX (2026-09-26): Ender'in bildirdiği hata - "muhasebe ekranına hiç veri düşmedi". Kök
   // sebep: bu fonksiyon SADECE Supabase'deki quality_approved_output tablosuna bakıyordu, ama
   // gerçek portal akışı (approveKalite -> declarations, "Hazır - Muhasebe Onayı Bekliyor") o
@@ -9583,18 +9766,34 @@ function renderMuhasebeV98(){
    const localPending=ds.filter(d=>String(d?.status||'')==='Hazır - Muhasebe Onayı Bekliyor');
    portalRows=localPending.map(d=>{
     const jo=jobs.find(j=>String(j.id)===String(d.jobOrder));
-    return `<tr data-v108-local="1"><td class="p-2.5 font-mono text-blue-400">${esc(d.id)}</td><td class="p-2.5">${esc(jo?.item||d.jobOrder||'-')}<div class="text-[9px] text-slate-500">${esc(d.jobOrder||'-')}</div></td><td class="p-2.5">${Number(d.qualityGood??d.good??d.qty??0)} Adet</td><td class="p-2.5">${esc(d.qualityApprovalDate||d.date||'-')}</td><td class="p-2.5"><span class="bg-emerald-900/80 text-emerald-300 px-2 py-0.5 rounded text-[10px]">Kalite Onaylı</span></td><td class="p-2.5 text-cyan-300">${esc(d.approver||'-')}</td><td class="p-2.5"><div class="flex flex-wrap gap-1"><button onclick="approveDeclarationByMuhasebe('${esc(d.id)}')" class="bg-emerald-600 hover:bg-emerald-500 text-white px-2 py-1 rounded text-[10px] font-semibold"><i class="fa-solid fa-check-double mr-1"></i>Muhasebe Onayı</button><button onclick="window.kmiOpenRejectModal('${esc(d.id)}','muhasebe')" class="bg-red-800 hover:bg-red-700 text-white px-2 py-1 rounded text-[10px] font-semibold">Reddet</button></div></td></tr>`;
+    return `<tr data-v108-local="1"><td class="p-2.5 font-mono text-blue-400">${esc(d.id)}</td><td class="p-2.5">${esc(jo?.item||d.jobOrder||'-')}<div class="text-[9px] text-slate-500">${esc(d.jobOrder||'-')}</div></td><td class="p-2.5">${Number(d.qualityGood??d.good??d.qty??0)} Adet</td><td class="p-2.5">${esc(d.qualityApprovalDate||d.date||'-')}</td><td class="p-2.5"><span class="bg-emerald-900/80 text-emerald-300 px-2 py-0.5 rounded text-[10px]">Kalite Onaylı</span></td><td class="p-2.5 text-cyan-300">${esc(d.approver||'-')}</td><td class="p-2.5"><span class="text-amber-300 text-[10px]">Üretim Serbest Bırakma / Yönetim Onayı bekleniyor</span></td></tr>`;
    }).join('');
   }catch(e){console.warn('[V98 muhasebe portal merge]',e);}
   tb.innerHTML=(dbRows+portalRows)||'<tr><td colspan="7" class="p-3 text-center text-slate-500">Muhasebe onayı bekleyen kalite onaylı ürün yok.</td></tr>';
  }
  const db=document.getElementById('muhasebeTableBody');if(db)db.innerHTML=S.accounting.map(a=>`<tr><td class="p-2.5 font-mono">${esc(String(a.id).slice(0,8))}</td><td class="p-2.5">${a.approved_at?new Date(a.approved_at).toLocaleString('tr-TR'):'-'}</td><td class="p-2.5">-</td><td class="p-2.5">${esc(woNo(a.work_order_id))}</td><td class="p-2.5">-</td><td class="p-2.5">-</td><td class="p-2.5">-</td><td class="p-2.5 text-cyan-400">${esc(personName(a.approved_by))}<div class="text-[9px] text-amber-300">İrsaliye: ${esc(a.delivery_note_no)}</div></td><td class="p-2.5">-</td></tr>`).join('')||'<tr><td colspan="9" class="p-4 text-center text-slate-500">Supabase muhasebe onayı kaydı yok.</td></tr>';
 }
-function renderManagementV98(){const tb=document.getElementById('managementApprovalTableBody');if(!tb)return;const pending=S.accounting.filter(a=>!managementFor(a.id));tb.innerHTML=pending.map(a=>{const q=S.quality.find(x=>String(x.id)===String(a.quality_approved_output_id));return `<tr><td class="p-2 font-mono">${esc(String(a.id).slice(0,8))}<div class="text-[9px] text-slate-500">${esc(woNo(a.work_order_id))}</div></td><td class="p-2">${esc(woNo(a.work_order_id))}<div class="text-[9px] text-amber-300">İrsaliye: ${esc(a.delivery_note_no)} · Muhasebe: ${esc(personName(a.approved_by))}</div></td><td class="p-2">-</td><td class="p-2 font-bold">${Number(q?.quantity||0)}</td><td class="p-2"><span class="bg-blue-900/70 text-blue-300 px-2 py-0.5 rounded text-[10px]">Yönetim Onayı Bekliyor</span></td><td class="p-2"><button onclick="v98ManagementApprove('${a.id}')" class="bg-blue-600 hover:bg-blue-500 text-white px-2 py-1 rounded text-[10px] font-bold">Son Onay</button></td></tr>`}).join('')||'<tr><td colspan="6" class="p-4 text-center text-slate-500">Yönetim onayı bekleyen Supabase kaydı yok.</td></tr>'}
-function renderShippingV98(){const tb=document.getElementById('shippingTableBody');if(!tb)return;const approved=S.management.filter(m=>m.decision==='APPROVED');tb.innerHTML=approved.map(m=>{const a=S.accounting.find(x=>String(x.id)===String(m.accounting_approval_id));const q=a&&S.quality.find(x=>String(x.id)===String(a.quality_approved_output_id));const sh=shipmentFor(m.id);return `<tr><td class="p-3 font-semibold text-white">${esc(woNo(m.work_order_id))}</td><td class="p-3">${esc(woNo(m.work_order_id))}<div class="text-[9px] text-amber-300">İrsaliye: ${esc(a?.delivery_note_no||'-')}</div></td><td class="p-3 font-bold text-emerald-400">${Number(q?.quantity||0)} Adet</td><td class="p-3 text-slate-400">${m.decided_at?new Date(m.decided_at).toLocaleString('tr-TR'):'-'}</td><td class="p-3">${sh?`<span class="text-emerald-400 font-semibold">Sevk Edildi</span><div class="text-[9px]">${esc(sh.vehicle_plate)} · ${esc(sh.delivery_note_no)}</div>`:`<span class="inline-block mb-2 text-amber-300 font-semibold">Sevke Hazır</span><br><button onclick="v98Ship('${m.id}')" class="bg-amber-600 text-white px-3 py-2 rounded text-[10px] font-bold">Sevk Et</button>`}</td></tr>`}).join('')||'<tr><td colspan="5" class="p-4 text-center text-slate-500">Yönetim onayından geçmiş Supabase sevkiyat kaydı yok.</td></tr>'}
-window.v98AccountingApprove=async function(qid){const c=sb(),q=S.quality.find(x=>String(x.id)===String(qid));if(!c||!q)return;const irs=prompt('İrsaliye numarasını giriniz:');if(!irs?.trim())return alert('İrsaliye numarası zorunludur.');const pid=personDbId();if(!pid)return alert('Supabase personel kimliği bulunamadı.');const {error}=await c.from('production_accounting_approvals').insert({quality_approved_output_id:q.id,work_order_id:q.work_order_id,delivery_note_no:irs.trim(),approved_by:pid,status:'MANAGEMENT_PENDING'});if(error)return alert('Muhasebe onayı kaydedilemedi: '+error.message);await load(true);alert('Muhasebe onayı Supabase’e kaydedildi.');};
-window.v98ManagementApprove=async function(aid){const c=sb(),a=S.accounting.find(x=>String(x.id)===String(aid));if(!c||!a)return;const pid=personDbId();if(!pid)return alert('Supabase personel kimliği bulunamadı.');if(!confirm('Bu kayda yönetim son onayı verilsin ve sevkiyata aktarılsın mı?'))return;const {error}=await c.from('production_management_approvals').insert({accounting_approval_id:a.id,work_order_id:a.work_order_id,decision:'APPROVED',decided_by:pid,decision_note:'Portal V98 yönetim son onayı'});if(error)return alert('Yönetim onayı kaydedilemedi: '+error.message);await load(true);alert('Yönetim son onayı Supabase’e kaydedildi. Kayıt sevkiyata aktarıldı.');};
-window.v98Ship=async function(mid){const c=sb(),m=S.management.find(x=>String(x.id)===String(mid));if(!c||!m)return;const a=S.accounting.find(x=>String(x.id)===String(m.accounting_approval_id));const q=a&&S.quality.find(x=>String(x.id)===String(a.quality_approved_output_id));const irs=prompt('İrsaliye numarası:',a?.delivery_note_no||'');if(!irs?.trim())return alert('İrsaliye numarası zorunludur.');const plate=prompt('Araç plakası:','');if(!plate?.trim())return alert('Araç plakası zorunludur.');const pid=personDbId();if(!pid)return alert('Supabase personel kimliği bulunamadı.');const {error}=await c.from('production_shipments').insert({management_approval_id:m.id,work_order_id:m.work_order_id,delivery_note_no:irs.trim(),vehicle_plate:plate.trim().toLocaleUpperCase('tr-TR'),shipped_quantity:Math.max(1,Number(q?.quantity||1)),shipped_by:pid});if(error)return alert('Sevkiyat kaydedilemedi: '+error.message);await load(true);alert('Sevkiyat Supabase’e kalıcı olarak kaydedildi.');};
+function renderManagementV98(){const tb=document.getElementById('managementApprovalTableBody');if(!tb)return;const pending=S.accounting.filter(a=>!managementFor(a.id));tb.innerHTML=pending.map(a=>{const q=S.quality.find(x=>String(x.id)===String(a.quality_approved_output_id));return `<tr><td class="p-2 font-mono">${esc(String(a.id).slice(0,8))}<div class="text-[9px] text-slate-500">${esc(woNo(a.work_order_id))}</div></td><td class="p-2">${esc(woNo(a.work_order_id))}<div class="text-[9px] text-amber-300">İrsaliye: ${esc(a.delivery_note_no)} · Muhasebe: ${esc(personName(a.approved_by))}</div></td><td class="p-2">-</td><td class="p-2 font-bold">${Number(q?.quantity||0)}</td><td class="p-2"><span class="bg-blue-900/70 text-blue-300 px-2 py-0.5 rounded text-[10px]">Yönetim Onayı Bekliyor</span></td><td class="p-2"><span class="text-amber-300 text-[10px]">Bu kayıt için onay, kanonik Yönetim Onayı ekranından verilmelidir</span></td></tr>`}).join('')||'<tr><td colspan="6" class="p-4 text-center text-slate-500">Yönetim onayı bekleyen Supabase kaydı yok.</td></tr>'}
+function renderShippingV98(){const tb=document.getElementById('shippingTableBody');if(!tb)return;const approved=S.management.filter(m=>m.decision==='APPROVED');tb.innerHTML=approved.map(m=>{const a=S.accounting.find(x=>String(x.id)===String(m.accounting_approval_id));const q=a&&S.quality.find(x=>String(x.id)===String(a.quality_approved_output_id));const sh=shipmentFor(m.id);return `<tr><td class="p-3 font-semibold text-white">${esc(woNo(m.work_order_id))}</td><td class="p-3">${esc(woNo(m.work_order_id))}<div class="text-[9px] text-amber-300">İrsaliye: ${esc(a?.delivery_note_no||'-')}</div></td><td class="p-3 font-bold text-emerald-400">${Number(q?.quantity||0)} Adet</td><td class="p-3 text-slate-400">${m.decided_at?new Date(m.decided_at).toLocaleString('tr-TR'):'-'}</td><td class="p-3">${sh?`<span class="text-emerald-400 font-semibold">Sevk Edildi</span><div class="text-[9px]">${esc(sh.vehicle_plate)} · ${esc(sh.delivery_note_no)}</div>`:`<span class="text-amber-300 text-[10px]">Bu kayıt için sevkiyat, kanonik Sevkiyat ekranından (Ticari Serbest Bırakma sonrası) yapılmalıdır</span>`}</td></tr>`}).join('')||'<tr><td colspan="5" class="p-4 text-center text-slate-500">Yönetim onayından geçmiş Supabase sevkiyat kaydı yok.</td></tr>'}
+// KMI RC-04 ITEM 1 CLOSURE (2026-10-08): all three V98 writers below are now HARD NO-OPS.
+// They used to insert directly into production_accounting_approvals /
+// production_management_approvals / production_shipments with ZERO role or sequence check
+// of any kind (not even client-side) - a complete bypass of the canonical server gates
+// (production_release_verify / declaration_management_approve_verify /
+// declaration_accounting_approve_verify / commercial_release_verify /
+// declaration_shipment_approve_verify). Per the explicit directive "No alternate
+// approval/shipment writer may bypass the canonical server gates", removing only the
+// buttons (as was done for v98AccountingApprove in an earlier pass) is NOT sufficient -
+// the functions themselves remained callable (e.g. from the browser console) and would
+// still perform the unguarded insert. They are kept defined (so no stray caller throws)
+// but now do nothing except direct the user to the real, gated screen.
+window.v98AccountingApprove=async function(){alert('Bu işlem artık kullanılamıyor. Muhasebe / Ticari Belge onayı, Yönetim Onayından SONRA, kanonik Muhasebe & Finans ekranından yapılmalıdır.');};
+window.v98ManagementApprove=async function(){alert('Bu işlem artık kullanılamıyor. Yönetim onayı, kanonik Yönetim Onayı ekranından (Üretim Serbest Bırakma sonrası) verilmelidir.');};
+window.v98Ship=async function(){alert('Bu işlem artık kullanılamıyor. Sevkiyat, kanonik Sevkiyat ekranından (Ticari Serbest Bırakma tamamlandıktan sonra) yapılmalıdır.');};
+// (original unsafe body removed in the RC-04 item-1 closure above - see window.v98Ship
+// defined earlier in this script block; kept this comment so a future reader searching
+// for 'production_shipments.insert' finds the removal note rather than assuming it was
+// never here.)
 window.v98SyncWorkflow=load;
 // Replace the incomplete V97 bridge with the actual schema bridge.
 window.v97SyncWorkOrders=load;
@@ -10437,17 +10636,27 @@ window.kmiR5FinalProductionReleaseFriendlyMessage=function(ev, jobOrderId){
 // GRANT: client-authorized WRITE action with full audit fields. NOTE (honest
 // limitation, standing project rule "no unauthorized DB/RLS/RPC changes"): unlike
 // window.kmiCommitAssignment (work_order_assignment_set_verify RPC) or
-// approveDeclarationByMuhasebe/approveManagementRecord (their own RPCs), this
-// action has NO server-side RPC re-verification, because creating a new Supabase
-// RPC is a DB change requiring explicit owner authorization not available in this
-// pass. This matches several OTHER existing writers in this same codebase that are
-// also client-authorized only (e.g. v118Ship itself has no RPC re-verification,
-// confirmed in docs/KMI_R5_DOMAIN_CAPABILITY_MAP_BATCH1.md Shipping §6) - so this is
-// not a weaker pattern than the codebase's own norm, but it IS weaker than the
-// directive's "AUTHORITATIVE SERVER/RPC" ask, and that gap is reported honestly
-// rather than silently matched to the stronger-looking RPC-backed gates above.
+// approveDeclarationByMuhasebe/approveManagementRecord (their own RPCs).
+//
+// KMI RC-04 CANONICAL APPROVAL SEQUENCE CORRECTION (2026-10-08): this gap is now
+// closed. supabase/migrations/20261008c_rc04_canonical_approval_sequence_correction.sql
+// adds public.production_release_verify(p_declaration_id, p_job_order_id, p_reason),
+// a real SECURITY DEFINER RPC (role: public.is_admin(), the server's existing,
+// canonical equivalent of PRODUCTION_MANAGER - see src/index.html:20035's own
+// `role==='ADMIN'` definition, not a new role). This function now calls it, HARD
+// FAIL-CLOSED on any error/rejection, BEFORE the local productionReleases[] write -
+// same pattern as approveKalite/approveDeclarationByMuhasebe/approveManagementRecord
+// (DEF-007/DEF-013). The function is now async; callers (kmiR5FinalProductionReleaseGrantUI
+// below, this same file) are updated to await it.
+//
+// This RPC call needs a representative declaration id for the job order (the server
+// gate is keyed on p_declaration_id, matching the migration's precondition - "Quality
+// server-verified for THIS declaration"). The evaluator (window.kmiR5FinalProductionReleaseEvaluate)
+// already determines FINAL_PRODUCTION_RELEASABLE from the job order's own quality-passed
+// declarations, so the most recent quality-approved declaration for this job order is the
+// correct, real id to send - never invented.
 window.productionReleases = window.productionReleases || loadStorage('productionReleases', []);
-window.kmiR5FinalProductionReleaseGrant=function(jobOrderId, reasonComment){
+window.kmiR5FinalProductionReleaseGrant=async function(jobOrderId, reasonComment){
   const actor=(typeof currentUser!=='undefined'&&currentUser)||window.currentUser||null;
   if(!actor || !window.KMI_AUTH || !window.KMI_AUTH.can(actor,'PRODUCTION_MANAGER')){
     return {status:'DENIED', reasonCode:'NOT_AUTHORIZED', message:'Üretim Serbest Bırakma yalnız yetkili Üretim Müdürü/Yönetim tarafından verilebilir.', evidence:{jobOrderId:jobOrderId}};
@@ -10458,13 +10667,35 @@ window.kmiR5FinalProductionReleaseGrant=function(jobOrderId, reasonComment){
   if(ev.status!=='FINAL_PRODUCTION_RELEASABLE'){
     return {status:'DENIED', reasonCode:'NOT_RELEASABLE:'+ev.reasonCode, message:'Koşullar sağlanmadığı için üretim serbest bırakılamaz: '+ev.message, evaluation:ev};
   }
+  // r5fprLatestDecl is the SAME lookup window.kmiR5FinalProductionReleaseEvaluate above
+  // just used to reach FINAL_PRODUCTION_RELEASABLE - reusing it here (rather than
+  // inventing a separate "quality-approved declaration" filter) guarantees the
+  // declaration id sent to the server is the real one the evaluator itself just
+  // approved of, never a second, possibly-divergent selection rule.
+  const repDecl=(typeof r5fprLatestDecl==='function')?r5fprLatestDecl(jobOrderId):null;
+  if(!repDecl){
+    return {status:'DENIED', reasonCode:'NO_DECLARATION_FOR_JOB_ORDER', message:'Bu iş emrine bağlı bir üretim beyanı bulunamadı.', evidence:ev.evidence};
+  }
+  {
+    const client=window.kurutluSupabase;
+    if(!client || typeof client.rpc!=='function'){ return {status:'DENIED', reasonCode:'NO_SERVER_CONNECTION', message:'Üretim Serbest Bırakma KAYDEDİLMEDİ: sunucu bağlantısı (Supabase) bu oturumda kullanılamıyor.'}; }
+    try{
+      const res=await client.rpc('production_release_verify',{p_declaration_id:String(repDecl.id),p_job_order_id:String(jobOrderId),p_reason:reasonComment||null});
+      if(res.error) throw new Error(res.error.message||'Sunucu yetkiyi doğrulamadı.');
+      if(!res.data || !res.data.verified) throw new Error('Sunucudan geçersiz doğrulama yanıtı alındı.');
+    }catch(e){
+      console.warn('[KMI-RC04] production_release_verify HARD FAIL-CLOSED - üretim serbest bırakma YAZILMADI:', e);
+      return {status:'DENIED', reasonCode:'SERVER_REJECTED', message:'Üretim Serbest Bırakma KAYDEDİLMEDİ: sunucu yetkinizi doğrulayamadı (' + (e && e.message || 'bilinmeyen hata') + ').'};
+    }
+  }
   const jos=(typeof jobOrders!=='undefined'&&Array.isArray(jobOrders))?jobOrders:(Array.isArray(window.jobOrders)?window.jobOrders:[]);
   const jo=jos.find(function(j){return String(j.id)===String(jobOrderId);});
   const record={
     id:'FPR-'+Date.now(), jobOrderId:jobOrderId,
     priorState:(jo&&jo.finalProductionReleaseStatus)||'NOT_RELEASED', newState:'FINAL_PRODUCTION_RELEASED',
     actor:actor.name||actor.id||'Bilinmeyen', actorId:actor.id||null, timestamp:new Date().toISOString(),
-    reasonComment:reasonComment||null, workflowVersion:'R5-FPR-v1', evaluatorEvidence:ev.evidence
+    reasonComment:reasonComment||null, workflowVersion:'R5-FPR-v1', evaluatorEvidence:ev.evidence,
+    serverVerifiedDeclarationId:repDecl.id
   };
   window.productionReleases=(window.productionReleases||[]).concat([record]);
   try{ saveStorage('productionReleases', window.productionReleases); }catch(e){}
@@ -10909,11 +11140,17 @@ function r5ccDeclarationChain(){
   // bare `declarations`, yoksa window.declarations'a düş) burada da uygulanır.
   const out=[];
   const decls=(typeof declarations!=='undefined'&&Array.isArray(declarations))?declarations:(Array.isArray(window.declarations)?window.declarations:[]);
-  const STAGE={ 'Yönetim Onayı Bekliyor':'MANAGEMENT_RELEASE', 'Hazır - Muhasebe Onayı Bekliyor':'COMMERCIAL_DOCUMENTATION' };
+  // KMI RC-04 item 3 fix (2026-10-08): 'Ticari Belge Onayı Bekliyor' added - this is the
+  // REAL post-Management Accounting/Commercial Documentation status under the corrected
+  // canonical order; without it, Command Center silently showed NO obligation at all for
+  // records actually waiting on Accounting. 'Hazır - Muhasebe Onayı Bekliyor' is kept
+  // mapped for any still-existing historical record (it is the cancelled pre-Management
+  // queue - no live code path writes it any more, see approveKalite/renderMuhasebeTable).
+  const STAGE={ 'Yönetim Onayı Bekliyor':'MANAGEMENT_RELEASE', 'Hazır - Muhasebe Onayı Bekliyor':'COMMERCIAL_DOCUMENTATION', 'Ticari Belge Onayı Bekliyor':'COMMERCIAL_DOCUMENTATION' };
   decls.forEach(function(d){
     const domain=STAGE[d.status]; if(!domain) return;
     out.push({ domain:domain, commandType:d.status, canonicalObjectId:d.id, who:d.operator||null,
-      what:d.jobOrder||d.id, where:null, status:d.status, waitingFor:domain==='MANAGEMENT_RELEASE'?'Yönetim onayı':'Muhasebe/irsaliye onayı',
+      what:d.jobOrder||d.id, where:null, status:d.status, waitingFor:domain==='MANAGEMENT_RELEASE'?'Yönetim onayı':'Muhasebe/Ticari belge (irsaliye) onayı',
       since:d.shiftClosedAt||null, priority:'MEDIUM',
       nextAction:(d.jobOrder && typeof window.kmiOpenJobOrderFile==='function') ? {type:'fn',fn:'kmiOpenJobOrderFile',args:[d.jobOrder],label:'İş Emri Dosyasını Aç (Onay/Red burada)'} : {type:'PARTIAL',note:'Bağlı iş emri bulunamadı veya kmiOpenJobOrderFile yok - ana Command Center panosundan (üst tablo) işlem yapılabilir.'} });
   });
@@ -11745,12 +11982,26 @@ window.kmiJobOrderScanApprove=function(id){
     return;
   }
   if(status==='Hazır - Muhasebe Onayı Bekliyor' && pending){
-    if(!(isBurcuAccountingAuthority(window.currentUser)||getEffectiveRole(window.currentUser)==='ADMIN')){window.kmiToast('Bu adım Muhasebe yetkisi gerektiriyor - sizin rolünüz ('+role+') onaylayamaz.','warn');return;}
-    approveDeclarationByMuhasebe(pending.id); closeFile(); return;
+    // KMI RC-04 CANONICAL APPROVAL SEQUENCE CORRECTION (2026-10-08): this barkod/quick-
+    // approve shortcut used to call approveDeclarationByMuhasebe directly (the same
+    // cancelled Quality -> Accounting transition retired on the Muhasebe screens above).
+    // Retired here too, not just left to fail server-side - the server RPC's own
+    // precondition now requires Management first regardless, but the active UI action
+    // itself is removed per directive, not merely left to error out.
+    window.kmiToast('Bu kayıt için sıradaki adım Üretim Serbest Bırakma / Yönetim Onayı - Muhasebe onayı henüz sırada değil.','warn'); closeFile(); return;
   }
   if(status==='Yönetim Onayı Bekliyor'){
     if(!canManagementApprove(window.currentUser)){window.kmiToast('Bu adım Yönetim onay yetkisi gerektiriyor - sizin rolünüz ('+role+') onaylayamaz.','warn');return;}
     approveManagementRecord(pending?pending.id:j.id, pending?'declaration':'job'); closeFile(); return;
+  }
+  if(status==='Ticari Belge Onayı Bekliyor' && pending){
+    // KMI RC-04 item 4 fix (2026-10-08): the real post-Management Accounting/Commercial
+    // Documentation step now has a barkod/quick-approve path too, calling the same real,
+    // server-gated approveDeclarationByMuhasebe used by the canonical Muhasebe & Finans
+    // screen (declaration_accounting_approve_verify RPC, fail-closed) - this is not a
+    // second writer, just a second entry point to the same function.
+    if(!(isBurcuAccountingAuthority(window.currentUser)||role==='ADMIN')){window.kmiToast('Bu adım Muhasebe yetkisi gerektiriyor - sizin rolünüz ('+role+') onaylayamaz.','warn');return;}
+    approveDeclarationByMuhasebe(pending.id); closeFile(); return;
   }
   if(status==='Sevk Onayı Bekliyor' && pending){
     if(!(getEffectiveRole(window.currentUser)==='ADMIN'||hasScreenAccess(window.currentUser,'sevkiyat'))){window.kmiToast('Bu adım Sevkiyat yetkisi gerektiriyor - sizin rolünüz ('+role+') onaylayamaz.','warn');return;}
@@ -12059,7 +12310,7 @@ window.v107NextJobOrderNo=function(){
 };
 function personIdByName(name){const p=(window.PERSONNEL_LIST||[]).find(x=>String(x.name||'').trim().toLocaleUpperCase('tr-TR')===String(name||'').trim().toLocaleUpperCase('tr-TR'));return p?Number(p.id):null}
 function statusFromDecl(d){
- const m={'Kalite Bekliyor':'Kalite Onayı Bekliyor','Hazır - Muhasebe Onayı Bekliyor':'Muhasebe Onayı Bekliyor','Muhasebe Onayı Bekliyor':'Muhasebe Onayı Bekliyor','Yönetim Onayı Bekliyor':'Yönetim Onayı Bekliyor','Sevk Onayı Bekliyor':'Sevke Hazır','Sevk Edildi':'Sevk Edildi / Kapandı','Tamamlandı (Yönetim Onaylı)':'Tamamlandı (Yönetim Onaylı)'};
+ const m={'Kalite Bekliyor':'Kalite Onayı Bekliyor','Hazır - Muhasebe Onayı Bekliyor':'Muhasebe Onayı Bekliyor','Muhasebe Onayı Bekliyor':'Muhasebe Onayı Bekliyor','Yönetim Onayı Bekliyor':'Yönetim Onayı Bekliyor','Ticari Belge Onayı Bekliyor':'Ticari Belge Onayı Bekliyor','Sevk Onayı Bekliyor':'Sevke Hazır','Sevk Edildi':'Sevk Edildi / Kapandı','Tamamlandı (Yönetim Onaylı)':'Tamamlandı (Yönetim Onaylı)'};
  return m[d?.status]||d?.status||'Açık';
 }
 function restore(){
@@ -12103,7 +12354,12 @@ function paintLocalAccountingPending(){
  const jobs=Array.isArray(jobOrders)?jobOrders:[];
  const pending=ds.filter(d=>String(d?.status||'')==='Hazır - Muhasebe Onayı Bekliyor');
  if(!pending.length)return;
- const rows=pending.map(d=>{const jo=jobs.find(j=>String(j.id)===String(d.jobOrder));return `<tr data-v108-local="1"><td class="p-2.5 font-mono text-blue-400">${d.id}</td><td class="p-2.5">${jo?.item||d.jobOrder||'-'}<div class="text-[9px] text-slate-500">${d.jobOrder||'-'}</div></td><td class="p-2.5">${Number(d.qualityGood??d.good??d.qty??0)} Adet</td><td class="p-2.5">${d.qualityApprovalDate||d.date||'-'}</td><td class="p-2.5"><span class="bg-emerald-900/80 text-emerald-300 px-2 py-0.5 rounded text-[10px]">Kalite Onaylı</span></td><td class="p-2.5 text-cyan-300">${d.approver||'-'}</td><td class="p-2.5"><div class="flex flex-wrap gap-1"><button onclick="approveDeclarationByMuhasebe('${d.id}')" class="bg-emerald-600 hover:bg-emerald-500 text-white px-2 py-1 rounded text-[10px] font-semibold"><i class="fa-solid fa-check-double mr-1"></i>Muhasebe Onayı</button><button onclick="window.kmiOpenRejectModal('${d.id}','muhasebe')" class="bg-red-800 hover:bg-red-700 text-white px-2 py-1 rounded text-[10px] font-semibold">Reddet</button></div></td></tr>`}).join('');
+ // KMI RC-04 CANONICAL APPROVAL SEQUENCE CORRECTION (2026-10-08): this writer's
+ // "Muhasebe Onayı"/"Reddet" action is retired, same as renderMuhasebeTable/
+ // renderMuhasebeV98 above - a record reaching this queue is quality-passed only and,
+ // under the corrected sequence, needs Final Production Release + Management approval
+ // BEFORE Accounting, not directly after Quality.
+ const rows=pending.map(d=>{const jo=jobs.find(j=>String(j.id)===String(d.jobOrder));return `<tr data-v108-local="1"><td class="p-2.5 font-mono text-blue-400">${d.id}</td><td class="p-2.5">${jo?.item||d.jobOrder||'-'}<div class="text-[9px] text-slate-500">${d.jobOrder||'-'}</div></td><td class="p-2.5">${Number(d.qualityGood??d.good??d.qty??0)} Adet</td><td class="p-2.5">${d.qualityApprovalDate||d.date||'-'}</td><td class="p-2.5"><span class="bg-emerald-900/80 text-emerald-300 px-2 py-0.5 rounded text-[10px]">Kalite Onaylı</span></td><td class="p-2.5 text-cyan-300">${d.approver||'-'}</td><td class="p-2.5"><span class="text-amber-300 text-[10px]">Üretim Serbest Bırakma / Yönetim Onayı bekleniyor</span></td></tr>`}).join('');
  // V98 DB renderer shows an empty row when quality_approved_output is empty. Replace it with the real portal declaration queue.
  tb.innerHTML=rows;
 }
@@ -12141,7 +12397,14 @@ function renderProductionApprovals(){
  const localPending=ds.filter(d=>String(d?.status||'')==='Yönetim Onayı Bekliyor' && !dbWoNos.has(String(d.jobOrder||'')));
  const dbHtml=dbPending.map(a=>{
    const q=(S.quality||[]).find(x=>String(x.id)===String(a.quality_approved_output_id));
-   return `<tr data-v111-source="supabase"><td class="p-2 font-mono text-blue-300">${esc(woNo(a.work_order_id))}<div class="text-[9px] text-slate-500">${esc(String(a.id).slice(0,8))}</div></td><td class="p-2"><b>${esc(woNo(a.work_order_id))}</b><div class="text-[9px] text-amber-300">İrsaliye: ${esc(a.delivery_note_no||'-')} · Muhasebe: ${esc(personName(a.approved_by))}</div></td><td class="p-2">Üretim</td><td class="p-2 font-bold text-emerald-300">${Number(q?.quantity||0)}</td><td class="p-2"><span class="bg-blue-900/70 text-blue-300 px-2 py-1 rounded text-[10px]">Yönetim Onayı Bekliyor</span></td><td class="p-2"><button onclick="v98ManagementApprove('${a.id}')" class="bg-blue-600 hover:bg-blue-500 text-white px-3 py-2 rounded text-[10px] font-bold"><i class="fa-solid fa-check mr-1"></i>Son Onay</button></td></tr>`;
+   // KMI RC-04 item-1 closure (2026-10-08): this row is sourced from the V98 shadow
+   // pipeline (production_accounting_approvals, keyed by work_order_id, not a declaration
+   // id), which has no canonical server RPC equivalent and cannot be routed through
+   // approveManagementRecord(declarationId,...) - there is no declaration id to give it.
+   // The unguarded v98ManagementApprove() writer is retired (see window.v98ManagementApprove
+   // above); this row is now informational only, same treatment as renderManagementV98's
+   // identical V98-sourced rows.
+   return `<tr data-v111-source="supabase"><td class="p-2 font-mono text-blue-300">${esc(woNo(a.work_order_id))}<div class="text-[9px] text-slate-500">${esc(String(a.id).slice(0,8))}</div></td><td class="p-2"><b>${esc(woNo(a.work_order_id))}</b><div class="text-[9px] text-amber-300">İrsaliye: ${esc(a.delivery_note_no||'-')} · Muhasebe: ${esc(personName(a.approved_by))}</div></td><td class="p-2">Üretim</td><td class="p-2 font-bold text-emerald-300">${Number(q?.quantity||0)}</td><td class="p-2"><span class="bg-blue-900/70 text-blue-300 px-2 py-1 rounded text-[10px]">Yönetim Onayı Bekliyor</span></td><td class="p-2"><span class="text-amber-300 text-[10px]">Bu kayıt için onay, kanonik Yönetim Onayı ekranından verilmelidir</span></td></tr>`;
  }).join('');
  const localHtml=localPending.map(d=>{
    const jo=(window.jobOrders||[]).find(j=>String(j.id)===String(d.jobOrder));
@@ -13160,7 +13423,10 @@ function allSearch(q){
  // Muhasebe / Commercial-Accounting reference - requires real Accounting authority (role/screen-based, not name-based).
  if(kmiSearchIsAccounting()||kmiSearchAuthed('ADMIN')){
   try{
-   decl().filter(d=>/Muhasebe/i.test(String(d.status||'')))
+   // KMI RC-04 item 3 fix (2026-10-08): the real post-Management Accounting/Commercial
+   // Documentation status is 'Ticari Belge Onayı Bekliyor', which contains no "Muhasebe"
+   // substring - a plain /Muhasebe/i test silently excluded it from search results.
+   decl().filter(d=>/Muhasebe/i.test(String(d.status||''))||String(d.status||'')==='Ticari Belge Onayı Bekliyor')
     .forEach(d=>add('Muhasebe',d.jobOrder||d.id,`${d.status||''} · ${d.operator||''}`,d.id,null,[d.id,d.jobOrder,d.status].join(' ')));
   }catch(e){}
  }
@@ -15524,7 +15790,16 @@ window.KMI_REJECT_STAGES={
  tesviye:{label:'Tesviye',check:d=>d.status==='Tesviye Bekliyor',needsTarget:true},
  vibrasyon:{label:'Vibrasyon',check:d=>d.status==='Vibrasyon Bekliyor',needsTarget:true},
  kalite:{label:'Kalite',check:d=>d.status==='Kalite Bekliyor'},
- muhasebe:{label:'Muhasebe',check:d=>d.status==='Hazır - Muhasebe Onayı Bekliyor'},
+ // KMI RC-04 item 1/3 fix (2026-10-08): 'muhasebe' re-pointed to the real, live
+ // post-Management Accounting/Commercial Documentation status ('Ticari Belge Onayı
+ // Bekliyor'). The old check ('Hazır - Muhasebe Onayı Bekliyor') was the CANCELLED
+ // pre-Management queue - no UI ever calls kmiOpenRejectModal(...,'muhasebe') for that
+ // status any more (its reject button was retired along with its approval button), so
+ // this stage's reject action had silently become unreachable. declaration_reject_record_
+ // verify's 'muhasebe' stage in the migration already expects this post-Management
+ // position (it invalidates DECLARATION_MANAGEMENT_APPROVE_VERIFIED +
+ // DECLARATION_ACCOUNTING_APPROVE_VERIFIED) - this client-side check now matches it.
+ muhasebe:{label:'Muhasebe/Ticari Belge',check:d=>d.status==='Ticari Belge Onayı Bekliyor'},
  yonetim:{label:'Yönetim',check:d=>d.status==='Yönetim Onayı Bekliyor'},
  sevkiyat:{label:'Sevkiyat',check:d=>d.status==='Sevk Onayı Bekliyor'}
 };
@@ -15537,7 +15812,7 @@ window.KMI_REROUTE_TARGETS=[
  {value:'kalite',label:'Kalite',dStatus:'Kalite Bekliyor',joStatus:'Kalite Onayı Bekliyor'},
  {value:'tesviye',label:'Tesviye',dStatus:'Tesviye Bekliyor',joStatus:'Tesviye Bekliyor'},
  {value:'vibrasyon',label:'Vibrasyon',dStatus:'Vibrasyon Bekliyor',joStatus:'Vibrasyon Bekliyor'},
- {value:'muhasebe',label:'Muhasebe',dStatus:'Hazır - Muhasebe Onayı Bekliyor',joStatus:'Muhasebe Onayı Bekliyor'},
+ {value:'muhasebe',label:'Muhasebe/Ticari Belge',dStatus:'Ticari Belge Onayı Bekliyor',joStatus:'Ticari Belge Onayı Bekliyor'},
  {value:'yonetim',label:'Yönetim',dStatus:'Yönetim Onayı Bekliyor',joStatus:'Yönetim Onayı Bekliyor'},
  {value:'sevkiyat',label:'Sevkiyat',dStatus:'Sevk Onayı Bekliyor',joStatus:'Sevke Hazır'}
 ];
@@ -15687,11 +15962,33 @@ window.kmiRejectDeclaration=async function(declId,stage,reason,target,rerouteTo)
  } else if(stage==='kalite'){
   d.status='Kalite Reddetti - Üretime İade'; if(jo){jo.status='Üretimde';jo.updatedAt=new Date().toISOString();}
  } else if(stage==='muhasebe'){
-  d.status='Kalite Bekliyor'; if(jo){jo.status='Kalite Bekliyor';jo.updatedAt=new Date().toISOString();}
- } else if(stage==='yonetim'){
-  d.status='Hazır - Muhasebe Onayı Bekliyor'; if(jo){jo.status='Muhasebe Onayı Bekliyor';jo.updatedAt=new Date().toISOString();}
- } else if(stage==='sevkiyat'){
+  // KMI RC-04 item 3/6 fix (2026-10-08): 'muhasebe' is now the Accounting/Commercial
+  // Documentation stage, which sits AFTER Management, not after Kalite. The server's
+  // declaration_reject_record_verify already invalidates DECLARATION_MANAGEMENT_APPROVE_
+  // VERIFIED + DECLARATION_ACCOUNTING_APPROVE_VERIFIED for this stage (20261008c) - the
+  // old local rollback ('Kalite Bekliyor') sent the record all the way back to Quality,
+  // three real stages further than the audit trail actually invalidated. One step back is
+  // Management.
   d.status='Yönetim Onayı Bekliyor'; if(jo){jo.status='Yönetim Onayı Bekliyor';jo.updatedAt=new Date().toISOString();}
+ } else if(stage==='yonetim'){
+  // 'yonetim' (Management) reject invalidates FINAL_PRODUCTION_RELEASE_VERIFIED +
+  // DECLARATION_MANAGEMENT_APPROVE_VERIFIED server-side - one step back is Final
+  // Production Release, which has no distinct declaration status of its own (it is a
+  // job-order-level flag, jo.finalProductionReleaseStatus, checked by approveManagementRecord's
+  // own FPR gate). The record stays visible in the Management queue ('Yönetim Onayı
+  // Bekliyor') but is reset so a Production Manager must re-grant Final Production
+  // Release before Management can approve again - it is NOT sent back to the cancelled
+  // pre-Management 'Hazır - Muhasebe Onayı Bekliyor' queue (the old, now-wrong behavior).
+  d.status='Yönetim Onayı Bekliyor'; if(jo){jo.status='Yönetim Onayı Bekliyor';jo.finalProductionReleaseStatus=null;jo.updatedAt=new Date().toISOString();}
+ } else if(stage==='sevkiyat'){
+  // 'sevkiyat' (Shipping) reject invalidates only COMMERCIAL_RELEASE_VERIFIED server-side -
+  // Accounting/Commercial Documentation and Management facts are untouched, so the record
+  // stays ready-to-ship; the next Ship attempt simply re-runs commercial_release_verify
+  // (approveShipment already calls it every time, so this self-heals). The old local
+  // rollback ('Yönetim Onayı Bekliyor') incorrectly forced the record all the way back
+  // through Management AND Accounting again, which the server-side audit trail does not
+  // require.
+  d.status='Sevk Onayı Bekliyor'; if(jo){jo.status='Sevke Hazır';jo.updatedAt=new Date().toISOString();}
  }
  d.updatedAt=new Date().toISOString();
  saveStorage('declarations',declarations);
@@ -15785,8 +16082,8 @@ window.kmiSubmitRejectJobLevel=function(jobId){
 (function(){
 'use strict';
 function esc(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
-const STAGE_LABEL={'Açık':'Açık · Başlamadı','Aktif':'Üretimde','Üretimde':'Üretimde','Tesviye Bekliyor':'Tesviye','Vibrasyon Bekliyor':'Vibrasyon','Kalite Onayı Bekliyor':'Kalite','Kalite Bekliyor':'Kalite','Muhasebe Onayı Bekliyor':'Muhasebe','Yönetim Onayı Bekliyor':'Yönetim','Sevke Hazır':'Sevkiyat','Sevk Edildi / Kapandı':'Kapandı','Tamamlandı (Yönetim Onaylı)':'Kapandı'};
-const STAGE_COLOR={'Kalite':'bg-purple-900/70 text-purple-300','Tesviye':'bg-indigo-900/70 text-indigo-300','Vibrasyon':'bg-indigo-900/70 text-indigo-300','Muhasebe':'bg-amber-900/70 text-amber-300','Yönetim':'bg-blue-900/70 text-blue-300','Sevkiyat':'bg-emerald-900/70 text-emerald-300','Kapandı':'bg-slate-800 text-slate-400','Üretimde':'bg-cyan-900/70 text-cyan-300','Açık · Başlamadı':'bg-slate-800 text-slate-400'};
+const STAGE_LABEL={'Açık':'Açık · Başlamadı','Aktif':'Üretimde','Üretimde':'Üretimde','Tesviye Bekliyor':'Tesviye','Vibrasyon Bekliyor':'Vibrasyon','Kalite Onayı Bekliyor':'Kalite','Kalite Bekliyor':'Kalite','Muhasebe Onayı Bekliyor':'Muhasebe','Yönetim Onayı Bekliyor':'Yönetim','Ticari Belge Onayı Bekliyor':'Muhasebe/Ticari Belge','Sevke Hazır':'Sevkiyat','Sevk Edildi / Kapandı':'Kapandı','Tamamlandı (Yönetim Onaylı)':'Kapandı'};
+const STAGE_COLOR={'Kalite':'bg-purple-900/70 text-purple-300','Tesviye':'bg-indigo-900/70 text-indigo-300','Vibrasyon':'bg-indigo-900/70 text-indigo-300','Muhasebe':'bg-amber-900/70 text-amber-300','Muhasebe/Ticari Belge':'bg-amber-900/70 text-amber-300','Yönetim':'bg-blue-900/70 text-blue-300','Sevkiyat':'bg-emerald-900/70 text-emerald-300','Kapandı':'bg-slate-800 text-slate-400','Üretimde':'bg-cyan-900/70 text-cyan-300','Açık · Başlamadı':'bg-slate-800 text-slate-400'};
 function jobLatestDecl(j){
  const ds=(typeof declarations!=='undefined'&&Array.isArray(declarations)?declarations:[]).filter(d=>String(d.jobOrder)===String(j.id));
  if(!ds.length)return null;
@@ -15796,7 +16093,7 @@ function jobLatestDecl(j){
 // stage-key) bilgisini döner - reject modallerini doğru şekilde açabilmek için.
 function pendingRejectTarget(j,d){
  const status=d?d.status:j.status;
- const map={'Kalite Bekliyor':'kalite','Tesviye Bekliyor':'tesviye','Vibrasyon Bekliyor':'vibrasyon','Hazır - Muhasebe Onayı Bekliyor':'muhasebe','Sevk Onayı Bekliyor':'sevkiyat'};
+ const map={'Kalite Bekliyor':'kalite','Tesviye Bekliyor':'tesviye','Vibrasyon Bekliyor':'vibrasyon','Ticari Belge Onayı Bekliyor':'muhasebe','Sevk Onayı Bekliyor':'sevkiyat'};
  if(d && map[status]) return {kind:'decl',declId:d.id,stage:map[status]};
  if(status==='Yönetim Onayı Bekliyor'){
   if(d) return {kind:'decl',declId:d.id,stage:'yonetim'};
@@ -25428,10 +25725,14 @@ function asRenderRoleFocus(u){
   }
 
   // MUHASEBE: declarations awaiting the real approveDeclarationByMuhasebe()
-  // action - the EXACT SAME filter renderMuhasebeTable already uses.
+  // action. KMI RC-04 item 3 fix (2026-10-08): this used to filter on 'Hazır -
+  // Muhasebe Onayı Bekliyor', the now-cancelled pre-Management queue - this dashboard
+  // count would have silently shown 0 forever for new production once the RC-04
+  // reorder went live, even while real Accounting work was piling up at the new
+  // status. Now matches the exact status renderTicariBelgeOnayi (the live screen) uses.
   if(role==='MUHASEBE'){
     let pendingCount=0;
-    try{ pendingCount=(typeof declarations!=='undefined'?declarations:window.declarations||[]).filter(function(d){ return d.status==='Hazır - Muhasebe Onayı Bekliyor'; }).length; }catch(e){}
+    try{ pendingCount=(typeof declarations!=='undefined'?declarations:window.declarations||[]).filter(function(d){ return d.status==='Ticari Belge Onayı Bekliyor'; }).length; }catch(e){}
     const body='<div class="flex items-center justify-between py-1.5"><div class="text-xs text-white">Muhasebe Onayı Bekleyen</div><span class="text-[9px] font-black '+(pendingCount?'text-amber-300 bg-amber-950/60':'text-slate-400 bg-slate-800/60')+' px-2 py-0.5 rounded-full shrink-0">'+pendingCount+'</span></div>';
     parts.push('<div class="bg-slate-900/60 border border-amber-800/60 rounded-2xl p-4"><b class="text-sm text-white"><i class="fa-solid fa-book text-amber-400 mr-1"></i>Muhasebe Bekleyenler</b><div class="mt-2">'+body+'</div></div>');
   }
