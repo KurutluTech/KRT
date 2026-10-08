@@ -17,9 +17,9 @@
          `git blame`/diffs on this file quiet between releases and avoid a
          commit-hash feedback loop (the source commit's SHA cannot depend on
          a value computed from that same SHA). See docs/KMI_DEPLOY_ID.md. -->
-    <meta name="kmi-source-commit" content="ad38677c0e56458106d3f024021d63e2a858e3a4">
-    <meta name="kmi-build-id" content="ad38677c0e56-20261008T093418Z">
-    <meta name="kmi-built-at" content="2026-10-08T09:34:18.812Z">
+    <meta name="kmi-source-commit" content="23ceec520e983e298ed09754bfe01fe3dc9ca2aa">
+    <meta name="kmi-build-id" content="23ceec520e98-20261008T193153Z">
+    <meta name="kmi-built-at" content="2026-10-08T19:31:53.347Z">
     <script>
       // Derived from the meta tags above at runtime, so there is exactly one
       // place (the meta tags) where the build script substitutes real
@@ -15624,6 +15624,28 @@ window.kmiRejectDeclaration=async function(declId,stage,reason,target,rerouteTo)
  // mutasyondan (d.rejections dahil) ÖNCE, hard fail-closed - reddedilirse hiçbir iz
  // (in-memory dahil) bırakılmaz.
  const __rerouteTarget=(rerouteTo && currentUser && typeof canManagementApprove==='function' && canManagementApprove(currentUser))?(window.KMI_REROUTE_TARGETS||[]).find(x=>x.value===rerouteTo):null;
+ // KMI RC-03 FINAL SECURITY CLOSURE (2026-10-08): reject was 100% client-side/localStorage
+ // before this - no server record of it ever existed, so a stale approval from a rejected
+ // cycle could still satisfy sequencing for direct-RPC calls in the new cycle
+ // (declaration_prior_step_audited had no reject-cycle boundary to check against). This
+ // RPC call is the server-authoritative signal that closes that gap, recorded BEFORE any
+ // local mutation, hard fail-closed, for BOTH the default "send back one step" path and
+ // the manager reroute-to-department path below (p_rerouted tells the server which
+ // invalidation scope to apply - see the migration for why a reroute is treated as a full,
+ // conservative reset rather than guessing a narrower one).
+ {
+  const __rejClient=window.kurutluSupabase;
+  if(!__rejClient || typeof __rejClient.rpc!=='function'){ alert('Reddetme KAYDEDİLMEDİ: sunucu bağlantısı (Supabase) bu oturumda kullanılamıyor.'); return; }
+  try{
+   const __rejRes=await __rejClient.rpc('declaration_reject_record_verify',{p_declaration_id:String(declId),p_stage:String(stage),p_rerouted:!!__rerouteTarget});
+   if(__rejRes.error) throw new Error(__rejRes.error.message||'Sunucu yetkiyi doğrulamadı.');
+   if(!__rejRes.data || !__rejRes.data.verified) throw new Error('Sunucudan geçersiz doğrulama yanıtı alındı.');
+  }catch(__rejE){
+   alert('Reddetme KAYDEDİLMEDİ: sunucu yetkinizi doğrulayamadı ('+(__rejE&&__rejE.message||'bilinmeyen hata')+'). Lütfen bağlantınızı kontrol edip tekrar deneyin.');
+   console.warn('[KMI-RC03-CLOSURE] declaration_reject_record_verify HARD FAIL-CLOSED - yerel reddetme YAZILMADI:',__rejE);
+   return;
+  }
+ }
  if(__rerouteTarget){
   const __client=window.kurutluSupabase;
   if(!__client || typeof __client.rpc!=='function'){ alert('Yönlendirme KAYDEDİLMEDİ: sunucu bağlantısı (Supabase) bu oturumda kullanılamıyor.'); return; }
