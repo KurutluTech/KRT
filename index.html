@@ -17,9 +17,9 @@
          `git blame`/diffs on this file quiet between releases and avoid a
          commit-hash feedback loop (the source commit's SHA cannot depend on
          a value computed from that same SHA). See docs/KMI_DEPLOY_ID.md. -->
-    <meta name="kmi-source-commit" content="__KMI_BUILD_SOURCE_COMMIT__">
-    <meta name="kmi-build-id" content="__KMI_BUILD_ID__">
-    <meta name="kmi-built-at" content="__KMI_BUILD_BUILT_AT__">
+    <meta name="kmi-source-commit" content="902e1e8b30160d5f2b7fe84052aeb20e636b943a">
+    <meta name="kmi-build-id" content="902e1e8b3016-20261007T223925Z">
+    <meta name="kmi-built-at" content="2026-10-07T22:39:25.702Z">
     <script>
       // Derived from the meta tags above at runtime, so there is exactly one
       // place (the meta tags) where the build script substitutes real
@@ -3128,6 +3128,233 @@ ead>
         // durumu UNKNOWN olduğunu (yani otomatik üretim kredisi/sevkiyatın artık sessizce
         // atlandığını) listeler - "manuel onay gerektiren durum" için görünürlük sağlar, hiçbir
         // veri değiştirmez/yazmaz.
+        // ===========================================================================
+        // KMI-R5 MASTER #23 OWNER-APPROVED CANONICAL REMEDIATION (GOLDEN-THREAD-SIM-002
+        // Owner Decision Addendum, 2026-10-07, "1. OPERATION-LEVEL QUANTITY TRUTH —
+        // APPROVED"). Required semantic separation: WORK ORDER TARGET QTY !=
+        // OPERATION INPUT QTY != OPERATION THROUGHPUT != OPERATION GOOD/SCRAP/REWORK !=
+        // PRODUCED GOOD != ROUTING COMPLETE != FINISHED GOODS != RELEASED != SHIPPED.
+        //
+        // Per the Owner's explicit instruction ("prefer extending canonical existing
+        // identity over creating a parallel engine"), this reuses the EXACT SAME
+        // machine/op matching rule already proven above in
+        // kmiRoutingEvaluateFinalOperation/kmiRoutingEvaluateQuantityDefiningOperation
+        // (which currently each duplicate this matching block independently - a
+        // pre-existing, already-present duplication, not introduced by this round).
+        // window.kmiRoutingResolveCurrentStepIndex is the ONE new canonical "which
+        // routeStep does this job order correspond to RIGHT NOW" resolver; it does not
+        // replace or alter either existing evaluator (both are left untouched, byte for
+        // byte, to avoid any risk of regressing their already-tested FINAL/QDO
+        // behavior) - it is used ONLY by the new Operation Execution model below.
+        // Fail-closed: UNKNOWN in any ambiguous/undefined case, exactly mirroring the
+        // existing evaluators' own discipline.
+        window.kmiRoutingResolveCurrentStepIndex=function(jobOrder){
+            try{
+                if(!jobOrder) return {status:'UNKNOWN',reasonCode:'NO_JOB_ORDER',evidence:{}};
+                if(!jobOrder.productId) return {status:'UNKNOWN',reasonCode:'NO_PRODUCT_LINK',evidence:{jobOrderId:jobOrder.id||null}};
+                const prod=(window.D?.products||[]).find(p=>String(p.id)===String(jobOrder.productId));
+                if(!prod) return {status:'UNKNOWN',reasonCode:'PRODUCT_NOT_FOUND',evidence:{jobOrderId:jobOrder.id||null,productId:jobOrder.productId}};
+                if(jobOrder.revision!=null && String(jobOrder.revision).trim() && prod.revision!=null && String(prod.revision).trim()){
+                    const joRev=String(jobOrder.revision).trim().toLocaleUpperCase('tr-TR');
+                    const pRev=String(prod.revision).trim().toLocaleUpperCase('tr-TR');
+                    if(joRev!==pRev) return {status:'UNKNOWN',reasonCode:'REVISION_MISMATCH',evidence:{jobOrderId:jobOrder.id||null,productId:jobOrder.productId,jobOrderRevision:jobOrder.revision,productRevision:prod.revision}};
+                }
+                const steps=(Array.isArray(prod.routeSteps)?prod.routeSteps:[]).filter(s=>s&&String(s.op||'').trim());
+                if(steps.length===0) return {status:'UNKNOWN',reasonCode:'NO_ROUTING_DEFINED',evidence:{jobOrderId:jobOrder.id||null,productId:jobOrder.productId,stepCount:0}};
+                const codeOf=s=>String(s).split('-')[0].trim().toLocaleUpperCase('tr-TR');
+                const jm=String(jobOrder.machine||'').trim();
+                const jop=String(jobOrder.operation||'').trim().toLocaleUpperCase('tr-TR');
+                const matches=[];
+                steps.forEach((s,i)=>{
+                    const sm=String(s.machine||'').trim();
+                    const sop=String(s.op||'').trim().toLocaleUpperCase('tr-TR');
+                    const machineMatch = jm && sm && (jm===sm || codeOf(jm)===codeOf(sm));
+                    const opMatch = jop && sop && jop===sop;
+                    if(machineMatch || opMatch) matches.push(i);
+                });
+                if(matches.length===0) return {status:'UNKNOWN',reasonCode:'CURRENT_OPERATION_NOT_RESOLVED',evidence:{jobOrderId:jobOrder.id||null,productId:jobOrder.productId,jobOrderMachine:jobOrder.machine||null,jobOrderOperation:jobOrder.operation||null,routeStepCount:steps.length}};
+                if(matches.length>1) return {status:'UNKNOWN',reasonCode:'CURRENT_OPERATION_AMBIGUOUS',evidence:{jobOrderId:jobOrder.id||null,productId:jobOrder.productId,matchedIndices:matches}};
+                return {status:'RESOLVED',reasonCode:'MATCHED',index:matches[0],step:steps[matches[0]],totalSteps:steps.length,routeSteps:steps};
+            }catch(e){
+                return {status:'UNKNOWN',reasonCode:'ROUTING_EVAL_ERROR',evidence:{error:String(e&&e.message||e)}};
+            }
+        };
+        // Per-routing-operation execution/progress record. Canonical identity = WO
+        // (jo.id) + routing-operation index (resolved above). Additive: jo.opProgress
+        // is a NEW array field, created lazily; nothing existing is removed or
+        // restructured. One record per distinct routeStep this job order has actually
+        // visited - never fabricated for steps never reached (§ "do not fabricate
+        // historical operation quantities / legacy records without evidence remain
+        // UNKNOWN").
+        // Locally-scoped numeric coercion, deliberately NOT relying on the file's
+        // later `const N=` definitions (lines 6409+), all of which are AFTER this
+        // insertion point - this block must not depend on script/lexical-scope
+        // ordering elsewhere in the file.
+        function kmiOpN(v){ const x=Number(v); return Number.isFinite(x)?x:0; }
+        function kmiOpProgressList(jo){ jo.opProgress=Array.isArray(jo.opProgress)?jo.opProgress:[]; return jo.opProgress; }
+        function kmiOpFindRecord(jo,index){ return kmiOpProgressList(jo).find(r=>r.routeStepIndex===index)||null; }
+        function kmiOpCreateRecord(jo,idRes){
+            const rec={
+                routeStepIndex:idRes.index, routeStepOp:idRes.step.op||null, machine:jo.machine||null,
+                // KMI-R5 SIM-002 ADDENDUM NOTE (documented simplification, not fabrication):
+                // KMI has no formal upstream material-allocation/issue concept yet (see the
+                // raw-material canonical model work, tracked separately) so "input qty" for
+                // a routing operation is recorded as the WORK ORDER's own target quantity -
+                // the best currently-available fact, not an invented one. If/when a real
+                // per-operation input-allocation concept exists, this should read from it
+                // instead.
+                inputQty:kmiOpN(jo.targetQty), goodQty:0, scrapQty:0, reworkQty:0,
+                operator:null, startedAt:null, completedAt:null, createdAt:new Date().toISOString()
+            };
+            kmiOpProgressList(jo).push(rec);
+            return rec;
+        }
+        // createIfMissing=false -> read-only (never creates/mutates); true -> get-or-
+        // create (used by the production-entry writers, which are the only legitimate
+        // creators of a new operation-execution record).
+        window.kmiOpGetRecord=function(jo,createIfMissing){
+            const idRes=window.kmiRoutingResolveCurrentStepIndex(jo);
+            if(idRes.status!=='RESOLVED') return {idRes,record:null};
+            let rec=kmiOpFindRecord(jo,idRes.index);
+            if(!rec && createIfMissing) rec=kmiOpCreateRecord(jo,idRes);
+            return {idRes,record:rec};
+        };
+        // Read-only, canonical "remaining qty AT THIS OPERATION" - targetQty is the
+        // best-available input-qty fact (see kmiOpCreateRecord note above).
+        window.kmiOpRemainingQty=function(jo,rec){ try{ return Math.max(0,kmiOpN(jo.targetQty)-kmiOpN(rec.goodQty)); }catch(e){ return null; } };
+
+        // ===========================================================================
+        // KMI-R5 MASTER #23 OWNER-APPROVED CANONICAL REMEDIATION (Owner Decision
+        // Addendum, 2026-10-07, "2. RAW-MATERIAL CONSUMPTION — CANONICAL MODEL
+        // APPROVED"). Required chain: RAW MATERIAL LOT -> ALLOCATION/RESERVATION ->
+        // ISSUE TO WORK ORDER -> PHYSICAL CONSUMPTION EVENT -> WIP.
+        //
+        // Honest scope note (minimal canonical model, not a new stock engine):
+        // ALLOCATION/RESERVATION and ISSUE TO WORK ORDER are represented by the
+        // EXISTING jo.materialLotId link (the "Kaynak Planla" assignment, unchanged,
+        // pre-existing mechanism) - this remediation does NOT invent a new, separate
+        // reserved-quantity ledger on top of lot.blankAvailable, which would risk
+        // colliding with MASTER #8's ownership of canonical Stock Truth reconciliation
+        // across the four stock sources (explicitly prohibited: "Do not merge
+        // V118_SALES_STOCK, PURCHASE_ITEM_MRP, RAW_MATERIAL_LOT and WMS_LEDGER
+        // opportunistically"). What WAS proven completely missing in SIM-002, and is
+        // implemented here, is the canonical PHYSICAL CONSUMPTION EVENT stage: one
+        // idempotent, auditable event per work order, firing exactly once at the
+        // Product/Revision's explicitly-declared material-consumption operation - not
+        // once per station as the pre-existing hardcoded decrement did.
+        //
+        // MATERIAL CONSUMPTION OPERATION != QUANTITY-DEFINING OPERATION (Addendum
+        // §2): a wholly separate product field (materialConsumptionOperation) and a
+        // wholly separate evaluator - never reusing kmiIsQuantityDefiningOperationJobOrder
+        // or its evaluator. Resolved via the SAME canonical machine/op matching
+        // algorithm as the other routing evaluators (mirrors
+        // kmiRoutingEvaluateQuantityDefiningOperation's own pattern exactly), never
+        // inferred from machine 101, machine name/code, CNC, first/last operation,
+        // Quality approval, or the quantity-defining operation - all of which the
+        // Owner explicitly prohibited as inference signals. A product with no
+        // materialConsumptionOperation defined gets UNKNOWN/NO_MATERIAL_CONSUMPTION_
+        // OPERATION_DEFINED from every function below and is completely unaffected -
+        // this is why the existing hardcoded machine-101/materialLotId decrement in
+        // approveKalite is NOT removed by this change (Addendum: "Remove/retire...
+        // only after the canonical replacement is... tested and proven") - it simply
+        // never resolves to MATERIAL_CONSUMPTION for any pre-existing real product,
+        // none of which define this new field yet.
+        window.kmiRoutingEvaluateMaterialConsumptionOperation=function(jobOrder){
+            try{
+                if(!jobOrder) return {status:'UNKNOWN',reasonCode:'NO_JOB_ORDER',evidence:{}};
+                if(!jobOrder.productId) return {status:'UNKNOWN',reasonCode:'NO_PRODUCT_LINK',evidence:{jobOrderId:jobOrder.id||null}};
+                const prod=(window.D?.products||[]).find(p=>String(p.id)===String(jobOrder.productId));
+                if(!prod) return {status:'UNKNOWN',reasonCode:'PRODUCT_NOT_FOUND',evidence:{jobOrderId:jobOrder.id||null,productId:jobOrder.productId}};
+                const mcoText=String(prod.materialConsumptionOperation||'').trim();
+                if(!mcoText) return {status:'UNKNOWN',reasonCode:'NO_MATERIAL_CONSUMPTION_OPERATION_DEFINED',evidence:{jobOrderId:jobOrder.id||null,productId:jobOrder.productId}};
+                const steps=(Array.isArray(prod.routeSteps)?prod.routeSteps:[]).filter(s=>s&&String(s.op||'').trim());
+                if(steps.length===0) return {status:'UNKNOWN',reasonCode:'NO_ROUTING_DEFINED',evidence:{jobOrderId:jobOrder.id||null,productId:jobOrder.productId}};
+                const mcoNorm=mcoText.toLocaleUpperCase('tr-TR');
+                const mcoIdx=steps.findIndex(s=>String(s.op||'').trim().toLocaleUpperCase('tr-TR')===mcoNorm);
+                if(mcoIdx===-1) return {status:'UNKNOWN',reasonCode:'MATERIAL_CONSUMPTION_OPERATION_NOT_IN_ROUTE',evidence:{jobOrderId:jobOrder.id||null,productId:jobOrder.productId,materialConsumptionOperation:mcoText}};
+                const idRes=window.kmiRoutingResolveCurrentStepIndex(jobOrder);
+                if(idRes.status!=='RESOLVED') return {status:'UNKNOWN',reasonCode:idRes.reasonCode,evidence:idRes.evidence||{}};
+                if(idRes.index===mcoIdx){
+                    return {status:'MATERIAL_CONSUMPTION_OPERATION',reasonCode:'MATCHED_MATERIAL_CONSUMPTION_STEP',evidence:{jobOrderId:jobOrder.id||null,productId:jobOrder.productId,matchedIndex:idRes.index,materialConsumptionIndex:mcoIdx,matchedStep:idRes.step}};
+                }
+                return {status:'NOT_MATERIAL_CONSUMPTION_OPERATION',reasonCode:'DIFFERENT_STEP_MATCHED',evidence:{jobOrderId:jobOrder.id||null,productId:jobOrder.productId,matchedIndex:idRes.index,materialConsumptionIndex:mcoIdx}};
+            }catch(e){
+                return {status:'UNKNOWN',reasonCode:'MCO_EVAL_ERROR',evidence:{error:String(e&&e.message||e)}};
+            }
+        };
+        window.kmiIsMaterialConsumptionOperationJobOrder=function(jo){
+            try{ return window.kmiRoutingEvaluateMaterialConsumptionOperation(jo).status==='MATERIAL_CONSUMPTION_OPERATION'; }
+            catch(e){ return false; }
+        };
+        // The canonical, idempotent, auditable PHYSICAL CONSUMPTION EVENT writer.
+        // Fail-closed: returns a non-CONSUMED status (never throws, never silently
+        // decrements) whenever: no lot is linked, no materialConsumptionOperation is
+        // defined for the product, routing identity is UNKNOWN, or the job order is
+        // not currently AT the declared consumption operation (so a downstream
+        // station's own Quality approval does not re-trigger consumption). Idempotency
+        // key = jobOrderId: one physical work order consumes its linked lot's material
+        // exactly once, no matter how many times this is called for the same WO
+        // (re-approval/correction/retry safe) - this is the direct fix for the proven
+        // SIM-002 defect (5000->4900->4800->4700 across 3 stations for one 100-unit
+        // batch). The event is appended to window.D.materialConsumptionEvents (new,
+        // additive, append-only canonical log - never fabricated for historical
+        // declarations that predate this remediation).
+        window.kmiMaterialConsumeForJobOrder=function(jo,qty,actorSource){
+            try{
+                if(!jo) return {status:'NO_JOB_ORDER'};
+                if(!jo.materialLotId) return {status:'NO_LOT_LINKED',jobOrderId:jo.id||null};
+                const mcoEval=window.kmiRoutingEvaluateMaterialConsumptionOperation(jo);
+                if(mcoEval.status==='UNKNOWN') return {status:'UNKNOWN',reasonCode:mcoEval.reasonCode,jobOrderId:jo.id||null};
+                if(mcoEval.status==='NOT_MATERIAL_CONSUMPTION_OPERATION') return {status:'NOT_MATERIAL_CONSUMPTION_OPERATION',jobOrderId:jo.id||null};
+                // mcoEval.status === 'MATERIAL_CONSUMPTION_OPERATION' from here on.
+                window.D.materialConsumptionEvents=Array.isArray(window.D.materialConsumptionEvents)?window.D.materialConsumptionEvents:[];
+                const existing=window.D.materialConsumptionEvents.find(e=>String(e.jobOrderId)===String(jo.id));
+                if(existing) return {status:'ALREADY_CONSUMED',jobOrderId:jo.id||null,event:existing};
+                const q=Number(qty)||0;
+                if(q<=0) return {status:'NO_QUANTITY_TO_CONSUME',jobOrderId:jo.id||null};
+                const lot=(window.D.lots||[]).find(l=>l.id===jo.materialLotId);
+                if(!lot) return {status:'LOT_NOT_FOUND',jobOrderId:jo.id||null,lotId:jo.materialLotId};
+                const event={
+                    id:'MCE-'+Date.now().toString(36).toUpperCase()+'-'+Math.random().toString(36).slice(2,6).toUpperCase(),
+                    jobOrderId:jo.id, productId:jo.productId||null, revision:jo.revision||null,
+                    routingOperationIndex:mcoEval.evidence.matchedIndex, routingOperationOp:(mcoEval.evidence.matchedStep||{}).op||null,
+                    lotId:jo.materialLotId, qty:q, unit:'adet', source:actorSource||'APPROVE_KALITE_CANONICAL',
+                    createdAt:new Date().toISOString()
+                };
+                lot.blankAvailable=Math.max(0,Number(lot.blankAvailable||0)-q);
+                window.D.materialConsumptionEvents.push(event);
+                try{window.save?.();}catch(e){}
+                try{window.KMI?.event?.('MATERIAL_CONSUMPTION_EVENT','JOB_ORDER',jo.id,{label:'Ham madde fiziksel tüketim olayı: '+event.id,qty:q,lotId:jo.materialLotId,source:'MASTER_23_CANONICAL'});}catch(e){}
+                return {status:'CONSUMED',jobOrderId:jo.id||null,event};
+            }catch(e){
+                return {status:'CONSUME_ERROR',error:String(e&&e.message||e)};
+            }
+        };
+        // KMI-R5 (FOUNDATION/GOLDEN THREAD FINAL CLOSURE §2, "FINISH MASTER #8 MIGRATION
+        // SAFETY"): read-only diagnostic - never auto-merges, never auto-fills, never
+        // invents a value. Lists every Product/Revision missing the canonical
+        // materialConsumptionOperation field, and flags which of those are genuinely
+        // "at risk" (have at least one job order with a raw-material LOT linked, i.e. a
+        // job order where automatic material consumption would actually apply once this
+        // field is completed). This is the "clear remediation list of products/revisions
+        // requiring Owner/master data completion" the directive asks for - it does not
+        // decide what the value should be, it only surfaces who needs one.
+        window.kmiR5MaterialConsumptionOperationRemediationList=function(){
+            try{
+                const products=(window.D&&Array.isArray(window.D.products))?window.D.products:[];
+                const jos=(typeof jobOrders!=='undefined'&&Array.isArray(jobOrders))?jobOrders:(Array.isArray(window.jobOrders)?window.jobOrders:[]);
+                const missing=products.filter(p=>p&&!String(p.materialConsumptionOperation||'').trim());
+                const items=missing.map(function(p){
+                    const linkedJos=jos.filter(function(j){return j&&String(j.productId)===String(p.id)&&j.materialLotId;});
+                    return {
+                        productId:p.id, productName:p.name||p.item||null, revision:p.revision||null,
+                        atRisk:linkedJos.length>0, linkedJobOrderCount:linkedJos.length,
+                        linkedJobOrderIds:linkedJos.map(function(j){return j.id;})
+                    };
+                });
+                return { total:items.length, atRiskCount:items.filter(function(x){return x.atRisk;}).length, items:items };
+            }catch(e){ return { total:0, atRiskCount:0, items:[], error:String(e&&e.message||e) }; }
+        };
         window.kmiRoutingListUnknownFinalOperationJobOrders=function(){
             try{
                 const list=(typeof jobOrders!=='undefined'?jobOrders:(window.jobOrders||[]));
@@ -3143,11 +3370,19 @@ ead>
             // declaration_quality_approve_verify RPC) yeniden doğrulanır ve audit_log'a
             // kaydedilir. Sunucu reddederse/ulaşılamazsa HARD FAIL-CLOSED: yerel durum
             // değiştirilmez - bkz. approveDeclarationByMuhasebe'deki aynı desen (DEF-013).
+            //
+            // KMI RC-03 FINAL SECURITY RELEASE GATE (2026-10-08): declaration lookup
+            // moved BEFORE the RPC call (it used to happen after) so the real job order id
+            // (d.jobOrder) can be sent to the server-side RPC as p_job_order_id - the RPC
+            // uses this for its own authoritative Quality HOLD check
+            // (declaration_job_order_on_hold_safe), never a client-asserted flag. Nothing
+            // else about this lookup changed.
+            const d = declarations.find(x => x.id === declId);
             {
                 const client = window.kurutluSupabase;
                 if (!client || typeof client.rpc !== 'function') { alert('Onay KAYDEDİLMEDİ: sunucu bağlantısı (Supabase) bu oturumda kullanılamıyor.'); return; }
                 try {
-                    const res = await client.rpc('declaration_quality_approve_verify', { p_declaration_id: String(declId) });
+                    const res = await client.rpc('declaration_quality_approve_verify', { p_declaration_id: String(declId), p_job_order_id: d ? String(d.jobOrder) : null });
                     if (res.error) throw new Error(res.error.message || 'Sunucu yetkiyi doğrulamadı.');
                     if (!res.data || !res.data.verified) throw new Error('Sunucudan geçersiz doğrulama yanıtı alındı.');
                 } catch (e) {
@@ -3156,7 +3391,6 @@ ead>
                     return;
                 }
             }
-            const d = declarations.find(x => x.id === declId);
             // KMI-TRUTH-REMEDIATION-CHECKPOINT-001 (2026-10-01, T8/N4): approveShipment
             // zaten aynı deklarasyon üzerinde tekrar/duplicate çağrıya karşı bir durum
             // (status) denetimiyle korunuyordu (`d.status!=='Sevk Onayı Bekliyor'` guard'ı),
@@ -3199,8 +3433,43 @@ ead>
                             lot.blankAvailable=Number(lot.blankAvailable||0)+Number(d.qualityGood||0);
                             try{window.save?.();}catch(e){}
                         }else if(jo.materialLotId && totalQty>0){
-                            const lot=window.D.lots.find(l=>l.id===jo.materialLotId);
-                            if(lot){ lot.blankAvailable=Math.max(0,Number(lot.blankAvailable||0)-totalQty); try{window.save?.();}catch(e){} }
+                            // KMI-R5 MASTER #23 Owner Addendum §2 wiring (2026-10-07): if
+                            // and ONLY if this product has explicitly declared a canonical
+                            // materialConsumptionOperation (a new, opt-in field - no existing
+                            // product defines it yet, so this branch is a pure no-op for
+                            // every pre-existing product/job order, preserving 100% of
+                            // current production behavior), route through the new
+                            // idempotent, auditable, fail-closed consumption-event engine
+                            // INSTEAD of the unconditional legacy decrement that used to run
+                            // unconditionally here - that legacy decrement was exactly the
+                            // proven SIM-002 repeated-decrement defect (fires on every
+                            // station's Quality approval, not just the physical consumption
+                            // point).
+                            //
+                            // KMI-R5 (FOUNDATION/GOLDEN THREAD FINAL CLOSURE §2, "FINISH
+                            // MASTER #8 MIGRATION SAFETY", 2026-10-07): the Owner Addendum's
+                            // original wiring (above) kept the unconditional legacy decrement
+                            // as the ELSE branch for any product without the new field - every
+                            // pre-existing product, since none defined it - so this was, in the
+                            // directive's own words, "the dangerous final state where products
+                            // without this field can continue silently using repeated legacy
+                            // consumption semantics". That silent fallback is retired here: a
+                            // product with no explicit materialConsumptionOperation now FAILS
+                            // CLOSED for automatic material consumption (VERİ GEREKLİ/UNKNOWN) -
+                            // it does NOT keep decrementing, and this file does NOT mass-invent
+                            // a materialConsumptionOperation value for any product to work
+                            // around that (explicitly prohibited). No historical lot/event data
+                            // already created by the old decrement is touched, deleted, or
+                            // rewritten - this only changes what happens on the NEXT Quality
+                            // approval going forward. See window.kmiR5MaterialConsumptionOperationRemediationList()
+                            // for the live list of products/revisions this blocks until Owner/
+                            // master-data completion defines their real consumption operation.
+                            const prodForMco=(window.D.products||[]).find(p=>String(p.id)===String(jo.productId));
+                            if(prodForMco && String(prodForMco.materialConsumptionOperation||'').trim()){
+                                try{ window.kmiMaterialConsumeForJobOrder(jo,totalQty,'APPROVE_KALITE_CANONICAL'); }catch(e){ console.error('[MASTER #23 canonical material consumption]',e); }
+                            }else{
+                                console.warn('[MASTER #8 - ham madde tüketimi FAIL CLOSED] Ürün '+(jo.productId||'?')+' için materialConsumptionOperation tanımlı değil (VERİ GEREKLİ) - otomatik ham madde düşümü atlandı, LOT değiştirilmedi (iş emri '+jo.id+').');
+                            }
                         }
                     }
                 }catch(e){ console.error('[Ham madde otomatik güncelleme]',e); }
@@ -3384,7 +3653,7 @@ ead>
             const client=window.kurutluSupabase;
             if(!client || typeof client.rpc!=='function'){ alert('Onay KAYDEDİLMEDİ: sunucu bağlantısı (Supabase) bu oturumda kullanılamıyor.'); return; }
             try{
-                const res=await client.rpc('declaration_accounting_approve_verify',{p_declaration_id:String(declId),p_delivery_note_no:irs.trim()});
+                const res=await client.rpc('declaration_accounting_approve_verify',{p_declaration_id:String(declId),p_delivery_note_no:irs.trim(),p_job_order_id:d?String(d.jobOrder):null});
                 if(res.error) throw new Error(res.error.message||'Sunucu yetkiyi doğrulamadı.');
                 if(!res.data || !res.data.verified) throw new Error('Sunucudan geçersiz doğrulama yanıtı alındı.');
             }catch(e){
@@ -3457,8 +3726,14 @@ ead>
             // RPC, is_management(), audit_log) burada da uygulanır.
             const client=window.kurutluSupabase;
             if(!client || typeof client.rpc!=='function'){ alert('Onay KAYDEDİLMEDİ: sunucu bağlantısı (Supabase) bu oturumda kullanılamıyor.'); return; }
+            // KMI RC-03 FINAL SECURITY RELEASE GATE (2026-10-08): resolve the real job
+            // order id BEFORE the RPC call so it can be sent as p_job_order_id - for
+            // type==='declaration' this is the linked job order (same lookup the FPR gate
+            // below already performs); for any other type, `id` already IS the job order
+            // id (this is the direct, non-declaration job-order close path).
+            const __mgmtJobOrderId = type==='declaration' ? (declarations.find(x=>x.id===id)||{}).jobOrder : id;
             try{
-                const res=await client.rpc('declaration_management_approve_verify',{p_declaration_id:String(id),p_record_type:type});
+                const res=await client.rpc('declaration_management_approve_verify',{p_declaration_id:String(id),p_record_type:type,p_job_order_id:__mgmtJobOrderId?String(__mgmtJobOrderId):null});
                 if(res.error) throw new Error(res.error.message||'Sunucu yetkiyi doğrulamadı.');
                 if(!res.data || !res.data.verified) throw new Error('Sunucudan geçersiz doğrulama yanıtı alındı.');
             }catch(e){
@@ -5746,6 +6021,35 @@ approveShipment=async function(id){if(!currentUser||!(getEffectiveRole(currentUs
      }
    }
  }catch(e){ console.error('[QMS shipment first-piece gate]',e); return alert('SEVKİYAT ENGELLENDİ: İlk parça durumu doğrulanırken beklenmeyen bir hata oluştu. Güvenlik nedeniyle sevkiyat yapılamadı.'); }
+ // KMI-R5 (FOUNDATION/GOLDEN THREAD FINAL CLOSURE §1, "CANONICAL RELEASE CHAIN -
+ // FINALIZE"): this declaration/job-order shipment path (the one the real Golden
+ // Thread run SIM-003 exercised) and window.v118Ship (the Sales-Order-line manual
+ // shipment path) are the two live shipment writers in this file. v118Ship already
+ // consults the canonical Commercial Release evaluator (window.kmiR5ShipmentCommercialReleaseClassifyLine,
+ // itself built on window.kmiR5CommercialReleaseEvaluate/ByJobOrder) before shipping -
+ // this path did not, so a job-order-driven shipment could reach SHIPPED without ever
+ // being evaluated against Commercial Documentation + Management Release + canonical
+ // Quality blockers as ONE combined fact, even though each of those facts is already
+ // individually enforced earlier in THIS SAME chain (approveDeclarationByMuhasebe,
+ // approveManagementRecord's Final Production Release gate, the HOLD/First-Piece
+ // checks just above). This closes that asymmetry by reusing the SAME evaluator
+ // v118Ship already uses - NOT a new/parallel release engine, NOT a second human
+ // approval click (COMMERCIAL_RELEASED is system-evaluated, per directive §1's own
+ // "Commercial Release may be system-evaluated when all required commercial
+ // conditions/documents are satisfied"). Only the provably-blocked class
+ // (COMMERCIAL_BLOCKED) fails shipment closed; UNKNOWN (e.g. no linked job order -
+ // structurally impossible here since joForHold is already required above, but kept
+ // fail-open for symmetry with v118Ship's own MISSING_RELATIONSHIP/MISSING_REQUIRED_EVIDENCE
+ // handling) never fabricates a block with no evidence. Fails CLOSED on an evaluator
+ // exception, matching every other gate in this function.
+ try{
+   if(typeof window.kmiR5CommercialReleaseEvaluate==='function'){
+     const crEv=window.kmiR5CommercialReleaseEvaluate(d.id);
+     if(crEv && crEv.status==='COMMERCIAL_BLOCKED'){
+       return alert('SEVKİYAT ENGELLENDİ: Ticari serbest bırakma (Commercial Release) koşulları sağlanmadı - '+crEv.message);
+     }
+   }
+ }catch(e){ console.error('[QMS/CR shipment commercial-release gate]',e); return alert('SEVKİYAT ENGELLENDİ: Ticari serbest bırakma durumu doğrulanırken beklenmeyen bir hata oluştu. Güvenlik nedeniyle sevkiyat yapılamadı.'); }
  // BACKLOG-3.1 (Master Entegrasyon): bu GERÇEK/canlı approveShipment kopyası (yukarıdaki
  // KMI-QMS-FAZ1 KRİTİK BULGU notuna bakınız - dosyada bundan önceki 3 kopya ölü koddur).
  // Sevkiyat Kalite Serbest Belgesi burada, HOLD kontrolü temiz geçtikten hemen sonra kesilir.
@@ -5768,7 +6072,7 @@ approveShipment=async function(id){if(!currentUser||!(getEffectiveRole(currentUs
    const __shipClient=window.kurutluSupabase;
    if(!__shipClient || typeof __shipClient.rpc!=='function'){ return alert('Sevkiyat KAYDEDİLMEDİ: sunucu bağlantısı (Supabase) bu oturumda kullanılamıyor.'); }
    try{
-     const __shipRes=await __shipClient.rpc('declaration_shipment_approve_verify',{p_declaration_id:String(id),p_delivery_note_no:irs.trim(),p_vehicle_plate:plate.trim().toLocaleUpperCase('tr-TR')});
+     const __shipRes=await __shipClient.rpc('declaration_shipment_approve_verify',{p_declaration_id:String(id),p_delivery_note_no:irs.trim(),p_vehicle_plate:plate.trim().toLocaleUpperCase('tr-TR'),p_job_order_id:String(d.jobOrder)});
      if(__shipRes.error) throw new Error(__shipRes.error.message||'Sunucu yetkiyi doğrulamadı.');
      if(!__shipRes.data || !__shipRes.data.verified) throw new Error('Sunucudan geçersiz doğrulama yanıtı alındı.');
    }catch(e){
@@ -6493,6 +6797,16 @@ setTimeout(()=>{if((typeof getEffectiveRole==='function'?getEffectiveRole(window
   // yeni operatör ataması için "Operatör Ataması Bekliyor" listesine düşer.
   window.confirmMachineTransfer=function(){
     const id=transferJobId||document.getElementById('declJobOrder')?.value; const j=jobOrders.find(x=>x.id===id); if(!j)return;
+    // KMI-GOLDEN-THREAD-SIM-002 §6 idempotency fix (2026-10-07): re-entry guard,
+    // same established pattern as kmiFinish's `s.finishedAt` re-check and
+    // approveKalite's `d.status!=='Kalite Bekliyor'` re-check - NOT a new
+    // mechanism. openMachineTransferModal only ever opens for a job whose
+    // status is still 'Açık'/'Üretimde'; once this function succeeds once,
+    // j.status moves to 'Kalite Bekliyor'. A double-click/retry/duplicate
+    // event firing this function again on the SAME already-transferred job
+    // (modal not yet closed, or a stale handler re-firing) must be a silent
+    // no-op, not a second transfer declaration for the same physical event.
+    if(!['Açık','Üretimde'].includes(j.status)){ return; }
     const to=document.getElementById('transferTargetMachine')?.value; if(!to||to===j.machine){alert('Farklı bir makine seçiniz.');return;}
     const good=Math.max(0,parseInt(document.getElementById('transferGoodQty')?.value)||0);
     const scrap=Math.max(0,parseInt(document.getElementById('transferScrapQty')?.value)||0);
@@ -6514,7 +6828,25 @@ setTimeout(()=>{if((typeof getEffectiveRole==='function'?getEffectiveRole(window
       transferInfo:{fromMachine:from,toMachine:to,note,requestedBy:currentUser?.name||'-',requestedById:currentUser?.id||null,requestedAt:now}
     };
     declarations.unshift(newDecl);
-    j.completedQty=Number(j.completedQty||0)+good;
+    // KMI-GOLDEN-THREAD-SIM-002 §4/§5 FIX (2026-10-07, Owner-authorized root-
+    // cause fix, proven not guessed - see docs/KMI_GOLDEN_THREAD_SIM_002_REPORT.md
+    // §4): j.completedQty is ALREADY the authoritative record of this same
+    // physical production event, written once by the production-entry writer
+    // (kmiAddProduction/kmiAdjust('good',...)) during the session that just
+    // ended. `good` here (transferGoodQty) is a RE-DECLARATION of that same
+    // already-counted quantity for the Quality declaration record - not a
+    // second physical event - exactly as kmiFinish already treats it (kmiFinish
+    // computes its own declaration's `good` by READING completedQty -
+    // s.startCompletedQty, and never writes back to completedQty either).
+    // The removed line `j.completedQty=Number(j.completedQty||0)+good` was
+    // adding the same session's already-recorded good quantity a SECOND time,
+    // which is the proven root cause of the GOLDEN-THREAD-SIM-001 finding
+    // (completedQty reaching 500 after 5 stations of the same 100 physical
+    // units - see the SIM-002 report's §3 reproduction table). Scrap/allocated
+    // were never duplicated this way (kmiAdjust writes them straight to the
+    // session object, confirmMachineTransfer never re-added them either) -
+    // only `good`/completedQty had this asymmetry, confirming it was a bug,
+    // not an intentional two-step accounting design.
     j.status='Kalite Bekliyor'; j.pendingTransferDeclId=declId;
     saveStorage('declarations',declarations);
     saveStorage('jobOrders',jobOrders);
@@ -13463,6 +13795,29 @@ window.kmiStartWork=function(id){
      return;
    }
  }
+ // KMI-R5 MASTER #23 OWNER-APPROVED CANONICAL REMEDIATION (Owner Decision
+ // Addendum §1, 2026-10-07): write-through resync. j.completedQty is kept in
+ // sync with the CURRENT routing operation's own goodQty record - so it means
+ // "good qty AT THE CURRENT OPERATION", not a cross-station cumulative sum.
+ // This resolves Finding 2 (a later station could never register new
+ // production once an earlier station had already filled completedQty to
+ // target) WITHOUT changing kmiFinish's existing good=completedQty-
+ // startCompletedQty formula or targetReached check - both become correct
+ // automatically once completedQty is resynced here, BEFORE baseline is
+ // computed. Fail-closed: when routing identity cannot be resolved (no
+ // product/routing/UNKNOWN), kmiOpGetRecord returns record:null and this is a
+ // pure no-op - completedQty is left exactly as legacy behavior already had
+ // it, so unrouted/legacy job orders are completely unaffected.
+ try{
+   const opGot=(typeof window.kmiOpGetRecord==='function')?window.kmiOpGetRecord(j,true):null;
+   if(opGot&&opGot.record){
+     const opRec=opGot.record;
+     j.completedQty=N(opRec.goodQty);
+     if(!opRec.machine) opRec.machine=j.machine||null;
+     if(!opRec.operator) opRec.operator=currentPerson()?.name||window.currentUser?.name||null;
+     if(!opRec.startedAt) opRec.startedAt=new Date().toISOString();
+   }
+ }catch(e){}
  const baseline=N(j.completedQty);
  put(id,{startedAt:new Date().toISOString(),finishedAt:null,operator:currentPerson()?.name||window.currentUser?.name||'-',machine:j.machine,shift:j.shift,startCompletedQty:baseline,produced:0,scrap:0,pauses:[],tools:[]});
  j.status='Üretimde';j.startedAt=new Date().toISOString();persistJobs();
@@ -13545,7 +13900,13 @@ window.kmiCreateShiftHandover=function(jobId, fields){
 window.kmiAddProduction=function(id){
  const j=jobs().find(x=>String(x.id)===String(id));if(!j)return;const s=sess(id);if(!s)return;
  const qty=Math.min(1,Math.max(0,N(j.targetQty)-N(j.completedQty)));if(!qty){toast('Hedef adet tamamlandı','warn');return}
- j.completedQty=N(j.completedQty)+qty;put(id,{produced:Math.max(0,N(j.completedQty)-N(s.startCompletedQty))});persistJobs();ev('GOOD_PART',j,{qty,sessionGood:Math.max(0,N(j.completedQty)-N(s.startCompletedQty))});kmiOpenWork(id)
+ j.completedQty=N(j.completedQty)+qty;
+ // KMI-R5 MASTER #23 Owner Addendum §1 write-through: keep the current
+ // operation's own record in sync with j.completedQty (see kmiStartWork for
+ // the resync-on-start side of this). Fail-closed no-op when identity is
+ // UNKNOWN - legacy/unrouted behavior is unaffected.
+ try{ const opGot=(typeof window.kmiOpGetRecord==='function')?window.kmiOpGetRecord(j,true):null; if(opGot&&opGot.record) opGot.record.goodQty=N(j.completedQty); }catch(e){}
+ put(id,{produced:Math.max(0,N(j.completedQty)-N(s.startCompletedQty))});persistJobs();ev('GOOD_PART',j,{qty,sessionGood:Math.max(0,N(j.completedQty)-N(s.startCompletedQty))});kmiOpenWork(id)
 };
 // KMI-FIX (2026-09-25): Operatör Beyan formundaki Sağlam/Hurda/Tahsis mantığını
 // Shop Floor'a da taşıyan +/- sayaç. 'good' oturum içi üretimi (ve iş emrinin
@@ -13557,11 +13918,27 @@ window.kmiAdjust=function(id,field,delta){
    if(delta>0){ const room=Math.max(0,N(j.targetQty)-N(j.completedQty)); if(!room){toast('Hedef adet tamamlandı','warn');return} }
    else{ if(N(s.produced)<=0){toast('Bu oturumda azaltılacak sağlam adet yok','warn');return} }
    j.completedQty=Math.max(N(s.startCompletedQty),N(j.completedQty)+delta);
+   // KMI-R5 MASTER #23 Owner Addendum §1 write-through (see kmiStartWork/
+   // kmiAddProduction) - fail-closed no-op when identity is UNKNOWN.
+   try{ const opGot=(typeof window.kmiOpGetRecord==='function')?window.kmiOpGetRecord(j,true):null; if(opGot&&opGot.record) opGot.record.goodQty=N(j.completedQty); }catch(e){}
    put(id,{produced:Math.max(0,N(j.completedQty)-N(s.startCompletedQty))});
    persistJobs();ev(delta>0?'GOOD_PART':'GOOD_PART_ADJUST',j,{qty:delta,sessionGood:Math.max(0,N(j.completedQty)-N(s.startCompletedQty))});
  }else{
    const cur=N(s[field]);const next=Math.max(0,cur+delta);
-   put(id,{[field]:next});ev(field==='scrap'?'SCRAP_ADJUST':'ALLOCATED_ADJUST',j,{qty:delta,total:next});
+   put(id,{[field]:next});
+   // KMI-R5 MASTER #23 Owner Addendum §1: the minimum operation-level
+   // semantics required include scrap and rework/tahsis, not just good -
+   // mirror the session's own scrap/allocated(tahsis) counters onto the
+   // current operation's record alongside goodQty. Fail-closed no-op when
+   // identity is UNKNOWN.
+   try{
+     const opGot=(typeof window.kmiOpGetRecord==='function')?window.kmiOpGetRecord(j,true):null;
+     if(opGot&&opGot.record){
+       if(field==='scrap') opGot.record.scrapQty=next;
+       else if(field==='allocated') opGot.record.reworkQty=next;
+     }
+   }catch(e){}
+   ev(field==='scrap'?'SCRAP_ADJUST':'ALLOCATED_ADJUST',j,{qty:delta,total:next});
  }
  kmiOpenWork(id);
 };
@@ -13575,7 +13952,13 @@ window.kmiAdjust=function(id,field,delta){
 function sheet(title,choices,cb){
  document.getElementById('kmiBottomSheet')?.remove();const d=document.createElement('div');d.id='kmiBottomSheet';d.className='fixed inset-0 z-[260] bg-black/60 flex items-end';d.innerHTML=`<div class="w-full max-w-xl mx-auto bg-slate-900 rounded-t-3xl p-4"><div class="text-lg font-black mb-3">${E(title)}</div><div class="grid grid-cols-2 gap-2">${choices.map((x,i)=>`<button data-i="${i}" class="bg-slate-800 rounded-2xl p-4 text-left font-bold">${E(x)}</button>`).join('')}</div><button onclick="this.closest('#kmiBottomSheet').remove()" class="w-full mt-3 p-3 text-slate-500">Vazgeç</button></div>`;document.body.appendChild(d);d.querySelectorAll('[data-i]').forEach(b=>b.onclick=()=>{const x=choices[N(b.dataset.i)];d.remove();cb(x)})
 }
-window.kmiScrap=function(id){sheet('Hurda nedeni',['Ölçü dışı','Yüzey','Takım kaynaklı','Malzeme','Diğer'],reason=>{const j=jobs().find(x=>String(x.id)===String(id)),s=sess(id);put(id,{scrap:N(s?.scrap)+1});ev('SCRAP',j,{qty:1,reason});
+window.kmiScrap=function(id){sheet('Hurda nedeni',['Ölçü dışı','Yüzey','Takım kaynaklı','Malzeme','Diğer'],reason=>{const j=jobs().find(x=>String(x.id)===String(id)),s=sess(id);const nextScrap=N(s?.scrap)+1;put(id,{scrap:nextScrap});
+ // KMI-R5 MASTER #23 Owner Addendum §1 write-through (see kmiAdjust) - this is
+ // a second, independent scrap writer (bottom-sheet reason picker), bypassing
+ // kmiAdjust, so it needs its own mirror onto the operation record. Fail-
+ // closed no-op when identity is UNKNOWN.
+ try{ const opGot=(typeof window.kmiOpGetRecord==='function')?window.kmiOpGetRecord(j,true):null; if(opGot&&opGot.record) opGot.record.scrapQty=nextScrap; }catch(e){}
+ ev('SCRAP',j,{qty:1,reason});
  // KMI-QMS-FAZ1: her hurda kaydı otomatik olarak gerçek bir NCR açar (Kalite Kontrol Kulesi'nde görünür)
  // ve CAPA gerektiren dispositionlarda mevcut Task motoruna (kmiTaskCreate) bağlanır - ayrı kayıt yok.
  try{window.kmiQmsCreateNCR&&window.kmiQmsCreateNCR({source:'SHOP_FLOOR_SCRAP',jobOrderId:id,qty:1,defectType:reason,disposition:'SCRAP'});}catch(e){console.error('[QMS scrap->NCR]',e);}
@@ -13829,6 +14212,19 @@ window.kmiFinish=function(id,postOp,vibrationMinutes){
  declarations.unshift(d);saveStorage('declarations',declarations);
  put(id,{finishedAt,elapsedSeconds:Math.round(elapsed(s)),declarationId:declId});
  kmiMachineRunLogClose(id,finishedAt,mins,downtimeMinutes);
+ // KMI-R5 MASTER #23 Owner Addendum §1: stamp the current operation's record
+ // completedAt and do a final defensive resync of good/scrap/rework (kmiFinish
+ // itself never WRITES completedQty/scrap - it only reads them for the good/
+ // scrap/allocated declaration totals above - so this is read-then-stamp, not
+ // a new write path). Fail-closed no-op when identity is UNKNOWN.
+ try{
+   const opGot=(typeof window.kmiOpGetRecord==='function')?window.kmiOpGetRecord(j,true):null;
+   if(opGot&&opGot.record){
+     const opRec=opGot.record;
+     opRec.goodQty=N(j.completedQty); opRec.scrapQty=N(s.scrap); opRec.reworkQty=N(s.allocated);
+     opRec.completedAt=finishedAt;
+   }
+ }catch(e){}
  j.finishedAt=finishedAt;j.productionMinutes=N(j.productionMinutes)+mins;
  const targetReached=j.targetType==='production'?N(j.completedQty)>=N(j.targetQty):true;
  j.status=targetReached?postOpStatus:'Üretimde';
@@ -16984,16 +17380,38 @@ window.kmiRenderMaintenanceWorkspace=function(){
 
  const actions='<div class="bg-slate-900/60 border border-slate-800 rounded-2xl p-4">'
   + '<b class="text-sm text-white">Araçlar</b><div class="mt-2 flex flex-wrap gap-2">'
-  + (canApprovalQueue ? '<button data-mw-tab="bakim" class="bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-black px-3 py-2 rounded-lg border border-slate-700"><i class="fa-solid fa-clipboard-list mr-1"></i>Bakım Emirleri / Makine Günlüğü</button>' : '<div class="text-xs text-slate-500">VERİ GEREKLİ: bu kullanıcı için tanımlı bir bakım aracı yok.</div>')
+  + (canApprovalQueue ? '<button data-mw-tab="bakim" class="bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-black px-3 py-2 rounded-lg border border-slate-700"><i class="fa-solid fa-clipboard-list mr-1"></i>Tam Ekran / Bakım Emirleri Yönetimi</button>' : '<div class="text-xs text-slate-500">VERİ GEREKLİ: bu kullanıcı için tanımlı bir bakım aracı yok.</div>')
   + '</div></div>';
 
+ // KMI-FIX (MASTER-23-ROUND4, 2026-10-07, Owner-approved UX correction): BAKIM
+ // used to land on only this KPI/exceptions summary - the real machine fleet/
+ // health working surface (the canonical V35 workspace() grid, unchanged, same
+ // #v35MaintenanceWorkspace element #tab-bakim already renders) only appeared
+ // after an extra click into "Bakım Emirleri / Makine Günlüğü". Owner wants the
+ // real surface visible immediately, with no extra click. Fix: render the SAME
+ // canonical V35 workspace (via the existing, unmodified window.v35RenderAll/
+ // workspace()) and inline its already-rendered output directly on this page -
+ // no second maintenance engine, no new writer/reader, no duplicate calculation,
+ // literally the same DOM content #tab-bakim shows, just also shown here so no
+ // click is required. #tab-bakim itself is left fully intact (not deleted, not
+ // rewritten) - the button above still reaches it directly for the full-screen
+ // view/tools that don't fit here (e.g. "+ Yeni Makine").
+ const inlineWorkspace='<div class="mt-4"><div id="kmiMwInlineWorkspace"></div></div>';
+
  page.innerHTML='<div class="max-w-[1400px] mx-auto p-4 sm:p-6">'
-  + header + kpiStrip + exceptions + actions
+  + header + kpiStrip + exceptions + actions + inlineWorkspace
   + '</div>';
 
  page.querySelectorAll('[data-mw-tab]').forEach(function(btn){
   btn.onclick=function(){ const tab=btn.getAttribute('data-mw-tab'); try{ if(typeof window.switchTab==='function') window.switchTab(tab); }catch(e){} };
  });
+
+ try{
+  if(typeof window.v35RenderAll==='function') window.v35RenderAll();
+  const src=document.getElementById('v35MaintenanceWorkspace');
+  const dst=document.getElementById('kmiMwInlineWorkspace');
+  if(src&&dst) dst.innerHTML=src.innerHTML;
+ }catch(e){ console.error('[kmiRenderMaintenanceWorkspace inline V35 reuse]',e); }
 };
 
 window.kmiOpenShippingWorkspace=function(){
@@ -18417,18 +18835,43 @@ function prodWsJobs(){
   return list.filter(function(j){return !j.deleted;});
 }
 function prodWsMachines(){ return (typeof MACHINES_LIST!=='undefined'&&Array.isArray(MACHINES_LIST))?MACHINES_LIST:(Array.isArray(window.MACHINES_LIST)?window.MACHINES_LIST:[]); }
+// KMI-FIX (MASTER-23-ROUND4, 2026-10-07): root-caused live - "Üretim" (Production) Genel Bakış
+// showed ÇALIŞAN MAKİNE 0 / ARIZALI (DOWN) MAKİNE 0 while Ana Sayfa/KMI LIVE correctly showed
+// 103 ÜRETİMDE / 111 ARIZA at the same instant (Owner-reported contradiction). Root cause,
+// proven by direct inspection of the live kmi_shopfloor_sessions_v1191 store and this function's
+// own code - TWO separate bugs, not one:
+// 1) prodWsMachineDown() read machineRuntimeStates - the DEAD array KMI-DATA-REMEDIATION-SLICE-01
+//    (2026-09-29, docs/KMI_DATA_REMEDIATION_SLICE01.md) and KMI-MACHINE-RUNTIME-TRUTH-REMEDIATION
+//    (docs/KMI_MACHINE_RUNTIME_TRUTH_REMEDIATION.md) already proved is never fed after V35 came
+//    online - always {} on a fresh load, so down was always 0 regardless of real machine state.
+// 2) prodWsMachineRunning() compared the RAW session's s.machine field ("103 - DMG MORI SEIKI
+//    NHX 5000", confirmed live) against the bare machine CODE ("103") - a format mismatch that
+//    can never match, so running was always 0.
+// Fix: delegate to the SAME canonical, already-tested evaluators the remediated consumers
+// (KMI LIVE, Shop Floor, machine leaderboard) use - window.kmiMachinesRunningNow() for session
+// truth and window.kmiMachineConditionByName() for Machine Condition (V35 canonical, Slice-01/
+// Runtime-Truth). No second machine-state engine, no new store, no business-rule change - this
+// is a pure read-path fix of two dead/mismatched readers to reuse the proven canonical ones, per
+// the ONE MACHINE FACT -> ONE CANONICAL EVALUATOR -> MANY VIEWS invariant.
 function prodWsMachineDown(code){
   try{
-    const states=(typeof machineRuntimeStates!=='undefined')?machineRuntimeStates:(window.machineRuntimeStates||{});
-    return !!(states && states[code] && states[code].down);
+    const list=prodWsMachines();
+    const mm=list.find(function(x){return String(x.code)===String(code);});
+    const name=mm?(mm.code+' - '+mm.name):null;
+    if(name && typeof window.kmiMachineConditionByName==='function'){
+      const c=window.kmiMachineConditionByName(name);
+      return !!(c && c.condition==='DOWN');
+    }
+    return false;
   }catch(e){ return false; }
 }
 function prodWsMachineRunning(code){
   try{
-    const sess=(typeof window.loadStorage==='function')?window.loadStorage('kmi_shopfloor_sessions_v1191',{}):(typeof loadStorage==='function'?loadStorage('kmi_shopfloor_sessions_v1191',{}):{});
-    return Object.keys(sess||{}).some(function(jobId){
-      const s=sess[jobId]; if(!s||!s.startedAt||s.finishedAt) return false;
-      return String(s.machine)===String(code);
+    const running=(typeof window.kmiMachinesRunningNow==='function')?window.kmiMachinesRunningNow():[];
+    return running.some(function(r){
+      const m=String(r.machine||'');
+      if(!m) return false;
+      return m===String(code) || m.split(' - ')[0].trim()===String(code).trim();
     });
   }catch(e){ return false; }
 }
@@ -24854,6 +25297,222 @@ function asRenderUpcoming(u){
 // above).
 window.asRenderUpcoming=asRenderUpcoming;
 
+// KMI-R5 MASTER #23 ROUND 5 (GOLDEN THREAD directive §17, Owner-locked
+// requirement, 2026-10-07): "EVERY ROLE MUST NOT RECEIVE THE SAME HOME
+// EXPERIENCE." Prior rounds confirmed window.kmiRenderAnaSayfa is 100%
+// role-agnostic (every asRender* section renders unconditionally for any
+// currentUser). The Owner's directive asks for an 11-role composition
+// (Operator/Quality/Maintenance/CAM/Planning/Purchasing/Warehouse/Shipping/
+// Accounting/Management/IT) - a full build of that size is NOT a safe,
+// same-session composition fix (it needs new canonical widgets for roles
+// that have none today - Purchasing/Warehouse/Accounting/IT - which is new
+// feature work, not UI composition). What IS safely implementable right now
+// is a FIRST SLICE for the two roles whose canonical sources already exist
+// end-to-end and were proven again this very round: OPERATOR (their own
+// active machine/session, via the same window.kmiMachinesRunningNow()
+// already used by Home/KMI LIVE/Shop Floor) and MAINTENANCE (DOWN machines,
+// via the same window.kmiMachineConditionByName()/V35 canonical source the
+// Round-4 Bakım landing-page fix reuses). This is PURELY ADDITIVE - it adds
+// ONE new card to the existing right rail for these two roles only; it does
+// not remove, hide, or alter anything any role already saw, reads only
+// already-canonical data (no new engine), and widens NO permission (a
+// MAINTENANCE-role user sees only machine/maintenance facts they could
+// already see on the Bakım page; an OPERATOR sees only their own session,
+// which they could already see on Shop Floor Live). The remaining 9 roles'
+// composition stays exactly as documented in
+// docs/KMI_MASTER23_ROUND4_RETURN_PACKAGE.md section B (a proposal, not yet
+// built) - built incrementally as each role's own canonical source is
+// confirmed, not guessed here.
+// MASTER #23 §7 (FOUNDATION/GOLDEN THREAD FINAL CLOSURE, owner directive,
+// 2026-10-07): finishes role/responsibility-aware Home composition for the
+// remaining roles beyond OPERATOR/BAKIM, per the composition matrix already
+// proposed (and left for Owner review) in
+// docs/KMI_MASTER23_ROUND4_RETURN_PACKAGE.md §B - this directive's §7 is
+// that review. Invariant preserved exactly as before: ONE HOME SHELL + ROLE
+// + RESPONSIBILITY + PERMISSION + RELEVANT OPERATIONAL CONTEXT = PERSONALIZED
+// HOME. Every branch below reads an EXISTING canonical store/evaluator only
+// (declarations, QMS.ncrs/holds, D.purchases, D.lots, jobOrders, the real
+// MANAGEMENT/department-assignment permission checks already used elsewhere
+// in this file) - no second Home engine, no new canonical truth, no
+// unauthorized data (each branch reuses the SAME access check that already
+// gates that domain's own workspace/table). A person can match more than one
+// branch (e.g. ADMIN + a specific department assignment), so cards
+// ACCUMULATE instead of early-returning, exactly like the existing
+// OPERATOR/BAKIM cards did implicitly (role is a single string, but the
+// department-assignment checks below are a separate, independent axis).
+function asRenderRoleFocus(u){
+  let role=null; try{ role=(typeof getEffectiveRole==='function')?getEffectiveRole(u):(u&&u.role)||null; }catch(e){ role=(u&&u.role)||null; }
+  const parts=[];
+
+  if(role==='OPERATOR'){
+    let mySessions=[];
+    try{
+      const running=(typeof window.kmiMachinesRunningNow==='function')?window.kmiMachinesRunningNow():[];
+      const myName=String((u&&u.name)||'').trim();
+      mySessions=running.filter(function(r){ return myName && String(r.operator||'').trim()===myName; });
+    }catch(e){ mySessions=[]; }
+    const body = mySessions.length ? mySessions.map(function(r){
+      return '<div class="flex items-center justify-between py-1.5 border-b border-slate-800/70 last:border-0">'
+        + '<div class="min-w-0"><div class="text-xs text-white truncate">'+asE(r.machine||'-')+'</div>'
+        + '<div class="text-[9px] text-slate-500">'+asE((r.job&&r.job.item)||r.jobId||'-')+'</div></div>'
+        + '<span class="text-[9px] font-black text-emerald-300 bg-emerald-950/60 px-2 py-0.5 rounded-full shrink-0">ÜRETİMDE</span></div>';
+    }).join('') : '<div class="text-slate-500 text-xs py-4 text-center">Şu an aktif bir üretim oturumunuz yok.</div>';
+    parts.push('<div class="bg-slate-900/60 border border-cyan-800/60 rounded-2xl p-4"><b class="text-sm text-white"><i class="fa-solid fa-user-gear text-cyan-400 mr-1"></i>Benim Makinelerim</b><div class="mt-2">'+body+'</div></div>');
+  }
+
+  if(role==='BAKIM'){
+    let downList=[];
+    try{
+      const list=(typeof MACHINES_LIST!=='undefined'&&Array.isArray(MACHINES_LIST))?MACHINES_LIST:(Array.isArray(window.MACHINES_LIST)?window.MACHINES_LIST:[]);
+      downList=list.map(function(m){
+        const name=m.code+' - '+m.name;
+        const c=(typeof window.kmiMachineConditionByName==='function')?window.kmiMachineConditionByName(name):{condition:'UNKNOWN'};
+        return {name:name, condition:c.condition};
+      }).filter(function(x){ return x.condition==='DOWN'; });
+    }catch(e){ downList=[]; }
+    const body = downList.length ? downList.map(function(x){
+      return '<div class="flex items-center justify-between py-1.5 border-b border-slate-800/70 last:border-0">'
+        + '<div class="text-xs text-white truncate">'+asE(x.name)+'</div>'
+        + '<span class="text-[9px] font-black text-red-300 bg-red-950/60 px-2 py-0.5 rounded-full shrink-0">ARIZA</span></div>';
+    }).join('') : '<div class="text-slate-500 text-xs py-4 text-center">Şu an ARIZALI (DOWN) makine yok.</div>';
+    parts.push('<div class="bg-slate-900/60 border border-red-800/60 rounded-2xl p-4"><b class="text-sm text-white"><i class="fa-solid fa-screwdriver-wrench text-red-400 mr-1"></i>Arızalı Makineler</b><div class="mt-2">'+body+'</div></div>');
+  }
+
+  // KALITE: pending quality approvals (declarations status 'Kalite Bekliyor'
+  // - SAME filter renderKaliteTable already uses, not a new queue), plus
+  // the canonical open-NCR and active-HOLD counts (QMS.ncrs/QMS.holds, the
+  // SAME stores the Quality Tower/Control Tower already read).
+  if(role==='KALITE'){
+    let pendingCount=0, openNcrCount=0, activeHoldCount=0;
+    try{ pendingCount=(typeof declarations!=='undefined'?declarations:window.declarations||[]).filter(function(d){ return d.status==='Kalite Bekliyor'; }).length; }catch(e){}
+    try{ openNcrCount=((window.QMS&&window.QMS.ncrs)||[]).filter(function(n){ return n.status==='OPEN'; }).length; }catch(e){}
+    try{ activeHoldCount=((window.QMS&&window.QMS.holds)||[]).filter(function(h){ return h.active; }).length; }catch(e){}
+    const row=function(label,count,color){ return '<div class="flex items-center justify-between py-1.5 border-b border-slate-800/70 last:border-0"><div class="text-xs text-white">'+asE(label)+'</div><span class="text-[9px] font-black '+color+' px-2 py-0.5 rounded-full shrink-0">'+count+'</span></div>'; };
+    const body=row('Kalite Onayı Bekleyen',pendingCount,pendingCount?'text-amber-300 bg-amber-950/60':'text-slate-400 bg-slate-800/60')
+      + row('Açık NCR',openNcrCount,openNcrCount?'text-red-300 bg-red-950/60':'text-slate-400 bg-slate-800/60')
+      + row('Aktif HOLD',activeHoldCount,activeHoldCount?'text-violet-300 bg-violet-950/60':'text-slate-400 bg-slate-800/60');
+    parts.push('<div class="bg-slate-900/60 border border-violet-800/60 rounded-2xl p-4"><b class="text-sm text-white"><i class="fa-solid fa-shield-halved text-violet-400 mr-1"></i>Kalite Bekleyenler</b><div class="mt-2">'+body+'</div></div>');
+  }
+
+  // SEVKIYAT: declarations already approved by Management and waiting on the
+  // real approveShipment() action - SAME status renderSevkiyatTable/the
+  // shipment workflow already filters on, not a new queue.
+  if(role==='SEVKIYAT'){
+    let readyCount=0;
+    try{ readyCount=(typeof declarations!=='undefined'?declarations:window.declarations||[]).filter(function(d){ return d.status==='Sevk Onayı Bekliyor'; }).length; }catch(e){}
+    const body='<div class="flex items-center justify-between py-1.5"><div class="text-xs text-white">Sevkiyat Onayı Bekleyen</div><span class="text-[9px] font-black '+(readyCount?'text-cyan-300 bg-cyan-950/60':'text-slate-400 bg-slate-800/60')+' px-2 py-0.5 rounded-full shrink-0">'+readyCount+'</span></div>'
+      + (readyCount?'<div class="text-[10px] text-slate-500 mt-1">Bu kayıtlar Yönetim onayından geçti, gerçek sevkiyat (approveShipment) işleminizi bekliyor.</div>':'<div class="text-slate-500 text-xs py-2">Şu an sevkiyat onayı bekleyen kayıt yok.</div>');
+    parts.push('<div class="bg-slate-900/60 border border-cyan-800/60 rounded-2xl p-4"><b class="text-sm text-white"><i class="fa-solid fa-truck-fast text-cyan-400 mr-1"></i>Sevkiyat Bekleyenler</b><div class="mt-2">'+body+'</div></div>');
+  }
+
+  // MUHASEBE: declarations awaiting the real approveDeclarationByMuhasebe()
+  // action - the EXACT SAME filter renderMuhasebeTable already uses.
+  if(role==='MUHASEBE'){
+    let pendingCount=0;
+    try{ pendingCount=(typeof declarations!=='undefined'?declarations:window.declarations||[]).filter(function(d){ return d.status==='Hazır - Muhasebe Onayı Bekliyor'; }).length; }catch(e){}
+    const body='<div class="flex items-center justify-between py-1.5"><div class="text-xs text-white">Muhasebe Onayı Bekleyen</div><span class="text-[9px] font-black '+(pendingCount?'text-amber-300 bg-amber-950/60':'text-slate-400 bg-slate-800/60')+' px-2 py-0.5 rounded-full shrink-0">'+pendingCount+'</span></div>';
+    parts.push('<div class="bg-slate-900/60 border border-amber-800/60 rounded-2xl p-4"><b class="text-sm text-white"><i class="fa-solid fa-book text-amber-400 mr-1"></i>Muhasebe Bekleyenler</b><div class="mt-2">'+body+'</div></div>');
+  }
+
+  // CAM: products missing a defined routing or a control plan - the SAME two
+  // real counts kmiRenderCamWorkspace's own "Genel Bakış" overview already
+  // computes (withRouting/withCp), inverted here to show the GAP rather than
+  // the coverage, which is what a CAM/process engineer actually needs to act
+  // on from Home. No CNC program-link metric is shown - that capability is
+  // honestly disclosed as MISSING in the CAM workspace itself, not invented
+  // here either.
+  if(role==='CAM'){
+    let missingRoutingCount=0, missingCpCount=0;
+    try{
+      const products=(window.D&&Array.isArray(window.D.products))?window.D.products:[];
+      missingRoutingCount=products.filter(function(p){ return !(Array.isArray(p.routeSteps)&&p.routeSteps.length>0); }).length;
+      const cpSet=new Set(((window.QMS&&window.QMS.controlPlans)||[]).map(function(x){ return String(x.productId); }));
+      missingCpCount=products.filter(function(p){ return !cpSet.has(String(p.id)); }).length;
+    }catch(e){}
+    const row=function(label,count){ return '<div class="flex items-center justify-between py-1.5 border-b border-slate-800/70 last:border-0"><div class="text-xs text-white">'+asE(label)+'</div><span class="text-[9px] font-black '+(count?'text-amber-300 bg-amber-950/60':'text-slate-400 bg-slate-800/60')+' px-2 py-0.5 rounded-full shrink-0">'+count+'</span></div>'; };
+    const body=row('Rotası Tanımsız Ürün',missingRoutingCount)+row('Kontrol Planı Olmayan Ürün',missingCpCount);
+    parts.push('<div class="bg-slate-900/60 border border-blue-800/60 rounded-2xl p-4"><b class="text-sm text-white"><i class="fa-solid fa-ruler-combined text-blue-400 mr-1"></i>CAM / Süreç Mühendisliği</b><div class="mt-2">'+body+'</div></div>');
+  }
+
+  // Department-ASSIGNMENT-based cards (window.KMI_ORG.hasAssignment) - this
+  // is a SEPARATE, real, existing axis from the role string above (an ADMIN
+  // or any role can additionally hold an explicit department assignment),
+  // using the EXACT same mechanism each module's own `*HasDeptAccess()`
+  // helper already uses (e.g. wmsHasDeptAccess for WAREHOUSE). Not mutually
+  // exclusive with the role branches above - cards accumulate.
+  function hasDept(deptId){ try{ return !!(window.KMI_ORG && window.KMI_ORG.hasAssignment(u||window.currentUser, deptId)); }catch(e){ return false; } }
+
+  // PURCHASING: open PO count - the SAME filter renderKpis' own "Açık PO"
+  // card already uses (D.purchases, status!=='Kapandı').
+  if(hasDept('PURCHASING')){
+    let openPoCount=0;
+    try{ openPoCount=((window.D&&window.D.purchases)||[]).filter(function(x){ return x.status!=='Kapandı'; }).length; }catch(e){}
+    const body='<div class="flex items-center justify-between py-1.5"><div class="text-xs text-white">Açık Satınalma Siparişi</div><span class="text-[9px] font-black '+(openPoCount?'text-amber-300 bg-amber-950/60':'text-slate-400 bg-slate-800/60')+' px-2 py-0.5 rounded-full shrink-0">'+openPoCount+'</span></div>';
+    parts.push('<div class="bg-slate-900/60 border border-orange-800/60 rounded-2xl p-4"><b class="text-sm text-white"><i class="fa-solid fa-cart-shopping text-orange-400 mr-1"></i>Satınalma</b><div class="mt-2">'+body+'</div></div>');
+  }
+
+  // WAREHOUSE: raw-material lots not yet accepted (qc!=='KABUL') - the SAME
+  // amber-vs-green "pending" distinction the existing LOT table already
+  // renders per row (l.qc==='KABUL'?emerald:amber), read here as a count
+  // instead of a full table. hasDept() calls the SAME window.KMI_ORG.
+  // hasAssignment() mechanism the real wmsHasDeptAccess() helper uses
+  // internally (that helper itself lives in a different, private IIFE
+  // closure and is not reachable from here - the underlying canonical
+  // store/check it wraps is reused directly instead, not duplicated).
+  if(hasDept('WAREHOUSE')){
+    let pendingLotCount=0;
+    try{ pendingLotCount=((window.D&&window.D.lots)||[]).filter(function(l){ return l.qc!=='KABUL'; }).length; }catch(e){}
+    const body='<div class="flex items-center justify-between py-1.5"><div class="text-xs text-white">Giriş Kalite / Karantina Bekleyen LOT</div><span class="text-[9px] font-black '+(pendingLotCount?'text-amber-300 bg-amber-950/60':'text-slate-400 bg-slate-800/60')+' px-2 py-0.5 rounded-full shrink-0">'+pendingLotCount+'</span></div>';
+    parts.push('<div class="bg-slate-900/60 border border-teal-800/60 rounded-2xl p-4"><b class="text-sm text-white"><i class="fa-solid fa-warehouse text-teal-400 mr-1"></i>Depo &amp; Stok</b><div class="mt-2">'+body+'</div></div>');
+  }
+
+  // SOFTWARE_IT: the SAME two real metrics kmiRenderITWorkspace's own
+  // overview already computes (personnel count, avg page-load perf). The
+  // audit-log viewer and integration-status board are honestly disclosed as
+  // MISSING there (audit_log is server-write-only, nothing reads it yet) -
+  // not fabricated here either.
+  if(hasDept('SOFTWARE_IT')){
+    const personCount=(Array.isArray(window.PERSONNEL_LIST)?window.PERSONNEL_LIST.length:0);
+    let perfTxt='-';
+    try{ const s=window.KMI_PERF&&typeof window.KMI_PERF.summary==='function'?window.KMI_PERF.summary():null; if(s&&typeof s.avgLoadMs==='number') perfTxt=s.avgLoadMs.toFixed(0)+' ms'; }catch(e){}
+    const body='<div class="flex items-center justify-between py-1.5 border-b border-slate-800/70"><div class="text-xs text-white">Personel / Kullanıcı</div><b class="text-xs text-cyan-300">'+personCount+'</b></div>'
+      + '<div class="flex items-center justify-between py-1.5"><div class="text-xs text-white">Ort. Sayfa Yükleme</div><b class="text-xs text-cyan-300">'+asE(perfTxt)+'</b></div>';
+    parts.push('<div class="bg-slate-900/60 border border-slate-700/60 rounded-2xl p-4"><b class="text-sm text-white"><i class="fa-solid fa-server text-slate-300 mr-1"></i>IT / Sistem</b><div class="mt-2">'+body+'</div></div>');
+  }
+
+  // PLANNING: gated on the EXACT SAME permission the real Planlama module
+  // itself is gated on (requiredPermission:'MANAGEMENT' on the 'planning'
+  // tower entry) - there is no separate PLANNING department id or role
+  // string anywhere in this file (audited: window.KMI_DEPARTMENTS has no
+  // PLANNING entry, getEffectiveRole does not resolve one either), so this
+  // is the one real, existing authorization check for this domain, not an
+  // invented one. Shows unscheduled work orders (status==='Açık' with an
+  // EMPTY assignedTo[] - the exact field window.v118ProductionNeed sets to
+  // [] on creation and window.kmiCommitAssignment fills in on scheduling,
+  // so this is a real, existing "not yet scheduled" signal, not a new one).
+  if(window.KMI_AUTH && typeof window.KMI_AUTH.can==='function' && window.KMI_AUTH.can(u,'MANAGEMENT')){
+    let unscheduledCount=0;
+    try{
+      const jos=(Array.isArray(window.jobOrders)?window.jobOrders:(typeof jobOrders!=='undefined'?jobOrders:[]));
+      unscheduledCount=jos.filter(function(j){ return j.status==='Açık' && (!Array.isArray(j.assignedTo)||!j.assignedTo.length); }).length;
+    }catch(e){}
+    const body='<div class="flex items-center justify-between py-1.5"><div class="text-xs text-white">Atanmamış (Planlanmamış) İş Emri</div><span class="text-[9px] font-black '+(unscheduledCount?'text-amber-300 bg-amber-950/60':'text-slate-400 bg-slate-800/60')+' px-2 py-0.5 rounded-full shrink-0">'+unscheduledCount+'</span></div>';
+    parts.push('<div class="bg-slate-900/60 border border-indigo-800/60 rounded-2xl p-4"><b class="text-sm text-white"><i class="fa-solid fa-diagram-project text-indigo-400 mr-1"></i>Planlama</b><div class="mt-2">'+body+'</div></div>');
+  }
+
+  // MANAGEMENT: intentionally NO dedicated card. Per the same composition
+  // matrix (docs/KMI_MASTER23_ROUND4_RETURN_PACKAGE.md §B), unmodified Home
+  // (fleet KPI strip, OEE/ranking, pulse - asRenderOperators/asRenderPulse/
+  // asRenderUpcoming, already rendered alongside this function's output) IS
+  // already the closest thing to Management's own real Home, and a
+  // Management permission holder also already sees whichever of the
+  // branches above apply to their explicit role/department on top of it -
+  // adding a redundant "Management" card here would duplicate, not inform.
+
+  return parts.join('');
+}
+window.asRenderRoleFocus=asRenderRoleFocus;
+
 // --- ANA SAYFA: gerçek sayfa (modal değil), diğer tüm .tab-content ile AYNI
 //     switchTab mekanizmasıyla gösterilir/gizlenir - arkada eski Admin sayfası
 //     KALMAZ (switchTab zaten TÜM .tab-content'lerden 'active' kaldırıyor).
@@ -24903,7 +25562,7 @@ window.kmiRenderAnaSayfa = function(){
     +     asRenderLiveFloorSummary()
     +     '<div class="grid grid-cols-1 lg:grid-cols-2 gap-4">' + asRenderTaskFloor(u) + asRenderTodayPerf(k) + '</div>'
     +   '</div>'
-    +   '<div class="flex flex-col gap-4 min-w-0">' + asRenderOperators() + asRenderPulse(u) + asRenderUpcoming(u) + '</div>'
+    +   '<div class="flex flex-col gap-4 min-w-0">' + asRenderRoleFocus(u) + asRenderOperators() + asRenderPulse(u) + asRenderUpcoming(u) + '</div>'
     + '</div></div>';
   page.querySelectorAll('[data-as-fn]').forEach(function(btn){
     btn.onclick=function(){ const fn=btn.getAttribute('data-as-fn'); try{ if(typeof window[fn]==='function') window[fn](); }catch(e){} };
