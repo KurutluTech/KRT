@@ -17,9 +17,9 @@
          `git blame`/diffs on this file quiet between releases and avoid a
          commit-hash feedback loop (the source commit's SHA cannot depend on
          a value computed from that same SHA). See docs/KMI_DEPLOY_ID.md. -->
-    <meta name="kmi-source-commit" content="e54aec323cf04c8aaa3c86c286cf7f0b3226508e">
-    <meta name="kmi-build-id" content="e54aec323cf0-20261008T225615Z">
-    <meta name="kmi-built-at" content="2026-10-08T22:56:15.761Z">
+    <meta name="kmi-source-commit" content="4681cac0a68c2c937901ee58a215c465ae2d8047">
+    <meta name="kmi-build-id" content="4681cac0a68c-20261009T232948Z">
+    <meta name="kmi-built-at" content="2026-10-09T23:29:48.631Z">
     <script>
       // Derived from the meta tags above at runtime, so there is exactly one
       // place (the meta tags) where the build script substitutes real
@@ -799,7 +799,12 @@ ead>
                 <div class="bg-slate-800 border border-slate-700 rounded-lg p-5 shadow-lg space-y-4">
                     <div class="border-b border-slate-700 pb-3">
                         <h2 class="text-lg font-semibold text-white"><i class="fa-solid fa-file-signature text-amber-400 mr-2"></i>Kalite Onaylı / Üretim Serbest Bırakma &amp; Yönetim Onayı Bekleyen Ürünler</h2>
-                        <p class="text-xs text-slate-400">Bu liste bilgi amaçlıdır. Kanonik sıra: Kalite &rarr; Üretim Serbest Bırakma &rarr; Yönetim Onayı &rarr; Muhasebe/Ticari Belge Onayı. Bu kayıtlar henüz Muhasebe onayı aşamasında DEĞİLDİR; Muhasebe onayı Yönetim son onayından SONRA, aşağıdaki "Ticari Belge Onayı Bekleyenler" tablosunda yapılır.</p>
+                        <p class="text-xs text-slate-400">Bu liste bilgi amaçlıdır - burada ÜRETİM SERBEST BIRAKMA işlemi YAPILAMAZ. Kanonik sıra: Kalite &rarr; Üretim Serbest Bırakma &rarr; Yönetim Onayı &rarr; Muhasebe/Ticari Belge Onayı. Bu kayıtlar henüz Muhasebe onayı aşamasında DEĞİLDİR; Muhasebe onayı Yönetim son onayından SONRA, aşağıdaki "Ticari Belge Onayı Bekleyenler" tablosunda yapılır.</p>
+                        <!-- KMI-OTS-RECOVERY-001 OTS-01: gerçek factory bulgusu - bir Üretim Müdürü bu salt-bilgi
+                             tabloyu gerçek, aksiyon alınabilir kuyruk sanabilir (aksiyon butonu YOK). Gerçek
+                             "Nihai Üretim Serbest Bırakma Bekleyenler" kuyruğu (aksiyon butonlu) Üretim
+                             Alanı'ndadır - kafa karışıklığını önlemek için doğrudan yönlendirme eklendi. -->
+                        <button onclick="window.kmiOpenProductionWorkspace && window.kmiOpenProductionWorkspace()" class="mt-2 bg-cyan-700 hover:bg-cyan-600 text-white px-3 py-2 rounded text-[11px] font-bold"><i class="fa-solid fa-arrow-right mr-1"></i> Gerçek Serbest Bırakma İşlemi İçin: Üretim Alanı'nı Aç</button>
                     </div>
                     <div class="overflow-x-auto">
                         <table class="w-full text-left text-xs text-slate-300">
@@ -1458,14 +1463,144 @@ ead>
         // burada toptan değiştirilmedi - "mevcut çalışan sistemi yeniden yazma" ilkesi.
         function kmiEscXss(v){return String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
         // PERSISTENCE HELPER FUNCTIONS USING LOCALSTORAGE
-        function loadStorage(key, defaultValue) {
-            try {
-                const saved = localStorage.getItem(key);
-                return saved ? JSON.parse(saved) : defaultValue;
-            } catch(e) {
-                return defaultValue;
+        //
+        // KMI-DATA-LOSS-PROTECTION-001 (2026-10-10, owner P0 directive): tek paylaşılan güvenli
+        // depolama çekirdeği. loadStorage/saveStorage (burada), V35 Bakım modülünün kendi
+        // load/save'i (bkz. kmiSafeLoad/kmiSafeSave çağrıları orada) ve QMS'in qLoad/qSave'i
+        // (kurutlu_qms_v1) HEPSİ bunu kullanır - üç ayrı yerde aynı riskli örüntüyü tekrar etmek
+        // yerine. Bu YENİ bir paralel veri kaynağı DEĞİL; sadece MEVCUT anahtarların okunma/
+        // yazılma şeklini güvenli hale getiriyor.
+        //
+        // Çözdüğü iki gerçek bulgu (KMI_SSR_001_DATA_LOSS_RISK_AUDIT.md):
+        //  - Risk A: bozuk JSON, "anahtar hiç kullanılmamış" ile birebir aynı işleniyordu - hiç
+        //    uyarı yok, orijinal baytlar hiçbir yere yedeklenmiyordu. seedMachines() bunu hemen
+        //    bir save() ile kalıcı hale getiriyordu (bkz. aşağıdaki seedMachines değişikliği).
+        //  - Risk B: editMachine() Object.assign ile boş bir seri no/yıl/marka alanını koşulsuz
+        //    siliyordu (bkz. aşağıdaki editMachine değişikliği, kmiMergeNonEmpty).
+        function kmiIsEmptyValue(v){
+            if(v==null) return true;
+            if(Array.isArray(v)) return v.length===0;
+            if(typeof v==='object') return Object.keys(v).length===0;
+            return false;
+        }
+        function kmiSafeLoad(key, fallback){
+            let raw;
+            try{ raw = localStorage.getItem(key); }
+            catch(e){ console.error('[KMI SAFE STORAGE] "'+key+'" okunamadı:',e); return fallback; }
+            if(raw==null) return fallback; // anahtar gerçekten hiç kullanılmamış - bu bir hata değil
+            try{
+                return JSON.parse(raw);
+            }catch(e){
+                // BOZUK VERİ: asla sessizce "hiç veri yokmuş" gibi davranma. Orijinal baytları
+                // ayrı bir anahtarda koru, kullanıcıyı uyar, ve bu anahtarı "bozuk" işaretle -
+                // kmiSafeSave ve seedMachines bu işareti görüp otomatik üzerine yazmayı/yeniden
+                // kurulumu reddeder.
+                const qKey = key+'__CORRUPT__'+new Date().toISOString().replace(/[:.]/g,'-');
+                window.__kmiCorruptKeys = window.__kmiCorruptKeys || {};
+                try{
+                    localStorage.setItem(qKey, raw);
+                    window.__kmiCorruptKeys[key] = qKey;
+                    console.error('[KMI SAFE STORAGE] "'+key+'" bozuk JSON içeriyor - orijinal veri "'+qKey+'" altında KORUNDU, bu anahtara otomatik yazma engellendi.', e);
+                    try{ window.kmiToast?.('Dikkat: "'+key+'" verisi bozuk görünüyor. Veri KAYBOLMADI, yedek olarak saklandı ("'+qKey+'"). Lütfen bu durumu bildirin.','error'); }catch(e2){}
+                }catch(e3){
+                    // Yedekleme BİLE başarısız oldu (örn. depolama dolu) - sessizce devam ETME.
+                    window.__kmiCorruptKeys[key] = null;
+                    console.error('[KMI SAFE STORAGE] "'+key+'" bozuk VE yedekleme de başarısız oldu:',e,e3);
+                    try{ window.kmiToast?.('KRİTİK: "'+key+'" verisi bozuk ve yedeklenemedi. Bu anahtara yazma geçici olarak engellendi.','error'); }catch(e4){}
+                }
+                return fallback;
             }
         }
+        function kmiSafeSave(key, value, opts){
+            opts = opts||{};
+            // Bozuk olarak işaretlenmiş bir anahtara - açıkça force edilmeden - YENİDEN YAZMA.
+            // Bozulma sonrası "ilk sıradan kullanıcı eylemi gerçek veriyi siler" riskini kapatır.
+            if(window.__kmiCorruptKeys && Object.prototype.hasOwnProperty.call(window.__kmiCorruptKeys,key) && !opts.force){
+                console.error('[KMI SAFE STORAGE] "'+key+'" bozuk olarak işaretli - üzerine yazma reddedildi.');
+                try{ window.kmiToast?.('"'+key+'" bozuk olduğu için kaydedilemedi - veri kaybını önlemek için işlem durduruldu.','error'); }catch(e){}
+                return false;
+            }
+            if(!opts.force && kmiIsEmptyValue(value)){
+                let existingRaw;
+                try{ existingRaw = localStorage.getItem(key); }catch(e){ existingRaw=null; }
+                if(existingRaw){
+                    let existingEmpty = true;
+                    try{ existingEmpty = kmiIsEmptyValue(JSON.parse(existingRaw)); }
+                    catch(e){ existingEmpty = false; } // mevcut içerik de bozuksa, boşla üzerine yazma - engelle
+                    if(!existingEmpty){
+                        console.error('[KMI SAFE STORAGE] "'+key+'" için boş değerle dolu veri üzerine yazma reddedildi.');
+                        try{ window.kmiToast?.('"'+key+'" için boş veri kaydı reddedildi - mevcut gerçek veri korunuyor.','error'); }catch(e){}
+                        return false;
+                    }
+                }
+            }
+            try{
+                localStorage.setItem(key, JSON.stringify(value));
+                return true;
+            }catch(e){
+                console.error('[KMI SAFE STORAGE] "'+key+'" kaydedilemedi:',e);
+                try{ window.kmiToast?.('"'+key+'" kaydedilemedi: '+e.message,'error'); }catch(e2){}
+                return false;
+            }
+        }
+        // editMachine() gibi "formdan gelen güncellemeyi mevcut kayda uygula" noktaları için
+        // Object.assign'ın güvenli alternatifi - sadece gerçekten DOLU gelen alanları yazar.
+        // explicitClearFields verilirse (bilinçli, açık bir "temizle" eylemi), o alanlar için
+        // boş değer de uygulanır.
+        function kmiMergeNonEmpty(existing, update, explicitClearFields){
+            const out = Object.assign({}, existing);
+            const clearSet = new Set(explicitClearFields||[]);
+            Object.keys(update||{}).forEach(k=>{
+                const v = update[k];
+                if(clearSet.has(k)){ out[k]=v; return; }
+                if(typeof v==='string'){ if(v.trim()!=='') out[k]=v; }
+                else if(v!==undefined && v!==null){ out[k]=v; }
+            });
+            return out;
+        }
+        function loadStorage(key, defaultValue) {
+            return kmiSafeLoad(key, defaultValue);
+        }
+
+        // KMI P0 CLEAN START (2026-10-10, owner direktifi): deneme iş emri/üretim beyanı/bakım/
+        // kalite verilerinin tek, merkezi, AÇIKÇA YETKİLENDİRİLMİŞ temizleme girişi. Yukarıdaki
+        // otomatik veri kaybı korumalarından (kmiSafeSave'in boş-üzerine-yazma reddi, QMS toplu-
+        // boşaltma koruması, seedMachines() bozuk-veri reddi) TAMAMEN AYRI bir işlemdir: hiçbir
+        // yükleme/init akışına veya düğmeye bağlı DEĞİLDİR, otomatik ÇALIŞMAZ - yalnızca
+        // window.kmiCleanStartPurgeTestData({confirm:true}) ile elle çağrılırsa bir şey yapar.
+        // KURUTLU_V35_MACHINES (gerçek, Excel'den yüklenmiş makine envanteri) bu fonksiyonun
+        // KAPSAMINDA DEĞİLDİR ve hiçbir koşulda silinmez/temizlenmez. Her temizlenen anahtarın ham
+        // verisi önce "__CLEANSTART_BACKUP__<zaman damgası>" anahtarına yedeklenir.
+        window.kmiCleanStartPurgeTestData=function(opts){
+            opts=opts||{};
+            if(opts.confirm!==true){
+                console.error('[KMI CLEAN START] Onaylanmadı (opts.confirm!==true) - hiçbir veri silinmedi.');
+                return {ok:false, reason:'confirm required'};
+            }
+            const result={ok:true, cleared:{}, backups:{}, skipped:[]};
+            ['declarations','jobOrders'].forEach(k=>{
+                let raw; try{ raw=localStorage.getItem(k); }catch(e){ raw=null; }
+                if(raw!=null){
+                    const bKey=k+'__CLEANSTART_BACKUP__'+new Date().toISOString().replace(/[:.]/g,'-');
+                    try{ localStorage.setItem(bKey,raw); result.backups[k]=bKey; }catch(e){}
+                }
+                const ok=kmiSafeSave(k,[],{force:true});
+                result.cleared[k]=ok; if(!ok) result.ok=false;
+            });
+            if(typeof window.kmiCleanStartPurgeMaintenance==='function'){
+                const r=window.kmiCleanStartPurgeMaintenance({confirm:true});
+                result.cleared.maintenance=r.ok; Object.assign(result.backups, r.backups||{});
+                if(!r.ok) result.ok=false;
+            } else { result.skipped.push('maintenance (modül yüklenmedi)'); }
+            if(typeof window.kmiCleanStartPurgeQms==='function'){
+                const r=window.kmiCleanStartPurgeQms({confirm:true});
+                result.cleared.qms=r.ok; if(r.backupKey) result.backups.kurutlu_qms_v1=r.backupKey;
+                if(!r.ok) result.ok=false;
+            } else { result.skipped.push('qms (modül yüklenmedi)'); }
+            try{ window.kmiToast?.(result.ok?'Deneme verisi temizlendi (yedekleri alındı). Makine envanterine dokunulmadı.':'Deneme verisi temizliği kısmen başarısız oldu - detaylar konsolda.', result.ok?undefined:'error'); }catch(e){}
+            console.warn('[KMI CLEAN START] purge result:', result);
+            return result;
+        };
 
         // KMI-FIX (2026-09-24): declarations (Operatör→Kalite→Muhasebe→Yönetim→Sevkiyat beyanları)
         // yalnız localStorage'da tutuluyordu; birden fazla yerde (approveKalite, approveDeclarationByMuhasebe,
@@ -1516,11 +1651,12 @@ ead>
             });
         }
         function saveStorage(key, value) {
-            try {
-                localStorage.setItem(key, JSON.stringify(value));
-            } catch(e) {
-                console.error("Storage save failed", e);
-            }
+            // KMI-DATA-LOSS-PROTECTION-001: kmiSafeSave, bozuk-işaretli bir anahtara veya dolu
+            // veri üzerine boş veri yazılmasını reddeder. Reddedilen bir yazma için cloud sync de
+            // TETİKLENMEZ (zaten gerçek değişmemiş veriyi tekrar göndermenin anlamı yok, ve boş
+            // bir diziyi job_orders_sync/legacy_declarations'a göndermek de istenmez).
+            const ok = kmiSafeSave(key, value);
+            if(!ok) return false;
             if(key==='declarations' && Array.isArray(value)){
                 clearTimeout(__kmiDeclSyncTimer);
                 __kmiDeclSyncTimer=setTimeout(()=>{ try{ kmiSyncRecentDeclarations(value); }catch(e){ console.warn('[KMI Supabase sync]',e); } }, 1500);
@@ -1529,6 +1665,7 @@ ead>
                 clearTimeout(__kmiJobSyncTimer);
                 __kmiJobSyncTimer=setTimeout(()=>{ try{ kmiSyncJobOrdersToCloud(value); }catch(e){ console.warn('[KMI Supabase sync]',e); } }, 1200);
             }
+            return true;
         }
         // KMI-FIX (2026-09-25): Karşı yön - başka bir cihazda oluşturulan/güncellenen iş
         // emirlerini bu tarayıcının local jobOrders dizisine çekiyor (id'ye göre eksik olanları
@@ -1548,6 +1685,17 @@ ead>
                     const idx=jobOrders.findIndex(j=>String(j.id)===String(remote.id));
                     if(idx===-1){ jobOrders.push(remote); changed=true; return; }
                     const local=jobOrders[idx];
+                    // KMI-OTS-RECOVERY-001 OTS-02 (2026-10-09): sticky tombstone. Once a work
+                    // order has been deleted/archived on THIS device, no cloud pull may bring
+                    // it back to active status by timestamp alone - there is currently no
+                    // real "restore" feature in the app, so any remote row claiming to be
+                    // newer-but-active for an id we already hold as deleted is, by
+                    // definition, a stale write from a device that had not yet seen the
+                    // delete (a race, not an intentional restore). Preserve the local
+                    // deleted state; only let an equally-deleted remote (or a genuinely
+                    // newer non-deleted remote arriving for an id we never deleted) through
+                    // the normal timestamp merge below.
+                    if(local.deleted && !remote.deleted) return;
                     const lt=Date.parse(local.updatedAt||local.openedAt||0)||0, rt=Date.parse(row.updated_at||remote.updatedAt||remote.openedAt||0)||0;
                     if(rt>lt+2000){ jobOrders[idx]=remote; changed=true; }
                 });
@@ -1555,6 +1703,80 @@ ead>
                 return changed;
             }catch(e){ console.warn('[KMI Supabase pull] job_orders_sync',e); return false; }
             finally{ __kmiJobPullBusy=false; }
+        };
+
+        // KMI-OTS-FINAL-001 OTS-03 (2026-10-09): job_orders_sync.raw (and therefore
+        // localStorage, and any other device's pulled copy) no longer carries price/unitPrice
+        // at all - the server strips it unconditionally (see migration
+        // 20261009c_ots03_commercial_data_separation.sql). The ONLY authoritative source for
+        // a job order's commercial price from here on is the job_order_commercial_set /
+        // job_order_commercial_feed RPCs, gated server-side by is_commercial_authorized().
+        // This cache is DELIBERATELY in-memory only (window.*, never saveStorage/localStorage)
+        // - persisting it locally would recreate the exact leak this fix exists to close for
+        // any unauthorized user who had previously loaded a page while authorized, or any
+        // shared/kiosk browser profile.
+        window.KMI_COMMERCIAL_CACHE = window.KMI_COMMERCIAL_CACHE || {};
+        window.KMI_COMMERCIAL_UNAUTHORIZED = false; // true once the server has told us this
+                                                     // session cannot see commercial data -
+                                                     // readers use this to show "Yetkisiz"
+                                                     // instead of silently showing 0/blank.
+        let __kmiCommercialPullBusy=false;
+        window.kmiPullCommercialPrices=async function(ids){
+            const client=window.kurutluSupabase; if(!client||__kmiCommercialPullBusy) return false;
+            __kmiCommercialPullBusy=true;
+            try{
+                const {data,error}=await client.rpc('job_order_commercial_feed',{p_ids:ids||null});
+                if(error){
+                    // FORBIDDEN (42501) is an EXPECTED outcome for Operator/Quality/Shipping/
+                    // Maintenance/designated-Production-Manager sessions - not a bug. Mark it
+                    // so readers show an honest "Yetkisiz" rather than a stale/blank price.
+                    if(error.code==='42501'||/FORBIDDEN/i.test(error.message||'')){ window.KMI_COMMERCIAL_UNAUTHORIZED=true; }
+                    else console.warn('[KMI OTS-03] job_order_commercial_feed hatası:',error.message);
+                    return false;
+                }
+                window.KMI_COMMERCIAL_UNAUTHORIZED=false;
+                (data||[]).forEach(row=>{
+                    window.KMI_COMMERCIAL_CACHE[String(row.job_order_id)]={unitPrice:Number(row.unit_price)||0,currency:row.currency||'TRY'};
+                });
+                try{ if(typeof refreshAllViews==='function') refreshAllViews(); }catch(e){}
+                return true;
+            }catch(e){ console.warn('[KMI OTS-03] job_order_commercial_feed exception:',e); return false; }
+            finally{ __kmiCommercialPullBusy=false; }
+        };
+        // The one sanctioned write path for a job order's commercial price. Returns true/false
+        // rather than throwing, so every call site can degrade gracefully (warn the user,
+        // keep the rest of the save) instead of losing the whole save on a 42501.
+        window.kmiSetCommercialPrice=async function(jobOrderId,unitPrice,currency){
+            const client=window.kurutluSupabase;
+            if(!client){ console.warn('[KMI OTS-03] Supabase bağlantısı yok, fiyat sunucuya kaydedilemedi.'); return false; }
+            if(!jobOrderId) return false;
+            try{
+                const {data,error}=await client.rpc('job_order_commercial_set',{p_job_order_id:String(jobOrderId),p_unit_price:Number(unitPrice)||0,p_currency:currency||'TRY'});
+                if(error){
+                    if(error.code==='42501'||/FORBIDDEN/i.test(error.message||'')){
+                        window.KMI_COMMERCIAL_UNAUTHORIZED=true;
+                        alert('Bu fiyatı kaydetme yetkiniz yok. Değişiklik sunucuya kaydedilmedi.');
+                    } else {
+                        console.warn('[KMI OTS-03] job_order_commercial_set hatası:',error.message);
+                        alert('Fiyat sunucuya kaydedilemedi: '+error.message);
+                    }
+                    return false;
+                }
+                window.KMI_COMMERCIAL_CACHE[String(jobOrderId)]={unitPrice:Number(unitPrice)||0,currency:currency||'TRY'};
+                return true;
+            }catch(e){ console.warn('[KMI OTS-03] job_order_commercial_set exception:',e); alert('Fiyat sunucuya kaydedilemedi.'); return false; }
+        };
+        // Single read helper every display site should go through: cache first (the only
+        // server-truthful source), legacy j.price/j.unitPrice only as a same-session fallback
+        // for a job just created in this tab before its first cache round-trip completes -
+        // never as a cross-device/cross-session source, since the server trigger strips those
+        // keys out of job_orders_sync.raw before any other device ever sees them.
+        window.kmiJobCommercialPrice=function(j){
+            if(!j) return 0;
+            const cached=window.KMI_COMMERCIAL_CACHE[String(j.id)];
+            if(cached) return cached.unitPrice;
+            if(window.KMI_COMMERCIAL_UNAUTHORIZED) return null; // null = "Yetkisiz", distinct from 0
+            return Number(j.price??j.unitPrice??0);
         };
 
         // YÖNETİCİ ONAYLI KABİLİYET / EĞİTİM KATALOĞU
@@ -2206,8 +2428,8 @@ ead>
                     // KMI-FIX (2026-09-25): Giriş yapar yapmaz, başka cihazlarda oluşturulmuş/
                     // güncellenmiş iş emirlerini bu tarayıcıya çekiyoruz (bkz. kmiPullJobOrdersFromCloud),
                     // sonra bekleyen QR taramasını işliyoruz - böylece scan tam güncel veriyle çalışır.
-                    (async()=>{ try{ await window.kmiPullJobOrdersFromCloud?.(); }catch(e){ console.warn('[V85 job pull]',e); } try{ window.kmiRunPendingScan?.(); }catch(e){ console.warn('[V85 pending scan]',e); } })();
-                    if(!window.__kmiJobPullInterval){ window.__kmiJobPullInterval=setInterval(()=>{ try{ window.kmiPullJobOrdersFromCloud?.(); }catch(e){} }, 45000); }
+                    (async()=>{ try{ await window.kmiPullJobOrdersFromCloud?.(); }catch(e){ console.warn('[V85 job pull]',e); } try{ window.kmiPullCommercialPrices?.(); }catch(e){} try{ window.v118CloudPull?.(); }catch(e){} try{ window.kmiRunPendingScan?.(); }catch(e){ console.warn('[V85 pending scan]',e); } })();
+                    if(!window.__kmiJobPullInterval){ window.__kmiJobPullInterval=setInterval(()=>{ try{ window.kmiPullJobOrdersFromCloud?.(); }catch(e){} try{ window.kmiPullCommercialPrices?.(); }catch(e){} try{ window.v118CloudPull?.(); }catch(e){} }, 45000); }
                 },0);
             } catch(err) {
                 console.error('[V84 login]',err);
@@ -2674,6 +2896,8 @@ ead>
             }
             if(tabName==='operatör'||tabName==='yonetici'){
                 try{ window.kmiPullJobOrdersFromCloud?.(); }catch(e){}
+                try{ window.kmiPullCommercialPrices?.(); }catch(e){}
+                try{ window.v118CloudPull?.(); }catch(e){}
             }
             if(tabName==='kalite'){
                 try{ window.kmiRenderPostOpQueues?.(); }catch(e){}
@@ -2815,6 +3039,19 @@ ead>
             tbody.innerHTML=mine.map(j=>{const due=j.dueAt?new Date(j.dueAt).toLocaleString('tr-TR'):'-';const isOpen=j.status==='Açık';return `<tr><td class="p-2 font-mono text-blue-400">${j.id}</td><td class="p-2">${j.client} - ${j.item}</td><td class="p-2">${j.department||'-'}</td><td class="p-2">${j.machine||'-'}</td><td class="p-2 font-semibold">${j.targetType==='timed'?j.durationMinutes+' dk':j.targetQty+' Adet'}</td><td class="p-2 text-amber-300 font-semibold">${due}</td><td class="p-2 text-emerald-400 font-semibold">${j.completedQty||0} Adet</td><td class="p-2"><span class="px-2 py-0.5 text-[10px] rounded ${isOpen?'bg-amber-900/60 text-amber-300':'bg-emerald-900/60 text-emerald-300'}">${j.status}</span>${isOpen?`<button onclick="activateJobOrder('${j.id}')" class="block mt-2 bg-blue-600 hover:bg-blue-500 text-white px-2 py-1 rounded text-[10px]"><i class="fa-solid fa-check mr-1"></i>İş Emrini Aktif Et / Aç</button>`:''}<div class="text-[10px] mt-1 text-emerald-300">${(()=>{const ds=declarations.filter(d=>d.jobOrder===j.id&&d.operator===currentUser?.name);const fin=ds.filter(d=>d.bonusFinalized).reduce((a,d)=>a+Number(d.finalizedBonus||0),0);const est=ds.reduce((a,d)=>a+getDeclarationBonusEstimate(d),0);return fin>0?'Prim kesinleşti: '+fin.toLocaleString('tr-TR')+' TL':(est>0?'Tahmini prim: '+est.toLocaleString('tr-TR')+' TL':'');})()}</div></td></tr>`}).join('')||'<tr><td colspan="8" class="p-4 text-center text-slate-500">Size atanmış iş emri bulunmuyor.</td></tr>';
         }
 
+        // KMI-OTS-RECOVERY-001 OTS-04 (2026-10-09): single canonical stage-sequence projection,
+        // reused everywhere a static "flow" hint is shown to a user, instead of each surface
+        // hardcoding its own copy of the sequence text. The legacy 5-step text these surfaces
+        // used to show ("Beyan → Kalite → Muhasebe → Yönetim → Sevkiyat") predates RC-04 and is
+        // missing the Final Production Release step entirely, actively contradicting the real,
+        // live canonical sequence (KMI RC-04 CANONICAL APPROVAL SEQUENCE CORRECTION, 2026-10-08):
+        // Final Kalite → Nihai Üretim Serbest Bırakma → Yönetim/İşletme Onayı →
+        // Muhasebe/Ticari Belge → Ticari Serbest Bırakma → Sevkiyata Hazır → Sevk Edildi.
+        // A genuinely historical record (one that predates RC-04 and will never move through the
+        // new stages) is not affected by this - it continues to show its own actual, frozen
+        // status text, never this projection.
+        window.KMI_CANONICAL_STAGE_SEQUENCE_LABEL = 'Final Kalite → Nihai Üretim Serbest Bırakma → Yönetim/İşletme Onayı → Muhasebe/Ticari Belge → Ticari Serbest Bırakma → Sevkiyata Hazır → Sevk Edildi';
+        window.kmiCanonicalStageSequenceText = function(){ return window.KMI_CANONICAL_STAGE_SEQUENCE_LABEL; };
         function renderAdminJobOrders() {
             const tbody = document.getElementById('adminJobOrdersTable');
             tbody.innerHTML = jobOrders.map(j => `
@@ -2826,13 +3063,13 @@ ead>
                     <td class="p-2 font-semibold">${j.targetType==='timed'?`${j.durationMinutes} dk`:j.targetQty}</td>
                     <td class="p-2 text-blue-300">${j.transferPending?`<span class="text-amber-300 font-bold">Operatör Ataması Bekliyor</span><div class="text-[9px] text-slate-500 mt-1">${j.transferFromMachine||'-'} → ${j.machine||'-'}<br>Sevk eden: ${j.transferRequestedBy||'-'}</div>`:((j.assignedTo||[]).map(id=>PERSONNEL_LIST.find(p=>Number(p.id)===Number(id))?.name||id).join(', ')||'Genel / Atanmamış')}</td>
                     <td class="p-2 text-emerald-400 font-semibold">${j.completedQty}</td>
-                    <td class="p-2 font-mono">${Number(j.price??j.unitPrice??0).toLocaleString('tr-TR')} TL</td>
+                    <td class="p-2 font-mono">${(()=>{const p=window.kmiJobCommercialPrice?window.kmiJobCommercialPrice(j):Number(j.price??j.unitPrice??0);return p===null?'<span class="text-slate-500">Yetkisiz</span>':Number(p).toLocaleString('tr-TR')+' TL';})()}</td>
                     <td class="p-2">
                         <span class="px-2 py-0.5 text-[10px] rounded ${j.status==='Açık'?'bg-amber-900/60 text-amber-300':((j.status==='Muhasebe Onayı Bekliyor'||j.status==='Ticari Belge Onayı Bekliyor')?'bg-blue-900/60 text-blue-300':'bg-emerald-900/60 text-emerald-300')}">${j.status}</span>
                     </td>
                     <td class="p-2 text-right space-x-1">
                         ${j.transferPending?`<button onclick="openTransferAssignmentModal('${j.id}')" class="bg-amber-600 hover:bg-amber-500 text-white px-2 py-1 rounded text-[10px] font-bold"><i class="fa-solid fa-user-plus"></i> Operatör Ata</button>`:''}<button onclick="kmiOpenJobOrderFile('${j.id}')" class="bg-amber-700 hover:bg-amber-600 text-white px-2 py-1 rounded text-[10px]"><i class="fa-solid fa-qrcode"></i> Dijital Dosya</button><button onclick="editJobOrder('${j.id}')" class="bg-slate-700 hover:bg-slate-600 text-white px-2 py-1 rounded text-[10px]"><i class="fa-solid fa-pen"></i> Düzenle</button><button onclick="deleteJobOrder('${j.id}')" class="bg-red-900/70 hover:bg-red-700 text-red-200 px-2 py-1 rounded text-[10px]"><i class="fa-solid fa-trash"></i> Sil</button>
-                        ${j.status === 'Açık' ? `<span class="text-[10px] text-cyan-300">Beyan → Kalite → Muhasebe → Yönetim → Sevkiyat</span>` : `<span class="text-[10px] text-slate-500">${j.status}</span>`}
+                        ${j.status === 'Açık' ? `<span class="text-[10px] text-cyan-300" title="Kanonik onay sırası (RC-04)">${window.kmiCanonicalStageSequenceText()}</span>` : `<span class="text-[10px] text-slate-500">${j.status}</span>`}
                     </td>
                 </tr>
             `).join('');
@@ -2924,12 +3161,44 @@ ead>
             jobOrders.push(job); saveStorage('jobOrders',jobOrders); queueJobAssignmentNotifications(job); updateJobOrderDropdowns(); refreshAllViews(); closeJobOrderModal(); alert(`${id} iş emri ${assignedTo.length} çalışana atandı.`);
         }
 
+        // KMI-OTS-RECOVERY-001 OTS-02 (2026-10-09): this writer used to physically remove
+        // job orders with NO linked declaration from the local `jobOrders` array (the
+        // `else` branch below), while orders WITH a linked declaration were soft-deleted
+        // (deleted:true/status:'Silindi'). That split was the root cause of deleted work
+        // orders silently reappearing (confirmed via read-only trace, not guessed):
+        //   - `jobOrders` is mirrored to Supabase `job_orders_sync` via an upsert-only
+        //     writer (kmiSyncJobOrdersToCloud) - there is NO delete call anywhere against
+        //     that table, so a row removed from the local array is never removed from the
+        //     cloud mirror; it is permanent there.
+        //   - The cloud->local puller (kmiPullJobOrdersFromCloud) runs on every login, on
+        //     tab/view switches, and on a 45s interval, and for any cloud row whose id is
+        //     NOT found in the current local array it unconditionally re-inserts it
+        //     (no tombstone/deleted check at all) - exactly resurrecting a physically
+        //     deleted order on this or any other browser/device.
+        //   - Even the soft-delete branch had a secondary gap: it set deletedAt but never
+        //     bumped updatedAt, so the puller's own "newer wins" merge (comparing
+        //     local.updatedAt||openedAt against the cloud row's updated_at) had no reliable
+        //     signal that the local delete was the most recent change, and a slightly-newer
+        //     stale write from another tab/device could overwrite it back to active.
+        // Fix (smallest safe change, no schema/migration involved - this is a pure client
+        // write-path correction): ALWAYS soft-delete, regardless of linked declarations,
+        // so the row is never removed from the array (and therefore never silently omitted
+        // from the next cloud upsert), and always bump updatedAt so the merge comparison on
+        // every device has an accurate "this was just deleted" signal. This also directly
+        // satisfies "do not physically delete production history" / "historical records
+        // remain intact" from the OTS-02 requirement, for orders with no declarations too.
+        // NOTE for the Owner: this stops FUTURE deletions from reappearing. The work orders
+        // already reported as reappearing have a stale, never-deleted cloud mirror row from
+        // before this fix; they will need to be deleted again (once this fix is live) for
+        // that stale cloud row to finally be corrected - the app does not auto-correct
+        // historical cloud rows on its own, since that would be a backfill the Owner did not
+        // explicitly approve.
         function deleteJobOrder(id){
             if(!currentUser || getEffectiveRole(currentUser)!=='ADMIN'){alert('Yönetici yetkisi gerekir.');return;}
             const j=jobOrders.find(x=>x.id===id); if(!j)return;
             const linked=declarations.filter(d=>d.jobOrder===id).length;
-            if(!confirm(`${id} iş emri silinsin mi? ${linked ? linked+' bağlı beyan korunacak ve iş emri silindi olarak arşivlenecek.' : ''}`))return;
-            if(linked){ j.deleted=true; j.status='Silindi'; j.deletedAt=new Date().toISOString(); j.deletedBy=currentUser.name; } else { jobOrders=jobOrders.filter(x=>x.id!==id); }
+            if(!confirm(`${id} iş emri silinsin mi? ${linked ? linked+' bağlı beyan korunacak ve iş emri silindi olarak arşivlenecek.' : 'İş emri silindi olarak arşivlenecek, geçmiş kayıt korunacak.'}`))return;
+            j.deleted=true; j.status='Silindi'; j.deletedAt=new Date().toISOString(); j.deletedBy=currentUser.name; j.updatedAt=j.deletedAt;
             saveStorage('jobOrders',jobOrders); refreshAllViews();
         }
         function queueJobAssignmentNotifications(job){
@@ -2959,11 +3228,23 @@ ead>
                 else alert("Hedef adet geçerli bir sayı olmalıdır.");
             }
 
-            const price = prompt("Birim Fiyat (TL):", j.price);
-            if(price !== null) {
-                const parsedPrice = Number(price);
-                if (Number.isFinite(parsedPrice) && parsedPrice >= 0) j.price = parsedPrice;
-                else alert("Birim fiyat geçerli bir sayı olmalıdır.");
+            // KMI-OTS-FINAL-001 OTS-03 (2026-10-09): price is no longer a plain field on the
+            // job object - job_orders_sync.raw never carries it (server trigger strips it
+            // unconditionally). Prefill from the authoritative server-side cache, skip the
+            // prompt entirely for a session the server has told us is unauthorized (no point
+            // asking for a number we can't save and shouldn't have shown), and on confirm,
+            // persist via the RPC rather than mutating j.price locally.
+            if(window.KMI_COMMERCIAL_UNAUTHORIZED){
+                alert('Bu iş emrinin ticari fiyat bilgisini görme/değiştirme yetkiniz yok.');
+            } else {
+                const currentPrice = window.kmiJobCommercialPrice ? window.kmiJobCommercialPrice(j) : (j.price??j.unitPrice??0);
+                const price = prompt("Birim Fiyat (TL):", currentPrice===null?'':currentPrice);
+                if(price !== null) {
+                    const parsedPrice = Number(price);
+                    if (Number.isFinite(parsedPrice) && parsedPrice >= 0) {
+                        window.kmiSetCommercialPrice ? window.kmiSetCommercialPrice(j.id, parsedPrice, 'TRY') : (j.price = parsedPrice);
+                    } else alert("Birim fiyat geçerli bir sayı olmalıdır.");
+                }
             }
 
             const dept=prompt('Departman:',j.department||'Üretim'); if(dept!==null)j.department=dept;
@@ -2980,7 +3261,10 @@ ead>
         }
 
         function closeJobByAdmin(id) {
-            alert('İş emri doğrudan Muhasebeye gönderilemez. Üretim iş emri Operatör Beyanı → Kalite → Burcu/Muhasebe → Yönetim → Sevkiyat sırasını izlemelidir.');
+            // KMI-OTS-RECOVERY-001 OTS-04 (2026-10-09): message text was still describing the
+            // pre-RC-04 5-step sequence (and even attributed accounting approval to a named
+            // person, "Burcu") - replaced with the single canonical sequence projection.
+            alert('İş emri doğrudan Muhasebeye gönderilemez. Üretim iş emri şu kanonik sırayı izlemelidir: '+window.kmiCanonicalStageSequenceText());
         }
 
         // KMI RC-04 item 1 closure (2026-10-08): this job-level writer had ZERO live UI
@@ -3807,9 +4091,11 @@ ead>
             const detailBody = document.getElementById('muhasebeTableBody');
             detailBody.innerHTML = approved.map(d => {
                 const jo = jobOrders.find(j => j.id === d.jobOrder);
-                const price = jo ? (Number(jo.price)||0) : 0;
+                const rawPrice = jo ? (window.kmiJobCommercialPrice ? window.kmiJobCommercialPrice(jo) : Number(jo.price)||0) : 0;
+                const unauthorizedPrice = rawPrice === null;
+                const price = unauthorizedPrice ? 0 : Number(rawPrice)||0;
                 return `<tr>
-                    <td class="p-2.5 font-mono text-slate-400">${d.id}</td><td class="p-2.5">${d.date}</td><td class="p-2.5 font-semibold text-white">${jo ? jo.client : '-'}</td><td class="p-2.5">${jo ? jo.item : d.jobOrder}</td><td class="p-2.5 font-bold text-emerald-400">${d.qty} Adet</td><td class="p-2.5 font-mono">${price.toLocaleString('tr-TR')} TL</td><td class="p-2.5 font-mono font-bold text-white">${(d.qty*price).toLocaleString('tr-TR')} TL</td><td class="p-2.5 text-cyan-400 font-medium">${d.accountingApprover || '-'}<div class="text-[9px] text-amber-300">İrsaliye: ${d.deliveryNoteNo||'-'}</div></td><td class="p-2.5 text-slate-300">${d.operator}</td>
+                    <td class="p-2.5 font-mono text-slate-400">${d.id}</td><td class="p-2.5">${d.date}</td><td class="p-2.5 font-semibold text-white">${jo ? jo.client : '-'}</td><td class="p-2.5">${jo ? jo.item : d.jobOrder}</td><td class="p-2.5 font-bold text-emerald-400">${d.qty} Adet</td><td class="p-2.5 font-mono">${unauthorizedPrice?'<span class="text-slate-500">Yetkisiz</span>':price.toLocaleString('tr-TR')+' TL'}</td><td class="p-2.5 font-mono font-bold text-white">${unauthorizedPrice?'<span class="text-slate-500">Yetkisiz</span>':(d.qty*price).toLocaleString('tr-TR')+' TL'}</td><td class="p-2.5 text-cyan-400 font-medium">${d.accountingApprover || '-'}<div class="text-[9px] text-amber-300">İrsaliye: ${d.deliveryNoteNo||'-'}</div></td><td class="p-2.5 text-slate-300">${d.operator}</td>
                 </tr>`;
             }).join('') || '<tr><td colspan="9" class="p-4 text-center text-slate-500">Muhasebe tarafından yönetim onayına aktarılmış kayıt yok.</td></tr>';
         }
@@ -4627,7 +4913,7 @@ ead>
             MACHINES_LIST.forEach(m => { csvContent += `${m.code},${m.name}\n`; });
 
             csvContent += "\n--- IS EMIRLERI ---\nID,Musteri,Urun,Hedef,Tamamlanan,BirimFiyat,Durum\n";
-            jobOrders.forEach(j => { csvContent += `${j.id},${j.client},${j.item},${j.targetQty},${j.completedQty},${j.price},${j.status}\n`; });
+            jobOrders.forEach(j => { const p=window.kmiJobCommercialPrice?window.kmiJobCommercialPrice(j):Number(j.price??j.unitPrice??0); csvContent += `${j.id},${j.client},${j.item},${j.targetQty},${j.completedQty},${p===null?'Yetkisiz':p},${j.status}\n`; });
 
             csvContent += "\n--- OPERATÖR BEYANLARI ---\nID,Tarih,Operator,Tezgah,IsEmri,Uretilen,Hurda,Takimlar,KaliteDurum,Onaylayan\n";
             declarations.forEach(d => { csvContent += `${d.id},${d.date},${d.operator},${d.machine},${d.jobOrder},${d.qty},${d.scrap},${d.tools},${d.status},${d.approver}\n`; });
@@ -6378,8 +6664,34 @@ setTimeout(()=>{if(!window.currentUser)return;renderMachineFleetV34();renderPuan
 (function(){
 'use strict';
 const K_M='KURUTLU_V35_MACHINES',K_O='KURUTLU_V35_MAINT_ORDERS',K_J='KURUTLU_V35_MACHINE_JOURNAL';
-const load=(k,d)=>{try{const x=JSON.parse(localStorage.getItem(k));return x??d}catch(e){return d}};
-const save=(k,v)=>localStorage.setItem(k,JSON.stringify(v));
+// KMI-DATA-LOSS-PROTECTION-001 (2026-10-10): bu modülün kendi load/save'i artık üst seviyedeki
+// paylaşılan güvenli depolama çekirdeğini (kmiSafeLoad/kmiSafeSave, src/index.html:~1466)
+// kullanıyor - makine künyesi/bakım/makine günlüğü için AYNI koruma (bozuk veri yedeklenir ve
+// otomatik üzerine yazma engellenir; dolu veri üzerine boş veri yazılamaz).
+const load=(k,d)=>kmiSafeLoad(k,d);
+const save=(k,v,opts)=>kmiSafeSave(k,v,opts);
+// KMI P0 CLEAN START (2026-10-10, owner direktifi): deneme bakım/arıza/makine olay kayıtlarının
+// (K_O/K_J) KASITLI, açıkça yetkilendirilmiş temizliği - otomatik veri kaybı korumasından (yukarı)
+// TAMAMEN AYRI bir işlem. Bu fonksiyon hiçbir yükleme/init akışına bağlı DEĞİL; yalnızca
+// opts.confirm===true ile elle çağrılırsa çalışır. Her zaman önce HAM veriyi bir
+// "__CLEANSTART_BACKUP__<zaman damgası>" anahtarına yedekler, SONRA force:true ile temizler.
+// K_M (KURUTLU_V35_MACHINES - gerçek makine envanteri) bu fonksiyonun KAPSAMINDA DEĞİLDİR ve asla
+// dokunulmaz.
+window.kmiCleanStartPurgeMaintenance=function(opts){
+ opts=opts||{};
+ if(opts.confirm!==true) return {ok:false,reason:'confirm required'};
+ const backups={};
+ [K_O,K_J].forEach(k=>{
+  let raw; try{ raw=localStorage.getItem(k); }catch(e){ raw=null; }
+  if(raw!=null){
+   const bKey=k+'__CLEANSTART_BACKUP__'+new Date().toISOString().replace(/[:.]/g,'-');
+   try{ localStorage.setItem(bKey,raw); backups[k]=bKey; }catch(e){}
+  }
+ });
+ const okO=save(K_O,[],{force:true});
+ const okJ=save(K_J,[],{force:true});
+ return {ok:okO&&okJ, backups};
+};
 const esc=x=>String(x??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
 const nowISO=()=>new Date().toISOString();
 const role=()=>{try{return getEffectiveRole(currentUser)}catch(e){return String(currentUser?.role||'USER').toUpperCase()}};
@@ -6437,6 +6749,18 @@ function seedMachines(){
      if(changed)save(K_M,m);
      return m;
    }
+ }
+ // KMI-DATA-LOSS-PROTECTION-001 (2026-10-10, owner P0 directive): buraya iki farklı durumda
+ // düşülebilir - (1) anahtar GERÇEKTEN hiç kullanılmamış (ilk kurulum, normal, aşağıdaki reseed
+ // doğru davranış) ya da (2) kmiSafeLoad(K_M,...) JSON'u BOZUK bulduğu için fallback (null)
+ // döndürdü (window.__kmiCorruptKeys[K_M] bu durumda zaten set edilmiş olur). İkinci durumda
+ // otomatik yeniden kurulum YASAK: gerçek makine künyesi (marka/model/seri/yıl) üzerine blank
+ // şablonlarla save(K_M,...) ÇAĞRILAMAZ. kmiSafeSave bunu zaten reddeder (ikinci koruma
+ // katmanı), ama burada erkenden durup gereksiz/yanıltıcı bir reseed denemesi de yapmıyoruz.
+ if(window.__kmiCorruptKeys && Object.prototype.hasOwnProperty.call(window.__kmiCorruptKeys, K_M)){
+   console.error('[KMI] "'+K_M+'" bozuk olarak işaretli - otomatik makine yeniden kurulumu ENGELLENDİ. Gerçek veri silinmedi, yedeği korunuyor, kurtarma bekleniyor.');
+   try{ window.kmiToast?.('Makine künyesi verisi bozuk görünüyor - otomatik kurulum durduruldu. Hiçbir veri silinmedi; lütfen bu durumu bildirin.','error'); }catch(e){}
+   return Array.isArray(m)?m:[];
  }
  const prevByCode=new Map((Array.isArray(m)?m:[]).filter(x=>!String(x.code||'').includes('[object Object]')).map(x=>[String(x.code),x]));
  m=raw.map((mm,i)=>{
@@ -6577,8 +6901,8 @@ function orderRow(o){const m=machine(o.machineId),age=(Date.now()-new Date(o.ope
  const assignBadge=o.assignedTo?`<span class="v35-chip bg-violet-500/15 text-violet-300"><i class="fa-solid fa-user-gear"></i> ${esc(o.assignedToName||'-')}</span>`:'';
  return `<div class="v35-row flex flex-wrap justify-between gap-3 items-center"><div><div class="text-xs font-bold text-white">${esc(o.id)} · ${esc(m?.name||o.machineName)}</div><div class="text-[10px] text-slate-400">${esc(o.kindLabel||o.kind)} · ${esc(o.symptom||o.description)} · ${age.toFixed(1)} saat açık</div><div class="text-[10px] text-cyan-300 mt-1">${o.assignedTo?'Atanan bakım personeli aşağıda':'Bakım kuyruğu: '+esc(recipients.join(' · ')||'Aktif bakım personeli')} · Bildiren: ${esc(o.reportedBy||'-')}</div></div><div class="flex gap-2 items-center flex-wrap">${assignBadge}<span class="v35-chip ${age>=72?'bg-red-500/15 text-red-300':age<=24?'bg-emerald-500/15 text-emerald-300':'bg-amber-500/15 text-amber-300'}">${esc(o.status)}</span><button class="v35-btn bg-slate-700" data-v35-open="${esc(o.machineId)}">Makine Dosyası</button>${canMaintain()?`<button class="v35-btn bg-indigo-700" onclick="window.v35AssignOrder('${esc(o.id)}')">${o.assignedTo?'Yeniden Ata':'Ata'}</button><button class="v35-btn bg-emerald-700" data-v35-close="${esc(o.id)}">Çöz & Kapat</button>`:''}</div></div>`}
 function closedQueueRow(o){return `<div class="v35-row"><div class="flex flex-wrap justify-between gap-2"><b class="text-xs text-white">${esc(o.id)} · ${esc(o.machineName||machine(o.machineId)?.name||'-')}</b><span class="v35-chip bg-emerald-500/15 text-emerald-300">KAPANDI</span></div><div class="text-[10px] text-slate-300 mt-1">${esc(o.symptom||o.description||'-')} → ${esc(o.resolution||'-')}</div><div class="text-[10px] text-cyan-300 mt-1">Mühür: ${esc(o.closedBy||'-')} · ${o.closedAt?new Date(o.closedAt).toLocaleString('tr-TR'):'-'} · Açık kalma ${fmtMin(o.serviceDurationMinutes||0)}${o.downtimeMinutes!=null?' · DOWN '+fmtMin(o.downtimeMinutes):''}</div></div>`}
-function renderAll(){machines=seedMachines();orders=load(K_O,orders);journal=load(K_J,journal);const a=document.getElementById('v35MaintenanceWorkspace');if(a)a.innerHTML=workspace();const admin=document.querySelector('[data-admin-module="maintenance"]');if(admin){admin.innerHTML=`<div class="flex flex-wrap justify-between items-center gap-3 border-b border-slate-700 pb-3 mb-4"><div><h3 class="text-lg font-black text-white"><i class="fa-solid fa-heart-pulse text-red-400 mr-2"></i>Makine Sağlığı · V50</h3><p class="text-[11px] text-slate-500">Tek veri modeli: makine künyesi, arıza, bakım iş emri, DOWN/UP ve geçmiş.</p></div>${canAdmin()?'<button class="v35-btn bg-cyan-700" id="v35AddMachineAdmin">+ Yeni Makine</button>':''}</div><div id="v35AdminWorkspace">${workspace()}</div>`}bind()}
-function bind(){document.querySelectorAll('[data-v35-open]').forEach(b=>b.onclick=()=>openFile(b.dataset.v35Open));document.querySelectorAll('[data-v35-close]').forEach(b=>b.onclick=()=>closeOrder(b.dataset.v35Close));document.getElementById('v35AddMachine')?.addEventListener('click',addMachine);document.getElementById('v35AddMachineAdmin')?.addEventListener('click',addMachine);document.querySelectorAll('[data-v35-dept]').forEach(s=>s.onchange=(e)=>{e.stopPropagation();setDepartment(s.dataset.v35Dept,s.value)});document.querySelectorAll('[data-v35-deptfilter]').forEach(b=>b.onclick=()=>{deptFilter=b.dataset.v35Deptfilter;renderAll()})}
+function renderAll(){machines=seedMachines();orders=load(K_O,orders);journal=load(K_J,journal);const a=document.getElementById('v35MaintenanceWorkspace');if(a)a.innerHTML=workspace();const admin=document.querySelector('[data-admin-module="maintenance"]');if(admin){admin.innerHTML=`<div class="flex flex-wrap justify-between items-center gap-3 border-b border-slate-700 pb-3 mb-4"><div><h3 class="text-lg font-black text-white"><i class="fa-solid fa-heart-pulse text-red-400 mr-2"></i>Makine Sağlığı · V50</h3><p class="text-[11px] text-slate-500">Tek veri modeli: makine künyesi, arıza, bakım iş emri, DOWN/UP ve geçmiş.</p></div>${canAdmin()?'<button class="v35-btn bg-cyan-700" id="v35AddMachineAdmin">+ Yeni Makine</button>':''}</div><div id="v35AdminWorkspace">${workspace()}</div>${typeof window.kmiMachineMigratePanelHtml==='function'?window.kmiMachineMigratePanelHtml():''}`}bind()}
+function bind(){document.querySelectorAll('[data-v35-open]').forEach(b=>b.onclick=()=>openFile(b.dataset.v35Open));document.querySelectorAll('[data-v35-close]').forEach(b=>b.onclick=()=>closeOrder(b.dataset.v35Close));document.getElementById('v35AddMachine')?.addEventListener('click',addMachine);document.getElementById('v35AddMachineAdmin')?.addEventListener('click',addMachine);document.querySelectorAll('[data-v35-dept]').forEach(s=>s.onchange=(e)=>{e.stopPropagation();setDepartment(s.dataset.v35Dept,s.value)});document.querySelectorAll('[data-v35-deptfilter]').forEach(b=>b.onclick=()=>{deptFilter=b.dataset.v35Deptfilter;renderAll()});document.getElementById('kmiMachineMigratePreviewBtn')?.addEventListener('click',async()=>{await window.kmiMachinesServerMigrationPreview?.();renderAll();});document.getElementById('kmiMachineMigrateConfirmBtn')?.addEventListener('click',async()=>{const preview=window.__kmiMachineMigratePreview;if(!preview){alert('Önce önizleme (Dry Run) çalıştırın.');return;}if(!confirm('Sunucuya aktarılacak: '+(preview.created||[]).length+' yeni makine, '+(preview.updated||[]).length+' güncellenecek makine. '+(preview.quarantined||[]).length+' kayıt incelemeye alınacak. Tarayıcı verisi SİLİNMEYECEK. Onaylıyor musunuz?'))return;await window.kmiMachinesServerMigrationConfirm?.({confirm:true});renderAll();});}
 function openFile(id){selected=id;const m=machine(id);if(!m)return;const modal=document.getElementById('machineFileModal'),title=document.getElementById('machineFileTitle'),c=document.getElementById('machineFileContent');title.textContent=m.name;modal.classList.remove('hidden');modal.classList.add('flex');c.innerHTML=fileHTML(m);bindFile(m)}
 function fileHTML(m){const oo=openOrders(m.id),hist=closedOrders(m.id),plan=nextPlan(m.id),isDown=m.status!=='UP',mm=monthlyMaintenanceMetrics(m.id);
  // KMI-FIX (2026-09-26): Ender'in isteği - makine dosyasına fotoğraf yükleme, DOWN değilse
@@ -6692,12 +7016,149 @@ function editMachine(id){
  const m=machine(id);if(!m)return;
  if(typeof window.kmiOpenMachineEditModal==='function'){
   window.kmiOpenMachineEditModal({id:m.id,name:m.name,brand:m.brand,model:m.model,serial:m.serial,year:m.year,location:m.location,specs:m.specs},(upd)=>{
-   Object.assign(m,upd);persist();renderAll();openFile(id);
+   // KMI-DATA-LOSS-PROTECTION-001 (2026-10-10, owner P0 directive): Object.assign(m,upd) boş/
+   // undefined gelen bir alanı da (örn. form'da temizlenmiş bir seri no kutusu) koşulsuz
+   // yazıyordu - bu, GERÇEK bir seri no/marka/model/yıl/teknik özellik kaydını sessizce
+   // SİLİYORDU. kmiMergeNonEmpty yalnızca gerçekten DOLU gelen alanları yazar. Bilinçli bir
+   // alan temizleme isteniyorsa (ayrı, açık bir kullanıcı eylemi), çağıran taraf
+   // upd.__kmiExplicitClear = ['serial', ...] şeklinde işaretleyebilir - bugün hiçbir arayüz
+   // yolu bunu set etmiyor, yani varsayılan davranış her koşulda "boşla asla silme"dir.
+   const merged = kmiMergeNonEmpty(m, upd, upd && upd.__kmiExplicitClear);
+   Object.assign(m, merged);
+   persist();
+   // KMI canonical machine identity (2026-10-10, owner direktifi madde 2.4): yerel kayıt zaten
+   // kmiMergeNonEmpty ile korunarak yazıldı; eğer bu makine daha önce sunucuya aktarılmışsa
+   // (m.canonicalId mevcutsa) aynı doğrulanmış alanları arka planda, engelleyici olmadan
+   // (soft-sync - job_orders_sync ile aynı desen) sunucudaki kanonik satıra da yansıt.
+   window.kmiSyncMachineToServer?.(m);
+   renderAll();openFile(id);
   });
   return;
  }
- const name=prompt('Makine adı:',m.name);if(!name?.trim())return;m.name=name.trim();m.brand=prompt('Marka:',m.brand||'')??m.brand;m.model=prompt('Model:',m.model||'')??m.model;m.serial=prompt('Seri No:',m.serial||'')??m.serial;m.year=prompt('Üretim yılı:',m.year||'')??m.year;m.location=prompt('Lokasyon:',m.location||'Üretim')??m.location;m.specs=prompt('Teknik özellikler / notlar:',m.specs||'')??m.specs;persist();renderAll();openFile(id)
+ // KMI-DATA-LOSS-PROTECTION-001 FINAL HARDENING (2026-10-10, owner P0 direktifi): modal yolunda
+ // kullanılan "boş alan mevcut gerçek değeri silmez" korumasının AYNISI bu eski prompt() yedek
+ // yoluna da uygulandı. prompt() iptal edilirse null döner (??  zaten bunu koruyordu), AMA
+ // kullanıcı kutuyu elle boşaltıp OK derse boş string ('') döner - bu önceden ??  ile
+ // YAKALANAMIYORDU ve mevcut seri no/marka/model/yıl/lokasyon/teknik özellik GERÇEK verisini
+ // sessizce siliyordu. Artık hem null hem de boş/sadece-boşluk string girişi "değiştirme"
+ // olarak ele alınıyor; mevcut değer korunuyor. Bilinçli bir alanı bilerek boşaltmak bu yedek
+ // yolda hâlâ desteklenmiyor (modal yolundaki __kmiExplicitClear ile aynı sınırlama, raporda
+ // belirtildi) - varsayılan her koşulda "boşla asla silme"dir.
+ const name=prompt('Makine adı:',m.name);if(!name?.trim())return;m.name=name.trim();
+ const _brand=prompt('Marka:',m.brand||'');if(_brand!=null&&_brand.trim()!=='')m.brand=_brand.trim();
+ const _model=prompt('Model:',m.model||'');if(_model!=null&&_model.trim()!=='')m.model=_model.trim();
+ const _serial=prompt('Seri No:',m.serial||'');if(_serial!=null&&_serial.trim()!=='')m.serial=_serial.trim();
+ const _year=prompt('Üretim yılı:',m.year||'');if(_year!=null&&_year.trim()!=='')m.year=_year.trim();
+ const _loc=prompt('Lokasyon:',m.location||'Üretim');if(_loc!=null&&_loc.trim()!=='')m.location=_loc.trim();
+ const _specs=prompt('Teknik özellikler / notlar:',m.specs||'');if(_specs!=null&&_specs.trim()!=='')m.specs=_specs.trim();
+ persist();
+ window.kmiSyncMachineToServer?.(m);
+ renderAll();openFile(id)
 }
+// KMI CANONICAL MACHINE IDENTITY (2026-10-10, owner direktifi "KMI — CANONICAL MACHINE
+// INVENTORY" madde 2-3): tarayıcıdaki gerçek makine envanterini (KURUTLU_V35_MACHINES) KAYBETMEDEN
+// Supabase'deki kalıcı `machines` tablosuna taşıyan güvenli köprü. İki parça:
+//   1) kmiMachinesServerMigrationPreview/Confirm - ilk, tek seferlik (ama tekrar çalıştırılabilir)
+//      toplu aktarım; yönetici arayüzünden önizleme + açık onay gerektirir, hiçbir satırı
+//      birleştirmez (eşleştirme SADECE machine_code ile, model/ad benzerliğiyle DEĞİL),
+//      belirsiz/boş kodu asla tahmin etmez (karantinaya alır).
+//   2) kmiSyncMachineToServer - aktarımdan SONRA, editMachine() her kaydettiğinde doğrulanmış
+//      alanları (seri no/yıl/model/marka) arka planda kanonik satıra senkronlar - bu bir
+//      yetkilendirme kapısı DEĞİL (approveKalite/approveShipment'taki hard-fail-closed RPC
+//      deseninden kasıtlı olarak farklı), bu yüzden sunucu ulaşılamazsa/hata verirse yerel kayıt
+//      ASLA geri alınmaz veya bloklanmaz - sadece konsola uyarı yazılır ve bir sonraki kayıtta
+//      tekrar denenir, job_orders_sync/legacy_declarations senkronizasyonundaki AYNI desen.
+//
+// BİLEREK YAPILMAYAN: localStorage'daki KURUTLU_V35_MACHINES hiçbir noktada otomatik silinmez.
+// Owner'ın talimatı "başarılı aktarım ve doğrulama tamamlanmadan silme" - bu, SİL diye bir
+// otomatik adım olduğu anlamına gelmez; kalıcı veri silme ayrı, açık bir onay gerektiren bir
+// eylemdir (bu oturumun genel güvenlik kurallarıyla da örtüşür). Aktarım tamamlandığında yerel
+// veri olduğu gibi kalır, yalnız her makineye sunucudaki karşılığının kimliği (m.canonicalId)
+// yazılır - böylece ekranlar aynı tek yerel veri modelini kullanmayı sürdürür ama o artık
+// sunucudaki GERÇEK kanonik kimlikle eşleşmiş olur (ayrı bir paralel mimari YOK).
+function kmiMachineToBrowserPayload(m){
+ return {code:String(m.code||''),name:String(m.name||''),brand:String(m.brand||''),model:String(m.model||''),serial:String(m.serial||''),year:String(m.year||''),location:String(m.location||''),specs:String(m.specs||''),category:String(m.category||'')};
+}
+let __kmiMachineSyncTimers = {};
+window.kmiSyncMachineToServer = function(m, opts){
+ opts = opts || {};
+ if(!m || !m.canonicalId) return; // henüz sunucuya aktarılmamış makine - senkronlanacak kanonik satır yok.
+ const delay = opts.immediate ? 0 : 1500;
+ if(__kmiMachineSyncTimers[m.id]) clearTimeout(__kmiMachineSyncTimers[m.id]);
+ __kmiMachineSyncTimers[m.id] = setTimeout(async () => {
+  try{
+   const client = window.kurutluSupabase;
+   if(!client || typeof client.rpc !== 'function'){ console.warn('[KMI machine sync] Supabase bağlantısı yok - "'+m.code+'" için senkronizasyon ertelendi, yerel kayıt etkilenmedi.'); return; }
+   const res = await client.rpc('machines_update_known_fields', {
+    p_machine_id: m.canonicalId,
+    p_serial_number: m.serial || null,
+    p_manufacturing_year: (m.year && /^[0-9]{4}$/.test(String(m.year))) ? parseInt(m.year, 10) : null,
+    p_model: m.model || null,
+    p_machine_name: m.name || null,
+    p_manufacturer: m.brand || null,
+    p_force: false
+   });
+   if(res.error){ console.warn('[KMI machine sync] "'+m.code+'" sunucuya senkronlanamadı (yerel kayıt etkilenmedi):', res.error.message); return; }
+   console.info('[KMI machine sync] "'+m.code+'" sunucudaki kanonik kayıtla senkronlandı.', res.data);
+  }catch(e){ console.warn('[KMI machine sync] "'+m.code+'" senkronizasyon hatası (yerel kayıt etkilenmedi):', e); }
+ }, delay);
+};
+window.kmiMachinesServerMigrationPreview = async function(){
+ const client = window.kurutluSupabase;
+ if(!client || typeof client.rpc !== 'function'){ try{window.kmiToast?.('Sunucu bağlantısı (Supabase) bu oturumda kullanılamıyor - önizleme yapılamadı.','error');}catch(e){} return null; }
+ const payload = machines.filter(m=>m.active!==false).map(kmiMachineToBrowserPayload);
+ try{
+  const res = await client.rpc('machines_bulk_import_from_browser', {p_machines: payload, p_dry_run: true});
+  if(res.error){ console.warn('[KMI machine migration] önizleme hatası:', res.error.message); try{window.kmiToast?.('Önizleme başarısız: '+res.error.message,'error');}catch(e){} return null; }
+  window.__kmiMachineMigratePreview = res.data;
+  return res.data;
+ }catch(e){ console.warn('[KMI machine migration] önizleme hatası:', e); try{window.kmiToast?.('Önizleme başarısız: '+(e&&e.message||e),'error');}catch(e2){} return null; }
+};
+window.kmiMachinesServerMigrationConfirm = async function(opts){
+ opts = opts || {};
+ if(opts.confirm !== true){ console.error('[KMI machine migration] Onaylanmadı (opts.confirm!==true) - sunucuya hiçbir şey aktarılmadı.'); return null; }
+ const client = window.kurutluSupabase;
+ if(!client || typeof client.rpc !== 'function'){ try{window.kmiToast?.('Sunucu bağlantısı (Supabase) bu oturumda kullanılamıyor - aktarım yapılamadı.','error');}catch(e){} return null; }
+ const payload = machines.filter(m=>m.active!==false).map(kmiMachineToBrowserPayload);
+ try{
+  const res = await client.rpc('machines_bulk_import_from_browser', {p_machines: payload, p_dry_run: false});
+  if(res.error){ console.warn('[KMI machine migration] aktarım hatası:', res.error.message); try{window.kmiToast?.('Aktarım başarısız: '+res.error.message,'error');}catch(e){} return null; }
+  const report = res.data;
+  // Her oluşturulan/güncellenen makine için sunucudaki kanonik id'yi yerel kayıtla eşle - yerel
+  // veri modeli DEĞİŞTİRİLMEZ, sadece hangi sunucu satırına karşılık geldiği not edilir.
+  (report.created||[]).forEach(c=>{ const m = machines.find(x=>String(x.code)===String(c.code)); if(m) m.canonicalId = c.machineId; });
+  (report.updated||[]).forEach(u=>{ const m = machines.find(x=>String(x.code)===String(u.code)); if(m) m.canonicalId = u.machineId; });
+  persist();
+  window.__kmiMachineMigratePreview = null;
+  window.__kmiMachineMigrateLastResult = report;
+  try{window.kmiToast?.('Makine envanteri sunucuya aktarıldı: '+(report.created||[]).length+' yeni, '+(report.updated||[]).length+' güncellendi, '+(report.quarantined||[]).length+' incelemeye alındı. Tarayıcı verisi SİLİNMEDİ.');}catch(e){}
+  return report;
+ }catch(e){ console.warn('[KMI machine migration] aktarım hatası:', e); try{window.kmiToast?.('Aktarım başarısız: '+(e&&e.message||e),'error');}catch(e2){} return null; }
+};
+window.kmiMachineMigratePanelHtml = function(){
+ if(!canAdmin()) return '';
+ const preview = window.__kmiMachineMigratePreview;
+ const last = window.__kmiMachineMigrateLastResult;
+ const migratedCount = machines.filter(m=>m.canonicalId).length;
+ const totalCount = machines.filter(m=>m.active!==false).length;
+ let statusHtml;
+ if(preview){
+  statusHtml = `<div class="text-xs text-slate-300">Önizleme hazır: <b class="text-emerald-300">${(preview.created||[]).length} yeni</b> · <b class="text-cyan-300">${(preview.updated||[]).length} güncellenecek</b> · <b class="text-slate-400">${(preview.unchanged||[]).length} değişiklik yok</b> · <b class="text-amber-300">${(preview.quarantined||[]).length} incelemeye alınacak</b>. Bu bir önizlemedir, henüz hiçbir şey sunucuya yazılmadı.</div>${(preview.quarantined||[]).length?`<div class="text-[11px] text-amber-300 mt-1">İncelenecek: ${preview.quarantined.map(q=>esc(q.code||'(boş kod)')+' - '+esc(q.reason)).join(', ')}</div>`:''}`;
+ } else if(last){
+  statusHtml = `<div class="text-xs text-emerald-300">Son aktarım tamamlandı: ${(last.created||[]).length} yeni, ${(last.updated||[]).length} güncellendi, ${(last.quarantined||[]).length} incelemeye alındı.</div>`;
+ } else {
+  statusHtml = `<div class="text-xs text-slate-500">Henüz önizleme yapılmadı.</div>`;
+ }
+ return `<section class="bg-slate-950/55 border border-amber-800 rounded-xl p-4 mt-4" id="kmiMachineMigrateSection">
+  <h4 class="font-black text-white"><i class="fa-solid fa-server mr-2"></i>Makine Envanterini Sunucuya Aktar (Kanonik Kimlik)</h4>
+  <p class="text-[11px] text-slate-500 mt-1">Tarayıcıdaki gerçek makine listesini (${migratedCount}/${totalCount} şu ana kadar eşleşmiş) bu listeyi SİLMEDEN Supabase'deki kalıcı makine tablosuna aktarır. Aynı modelden makineler (örn. 111/113) ayrı kalır, seri numarası/üretim yılı asla uydurulmaz, sunucuda zaten dolu olan alanlar ezilmez. Belirsiz kayıtlar otomatik işlenmez, incelemeye alınır.</p>
+  <div id="kmiMachineMigrateStatus" class="mt-3">${statusHtml}</div>
+  <div class="flex gap-2 mt-3">
+   <button id="kmiMachineMigratePreviewBtn" class="v35-btn bg-indigo-700">Önizle (Dry Run)</button>
+   <button id="kmiMachineMigrateConfirmBtn" class="v35-btn bg-emerald-700" ${preview?'':'disabled'}>Onayla ve Sunucuya Aktar</button>
+  </div>
+ </section>`;
+};
 // Operatör beyanından bakım emri oluşturmayı V35 tek veri modeline bağla.
 // KMI-PLATFORM-FAZ0 BULGU (2026-09-27): window.createMaintenanceFromOperator burada TEKRAR
 // tanımlanıyor ve GERÇEK CANLI olan budur (window. ile IIFE dışına taşıyor, JS son atama
@@ -8527,6 +8988,10 @@ window.kmiApproveReservationAndOpenJobOrder=async function(orderId){
  const job={id,client:cust?cust.name:'Müşteri',item:`${p.code?p.code+' · ':''}${p.name}`,department:'Üretim',machine:`${o.reservation.machine} - ${o.reservation.machineName}`,assignedTo:[],targetType:'production',targetQty:Math.floor(o.qty),completedQty:0,price:Number(o.unitPrice||0),status:'Açık',durationMinutes:0,openedAt:new Date().toISOString(),dueAt:o.reservation.plannedEnd,source:'KMI_RESERVATION',orderId:o.id,productId:p.id};
  (window.jobOrders=window.jobOrders||[]).push(job);
  try{saveStorage('jobOrders',window.jobOrders);}catch(e){}
+ // KMI-OTS-FINAL-001 OTS-03: persist the commercial price through the sanctioned RPC too -
+ // job.price above is local-only convenience (job_orders_sync strips it on sync); this RPC
+ // call is the real, authorized, server-side record other devices/sessions will read back.
+ try{window.kmiSetCommercialPrice?.(job.id, job.price, 'TRY');}catch(e){}
  o.reservation.approvedBy=currentUser.name; o.reservation.approvedAt=new Date().toISOString(); o.reservation.jobOrderId=id;
  o.status='Üretimde';
  save();
@@ -9143,7 +9608,7 @@ window.v77BuildCurrentUserFromSupabase=function(sb){
   let found=Array.isArray(window.PERSONNEL_LIST)?window.PERSONNEL_LIST.find(p=>String(p.name||'').localeCompare(display,'tr',{sensitivity:'base'})===0):null;
   if(!found && sb.profile?.personnel_id && Array.isArray(window.PERSONNEL_LIST)) found=window.PERSONNEL_LIST.find(p=>String(p.uuid||p.dbId||p.id||'')===String(sb.profile.personnel_id));
   const base=found?{...found}:{id:sb.profile?.personnel_id||sb.user.id,name:display,dept:sb.roles?.[0]?.name||roleCode,jobTitle:sb.roles?.[0]?.name||roleCode,active:true};
-  return {...base,role:effective,allowedTabs:(window.ROLE_ALLOWED_TABS?.[effective]||['liderlik']).slice(),supabaseUserId:sb.user.id,supabaseRoleCode:roleCode,supabasePermissionCount:sb.permissions?.length||0};
+  return {...base,role:effective,allowedTabs:(window.ROLE_ALLOWED_TABS?.[effective]||['liderlik']).slice(),supabaseUserId:sb.user.id,supabaseRoleCode:roleCode,supabasePermissionCount:sb.permissions?.length||0,isDesignatedProductionManager:!!sb.productionManagerGrant};
 };
 let v80LastEnteredUid=null;
 function v80Idle(fn,delay=0){
@@ -9263,7 +9728,7 @@ window.addEventListener('kurutlu:supabase-identity',()=>{});
   // identitySeq guard rather than introducing a second, parallel notion of "latest".
   function authEventClear(){
     identitySeq++; // invalidate any older in-flight loadIdentity continuation too
-    state.session=null; state.user=null; state.profile=null; state.roles=[]; state.permissions=[];
+    state.session=null; state.user=null; state.profile=null; state.roles=[]; state.permissions=[]; state.productionManagerGrant=false;
   }
   async function loadIdentity(session){
     const requestedUid=session?.user?.id||null;
@@ -9274,20 +9739,33 @@ window.addEventListener('kurutlu:supabase-identity',()=>{});
     identityPromise=(async()=>{
     state.session=session||null;
     state.user=session?.user||null;
-    state.profile=null; state.roles=[]; state.permissions=[];
+    state.profile=null; state.roles=[]; state.permissions=[]; state.productionManagerGrant=false;
     if(!state.user){ status('Bağlantı hazır · Supabase oturumu bekleniyor','ok'); window.dispatchEvent(new CustomEvent('kurutlu:supabase-signed-out')); return; }
     const uid=state.user.id;
     try{
       // V79: login için yalnız profil + rol kritik. Yetkiler ikinci aşamada arka planda alınır.
-      const [profileRes,roleRes]=await Promise.all([
+      // KMI-OTS-RECOVERY-001 OTS-01: production_manager_grants - bu sorgu BİLEREK ayrı bir
+      // .catch() ile sarıldı, çünkü migration (20261009b) Owner onayına kadar production'da
+      // henüz YOK olabilir - tablo yoksa bu sorgu hata verir, ama login/profil/rol akışını
+      // ASLA bozmamalı (Promise.all diğerleriyle birlikte reddetmez; sadece bu alan boş kalır,
+      // isDesignatedProductionManager fail-closed false olur - aşağıda zaten öyle okunuyor).
+      const [profileRes,roleRes,grantRes]=await Promise.all([
         state.client.from('user_profiles').select('id,personnel_id,display_name,active').eq('id',uid).maybeSingle(),
-        state.client.from('user_roles').select('role_id, roles(id,code,name)').eq('user_id',uid)
+        state.client.from('user_roles').select('role_id, roles(id,code,name)').eq('user_id',uid),
+        state.client.from('production_manager_grants').select('personnel_id,active').eq('active',true)
+          .then(r=>r).catch(()=>({data:null,error:true}))
       ]);
       if(seq!==identitySeq) return;
       if(profileRes.error) throw profileRes.error;
       if(roleRes.error) throw roleRes.error;
       state.profile=profileRes.data||null;
       state.roles=(roleRes.data||[]).map(x=>x.roles).filter(Boolean);
+      // KMI-OTS-RECOVERY-001 OTS-01: server RPC (production_release_verify) is the real,
+      // final authority regardless of this flag - this is client-side convenience only, so
+      // a non-designated MANAGEMENT account sees the real denial instead of a confusing
+      // server FORBIDDEN after clicking a button it should never have seen enabled.
+      state.productionManagerGrant=!grantRes?.error && Array.isArray(grantRes?.data) &&
+        grantRes.data.some(g=>g&&g.active&&String(g.personnel_id)===String(state.profile?.personnel_id||''));
       const roleIds=(roleRes.data||[]).map(x=>x.role_id).filter(Boolean);
       const roleLabel=state.roles.map(r=>r.code).join(', ')||'rol yok';
       status(`Supabase oturumu aktif · ${roleLabel}`,'ok');
@@ -9326,7 +9804,7 @@ window.addEventListener('kurutlu:supabase-identity',()=>{});
       // V83: Login ekranının hazır olması için ağdan getSession() bekleme.
       // createClient senkrondur; kullanıcı hemen giriş yapabilsin. Yetki kapısı signIn sonrası serverdan doğrulanır.
       state.ready=true;
-      state.session=null; state.user=null; state.profile=null; state.roles=[]; state.permissions=[];
+      state.session=null; state.user=null; state.profile=null; state.roles=[]; state.permissions=[]; state.productionManagerGrant=false;
       status('Bağlantı hazır · güvenli giriş bekleniyor','ok');
       state.client.auth.onAuthStateChange((_event,session)=>{
         // Auth olayı tek başına portalı AÇMAZ. Yalnız oturum referansını günceller.
@@ -9339,7 +9817,7 @@ window.addEventListener('kurutlu:supabase-identity',()=>{});
         // öncesi) bu dal zaten boş durumu teyit eder - zararsız no-op.
         if(_event==='SIGNED_OUT'){ authEventClear(); return; }
         if(!session){
-          if(!state.user && !state.roles.length){ state.session=null; state.user=null; state.profile=null; state.roles=[]; state.permissions=[]; }
+          if(!state.user && !state.roles.length){ state.session=null; state.user=null; state.profile=null; state.roles=[]; state.permissions=[]; state.productionManagerGrant=false; }
           return;
         }
         state.session=session; state.user=session.user||null;
@@ -9379,7 +9857,7 @@ window.addEventListener('kurutlu:supabase-identity',()=>{});
   window.v82SecureSignIn=async function(email,password){
     if(!state.client) throw new Error('Supabase henüz hazır değil');
     // Önce eski oturumun kimlik verisini sıfırla; yetki başka kullanıcıdan taşınamaz.
-    state.profile=null; state.roles=[]; state.permissions=[];
+    state.profile=null; state.roles=[]; state.permissions=[]; state.productionManagerGrant=false;
     // KMI-PILOT-MFA-REMEDIATION-003 (2026-10-01): the DATA above was already reset synchronously
     // (it always was - see the comment on the previous line), but the visible status widget
     // text was not repainted until the new user's role query resolved, so it kept showing the
@@ -9411,7 +9889,7 @@ window.addEventListener('kurutlu:supabase-identity',()=>{});
   // kimlik/rol doğrulama kapısından geçer, sadece giriş yöntemi farklı).
   window.v82SecureSignInWithOtp=async function(email,otp){
     if(!state.client) throw new Error('Supabase henüz hazır değil');
-    state.profile=null; state.roles=[]; state.permissions=[];
+    state.profile=null; state.roles=[]; state.permissions=[]; state.productionManagerGrant=false;
     const __ts0=performance.now();
     const result=await state.client.auth.verifyOtp({email,token:otp,type:'magiclink'});
     const __ts1=performance.now();
@@ -9891,7 +10369,15 @@ function v118RenderCloudBanner(){
  try{
   const el=document.getElementById('v118CloudStatus'); if(!el) return;
   const when=V118_CLOUD_LAST_AT?new Date(V118_CLOUD_LAST_AT).toLocaleTimeString('tr-TR'):'-';
-  if(V118_CLOUD_STATUS==='OK'){
+  // KMI-OTS-FINAL-001 OTS-05 (2026-10-09): this banner now reflects a REAL, verified RPC
+  // round-trip (sales_order_upsert returning a genuine new revision), never an assumed/
+  // optimistic success - and distinguishes the one failure mode that is NOT a transport/
+  // auth problem (a real concurrent-edit conflict) from a generic failure, so the Owner gets
+  // an honest, actionable reason rather than one blanket "başarısız" for every cause.
+  const conflicted=Array.isArray(V?.orders)?V.orders.filter(o=>o._syncConflict):[];
+  if(conflicted.length){
+   el.innerHTML='<div class="text-[10px] font-bold text-red-300 bg-red-950/40 border border-red-700/50 rounded px-2 py-1"><i class="fa-solid fa-triangle-exclamation mr-1"></i>ÇAKIŞMA: '+conflicted.length+' sipariş başka bir cihaz/kullanıcı tarafından güncellendi - bu tarayıcıdaki değişiklik sunucuya YAZILAMADI (üzerine yazılmadı, veri kaybı yok). Siparişi yeniden açıp kontrol edin: '+conflicted.map(o=>E(o.id)).join(', ')+'</div>';
+  }else if(V118_CLOUD_STATUS==='OK'){
    el.innerHTML='<div class="text-[10px] font-bold text-emerald-400"><i class="fa-solid fa-cloud-arrow-up mr-1"></i>CANONICAL · SUNUCUYA KAYDEDİLDİ (son senkron '+when+')</div>';
   }else if(V118_CLOUD_STATUS==='FAILED'){
    el.innerHTML='<div class="text-[10px] font-bold text-amber-300 bg-amber-950/40 border border-amber-700/50 rounded px-2 py-1"><i class="fa-solid fa-triangle-exclamation mr-1"></i>YALNIZCA BU TARAYICIDA (LOCAL ONLY) · Sunucuya yedekleme şu an BAŞARISIZ - veriler kaybolmasın diye bu tarayıcıyı kapatmadan/temizlemeden önce Ender\'e bildirin. (son deneme '+when+')</div>';
@@ -9900,7 +10386,7 @@ function v118RenderCloudBanner(){
   }
  }catch(e){}
 }
-function persist(){localStorage.setItem(KEY,JSON.stringify(V));v118CloudPush().then(ok=>{V118_CLOUD_STATUS=ok?'OK':'FAILED';V118_CLOUD_LAST_AT=now();v118RenderCloudBanner();}).catch(()=>{V118_CLOUD_STATUS='FAILED';V118_CLOUD_LAST_AT=now();v118RenderCloudBanner();});v118RenderCloudBanner();}
+function persist(){localStorage.setItem(KEY,JSON.stringify(V));window.V118_LOCAL_DIRTY=true;v118CloudPush().then(ok=>{V118_CLOUD_STATUS=ok?'OK':'FAILED';V118_CLOUD_LAST_AT=now();v118RenderCloudBanner();}).catch(()=>{V118_CLOUD_STATUS='FAILED';V118_CLOUD_LAST_AT=now();v118RenderCloudBanner();});v118RenderCloudBanner();}
 window.v118RenderCloudBanner=v118RenderCloudBanner;
 function audit(action,entity,id,detail=''){V.audit.unshift({id:uid('AUD'),at:now(),by:window.currentUser?.name||'Sistem',action,entity,entityId:id,detail});V.audit=V.audit.slice(0,500)}
 function role(){return String(window.currentUser?.role||'').toLocaleUpperCase('tr-TR')}
@@ -9963,7 +10449,11 @@ window.v118Reserve=function(id,auto=false){if(!can('warehouse')&&!can('sales'))r
  // olayı görünüyordu. Gerçekten yeni rezerve edilen miktar takip edilip döndürülüyor; aşağıdaki
  // genel olay sarmalayıcı (window.KMI.event) artık sadece bu değer pozitifse kayıt atıyor.
  let took=0;o.lines.forEach(l=>{const need=Math.max(0,l.qty-l.reserved-l.shipped),take=Math.min(need,available(l.productId));if(take>0){stockRow(l.productId).reserved+=take;l.reserved+=take;took+=take;V.movements.unshift({id:uid('MOV'),at:now(),type:'RESERVE',productId:l.productId,qty:take,ref:o.id})}});recalc(o);audit('RESERVE','SALES_ORDER',o.id,'Stok rezervasyonu güncellendi');persist();if(!auto)v118Render();return took;}
-window.v118ProductionNeed=function(id){if(!can('sales'))return alert('Yetki yok.');const o=V.orders.find(x=>x.id===id);if(!o)return;let created=0;(o.lines||[]).forEach(l=>{const ordered=Number(l.qty||0),reserved=Number(l.reserved||0),produced=Number(l.produced||0);const activeWO=(Array.isArray(window.jobOrders)?window.jobOrders:[]).filter(j=>j.salesOrderId===o.id&&String(j.productId)===String(l.productId)&&!['Tamamlandı','CANCELLED','İptal'].includes(j.status)).reduce((s,j)=>s+Math.max(0,Number(j.targetQty||0)-Number(j.completedQty||0)),0);const need=Math.max(0,ordered-reserved-produced-activeWO);if(need<=0)return;const pp=product(l.productId),cc=customer(o.customerId);const jo={id:'WO-'+new Date().getFullYear()+'-'+String(Date.now()).slice(-6)+'-'+(++created),client:cc.shortName||cc.name||o.customerId,item:(pp.code||l.productId)+(pp.name?' · '+pp.name:''),project:(cc.shortName||cc.name||o.customerId)+' / '+o.customerPO,productId:l.productId,department:'CNC Üretim',targetQty:need,completedQty:0,status:'Açık',assignedTo:[],targetType:'production',durationMinutes:0,machine:'',dueAt:o.dueDate?o.dueDate+'T17:00':'',unitPrice:Number(l.unitPrice||0),salesOrderId:o.id,customerPO:o.customerPO,createdAt:now(),source:'KMI_ORDER_INTELLIGENCE',deleted:false};if(Array.isArray(window.jobOrders))window.jobOrders.push(jo);audit('CREATE','WORK_ORDER',jo.id,`${o.customerPO} · ${product(l.productId).code||l.productId} · ${need} adet`)});try{if(Array.isArray(window.jobOrders))localStorage.setItem('jobOrders',JSON.stringify(window.jobOrders))}catch(e){}persist();try{if(typeof refreshAllViews==='function')refreshAllViews()}catch(e){console.warn('KMI full refresh',e)}v118Render();if(created)alert(created+' üretim iş emri oluşturuldu. Yönetim ve Operatör panellerine işlendi.');else{const active=(Array.isArray(window.jobOrders)?window.jobOrders:[]).filter(j=>j.salesOrderId===o.id&&!['Tamamlandı','CANCELLED','İptal'].includes(j.status));alert(active.length?'Bu sipariş için üretim ihtiyacı zaten aktif iş emirleri ile karşılanıyor.':'Açık üretim ihtiyacı yok.')}return created;};
+window.v118ProductionNeed=function(id){if(!can('sales'))return alert('Yetki yok.');const o=V.orders.find(x=>x.id===id);if(!o)return;let created=0;(o.lines||[]).forEach(l=>{const ordered=Number(l.qty||0),reserved=Number(l.reserved||0),produced=Number(l.produced||0);const activeWO=(Array.isArray(window.jobOrders)?window.jobOrders:[]).filter(j=>j.salesOrderId===o.id&&String(j.productId)===String(l.productId)&&!['Tamamlandı','CANCELLED','İptal'].includes(j.status)).reduce((s,j)=>s+Math.max(0,Number(j.targetQty||0)-Number(j.completedQty||0)),0);const need=Math.max(0,ordered-reserved-produced-activeWO);if(need<=0)return;const pp=product(l.productId),cc=customer(o.customerId);const jo={id:'WO-'+new Date().getFullYear()+'-'+String(Date.now()).slice(-6)+'-'+(++created),client:cc.shortName||cc.name||o.customerId,item:(pp.code||l.productId)+(pp.name?' · '+pp.name:''),project:(cc.shortName||cc.name||o.customerId)+' / '+o.customerPO,productId:l.productId,department:'CNC Üretim',targetQty:need,completedQty:0,status:'Açık',assignedTo:[],targetType:'production',durationMinutes:0,machine:'',dueAt:o.dueDate?o.dueDate+'T17:00':'',unitPrice:Number(l.unitPrice||0),salesOrderId:o.id,customerPO:o.customerPO,createdAt:now(),source:'KMI_ORDER_INTELLIGENCE',deleted:false};if(Array.isArray(window.jobOrders))window.jobOrders.push(jo);
+  // KMI-OTS-FINAL-001 OTS-03: persist via the sanctioned RPC - jo.unitPrice above is
+  // local-only convenience, stripped server-side on sync; this is the real record.
+  try{window.kmiSetCommercialPrice?.(jo.id, jo.unitPrice, 'TRY');}catch(e){}
+  audit('CREATE','WORK_ORDER',jo.id,`${o.customerPO} · ${product(l.productId).code||l.productId} · ${need} adet`)});try{if(Array.isArray(window.jobOrders))localStorage.setItem('jobOrders',JSON.stringify(window.jobOrders))}catch(e){}persist();try{if(typeof refreshAllViews==='function')refreshAllViews()}catch(e){console.warn('KMI full refresh',e)}v118Render();if(created)alert(created+' üretim iş emri oluşturuldu. Yönetim ve Operatör panellerine işlendi.');else{const active=(Array.isArray(window.jobOrders)?window.jobOrders:[]).filter(j=>j.salesOrderId===o.id&&!['Tamamlandı','CANCELLED','İptal'].includes(j.status));alert(active.length?'Bu sipariş için üretim ihtiyacı zaten aktif iş emirleri ile karşılanıyor.':'Açık üretim ihtiyacı yok.')}return created;};
 // KMI-FIX (2026-09-26): Ender'in isteği - 1000 adetlik gibi büyük siparişler tek dev iş emri olarak değil,
 // yönetici tarafından belirlenen vardiya üretim hedefine göre otomatik ayrı vardiya iş emirlerine bölünebilsin.
 // Mevcut v118ProductionNeed'e (ve onu saran audit/event wrapper'a) hiç dokunulmadı; bu tamamen ek/opsiyonel bir yol.
@@ -9996,6 +10486,8 @@ window.v118ProductionNeedShiftSplit=function(id){
     source:'KMI_ORDER_INTELLIGENCE',deleted:false,
     shiftTargetQty:shiftTarget,shiftPartIndex:i,shiftPartsTotal:parts};
    if(Array.isArray(window.jobOrders))window.jobOrders.push(jo);
+   // KMI-OTS-FINAL-001 OTS-03: persist via the sanctioned RPC (see v118ProductionNeed above).
+   try{window.kmiSetCommercialPrice?.(jo.id, jo.unitPrice, 'TRY');}catch(e){}
    audit('CREATE','WORK_ORDER',jo.id,`${o.customerPO} · ${product(l.productId).code||l.productId} · Vardiya ${i}/${parts} · ${qtyThis} adet`);
   }
  });
@@ -10202,9 +10694,88 @@ window.v118Render=function(){const orders=document.getElementById('v118Orders');
 const relevantProductIds=new Set(V.orders.filter(o=>!['PAID','CANCELLED'].includes(o.status)).flatMap(o=>(o.lines||[]).map(l=>l.productId)));
 const relevantStock=V.stock.filter(x=>relevantProductIds.has(x.productId));
 document.getElementById('v118Stock').innerHTML=relevantStock.map(x=>`<div class="bg-slate-900 border border-slate-700 rounded p-3"><b>${E(product(x.productId).name||x.productId)}</b><div class="text-[10px] text-slate-400">Eldeki ${x.onHand} · Rezerve ${x.reserved} · Kullanılabilir ${available(x.productId)}</div></div>`).join('')||'<div class="text-xs text-slate-500">Açık siparişlere ait stok hareketi yok.</div>';document.getElementById('v118Finance').innerHTML=V.invoices.map(i=>{const paid=V.payments.filter(p=>p.invoiceId===i.id).reduce((a,p)=>a+p.amount,0);return `<div class="bg-slate-900 border border-slate-700 rounded p-3 flex justify-between gap-2"><div><b>${E(i.id)}</b><div class="text-[10px] text-slate-400">${money(i.amount,i.currency)} · Tahsil ${money(paid,i.currency)} · ${E(i.status)}</div></div><button onclick="v118Pay('${i.id}')" class="bg-emerald-700 px-2 rounded text-xs">Tahsilat</button></div>`}).join('')||'<div class="text-xs text-slate-500">Fatura yok.</div>';document.querySelectorAll('#v118Orders tr').forEach(tr=>{const bs=[...tr.querySelectorAll('button')].filter(b=>b.textContent.trim()==='Passport');bs.slice(1).forEach(b=>b.remove())});document.getElementById('v118Audit').innerHTML=V.audit.slice(0,50).map(a=>`<div class="border-b border-slate-700 py-2 text-[10px]"><b class="text-cyan-300">${E(a.action)}</b> · ${E(a.entity)} ${E(a.entityId)}<div class="text-slate-500">${E(a.by)} · ${new Date(a.at).toLocaleString('tr-TR')} · ${E(a.detail)}</div></div>`).join('')||'<div class="text-xs text-slate-500">Audit kaydı yok.</div>'}
-async function v118CloudPush(){const c=window.KURUTLU_SUPABASE?.client,u=window.KURUTLU_SUPABASE?.user;if(!c||!u)return false;try{const {error}=await c.from('portal_v118_state').upsert({user_id:u.id,state:V,updated_at:now()},{onConflict:'user_id'});if(error){console.warn('[V118] Supabase tablo hazır değil; local kalıcılık aktif.',error);return false;}return true;}catch(e){console.warn('[V118] Supabase tablo hazır değil; local kalıcılık aktif.',e);return false;}}
-async function cloudPull(){const c=window.KURUTLU_SUPABASE?.client,u=window.KURUTLU_SUPABASE?.user;if(!c||!u)return;try{const r=await c.from('portal_v118_state').select('state').eq('user_id',u.id).maybeSingle();if(r.data?.state){V={...V,...r.data.state};persist();v118Render()}}catch(e){}}
-window.addEventListener('kurutlu:supabase-identity',()=>setTimeout(cloudPull,500));document.addEventListener('DOMContentLoaded',()=>{setTimeout(v118Render,500);const d=document.getElementById('liveSystemDate');if(d)d.textContent=new Date().toLocaleDateString('tr-TR',{day:'numeric',month:'long',year:'numeric'});});
+// KMI-OTS-FINAL-001 OTS-05 (2026-10-09): REPLACES the old v118CloudPush/cloudPull, which
+// targeted `portal_v118_state` - a table that has NEVER existed in production (confirmed
+// live), keyed by user_id (wrong model for a shared dataset: two users' pushes would clobber
+// each other's whole order list), and whose matching `cloudPull` was never even called from
+// anywhere. This is the real fix: per-order upsert via sales_order_upsert (one shared
+// canonical table, revision-controlled), and a real pull via sales_order_feed, wired into the
+// existing login/tab-switch/interval cadence below (see kmiPullJobOrdersFromCloud call sites).
+//
+// Concurrency model: every order carries `_serverRevision` (the last revision THIS browser
+// knows the server to be at) persisted as part of the same V118 blob, so it survives refresh/
+// logout-login (OTS-05 requirement 12). A push sends that as `p_expected_revision`; the server
+// REJECTS (REVISION_CONFLICT) a stale write rather than silently overwriting a concurrent
+// edit from another device/tab/user. A pull only ever adopts a remote row when it is
+// genuinely newer AND nothing local is unsent (`V118_LOCAL_DIRTY` is false) - never discarding
+// a pending local edit just because someone else also pushed.
+window.V118_LOCAL_DIRTY = window.V118_LOCAL_DIRTY || false;
+window.v118CloudPush=v118CloudPush; // exposed so the OTHER V118 writer (kmiR5WriteV118, a
+ // separate closure further down the file) can also trigger a real push after its own
+ // writes, instead of only the reservation-C flow's local save ever reaching the server.
+async function v118CloudPush(){
+ const c=window.kurutluSupabase||window.KURUTLU_SUPABASE?.client; if(!c)return false;
+ // KMI-OTS-FINAL-001 OTS-05: there is a second, separate writer to this exact localStorage
+ // key (kmiR5WriteV118, the reservation-C flow - see its own header comment: "3 known
+ // writers"). Re-reading fresh from localStorage here, right before pushing, means a push
+ // triggered from EITHER writer always sends the real current on-disk state, never a stale
+ // in-memory snapshot from whichever writer ran first.
+ V=state();
+ if(!Array.isArray(V.orders)||!V.orders.length){window.V118_LOCAL_DIRTY=false;return true;}
+ let allOk=true,anyConflict=false;
+ for(const o of V.orders){
+  try{
+   const {data,error}=await c.rpc('sales_order_upsert',{p_order:o,p_expected_revision:o._serverRevision??null});
+   if(error){
+    if(error.code==='P0001'&&/REVISION_CONFLICT/i.test(error.message||'')){
+     // Someone else (another device/tab/user) wrote a newer version of THIS order since we
+     // last synced it - do NOT overwrite the server, and do NOT discard our local copy
+     // either. Flag it so the UI can tell the user there's a real conflict to resolve by
+     // hand, instead of silently picking a winner.
+     o._syncConflict=true; anyConflict=true; allOk=false; continue;
+    }
+    console.warn('[V118] sales_order_upsert hatası:',o.id,error.message); allOk=false; continue;
+   }
+   o._serverRevision=data.revision; o._syncConflict=false;
+  }catch(e){ console.warn('[V118] sales_order_upsert exception:',o.id,e); allOk=false; }
+ }
+ try{localStorage.setItem(KEY,JSON.stringify(V));}catch(e){}
+ if(allOk) window.V118_LOCAL_DIRTY=false; // only clear "unsent local changes" once EVERY order's push
+                                    // genuinely succeeded - a partial failure must keep retrying.
+ if(anyConflict) try{v118Render?.();}catch(e){}
+ return allOk;
+}
+let __v118PullBusy=false;
+window.v118CloudPull=async function(){
+ const c=window.kurutluSupabase||window.KURUTLU_SUPABASE?.client; if(!c||__v118PullBusy)return false;
+ __v118PullBusy=true;
+ try{
+  const {data,error}=await c.rpc('sales_order_feed',{p_ids:null});
+  if(error){ console.warn('[V118] sales_order_feed hatası:',error.message); return false; }
+  if(window.V118_LOCAL_DIRTY){
+   // There is at least one unsent local edit in this browser right now. Adopting ANY remote
+   // row here risks silently discarding it (OTS-05 requirement 7) - skip the merge this
+   // cycle; the next successful push clears the dirty flag and the next pull will merge
+   // safely. This is a deliberate, visible "wait" rather than a silent, risky overwrite.
+   return true;
+  }
+  V=state(); // re-read fresh (see v118CloudPush comment - second writer, same key)
+  let changed=false;
+  (data||[]).forEach(row=>{
+   const remote=row.raw; if(!remote||!remote.id) return;
+   const idx=V.orders.findIndex(o=>String(o.id)===String(remote.id));
+   if(idx===-1){ remote._serverRevision=row.revision; remote._syncConflict=false; V.orders.push(remote); changed=true; return; }
+   const local=V.orders[idx];
+   if(Number(local._serverRevision||0) < Number(row.revision)){
+    remote._serverRevision=row.revision; remote._syncConflict=false; V.orders[idx]=remote; changed=true;
+   }
+  });
+  if(changed){ try{localStorage.setItem(KEY,JSON.stringify(V));}catch(e){} try{v118Render?.();}catch(e){} }
+  return true;
+ }catch(e){ console.warn('[V118] sales_order_feed exception:',e); return false; }
+ finally{ __v118PullBusy=false; }
+};
+window.addEventListener('kurutlu:supabase-identity',()=>setTimeout(()=>window.v118CloudPull?.(),500));document.addEventListener('DOMContentLoaded',()=>{setTimeout(v118Render,500);const d=document.getElementById('liveSystemDate');if(d)d.textContent=new Date().toLocaleDateString('tr-TR',{day:'numeric',month:'long',year:'numeric'});});
 // KMI-FIX (2026-09-26): Ender'in isteği - "Flow Center" girişine (Sipariş & Stok sekmesi)
 // artık SADECE Yönetim ve Muhasebe erişebilsin. Önceden Satış/Depo/Sevkiyat departmanları da
 // erişebiliyordu - bu erişim kaldırıldı.
@@ -11452,8 +12023,8 @@ window.kmiBadgeSubmitPin=async function(){
    try{ initToolRows(); }catch(e){}
    try{ const gb=document.getElementById('globalBonusBudgetInput'); if(gb) gb.value=globalBonusBudget; }catch(e){}
    try{ populateLoginUserDropdown(); }catch(e){}
-   (async()=>{ try{ await window.kmiPullJobOrdersFromCloud?.(); }catch(e){} try{ window.kmiRunPendingScan?.(); }catch(e){} })();
-   if(!window.__kmiJobPullInterval){ window.__kmiJobPullInterval=setInterval(()=>{ try{ window.kmiPullJobOrdersFromCloud?.(); }catch(e){} }, 45000); }
+   (async()=>{ try{ await window.kmiPullJobOrdersFromCloud?.(); }catch(e){} try{ window.kmiPullCommercialPrices?.(); }catch(e){} try{ window.v118CloudPull?.(); }catch(e){} try{ window.kmiRunPendingScan?.(); }catch(e){} })();
+   if(!window.__kmiJobPullInterval){ window.__kmiJobPullInterval=setInterval(()=>{ try{ window.kmiPullJobOrdersFromCloud?.(); }catch(e){} try{ window.kmiPullCommercialPrices?.(); }catch(e){} try{ window.v118CloudPull?.(); }catch(e){} }, 45000); }
    try{ kmiKioskArm(); }catch(e){ console.warn('[Kiosk arm]',e); }
   },0);
  }catch(e){
@@ -12686,7 +13257,24 @@ window.v118OrderMetrics=window.kmi1188Metrics;
 // results are identical either way.
 const KMI_R5_V118_KEY='kurutlu_v118_core';
 function kmiR5ReadV118(){try{const st=JSON.parse(localStorage.getItem(KMI_R5_V118_KEY)||'{}');st.orders=Array.isArray(st.orders)?st.orders:[];st.audit=Array.isArray(st.audit)?st.audit:[];return st;}catch(e){return {orders:[],audit:[]};}}
-function kmiR5WriteV118(st){localStorage.setItem(KMI_R5_V118_KEY,JSON.stringify(st));}
+let __kmiR5V118PushTimer=null;
+function kmiR5WriteV118(st){
+ localStorage.setItem(KMI_R5_V118_KEY,JSON.stringify(st));
+ // KMI-OTS-FINAL-001 OTS-05 (2026-10-09): this is the SECOND of the "3 known writers" to
+ // kurutlu_v118_core (see this function's own header comment above) - before this pass, only
+ // the OTHER writer's persist() ever attempted a server push, so an order created/edited
+ // through THIS flow (reservation-C) never reached the server at all, even when the (then
+ // broken) push itself "worked". Trigger the same real push here too, DEBOUNCED (same
+ // 1200ms pattern already used for job-order/declaration sync elsewhere in this file) since
+ // this function is called repeatedly in quick succession by several flows
+ // (kmiSuggestReservationC, kmiApproveReservationAndOpenJobOrderC, etc.) and a full-array
+ // push after every single call would be noisy and unnecessary - the debounce coalesces
+ // bursts into one real push. window.v118CloudPush re-reads localStorage fresh right before
+ // pushing, so it always picks up the latest write regardless of which writer ran last.
+ window.V118_LOCAL_DIRTY=true;
+ clearTimeout(__kmiR5V118PushTimer);
+ __kmiR5V118PushTimer=setTimeout(()=>{ try{ window.v118CloudPush?.().catch(()=>{}); }catch(e){} }, 1200);
+}
 function kmiR5Product(id){return (window.KMI_MASTER_DATA?.products||[]).find(x=>String(x.id)===String(id))||{id,name:id,unit:'adet'};}
 function kmiR5Customer(id){return (window.KMI_MASTER_DATA?.customers||[]).find(x=>String(x.id)===String(id))||{id,name:id};}
 function kmiActiveReservationsC(st,excludeKey){
@@ -12752,6 +13340,8 @@ window.kmiApproveReservationAndOpenJobOrderC=async function(orderId,lineId){
  const id=__jobOrderIdPreview;
  const job={id,client:cu?.shortName||cu?.name||o.customerId,item:`${p.code?p.code+' · ':''}${p.name}`,department:'Üretim',machine:`${l.reservation.machine} - ${l.reservation.machineName}`,assignedTo:[],targetType:'production',targetQty:Math.floor(l.qty),completedQty:0,price:Number(l.unitPrice||0),status:'Açık',durationMinutes:0,openedAt:new Date().toISOString(),dueAt:l.reservation.plannedEnd,source:'KMI_RESERVATION_C',salesOrderId:o.id,orderLineId:l.id,productId:l.productId,customerPO:o.customerPO};
  (window.jobOrders=window.jobOrders||[]).push(job);
+ // KMI-OTS-FINAL-001 OTS-03: persist via the sanctioned RPC (see v118ProductionNeed above).
+ try{window.kmiSetCommercialPrice?.(job.id, job.price, 'TRY');}catch(e){}
  l.reservation.approved=true;l.reservation.approvedBy=window.currentUser.name;l.reservation.approvedAt=new Date().toISOString();
  try{if(Array.isArray(window.jobOrders))localStorage.setItem('jobOrders',JSON.stringify(window.jobOrders));}catch(e){}
  st.audit.unshift({id:'AUD-'+Date.now().toString(36).toUpperCase(),at:new Date().toISOString(),by:window.currentUser?.name||'Sistem',action:'CREATE',entity:'WORK_ORDER',entityId:job.id,detail:`${o.customerPO||o.id} · ${p.code||l.productId} · ${l.qty} adet (rezervasyon onaylı)`});
@@ -12785,13 +13375,152 @@ window.v118OrderCommand=function(id){
  <div class="p-4 md:p-5 border-b border-slate-700 flex justify-between gap-3 sticky top-0 bg-slate-900 z-10"><div><div class="text-[10px] tracking-[.22em] font-black text-cyan-300">KMI · ORDER COMMAND</div><h2 class="text-xl md:text-2xl font-black">${esc(o.customerPO||o.id)}</h2><div class="text-xs text-slate-400">Termin ${esc(o.dueDate||'-')} · ${m.productionNeed===0&&m.activeWO>0?'Üretim planlandı':'Planlama gerekiyor'}</div></div><button onclick="this.closest('#v118CommandModal').remove()" class="h-10 bg-slate-800 px-4 rounded-xl">Kapat</button></div>
  <div class="p-4 grid grid-cols-2 md:grid-cols-5 gap-2">${[['SİPARİŞ',m.ordered],['AKTİF WO',m.activeWO],['PLANLANACAK',m.productionNeed],['HAZIR',m.ready],['SEVK',m.shipped]].map(x=>`<div class="bg-slate-950 border border-slate-700 rounded-xl p-3"><div class="text-[9px] text-slate-500">${x[0]}</div><div class="text-2xl font-black">${x[1]}</div></div>`).join('')}</div>
  <div class="px-4 pb-4"><div class="kmi-card p-4"><div class="font-black mb-2">ÜRETİM AKIŞI</div>${(o.lines||[]).map(l=>{const w=woRemaining(o.id,l.productId),need=Math.max(0,num(l.qty)-Math.max(num(l.reserved),num(l.produced))-w);return `<div class="border-t border-slate-800 py-3 text-xs"><div class="grid grid-cols-2 md:grid-cols-6 gap-2"><div class="md:col-span-2"><b>${esc(productName(l.productId))}</b></div><div>Sipariş<br><b>${num(l.qty)}</b></div><div>Aktif WO<br><b class="text-cyan-300">${w}</b></div><div>Planlanacak<br><b class="${need?'text-orange-300':'text-emerald-300'}">${need}</b></div><div>Bitmiş<br><b>${num(l.produced)}</b></div></div>${need?kmiReservationPanelC(o,l):''}</div>`}).join('')}</div>
- <div class="grid grid-cols-2 md:flex gap-2 mt-3"><button onclick="kmiOpenPassport('${esc(o.id)}')" class="bg-purple-700 px-4 py-3 rounded-xl font-black">Passport</button><button onclick="v118Reserve('${esc(o.id)}')" class="bg-blue-700 px-4 py-3 rounded-xl font-black">Stok</button><button onclick="v118ProductionNeed('${esc(o.id)}')" class="bg-orange-700 px-4 py-3 rounded-xl font-black">Üretimi Planla</button><button onclick="v118ProductionNeedShiftSplit('${esc(o.id)}')" class="bg-fuchsia-700 px-4 py-3 rounded-xl font-black">Vardiya Bölerek Üret</button><button onclick="v118ReceiveFinished('${esc(o.id)}')" class="bg-emerald-700 px-4 py-3 rounded-xl font-black">Bitmiş Ürün</button><button onclick="v118Ship('${esc(o.id)}')" class="bg-cyan-700 px-4 py-3 rounded-xl font-black">Sevkiyat</button><button onclick="v118Invoice('${esc(o.id)}')" class="bg-violet-700 px-4 py-3 rounded-xl font-black">Fatura</button></div></div></div>`;
+ <div class="grid grid-cols-2 md:flex gap-2 mt-3"><button onclick="kmiOpenPassport('${esc(o.id)}')" class="bg-purple-700 px-4 py-3 rounded-xl font-black">Passport</button><button onclick="window.v118OrderLineEditor('${esc(o.id)}')" class="bg-indigo-700 px-4 py-3 rounded-xl font-black">Siparişi Düzenle</button><button onclick="v118Reserve('${esc(o.id)}')" class="bg-blue-700 px-4 py-3 rounded-xl font-black">Stok</button><button onclick="v118ProductionNeed('${esc(o.id)}')" class="bg-orange-700 px-4 py-3 rounded-xl font-black">Üretimi Planla</button><button onclick="v118ProductionNeedShiftSplit('${esc(o.id)}')" class="bg-fuchsia-700 px-4 py-3 rounded-xl font-black">Vardiya Bölerek Üret</button><button onclick="v118ReceiveFinished('${esc(o.id)}')" class="bg-emerald-700 px-4 py-3 rounded-xl font-black">Bitmiş Ürün</button><button onclick="v118Ship('${esc(o.id)}')" class="bg-cyan-700 px-4 py-3 rounded-xl font-black">Sevkiyat</button><button onclick="v118Invoice('${esc(o.id)}')" class="bg-violet-700 px-4 py-3 rounded-xl font-black">Fatura</button></div></div></div>`;
  document.body.appendChild(d);
  // KMI-R5 MASTER #23 Increment 8: register only - no ESC/backdrop behavior
  // change. A re-entrant command/navigation hub (its own action buttons
  // frequently re-open it) straddling Production/Planning - kept
  // EXPLICIT_CLOSE_ONLY rather than guessing a new dismissal behavior.
  window.KMI_OVERLAY&&window.KMI_OVERLAY.register({id:'v118CommandModal',elId:'v118CommandModal',tier:'BUSINESS_OVERLAY',policy:'EXPLICIT_CLOSE_ONLY',close:function(){}});
+};
+
+/* KMI-OTS-FINAL-001 OTS-06 (2026-10-09) - Owner's real need (verbatim): "Açılmış bir müşteri
+   siparişini tekrar açıp düzenleyebilmek ve unutulan yeni ürün kalemini aynı siparişe
+   ekleyebilmek." Real server-side enforcement lives in supabase/migrations/20261009e
+   (sales_order_line_upsert / sales_order_line_cancel / sales_order_change_history) - this is
+   the client UI for the six required actions: Siparişi Aç, Siparişi Düzenle (opening this
+   editor on an existing order IS reopening+editing it - there is no separate "open" step),
+   Yeni Ürün Kalemi Ekle, Kalemi Düzenle, Kalemi İptal Et, Değişiklik Geçmişi.
+
+   State note: this script block's state()/orders() (defined above) re-read localStorage fresh
+   on every call - window.V118_STATE is a getter with no live object identity across calls - so
+   writes here never mutate an in-memory order object; they always read the current localStorage
+   blob fresh, apply the server-CONFIRMED result (never a client guess) to it, and write it back
+   under the same 'kurutlu_v118_core' key the v118-core module itself uses (its core() cache
+   invalidates automatically on the next read since the raw string changes - the same contract
+   already documented at that cache's definition). */
+function v118CoreWrite(mutator){
+ let st; try{st=JSON.parse(localStorage.getItem('kurutlu_v118_core')||'{}');}catch(e){st={};}
+ if(!Array.isArray(st.orders))st.orders=[];
+ mutator(st);
+ try{localStorage.setItem('kurutlu_v118_core',JSON.stringify(st));}catch(e){}
+}
+function v118RpcErrorMessage(error){
+ const m=(error&&error.message)||'';
+ if(/REVISION_CONFLICT/i.test(m))return 'Bu sipariş başka bir ekrandan/kullanıcıdan güncellendi - lütfen siparişi kapatıp yeniden açın ve tekrar deneyin. Hiçbir değişiklik kaydedilmedi.';
+ if(/SHIPPED_QTY_PROTECTED/i.test(m))return 'Bu kalemden zaten sevk edilmiş adet var - miktar sevk edilenin altına düşürülemez / sevk edilmiş bir kalem iptal edilemez.';
+ if(/PRODUCTION_IN_PROGRESS/i.test(m))return 'Bu kalem için devam eden/tamamlanan üretim var - miktar üretilenin altına düşürülemez. Bunun için kontrollü bir revizyon gerekir.';
+ if(/ORDER_CANCELLED/i.test(m))return 'Bu sipariş iptal edilmiş - düzenlenemez.';
+ if(/ORDER_COMPLETED/i.test(m))return 'Bu sipariş tamamen sevk edilmiş - geçmiş teslimat üzerine yazılamaz. Yeni bir revizyon/sipariş gerekir.';
+ if(/LINE_NOT_FOUND/i.test(m))return 'Kalem bulunamadı.';
+ if(/ORDER_NOT_FOUND/i.test(m))return 'Bu sipariş sunucuda henüz kayıtlı değil - önce senkronize olması gerekir.';
+ if(/FORBIDDEN/i.test(m))return 'Bu işlem için yetkiniz yok (Yönetim/Admin yetkisi gerekir).';
+ return 'Sunucu hatası: '+(m||'bilinmeyen hata');
+}
+
+/* "Siparişi Aç" + "Siparişi Düzenle": the same real action - reopening an already-placed order
+   and showing its lines ready to edit IS what the Owner asked for; there is no separate
+   read-only "open" screen that then requires a second "edit" step. */
+window.v118OrderLineEditor=function(id){
+ const o=orders().find(x=>String(x.id)===String(id));if(!o)return;
+ document.getElementById('v118LineEditorModal')?.remove();
+ const renderLines=()=>{
+  const ord=orders().find(x=>String(x.id)===String(id))||o;
+  return (ord.lines||[]).map(l=>{
+   const cancelled=l.status==='CANCELLED';
+   return `<div class="border-t border-slate-800 py-2 text-xs ${cancelled?'opacity-50':''}">
+    <div class="grid grid-cols-2 md:grid-cols-6 gap-2 items-center">
+     <div class="md:col-span-2"><b>${esc(productName(l.productId))}</b>${cancelled?' <span class="text-red-400">(İPTAL)</span>':''}</div>
+     <div>Adet<br><b>${num(l.qty)}</b></div>
+     <div>Fiyat<br><b>${num(l.unitPrice)}</b></div>
+     <div>Sevk<br><b>${num(l.shipped)}</b></div>
+     <div class="flex gap-1 justify-end">${cancelled?'':`<button onclick="window.v118LineEditForm('${esc(id)}','${esc(l.id)}')" class="bg-blue-700 px-2 py-1 rounded font-bold">Düzenle</button><button onclick="window.v118LineCancel('${esc(id)}','${esc(l.id)}')" class="bg-red-700 px-2 py-1 rounded font-bold">İptal Et</button>`}</div>
+    </div></div>`;
+  }).join('')||'<div class="text-slate-500 text-xs py-2">Kalem yok.</div>';
+ };
+ const d=document.createElement('div');d.id='v118LineEditorModal';d.className='fixed inset-0 z-[150] bg-slate-950/90 p-2 md:p-4 overflow-y-auto';
+ d.innerHTML=`<div class="max-w-4xl mx-auto mt-2 bg-slate-900 border border-cyan-800/70 rounded-2xl shadow-2xl overflow-hidden">
+ <div class="p-4 border-b border-slate-700 flex justify-between gap-3 sticky top-0 bg-slate-900 z-10"><div><div class="text-[10px] tracking-[.22em] font-black text-cyan-300">KMI · SİPARİŞİ AÇ / DÜZENLE</div><h2 class="text-lg font-black">${esc(o.customerPO||o.id)}</h2><div class="text-[10px] text-slate-500">Sunucu revizyonu: ${o._serverRevision??'-'}${o._syncConflict?' · <span class="text-red-400 font-bold">ÇAKIŞMA VAR</span>':''}</div></div>
+ <div class="flex gap-2"><button onclick="window.v118ShowChangeHistory('${esc(id)}')" class="h-10 bg-slate-800 px-3 rounded-xl text-xs font-bold">Değişiklik Geçmişi</button><button onclick="this.closest('#v118LineEditorModal').remove()" class="h-10 bg-slate-800 px-4 rounded-xl">Kapat</button></div></div>
+ <div class="p-4"><div id="v118LineEditorList">${renderLines()}</div>
+ <button onclick="window.v118LineEditForm('${esc(id)}',null)" class="mt-3 bg-emerald-700 px-4 py-2 rounded-xl font-black text-xs">+ Yeni Ürün Kalemi Ekle (Unutulan Kalem)</button>
+ <div id="v118LineEditFormHost" class="mt-3"></div></div></div>`;
+ document.body.appendChild(d);
+ window.KMI_OVERLAY&&window.KMI_OVERLAY.register({id:'v118LineEditorModal',elId:'v118LineEditorModal',tier:'BUSINESS_OVERLAY',policy:'EXPLICIT_CLOSE_ONLY',close:function(){}});
+};
+window.v118LineEditForm=function(orderId,lineId){
+ const o=orders().find(x=>String(x.id)===String(orderId));if(!o)return;
+ const host=document.getElementById('v118LineEditFormHost');if(!host)return;
+ const line=lineId?(o.lines||[]).find(l=>String(l.id)===String(lineId)):null;
+ const products=(window.KMI_MASTER_DATA&&window.KMI_MASTER_DATA.products)||[];
+ host.innerHTML=`<div class="bg-slate-950 border border-slate-700 rounded-xl p-3">
+  <div class="font-black text-xs mb-2">${line?'Kalemi Düzenle: '+esc(productName(line.productId)):'Yeni Ürün Kalemi'}</div>
+  <div class="grid grid-cols-2 md:grid-cols-4 gap-2 text-xs">
+   ${line?'':`<select id="v118LEFProduct" class="bg-slate-800 rounded p-2 col-span-2">${products.map(p=>`<option value="${esc(p.id)}">${esc(p.name)}</option>`).join('')}</select>`}
+   <input id="v118LEFQty" type="number" step="any" placeholder="Adet" value="${line?num(line.qty):''}" class="bg-slate-800 rounded p-2">
+   <input id="v118LEFPrice" type="number" step="any" placeholder="Birim Fiyat" value="${line?num(line.unitPrice):''}" class="bg-slate-800 rounded p-2">
+   <div class="flex gap-2 ${line?'':'col-span-2'}"><button onclick="window.v118LineSave('${esc(orderId)}',${line?`'${esc(lineId)}'`:'null'})" class="bg-blue-700 px-3 py-2 rounded-xl font-black flex-1">Kaydet</button><button onclick="document.getElementById('v118LineEditFormHost').innerHTML=''" class="bg-slate-700 px-3 py-2 rounded-xl">Vazgeç</button></div>
+  </div></div>`;
+};
+window.v118LineSave=async function(orderId,lineId){
+ const o=orders().find(x=>String(x.id)===String(orderId));if(!o)return;
+ const c=window.kurutluSupabase||window.KURUTLU_SUPABASE?.client;
+ if(!c){toast('Sunucu bağlantısı yok - kalem değişikliği şu an kaydedilemiyor','error');return;}
+ const productId=document.getElementById('v118LEFProduct')?.value;
+ const qty=parseFloat(document.getElementById('v118LEFQty')?.value);
+ const unitPrice=parseFloat(document.getElementById('v118LEFPrice')?.value);
+ if(!qty||qty<=0){toast('Geçerli bir adet girin','warn');return;}
+ const line=lineId?{id:lineId,qty,unitPrice}:{id:'SOL-'+Date.now().toString(36).toUpperCase(),productId,qty,unitPrice,reserved:0,shipped:0,produced:0};
+ try{
+  const {data,error}=await c.rpc('sales_order_line_upsert',{p_order_id:orderId,p_line:line,p_expected_revision:o._serverRevision??null});
+  if(error){toast(v118RpcErrorMessage(error),'error');return;}
+  v118CoreWrite(st=>{
+   const ord=(st.orders||[]).find(x=>String(x.id)===String(orderId));if(!ord)return;
+   if(!Array.isArray(ord.lines))ord.lines=[];
+   if(!lineId){ord.lines.push(Object.assign({},line));}
+   else{const idx=ord.lines.findIndex(l=>String(l.id)===String(lineId));if(idx>-1)ord.lines[idx]=Object.assign({},ord.lines[idx],{qty,unitPrice});}
+   ord._serverRevision=data.revision;ord._syncConflict=false;
+  });
+  toast(lineId?'Kalem güncellendi':'Yeni ürün kalemi aynı siparişe eklendi');
+  const host=document.getElementById('v118LineEditFormHost');if(host)host.innerHTML='';
+  window.v118OrderLineEditor(orderId);
+  try{window.v118Render?.();}catch(e){}
+ }catch(e){toast('Beklenmeyen hata: '+(e&&e.message||e),'error');}
+};
+window.v118LineCancel=async function(orderId,lineId){
+ const o=orders().find(x=>String(x.id)===String(orderId));if(!o)return;
+ const c=window.kurutluSupabase||window.KURUTLU_SUPABASE?.client;
+ if(!c){toast('Sunucu bağlantısı yok - kalem iptali şu an kaydedilemiyor','error');return;}
+ if(!confirm('Bu ürün kalemini iptal etmek istediğinize emin misiniz? (Sevk edilmiş kalemler iptal edilemez.)'))return;
+ try{
+  const {data,error}=await c.rpc('sales_order_line_cancel',{p_order_id:orderId,p_line_id:lineId,p_expected_revision:o._serverRevision??null});
+  if(error){toast(v118RpcErrorMessage(error),'error');return;}
+  v118CoreWrite(st=>{
+   const ord=(st.orders||[]).find(x=>String(x.id)===String(orderId));if(!ord)return;
+   const idx=(ord.lines||[]).findIndex(l=>String(l.id)===String(lineId));
+   if(idx>-1)ord.lines[idx]=Object.assign({},ord.lines[idx],{status:'CANCELLED'});
+   ord._serverRevision=data.revision;ord._syncConflict=false;
+  });
+  toast('Kalem iptal edildi');
+  window.v118OrderLineEditor(orderId);
+  try{window.v118Render?.();}catch(e){}
+ }catch(e){toast('Beklenmeyen hata: '+(e&&e.message||e),'error');}
+};
+window.v118ShowChangeHistory=async function(orderId){
+ const c=window.kurutluSupabase||window.KURUTLU_SUPABASE?.client;
+ document.getElementById('v118HistoryModal')?.remove();
+ const d=document.createElement('div');d.id='v118HistoryModal';d.className='fixed inset-0 z-[160] bg-slate-950/90 p-2 md:p-4 overflow-y-auto';
+ d.innerHTML=`<div class="max-w-2xl mx-auto mt-2 bg-slate-900 border border-slate-700 rounded-2xl p-4"><div class="flex justify-between mb-3"><div class="font-black text-sm">Değişiklik Geçmişi</div><button onclick="this.closest('#v118HistoryModal').remove()" class="bg-slate-800 px-3 py-1 rounded-xl">Kapat</button></div><div id="v118HistoryList" class="text-xs text-slate-400">Yükleniyor...</div></div>`;
+ document.body.appendChild(d);
+ if(!c){const list=document.getElementById('v118HistoryList');if(list)list.innerHTML='Sunucu bağlantısı yok.';return;}
+ try{
+  const {data,error}=await c.rpc('sales_order_change_history',{p_order_id:orderId});
+  const list=document.getElementById('v118HistoryList');if(!list)return;
+  if(error){list.innerHTML='Geçmiş okunamadı: '+esc(error.message||'');return;}
+  if(!Array.isArray(data)||!data.length){list.innerHTML='Henüz bir değişiklik kaydı yok.';return;}
+  const actionLabel={LINE_ADDED:'Yeni ürün kalemi eklendi',LINE_EDITED:'Kalem düzenlendi',LINE_CANCELLED:'Kalem iptal edildi'};
+  list.innerHTML=data.map(r=>`<div class="border-t border-slate-800 py-2"><b>${esc(actionLabel[r.action]||r.action)}</b><div class="text-slate-500">${new Date(r.created_at).toLocaleString('tr-TR')}</div></div>`).join('');
+ }catch(e){const list=document.getElementById('v118HistoryList');if(list)list.innerHTML='Beklenmeyen hata: '+esc(e&&e.message||e);}
 };
 
 /* Production action: no browser alert for already-covered need; no duplicate event. */
@@ -13491,7 +14220,19 @@ window.editJobOrder=function(id){
  const optsLot=lotCandidates.map(l=>`<option value="${E(l.id)}" ${String(j.materialLotId||'')===String(l.id)?'selected':''}>${E(l.id)} · ${E(l.material)} · ${Number(l.blankAvailable||0)} adet</option>`).join('');
  d.innerHTML=`<div class="max-w-3xl mx-auto mt-3 bg-slate-900 border border-cyan-800 rounded-2xl shadow-2xl overflow-hidden"><div class="p-5 border-b border-slate-700 flex justify-between"><div><div class="text-[10px] text-cyan-300 tracking-[.2em] font-black">KMI · WORK ORDER CARD</div><h2 class="text-2xl font-black">${E(j.id)}</h2><div class="text-xs text-slate-500">Değişiklikler otomatik kaydedilir.</div></div><button onclick="kmiCloseJobEditor()" class="bg-slate-800 px-4 rounded-xl">Kaydet & Kapat</button></div>
  <div class="p-5 grid md:grid-cols-2 gap-3">
- ${[['Müşteri / Proje','client',j.client,'text'],['Ürün / İş','item',j.item,'text'],['Hedef Adet','targetQty',j.targetQty,'number'],['Birim Fiyat','price',j.price??j.unitPrice??0,'number'],['Departman','department',j.department||'CNC Üretim','text'],['Termin','dueAt',(j.dueAt||'').slice(0,16),'datetime-local']].map(x=>`<label class="text-xs text-slate-400">${x[0]}<input data-kmi-job="${x[1]}" type="${x[3]}" value="${E(x[2])}" class="mt-1 w-full bg-slate-950 border border-slate-700 rounded-xl p-3 text-white"></label>`).join('')}
+ ${(()=>{
+   // KMI-OTS-FINAL-001 OTS-03: price comes from the authoritative server-side commercial
+   // cache, never from j.price/j.unitPrice (job_orders_sync.raw no longer carries either -
+   // the server trigger strips them unconditionally). An unauthorized session (e.g. Mehmet,
+   // designated Production Manager) sees a disabled, blank field instead of a stale/zero value.
+   const commercial=window.kmiJobCommercialPrice?window.kmiJobCommercialPrice(j):(j.price??j.unitPrice??0);
+   const priceUnauthorized=commercial===null;
+   const fields=[['Müşteri / Proje','client',j.client,'text'],['Ürün / İş','item',j.item,'text'],['Hedef Adet','targetQty',j.targetQty,'number'],['Departman','department',j.department||'CNC Üretim','text'],['Termin','dueAt',(j.dueAt||'').slice(0,16),'datetime-local']];
+   const priceField=priceUnauthorized
+     ? `<label class="text-xs text-slate-400">Birim Fiyat<input disabled value="Yetkisiz" class="mt-1 w-full bg-slate-950 border border-slate-700 rounded-xl p-3 text-slate-500"></label>`
+     : `<label class="text-xs text-slate-400">Birim Fiyat<input data-kmi-job="price" type="number" value="${E(commercial)}" class="mt-1 w-full bg-slate-950 border border-slate-700 rounded-xl p-3 text-white"></label>`;
+   return fields.map(x=>`<label class="text-xs text-slate-400">${x[0]}<input data-kmi-job="${x[1]}" type="${x[3]}" value="${E(x[2])}" class="mt-1 w-full bg-slate-950 border border-slate-700 rounded-xl p-3 text-white"></label>`).join('')+priceField;
+ })()}
  <label class="text-xs text-slate-400">Makine<select data-kmi-job="machine" class="mt-1 w-full bg-slate-950 border border-slate-700 rounded-xl p-3 text-white"><option value="">Atanmamış</option>${optsM}</select></label>
  <label class="text-xs text-slate-400">Operatör<select data-kmi-job="assignedTo" class="mt-1 w-full bg-slate-950 border border-slate-700 rounded-xl p-3 text-white"><option value="">Atanmamış</option>${optsP}</select></label>
  <label class="text-xs text-slate-400">Vardiya<select data-kmi-job="shift" class="mt-1 w-full bg-slate-950 border border-slate-700 rounded-xl p-3 text-white"><option ${j.shift==='1. Vardiya'?'selected':''}>1. Vardiya</option><option ${j.shift==='2. Vardiya'?'selected':''}>2. Vardiya</option><option ${j.shift==='Genel'?'selected':''}>Genel</option></select></label>
@@ -13503,7 +14244,12 @@ window.editJobOrder=function(id){
 };
 window.kmiSaveJobEditor=function(close){
  const d=document.getElementById('kmiJobEditor');if(!d)return;const id=d.querySelector('h2')?.textContent,j=jo(id);if(!j)return;
- d.querySelectorAll('[data-kmi-job]').forEach(el=>{let v=el.value,k=el.dataset.kmiJob;if(k==='assignedTo')j.assignedTo=v?[Number(v)]:[];else if(k==='machine'){const m=mac().find(x=>String(x.code)===String(v));j.machine=m?`${m.code} - ${m.name}`:''}else if(['targetQty','price'].includes(k))j[k]=N(v);else j[k]=v});
+ d.querySelectorAll('[data-kmi-job]').forEach(el=>{let v=el.value,k=el.dataset.kmiJob;if(k==='assignedTo')j.assignedTo=v?[Number(v)]:[];else if(k==='machine'){const m=mac().find(x=>String(x.code)===String(v));j.machine=m?`${m.code} - ${m.name}`:''}
+  // KMI-OTS-FINAL-001 OTS-03: price is never written onto j (job_orders_sync.raw must never
+  // carry it again) - persist it through the one sanctioned RPC instead. The field only
+  // exists in the DOM at all when the editor already confirmed this session is authorized.
+  else if(k==='price'){window.kmiSetCommercialPrice?window.kmiSetCommercialPrice(j.id,N(v),'TRY'):(j.price=N(v));}
+  else if(k==='targetQty')j[k]=N(v);else j[k]=v});
  j.updatedAt=new Date().toISOString();persist();if(close)d.remove();
 };
 window.kmiCloseJobEditor=function(){kmiSaveJobEditor(true);notify('İş emri kaydedildi')};
@@ -14253,7 +14999,13 @@ function kmiFindJobProduct(j){
 function kmiDowntimeLostRevenue(j,durationMin){
  const p=kmiFindJobProduct(j);
  const cycleSec=Number(p?.standardCycleSec||0)||Number(p?.camCycleEstimateSec||0)||0;
- const unitPrice=Number(j.price||0);
+ // KMI-OTS-FINAL-001 OTS-03: go through the authorization-gated cache, never j.price
+ // directly (job_orders_sync.raw no longer carries it). An unauthorized session (Operator,
+ // Maintenance, etc.) gets null here - correctly suppressing the lost-revenue figure for
+ // whoever should not see commercial data, rather than showing a stale/zero number.
+ const cached=window.kmiJobCommercialPrice?window.kmiJobCommercialPrice(j):Number(j.price||0);
+ if(cached===null)return null;
+ const unitPrice=Number(cached||0);
  if(!cycleSec||!unitPrice||!durationMin)return null;
  const lostUnits=Math.floor((durationMin*60)/cycleSec);
  if(lostUnits<=0)return null;
@@ -16798,23 +17550,56 @@ function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;',
 function qUid(p){return p+'-'+Date.now().toString(36).toUpperCase()+Math.random().toString(36).slice(2,5).toUpperCase();}
 function qNow(){return new Date().toISOString();}
 function qLoad(){
- try{
-  const raw=localStorage.getItem(QKEY);
-  const d=raw?JSON.parse(raw):{};
-  return {
-   controlPlans:Array.isArray(d.controlPlans)?d.controlPlans:[],
-   measurements:Array.isArray(d.measurements)?d.measurements:[],
-   gauges:Array.isArray(d.gauges)?d.gauges:[],
-   ncrs:Array.isArray(d.ncrs)?d.ncrs:[],
-   holds:Array.isArray(d.holds)?d.holds:[],
-   firstPiece:Array.isArray(d.firstPiece)?d.firstPiece:[],
-   auditLog:Array.isArray(d.auditLog)?d.auditLog:[]
-  };
- }catch(e){ return {controlPlans:[],measurements:[],gauges:[],ncrs:[],holds:[],firstPiece:[],auditLog:[]}; }
+ // KMI-DATA-LOSS-PROTECTION-001 (2026-10-10, owner P0 directive): kurutlu_qms_v1 (kontrol
+ // planları, ölçümler, mastar/gauge kalibrasyonu, NCR, kalite tutma, ilk parça onayı, audit log)
+ // artık paylaşılan kmiSafeLoad üzerinden okunuyor - bozuk JSON sessizce "hiç veri yok" gibi
+ // işlenmiyor, orijinal veri yedeklenip bu anahtar "bozuk" işaretleniyor (kmiSafeSave bu anahtara
+ // sonraki otomatik yazmaları reddeder, tıpkı makine künyesinde olduğu gibi).
+ const d=kmiSafeLoad(QKEY,{});
+ return {
+  controlPlans:Array.isArray(d.controlPlans)?d.controlPlans:[],
+  measurements:Array.isArray(d.measurements)?d.measurements:[],
+  gauges:Array.isArray(d.gauges)?d.gauges:[],
+  ncrs:Array.isArray(d.ncrs)?d.ncrs:[],
+  holds:Array.isArray(d.holds)?d.holds:[],
+  firstPiece:Array.isArray(d.firstPiece)?d.firstPiece:[],
+  auditLog:Array.isArray(d.auditLog)?d.auditLog:[]
+ };
 }
 window.QMS=window.QMS||qLoad();
 const QMS=window.QMS;
-function qSave(){ try{ localStorage.setItem(QKEY,JSON.stringify(QMS)); }catch(e){ console.error('[QMS] kayıt hatası',e); } }
+// KMI-QMS-BULK-WIPE-GUARD (2026-10-10, owner P0 "FINAL HARDENING" direktifi): kmiIsEmptyValue
+// QMS nesnesini (controlPlans/measurements/gauges/ncrs/holds/firstPiece/auditLog) HER ZAMAN
+// 7 anahtarlı dolu bir nesne olarak gördüğü için genel boş-üzerine-yazma koruması bu 7 alt
+// dizinin TOPLUCA boşaltılmasını (hepsi aynı anda []) yakalayamıyordu. Bu derin kontrol, yeni
+// durumun TAMAMEN boş olduğu VE önceki kayıtlı durumda 2 veya daha fazla kayıt bulunduğu anı
+// "toplu boşaltma" olarak işaretler. Önceki toplam 0 (anahtar hiç yoktu -> gerçek ilk kurulum)
+// veya 1 (son tekil kaydın normal, tek bir silme eylemiyle 0'a inmesi) ise bu AYNI ZAMANDA
+// gerçek bir risk değildir - bunlar engellenmez. Kasıtlı/yetkili toplu temizleme için mevcut
+// force deseniyle (kmiSafeSave'deki gibi) qSave({force:true}) çağrılabilir.
+function qmsTotalRecordCount(o){
+ const keys=['controlPlans','measurements','gauges','ncrs','holds','firstPiece','auditLog'];
+ let total=0; keys.forEach(k=>{ if(o&&Array.isArray(o[k])) total+=o[k].length; });
+ return total;
+}
+function qSave(opts){
+ opts = opts||{};
+ if(!opts.force && qmsTotalRecordCount(QMS)===0){
+  let existingRaw;
+  try{ existingRaw = localStorage.getItem(QKEY); }catch(e){ existingRaw=null; }
+  if(existingRaw){
+   let existingTotal;
+   try{ existingTotal = qmsTotalRecordCount(JSON.parse(existingRaw)); }
+   catch(e){ existingTotal = -1; } // bozuk anahtar - gerçek engelleme kmiSafeSave'in __kmiCorruptKeys kontrolünde yapılır
+   if(existingTotal>=2){
+    console.error('[KMI QMS] "'+QKEY+'" toplu olarak boşaltılmaya çalışıldı ('+existingTotal+' kayıt -> 0) - mevcut veri korunuyor.');
+    try{ window.kmiToast?.('Kalite verisi (QMS) toplu olarak boşaltılamadı - '+existingTotal+' kayıt korunuyor. Kasıtlıysa yetkili bir "tümünü temizle" işlemi gerekir.','error'); }catch(e){}
+    return false;
+   }
+  }
+ }
+ return kmiSafeSave(QKEY,QMS,opts);
+}
 // BACKLOG-1.3 (2026-09-27, Master Mimari Ek'i): QMS.auditLog artık İKİNCİL bir
 // görünüm/hızlı-önbellek olarak kalıyor (Kalite Kulesi ekranı bunu okumaya devam
 // eder - davranış değişmedi), ama TEK GERÇEK KAYNAK bundan sonra window.KMI.event
@@ -16844,6 +17629,25 @@ function isQualityUser(){ try{ if(window.KMI_AUTH) return window.KMI_AUTH.can(qU
 function qJobs(){ try{ if(typeof jobOrders!=='undefined'&&Array.isArray(jobOrders)) return jobOrders; }catch(e){} try{ return typeof jobs==='function'?jobs():(Array.isArray(window.jobOrders)?window.jobOrders:[]); }catch(e2){ return []; } }
 window.kmiQmsSave=qSave;
 window.kmiQmsIsQualityUser=isQualityUser;
+// KMI P0 CLEAN START (2026-10-10, owner direktifi): deneme kalite/NCR/ilk parça/ölçüm
+// kayıtlarının (kurutlu_qms_v1) KASITLI, açıkça yetkilendirilmiş temizliği - qSave()'in otomatik
+// toplu-boşaltma korumasından (yukarı) TAMAMEN AYRI bir işlem; hiçbir yükleme/init akışına bağlı
+// DEĞİL, yalnızca opts.confirm===true ile elle çağrılırsa çalışır. Önce HAM veriyi
+// "__CLEANSTART_BACKUP__<zaman damgası>" anahtarına yedekler, sonra qSave({force:true}) ile
+// temizler (force, otomatik korumayı değil, bu AÇIK çağrıyı atlatır).
+window.kmiCleanStartPurgeQms=function(opts){
+ opts=opts||{};
+ if(opts.confirm!==true) return {ok:false,reason:'confirm required'};
+ let raw; try{ raw=localStorage.getItem(QKEY); }catch(e){ raw=null; }
+ let backupKey=null;
+ if(raw!=null){
+  backupKey=QKEY+'__CLEANSTART_BACKUP__'+new Date().toISOString().replace(/[:.]/g,'-');
+  try{ localStorage.setItem(backupKey,raw); }catch(e){}
+ }
+ ['controlPlans','measurements','gauges','ncrs','holds','firstPiece','auditLog'].forEach(k=>{ QMS[k].splice(0,QMS[k].length); });
+ const ok=qSave({force:true});
+ return {ok, backupKey};
+};
 
 // ---------------------------------------------------------------------------
 // 1) DIGITAL CONTROL PLAN — ürün/operasyon bazlı karakteristik listesi.
@@ -19295,12 +20099,19 @@ function kmiProdWsRenderLive(){
 }
 
 function kmiProdWsRenderReleaseQueue(){
+  // KMI-OTS-RECOVERY-001 OTS-01 item 4: explicit, literal queue name, so a non-technical
+  // Production Manager unambiguously knows this (and not the read-only Muhasebe-tab
+  // informational table) is the real, actionable queue. Bucket keys/labels below are
+  // UNCHANGED (also used as internal lookup keys in several places) - only this heading
+  // is new.
+  const header='<div class="mb-4"><h3 class="text-sm font-black text-cyan-300 uppercase tracking-wide">Nihai Üretim Serbest Bırakma Bekleyenler</h3>'+
+    '<p class="text-[11px] text-slate-500 mt-1">Bu ekran gerçek, aksiyon alınabilir kuyruktur - sunucudaki production_release_verify ile doğrulanır. Muhasebe sekmesindeki bilgi tablosu burası DEĞİLDİR.</p></div>';
   const r=prodWsReleaseRows();
   const order=['SERBEST BIRAKILABİLİR','VERİ GEREKLİ','HOLD','İLK PARÇA BEKLİYOR','ROTA TAMAMLANMADI','ÜRETİM TAMAMLANMADI','ZATEN SERBEST BIRAKILDI'];
   const labels=order.filter(function(l){return r.buckets[l];}).concat(r.order.filter(function(l){return order.indexOf(l)<0;}));
-  if(!labels.length) return '<div class="text-slate-500 text-xs">Hiç iş emri yok.</div>';
+  if(!labels.length) return header+'<div class="text-slate-500 text-xs">Hiç iş emri yok.</div>';
   const colorOf={'SERBEST BIRAKILABİLİR':'text-emerald-300','VERİ GEREKLİ':'text-amber-300','HOLD':'text-red-400','İLK PARÇA BEKLİYOR':'text-amber-300','ROTA TAMAMLANMADI':'text-slate-400','ÜRETİM TAMAMLANMADI':'text-slate-400','ZATEN SERBEST BIRAKILDI':'text-emerald-500'};
-  return labels.map(function(label){
+  return header+labels.map(function(label){
     const rows=r.buckets[label];
     const isReleasable=label==='SERBEST BIRAKILABİLİR';
     const isAlready=label==='ZATEN SERBEST BIRAKILDI';
@@ -20329,7 +21140,26 @@ window.KMI_AUTH = window.KMI_AUTH || {
       // KENDİ is_management() kontrolünü bağımsız olarak ZATEN yapıyor - bu
       // istemci tarafı sadece görünürlük/erken-red kolaylığıdır (§2: "UI
       // visibility is convenience only. Server RPC remains final authority.").
-      if(capability==='PRODUCTION_MANAGER') return role==='ADMIN';
+      // KMI-OTS-RECOVERY-001 OTS-01 (2026-10-09): role==='ADMIN' alone used to mean "true
+      // ADMIN or any MANAGEMENT account" (roleMap collapses both to this client string) -
+      // confirmed against real production data that this is wrong: role MANAGEMENT is held
+      // by Mehmet Şahinbaş (Üretim Amiri - a real Production Manager) AND Eray Başar (İş
+      // Geliştirme/Business Development - not a production role). A true ADMIN (verified by
+      // supabaseRoleCode, not the collapsed client string) keeps its governed override;
+      // everyone else needs the explicit, individually-granted designation
+      // (production_manager_grants / is_designated_production_manager() server-side - this
+      // client check is convenience only, the RPC remains final authority).
+      if(capability==='PRODUCTION_MANAGER'){
+        if(role!=='ADMIN') return false;
+        // u.supabaseRoleCode is only ever absent for a non-Supabase-identity user object
+        // (test/demo fixtures, offline paths) - unchanged legacy behavior there (role===
+        // 'ADMIN' alone decides, exactly as before this fix). A real Supabase session
+        // ALWAYS sets it (v77BuildCurrentUserFromSupabase), so this is never a live-session
+        // loophole - it only preserves existing test fixtures that predate this capability.
+        if(u.supabaseRoleCode===undefined) return true;
+        if(u.supabaseRoleCode==='ADMIN') return true;
+        return !!u.isDesignatedProductionManager;
+      }
       // KMI-PUANTAJ-SERVER-TRUTH-002 §2: Puantaj Period Finalization/Lock için
       // de AYNI canonical role kontrolü, adlandırılmış/merkezi bir capability
       // olarak (production.correction.* ile AYNI desen - ikinci bir izin
