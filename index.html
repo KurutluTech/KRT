@@ -17,9 +17,9 @@
          `git blame`/diffs on this file quiet between releases and avoid a
          commit-hash feedback loop (the source commit's SHA cannot depend on
          a value computed from that same SHA). See docs/KMI_DEPLOY_ID.md. -->
-    <meta name="kmi-source-commit" content="4681cac0a68c2c937901ee58a215c465ae2d8047">
-    <meta name="kmi-build-id" content="4681cac0a68c-20261009T232948Z">
-    <meta name="kmi-built-at" content="2026-10-09T23:29:48.631Z">
+    <meta name="kmi-source-commit" content="456c8b8593bae1ddabd58fe96435bb6c5837746d">
+    <meta name="kmi-build-id" content="456c8b8593ba-20261010T110814Z">
+    <meta name="kmi-built-at" content="2026-10-10T11:08:14.700Z">
     <script>
       // Derived from the meta tags above at runtime, so there is exactly one
       // place (the meta tags) where the build script substitutes real
@@ -529,8 +529,14 @@ ead>
                          and all its functions are unchanged and still reachable (now composed
                          INSIDE that workspace, not standalone). -->
                     <button onclick="if(typeof window.kmiOpenQualityWorkspace==='function'){window.kmiOpenQualityWorkspace();}else{switchTab('kalite');}" class="nav-btn px-3 py-2 rounded-md hover:bg-slate-700 text-slate-300" id="btn-kalite"><i class="fa-solid fa-circle-check mr-1"></i> Kalite Onay</button>
-                    <button onclick="switchTab('sevkiyat')" class="nav-btn px-3 py-2 rounded-md hover:bg-slate-700 text-slate-300" id="btn-sevkiyat"><i class="fa-solid fa-truck-fast mr-1"></i> Sevkiyat</button>
-                    <button id="btn-bakim" onclick="switchTab('bakim')" class="nav-btn px-4 py-2 rounded-lg font-semibold text-slate-300 hover:bg-slate-700"><i class="fa-solid fa-screwdriver-wrench mr-2"></i>Bakım & Makine</button>
+                    <!-- KMI-UNIFY-001 (2026-10-10): same fallback precedent as btn-kalite/
+                         btn-siparis/btn-muhasebe above - this legacy row is normally hidden
+                         (kmiLegacyNavRetire) but was found with an unguarded switchTab() call
+                         that would open the bare old screen instead of the canonical workspace
+                         if the hide ever failed. #tab-sevkiyat/#tab-bakim and their functions
+                         are unchanged, still reachable (now composed INSIDE the workspace). -->
+                    <button onclick="if(typeof window.kmiOpenShippingWorkspace==='function'){window.kmiOpenShippingWorkspace();}else{switchTab('sevkiyat');}" class="nav-btn px-3 py-2 rounded-md hover:bg-slate-700 text-slate-300" id="btn-sevkiyat"><i class="fa-solid fa-truck-fast mr-1"></i> Sevkiyat</button>
+                    <button id="btn-bakim" onclick="if(typeof window.kmiOpenMaintenanceWorkspace==='function'){window.kmiOpenMaintenanceWorkspace();}else{switchTab('bakim');}" class="nav-btn px-4 py-2 rounded-lg font-semibold text-slate-300 hover:bg-slate-700"><i class="fa-solid fa-screwdriver-wrench mr-2"></i>Bakım & Makine</button>
                     <!-- KMI-R5 OWNER REVIEW DEFECT ROUND 1 ("CONTINUE - SALES/CUSTOMER ORDER +
                          PLANNING CANONICAL COMPLETION"): same fallback precedent as btn-kalite
                          above - prefers the canonical Satış & Müşteri workspace; #tab-siparis
@@ -910,7 +916,7 @@ ead>
 <button type="button" onclick="document.getElementById('v118OrdersSection')?.scrollIntoView({behavior:'smooth',block:'start'})" class="bg-cyan-950/50 border border-cyan-800 rounded p-2 text-left hover:border-cyan-500">2 · REZERVASYON</button>
 <button type="button" onclick="document.getElementById('v118ProductionSection')?.scrollIntoView({behavior:'smooth',block:'start'})" class="bg-amber-950/50 border border-amber-800 rounded p-2 text-left hover:border-amber-500">3 · ÜRETİM</button>
 <button type="button" onclick="if(typeof window.kmiOpenQualityWorkspace==='function'){window.kmiOpenQualityWorkspace();}else{switchTab('kalite');}" class="bg-emerald-950/50 border border-emerald-800 rounded p-2 text-left hover:border-emerald-500">4 · KALİTE/DEPO</button>
-<button type="button" onclick="switchTab('sevkiyat')" class="bg-sky-950/50 border border-sky-800 rounded p-2 text-left hover:border-sky-500">5 · SEVKİYAT</button>
+<button type="button" onclick="if(typeof window.kmiOpenShippingWorkspace==='function'){window.kmiOpenShippingWorkspace();}else{switchTab('sevkiyat');}" class="bg-sky-950/50 border border-sky-800 rounded p-2 text-left hover:border-sky-500">5 · SEVKİYAT</button>
 <button type="button" onclick="document.getElementById('v118FinanceSection')?.scrollIntoView({behavior:'smooth',block:'start'})" class="bg-violet-950/50 border border-violet-800 rounded p-2 text-left hover:border-violet-500">6 · FATURA</button>
 <button type="button" onclick="document.getElementById('v118FinanceSection')?.scrollIntoView({behavior:'smooth',block:'start'})" class="bg-green-950/50 border border-green-800 rounded p-2 text-left hover:border-green-500">7 · TAHSİLAT</button>
 <button type="button" onclick="document.getElementById('v118AuditSection')?.scrollIntoView({behavior:'smooth',block:'start'})" class="bg-slate-800 border border-slate-600 rounded p-2 text-left hover:border-slate-400">8 · AUDIT</button>
@@ -3622,6 +3628,47 @@ ead>
         // batch). The event is appended to window.D.materialConsumptionEvents (new,
         // additive, append-only canonical log - never fabricated for historical
         // declarations that predate this remediation).
+        // KMI-UNIFY-001 (Owner decision, 2026-10-10, "Mevcut onaylı KMI Canonical Stock
+        // Truth / Stock Movement Ledger mimarisini uygula"): hammadde için rezervasyon,
+        // üretime fiziksel teslim ve fiili tüketim AYRI olaylardır. Rezervasyon =
+        // mevcut jo.materialLotId ataması (DEĞİŞMEDİ). Bu fonksiyon EKSİK OLAN ORTA
+        // aşamadır: "Üretime Fiziksel Teslim" - Available (lot.blankAvailable) azalır,
+        // Issued to Production (lot.issuedQty, YENİ alan) artar. Bu aşamadan geçmeden
+        // (issuedQty yetersizken) kmiMaterialConsumeForJobOrder artık TÜKETİM
+        // KAYDETMEYİ REDDEDER (aşağıda) - böylece "sarf" her zaman önce fiilen teslim
+        // edilmiş malzemeden düşülür, hiçbir zaman doğrudan Available'dan icat edilmez.
+        // Fail-closed, append-only (window.D.materialIssueEvents, yeni) - mevcut
+        // materialConsumptionEvents/approveKalite zinciri DEĞİŞTİRİLMEDİ, sadece bu ayrı
+        // ön-aşama eklendi. Birden fazla kısmi teslim desteklenir (iş emri tek seferde
+        // tüm malzemeyi almayabilir) - bu yüzden tek-seferlik idempotency YOK, bunun
+        // yerine her çağrı kendi miktarını Available'dan düşer (yetersizse REDDEDER,
+        // asla negatif/icat sayı üretmez).
+        window.kmiMaterialIssueToProduction=function(jo,qty,actorSource){
+            try{
+                if(!jo) return {status:'NO_JOB_ORDER'};
+                if(!jo.materialLotId) return {status:'NO_LOT_LINKED',jobOrderId:jo.id||null};
+                const q=Number(qty)||0;
+                if(q<=0) return {status:'NO_QUANTITY_TO_ISSUE',jobOrderId:jo.id||null};
+                const lot=(window.D.lots||[]).find(l=>l.id===jo.materialLotId);
+                if(!lot) return {status:'LOT_NOT_FOUND',jobOrderId:jo.id||null,lotId:jo.materialLotId};
+                const available=Number(lot.blankAvailable||0);
+                if(q>available) return {status:'INSUFFICIENT_AVAILABLE',jobOrderId:jo.id||null,lotId:jo.materialLotId,available,requested:q};
+                const event={
+                    id:'MIE-'+Date.now().toString(36).toUpperCase()+'-'+Math.random().toString(36).slice(2,6).toUpperCase(),
+                    jobOrderId:jo.id, productId:jo.productId||null, lotId:jo.materialLotId, qty:q, unit:'adet',
+                    source:actorSource||'MANUAL_ISSUE', createdAt:new Date().toISOString()
+                };
+                lot.blankAvailable=Math.max(0,available-q);
+                lot.issuedQty=Number(lot.issuedQty||0)+q;
+                window.D.materialIssueEvents=Array.isArray(window.D.materialIssueEvents)?window.D.materialIssueEvents:[];
+                window.D.materialIssueEvents.push(event);
+                try{window.save?.();}catch(e){}
+                try{window.KMI?.event?.('MATERIAL_ISSUE_EVENT','JOB_ORDER',jo.id,{label:'Ham madde üretime teslim: '+event.id,qty:q,lotId:jo.materialLotId,source:event.source});}catch(e){}
+                return {status:'ISSUED',jobOrderId:jo.id||null,event};
+            }catch(e){
+                return {status:'ISSUE_ERROR',error:String(e&&e.message||e)};
+            }
+        };
         window.kmiMaterialConsumeForJobOrder=function(jo,qty,actorSource){
             try{
                 if(!jo) return {status:'NO_JOB_ORDER'};
@@ -3637,6 +3684,11 @@ ead>
                 if(q<=0) return {status:'NO_QUANTITY_TO_CONSUME',jobOrderId:jo.id||null};
                 const lot=(window.D.lots||[]).find(l=>l.id===jo.materialLotId);
                 if(!lot) return {status:'LOT_NOT_FOUND',jobOrderId:jo.id||null,lotId:jo.materialLotId};
+                // KMI-UNIFY-001: sarf artık DOĞRUDAN Available'dan değil, önce fiilen
+                // "Üretime Teslim Edilmiş" (lot.issuedQty) miktardan düşülür - teslim
+                // edilmemiş/eksik teslim edilmiş malzeme asla "tüketildi" sayılmaz.
+                const issued=Number(lot.issuedQty||0);
+                if(q>issued) return {status:'INSUFFICIENT_ISSUED_QTY',jobOrderId:jo.id||null,lotId:jo.materialLotId,issued,requested:q};
                 const event={
                     id:'MCE-'+Date.now().toString(36).toUpperCase()+'-'+Math.random().toString(36).slice(2,6).toUpperCase(),
                     jobOrderId:jo.id, productId:jo.productId||null, revision:jo.revision||null,
@@ -3644,7 +3696,7 @@ ead>
                     lotId:jo.materialLotId, qty:q, unit:'adet', source:actorSource||'APPROVE_KALITE_CANONICAL',
                     createdAt:new Date().toISOString()
                 };
-                lot.blankAvailable=Math.max(0,Number(lot.blankAvailable||0)-q);
+                lot.issuedQty=Math.max(0,issued-q);
                 window.D.materialConsumptionEvents.push(event);
                 try{window.save?.();}catch(e){}
                 try{window.KMI?.event?.('MATERIAL_CONSUMPTION_EVENT','JOB_ORDER',jo.id,{label:'Ham madde fiziksel tüketim olayı: '+event.id,qty:q,lotId:jo.materialLotId,source:'MASTER_23_CANONICAL'});}catch(e){}
@@ -8432,9 +8484,23 @@ function v61LotCalc(l){
 function material(){
  const prows=D.lots.map(l=>{
   const c=v61LotCalc(l);
-  return `<tr class="border-b border-slate-800"><td class="p-3 font-mono text-amber-300">${esc(l.id)}</td><td>${esc(l.material)}${c.product?`<div class="text-[10px] text-cyan-400">${esc(c.product.code||c.product.name)}</div>`:''}</td><td>${esc(l.source)}</td><td>${Number(l.kgIn).toLocaleString('tr-TR')} kg</td><td>${Number(l.kgAvailable).toLocaleString('tr-TR')} kg</td><td>${Number(l.blankAvailable).toLocaleString('tr-TR')}</td><td>${c.unitWeightKg>0?c.unitWeightKg.toLocaleString('tr-TR',{maximumFractionDigits:3})+' kg':'-'}</td><td>${c.unitWeightKg>0?c.theoreticalBlanksRemaining.toLocaleString('tr-TR'):'-'}</td><td>${c.yieldPct>0?c.yieldPct.toLocaleString('tr-TR',{maximumFractionDigits:1})+'%':'-'}</td><td><span class="px-2 py-1 rounded text-[10px] ${l.qc==='KABUL'?'bg-emerald-900 text-emerald-300':'bg-amber-900 text-amber-300'}">${esc(l.qc)}</span></td><td class="whitespace-nowrap"><button onclick="v61ProcessLot('${l.id}')" class="bg-slate-700 px-2 py-1 rounded text-xs">Giriş Kalite / Kesim</button> <button onclick="v61LotAnalysis('${l.id}')" class="bg-cyan-800 px-2 py-1 rounded text-xs ml-1">Detaylı Analiz</button> <button onclick="v69DeleteDRecord('lots','${l.id}','LOT')" class="bg-red-950 text-red-300 px-2 py-1 rounded text-xs ml-1">Sil</button></td></tr>`;
+  return `<tr class="border-b border-slate-800"><td class="p-3 font-mono text-amber-300">${esc(l.id)}</td><td>${esc(l.material)}${c.product?`<div class="text-[10px] text-cyan-400">${esc(c.product.code||c.product.name)}</div>`:''}</td><td>${esc(l.source)}</td><td>${Number(l.kgIn).toLocaleString('tr-TR')} kg</td><td>${Number(l.kgAvailable).toLocaleString('tr-TR')} kg</td><td>${Number(l.blankAvailable).toLocaleString('tr-TR')}</td><td class="text-amber-300">${Number(l.issuedQty||0).toLocaleString('tr-TR')}</td><td>${c.unitWeightKg>0?c.unitWeightKg.toLocaleString('tr-TR',{maximumFractionDigits:3})+' kg':'-'}</td><td>${c.unitWeightKg>0?c.theoreticalBlanksRemaining.toLocaleString('tr-TR'):'-'}</td><td>${c.yieldPct>0?c.yieldPct.toLocaleString('tr-TR',{maximumFractionDigits:1})+'%':'-'}</td><td><span class="px-2 py-1 rounded text-[10px] ${l.qc==='KABUL'?'bg-emerald-900 text-emerald-300':'bg-amber-900 text-amber-300'}">${esc(l.qc)}</span></td><td class="whitespace-nowrap"><button onclick="v61ProcessLot('${l.id}')" class="bg-slate-700 px-2 py-1 rounded text-xs">Giriş Kalite / Kesim</button> <button onclick="window.kmiIssueLotPrompt('${l.id}')" class="bg-amber-800 px-2 py-1 rounded text-xs ml-1">Üretime Teslim Et</button> <button onclick="v61LotAnalysis('${l.id}')" class="bg-cyan-800 px-2 py-1 rounded text-xs ml-1">Detaylı Analiz</button> <button onclick="v69DeleteDRecord('lots','${l.id}','LOT')" class="bg-red-950 text-red-300 px-2 py-1 rounded text-xs ml-1">Sil</button></td></tr>`;
  }).join('');
- return shell('Malzeme · LOT · Giriş Kalite · Kesim','Müşteri malı ve Kurutlu satınalması aynı LOT izlenebilirliğiyle yönetilir. kg ve blank/adet stokları ayrı tutulur. Blank ağırlığı, teorik blank sayısı ve malzeme verimi ürün ölçü/yoğunluk verisinden otomatik hesaplanır.',`<button onclick="v61AddLot()" class="bg-blue-600 px-3 py-2 rounded">+ Ham Madde Girişi</button>`,`<div class="bg-slate-950 border border-slate-700 rounded-xl p-4 mb-4 text-xs text-slate-300"><b class="text-amber-300">Kural:</b> Ham madde girişi üretim değildir. Kesilmiş blank da CNC üretim KPI'ına eklenmez. LOT → blank → iş emri → sağlam/hurda zinciri ayrı izlenir.</div><div class="overflow-x-auto"><table class="w-full text-sm"><thead class="text-left text-slate-500"><tr><th class="p-3">LOT</th><th>Malzeme</th><th>Kaynak</th><th>Gelen</th><th>Kalan kg</th><th>Kalan blank</th><th>Blank Ağırlığı</th><th>Teorik Blank</th><th>Malzeme Verimi</th><th>Giriş Kalite</th><th>İşlem</th></tr></thead><tbody>${prows}</tbody></table></div>`)}
+ return shell('Malzeme · LOT · Giriş Kalite · Kesim','Müşteri malı ve Kurutlu satınalması aynı LOT izlenebilirliğiyle yönetilir. kg ve blank/adet stokları ayrı tutulur. Blank ağırlığı, teorik blank sayısı ve malzeme verimi ürün ölçü/yoğunluk verisinden otomatik hesaplanır.',`<button onclick="v61AddLot()" class="bg-blue-600 px-3 py-2 rounded">+ Ham Madde Girişi</button>`,`<div class="bg-slate-950 border border-slate-700 rounded-xl p-4 mb-4 text-xs text-slate-300"><b class="text-amber-300">Kural:</b> Ham madde girişi üretim değildir. Kesilmiş blank da CNC üretim KPI'ına eklenmez. LOT → blank → iş emri → sağlam/hurda zinciri ayrı izlenir. "Üretime Teslim Et", bu blank'leri (Kalan blank → Teslim Edilen) bir iş emrine fiziksel olarak gönderir; fiili tüketim (sarf) ayrı, kalite onayı sırasında kaydedilir (KMI-UNIFY-001).</div><div class="overflow-x-auto"><table class="w-full text-sm"><thead class="text-left text-slate-500"><tr><th class="p-3">LOT</th><th>Malzeme</th><th>Kaynak</th><th>Gelen</th><th>Kalan kg</th><th>Kalan blank</th><th>Teslim Edilen</th><th>Blank Ağırlığı</th><th>Teorik Blank</th><th>Malzeme Verimi</th><th>Giriş Kalite</th><th>İşlem</th></tr></thead><tbody>${prows}</tbody></table></div>`)}
+window.kmiIssueLotPrompt=function(lotId){
+ const lot=(D.lots||[]).find(x=>x.id===lotId); if(!lot) return alert('LOT bulunamadı.');
+ const candidates=(typeof jobs==='function'?jobs():[]).filter(j=>j&&String(j.materialLotId||'')===String(lotId));
+ if(!candidates.length) return alert('Bu LOT\'a bağlı (Kaynak Planla ile atanmış) hiçbir iş emri yok. Önce iş emrine bu LOT\'u atayın.');
+ const list=candidates.map(j=>j.id+(j.item?' · '+j.item:'')).join('\n');
+ const jid=prompt('Hangi iş emrine teslim edilecek? İş emri ID girin:\n'+list, candidates[0].id); if(!jid) return;
+ const jo=candidates.find(j=>String(j.id)===String(jid.trim())); if(!jo) return alert('Bu ID, bu LOT\'a bağlı iş emirleri arasında bulunamadı.');
+ const qtyStr=prompt('Teslim edilecek adet (Kalan blank: '+Number(lot.blankAvailable||0)+'):','0'); if(qtyStr===null) return;
+ const qty=Number(qtyStr); if(!(qty>0)) return alert('Geçerli bir adet girin.');
+ const res=window.kmiMaterialIssueToProduction(jo,qty,'MANUAL_ISSUE_UI');
+ if(res.status==='ISSUED'){ toast?.('Teslim kaydedildi: '+qty+' adet → '+jo.id,'ok'); try{save();}catch(e){} renderAll?.(); }
+ else if(res.status==='INSUFFICIENT_AVAILABLE') alert('Yetersiz kalan blank. Mevcut: '+res.available+', istenen: '+res.requested);
+ else alert('Teslim kaydedilemedi: '+(res.status||'HATA'));
+};
 window.v61LotDimsChange=function(){
  const pid=document.getElementById('lotProduct')?.value||'';
  const L=Number(document.getElementById('lotDimL')?.value||0),W=Number(document.getElementById('lotDimW')?.value||0),H=Number(document.getElementById('lotDimH')?.value||0),density=Number(document.getElementById('lotDensity')?.value||0),kgIn=Number(document.getElementById('lotKgIn')?.value||0);
@@ -9055,8 +9121,14 @@ function mrp71(i){
  // reorder önerisini bastırabiliyordu. FIX: gerçek kanonik alan
  // workflowStatus + mevcut açık-PO beyaz listesine (OPEN_PO_STATES ile
  // AYNI, 4. kopyası İCAT EDİLMEDİ) yakınsatıldı.
- const OPEN_PO_STATES_MRP71=['PENDING_MANAGEMENT','PENDING_ACCOUNTING','PAID','INCOMING_QC','ORDERED','DRAFT'];
- const open=D.purchases.filter(p=>p.purchaseItemId===i.id&&OPEN_PO_STATES_MRP71.indexOf(String(p.workflowStatus||''))!==-1).reduce((a,p)=>a+Number(p.qty||0),0);
+ // KMI-UNIFY-001: tek paylaşılan liste - window.KMI_PURCHASE_OPEN_STATES.
+ // Her inline <script> bloğu kendi lexical scope'unda çalıştığı için bu artık
+ // window üzerinde tanımlanıyor (önceden 6 ayrı yerde elle birbirine eş
+ // tutulan kopyası vardı - bkz. 13665/23424/24306/27623 - tek bir yerin
+ // güncellenip diğerlerinin unutulması sessiz bir "açık PO" tanım farkına
+ // yol açabilirdi). Bu, o paylaşılan listenin tanımlandığı TEK yerdir.
+ window.KMI_PURCHASE_OPEN_STATES=window.KMI_PURCHASE_OPEN_STATES||['PENDING_MANAGEMENT','PENDING_ACCOUNTING','PAID','INCOMING_QC','ORDERED','DRAFT'];
+ const open=D.purchases.filter(p=>p.purchaseItemId===i.id&&window.KMI_PURCHASE_OPEN_STATES.indexOf(String(p.workflowStatus||''))!==-1).reduce((a,p)=>a+Number(p.qty||0),0);
  const target=Math.max(Number(i.maxStock||0),rop+monthly), shortage=Math.max(0,target-Number(i.stockQty||0)-open), moq=Number(i.moq||0), mult=Number(i.orderMultiple||0)||1;
  let suggested=shortage?Math.max(shortage,moq):0;if(suggested)suggested=Math.ceil(suggested/mult)*mult;
  return {monthly,daily,reorderPoint:rop,openPO:open,target,suggestedOrder:suggested};
@@ -9081,7 +9153,28 @@ ${identityPanel('purchase-item',i,i.barcode||i.code)}
 <div class="mt-6"><div class="flex justify-between mb-2"><b>Doküman Kasası</b><button onclick="v63DocAdd()" class="bg-cyan-800 px-3 py-1 rounded text-xs">+ Teknik Föy / Sertifika / Çizim</button></div><div id="v63Docs">${docRows(i.documents)}</div></div>
 <div class="mt-6"><div class="flex justify-between mb-2"><b>KURUTLU'ya Özel Alanlar</b><button onclick="v62FieldAdd()" class="bg-blue-700 px-3 py-1 rounded text-xs">+ Veri Hücresi Ekle</button></div><div id="v62Fields">${fieldRows(i.fields)}</div></div>
 <div class="mt-6 flex justify-between"><button onclick="v71DeletePurchaseItem('${i.id}')" class="bg-red-950 text-red-300 px-4 py-2 rounded">Kartı Sil</button><button onclick="v71SavePurchaseItem('${i.id}')" class="bg-emerald-700 px-5 py-2 rounded font-black">Satınalma Ürün Kartını Kaydet</button></div>`);renderIdentityCodes('purchase-item',i,i.barcode||i.code)};
-window.v71SavePurchaseItem=function(id){const i=D.purchaseItems.find(x=>x.id===id);if(!i)return;const val=(x)=>document.getElementById(x)?.value??'';Object.assign(i,{code:val('piCode').trim(),name:val('piName').trim(),category:val('piCat').trim(),active:val('piActive')==='1',manufacturer:val('piMfr').trim(),manufacturerPartNo:val('piMpn').trim(),gtin:val('piGtin').trim(),barcode:val('piBarcode').trim(),description:val('piDesc').trim(),stockQty:Number(val('piStock')||0),reservedQty:Number(val('piReserved')||0),safetyStock:Number(val('piSafety')||0),reorderPoint:Number(val('piROP')||0),maxStock:Number(val('piMax')||0),leadTimeDays:Number(val('piLead')||0),moq:Number(val('piMOQ')||0),orderMultiple:Number(val('piMultiple')||1),baseUom:val('piUom').trim(),purchaseUom:val('piPUom').trim(),uomFactor:Number(val('piFactor')||1),abcClass:val('piABC').trim(),xyzClass:val('piXYZ').trim(),preferredSupplier:val('piSupplier'),buyer:val('piBuyer').trim(),planner:val('piPlanner').trim(),procurementType:val('piProc').trim(),warehouse:val('piWh').trim(),bin:val('piBin').trim(),countryOfOrigin:val('piOrigin').trim(),hsCode:val('piHS').trim(),incoterm:val('piInc').trim(),shelfLifeDays:Number(val('piShelf')||0),lotTracking:val('piLot')==='1',serialTracking:val('piSerial')==='1',qualitySpec:val('piQuality').trim(),certificateRequirement:val('piCert').trim()});save();v62CloseModal();v61Show('supply')};
+// KMI-UNIFY-001 (Owner decision 2026-10-10): stockQty/reservedQty artık bu formdan
+// SESSİZCE (hareket kaydı olmadan) değiştirilemiyor. Ekranın düzenleme yeteneği
+// KALDIRILMADI (bu, gerçek elle düzeltme ihtiyaçlarını - sayım farkı, iade, vb. -
+// engeller); bunun yerine her değişiklik D.inventoryMovements'a bir MANUAL_ADJUSTMENT
+// hareketi olarak YAZILIR (zaten var olan, PO kabul akışının kullandığı AYNI defter -
+// yeni bir ledger İCAT EDİLMEDİ). Delta sıfırsa hiçbir hareket yazılmaz (gürültü yok).
+window.v71SavePurchaseItem=function(id){const i=D.purchaseItems.find(x=>x.id===id);if(!i)return;const val=(x)=>document.getElementById(x)?.value??'';
+ const newStockQty=Number(val('piStock')||0), newReservedQty=Number(val('piReserved')||0);
+ const stockDelta=newStockQty-Number(i.stockQty||0), reservedDelta=newReservedQty-Number(i.reservedQty||0);
+ D.inventoryMovements=Array.isArray(D.inventoryMovements)?D.inventoryMovements:[];
+ // KMI-UNIFY-001: bu kalemin HİÇ hareket geçmişi yoksa (tracking'den önce var olan
+ // stok), delta'dan ÖNCE gerçek mevcut miktarı bir OPENING_BALANCE hareketi olarak
+ // kaydet - yoksa replay (kmiStockStockCheckPurchaseItemConsistency) her zaman bu
+ // eski, hareket-öncesi bakiye kadar "açıklanamıyor" görünür. Uydurulan bir sayı
+ // DEĞİL - kalemin kendi GERÇEK, o anki stockQty'si (delta uygulanmadan önceki hali).
+ if(stockDelta!==0 && !D.inventoryMovements.some(m=>String(m.purchaseItemId)===String(i.id))){
+   const opening=Number(i.stockQty||0);
+   if(opening!==0)D.inventoryMovements.unshift({id:'STK-'+String(Date.now()).slice(-9)+'-OB',type:'OPENING_BALANCE',purchaseItemId:i.id,item:i.name,qty:opening,unit:i.baseUom||'adet',warehouseLocation:i.warehouse||'',by:currentUser?.name||'-',at:new Date().toISOString(),note:'Hareket takibinden önceki mevcut bakiye (geriye dönük kayıt, uydurulmadı - kalemin kendi o anki stockQty değeri)'});
+ }
+ if(stockDelta!==0)D.inventoryMovements.unshift({id:'STK-'+String(Date.now()).slice(-9)+'-S',type:'MANUAL_ADJUSTMENT',purchaseItemId:i.id,item:i.name,qty:stockDelta,unit:i.baseUom||'adet',warehouseLocation:i.warehouse||'',by:currentUser?.name||'-',at:new Date().toISOString(),note:'stockQty elle düzeltme: '+Number(i.stockQty||0)+' → '+newStockQty});
+ if(reservedDelta!==0)D.inventoryMovements.unshift({id:'STK-'+String(Date.now()).slice(-9)+'-R',type:'MANUAL_ADJUSTMENT_RESERVED',purchaseItemId:i.id,item:i.name,qty:reservedDelta,unit:i.baseUom||'adet',warehouseLocation:i.warehouse||'',by:currentUser?.name||'-',at:new Date().toISOString(),note:'reservedQty elle düzeltme: '+Number(i.reservedQty||0)+' → '+newReservedQty});
+ Object.assign(i,{code:val('piCode').trim(),name:val('piName').trim(),category:val('piCat').trim(),active:val('piActive')==='1',manufacturer:val('piMfr').trim(),manufacturerPartNo:val('piMpn').trim(),gtin:val('piGtin').trim(),barcode:val('piBarcode').trim(),description:val('piDesc').trim(),stockQty:newStockQty,reservedQty:newReservedQty,safetyStock:Number(val('piSafety')||0),reorderPoint:Number(val('piROP')||0),maxStock:Number(val('piMax')||0),leadTimeDays:Number(val('piLead')||0),moq:Number(val('piMOQ')||0),orderMultiple:Number(val('piMultiple')||1),baseUom:val('piUom').trim(),purchaseUom:val('piPUom').trim(),uomFactor:Number(val('piFactor')||1),abcClass:val('piABC').trim(),xyzClass:val('piXYZ').trim(),preferredSupplier:val('piSupplier'),buyer:val('piBuyer').trim(),planner:val('piPlanner').trim(),procurementType:val('piProc').trim(),warehouse:val('piWh').trim(),bin:val('piBin').trim(),countryOfOrigin:val('piOrigin').trim(),hsCode:val('piHS').trim(),incoterm:val('piInc').trim(),shelfLifeDays:Number(val('piShelf')||0),lotTracking:val('piLot')==='1',serialTracking:val('piSerial')==='1',qualitySpec:val('piQuality').trim(),certificateRequirement:val('piCert').trim()});save();v62CloseModal();v61Show('supply')};
 window.v71DeletePurchaseItem=function(id){if(D.purchases.some(p=>p.purchaseItemId===id))return alert('Bu karta bağlı satınalma geçmişi var. İzlenebilirlik için önce PO bağlantılarını kaldırın.');if(!confirm('Satınalma ürün kartı silinsin mi?'))return;D.purchaseItems=D.purchaseItems.filter(x=>x.id!==id);save();v62CloseModal();v61Show('supply')};
 window.v71ListAdd=function(k){const i=D.purchaseItems.find(x=>x.id===activeV62?.id);if(!i)return;i[k]=i[k]||[];i[k].push('');save();document.getElementById(k==='alternatives'?'v71Alternatives':'v71Equivalents').innerHTML=listInput71(i[k],k)};
 window.v71ListChange=function(k,n,v){const i=D.purchaseItems.find(x=>x.id===activeV62?.id);if(i?.[k]){i[k][n]=v;save()}};
@@ -10449,15 +10542,69 @@ window.v118Reserve=function(id,auto=false){if(!can('warehouse')&&!can('sales'))r
  // olayı görünüyordu. Gerçekten yeni rezerve edilen miktar takip edilip döndürülüyor; aşağıdaki
  // genel olay sarmalayıcı (window.KMI.event) artık sadece bu değer pozitifse kayıt atıyor.
  let took=0;o.lines.forEach(l=>{const need=Math.max(0,l.qty-l.reserved-l.shipped),take=Math.min(need,available(l.productId));if(take>0){stockRow(l.productId).reserved+=take;l.reserved+=take;took+=take;V.movements.unshift({id:uid('MOV'),at:now(),type:'RESERVE',productId:l.productId,qty:take,ref:o.id})}});recalc(o);audit('RESERVE','SALES_ORDER',o.id,'Stok rezervasyonu güncellendi');persist();if(!auto)v118Render();return took;}
-window.v118ProductionNeed=function(id){if(!can('sales'))return alert('Yetki yok.');const o=V.orders.find(x=>x.id===id);if(!o)return;let created=0;(o.lines||[]).forEach(l=>{const ordered=Number(l.qty||0),reserved=Number(l.reserved||0),produced=Number(l.produced||0);const activeWO=(Array.isArray(window.jobOrders)?window.jobOrders:[]).filter(j=>j.salesOrderId===o.id&&String(j.productId)===String(l.productId)&&!['Tamamlandı','CANCELLED','İptal'].includes(j.status)).reduce((s,j)=>s+Math.max(0,Number(j.targetQty||0)-Number(j.completedQty||0)),0);const need=Math.max(0,ordered-reserved-produced-activeWO);if(need<=0)return;const pp=product(l.productId),cc=customer(o.customerId);const jo={id:'WO-'+new Date().getFullYear()+'-'+String(Date.now()).slice(-6)+'-'+(++created),client:cc.shortName||cc.name||o.customerId,item:(pp.code||l.productId)+(pp.name?' · '+pp.name:''),project:(cc.shortName||cc.name||o.customerId)+' / '+o.customerPO,productId:l.productId,department:'CNC Üretim',targetQty:need,completedQty:0,status:'Açık',assignedTo:[],targetType:'production',durationMinutes:0,machine:'',dueAt:o.dueDate?o.dueDate+'T17:00':'',unitPrice:Number(l.unitPrice||0),salesOrderId:o.id,customerPO:o.customerPO,createdAt:now(),source:'KMI_ORDER_INTELLIGENCE',deleted:false};if(Array.isArray(window.jobOrders))window.jobOrders.push(jo);
+// KMI-UNIFY-001 (P0 continuation, Priority 4, owner-approved 2026-10-10): siparişten iş emri
+// açan İKİ bağımsız writer (bu dosyadaki v118ProductionNeed/ProductionNeedShiftSplit - eskiden
+// yalnız istemci taraflı can('sales') departman-adı metin eşleşmesiyle korunuyordu - ve
+// kmiApproveReservationAndOpenJobOrderC - zaten reservation_wo_approval_verify RPC ile sunucuda
+// doğrulanıyordu) TEK bir sunucu-doğrulamalı yazma noktasına birleştirildi. Gerçek yetki artık
+// HER İKİ YOLDA DA sunucuda, mevcut (bugüne kadar yalnız istemci tarafı Personel Yetkileri
+// ekranında kullanılan) granular permission altyapısından (public.has_permission('İş Emirleri',
+// 'CREATE'|'APPROVE'), work_order_open_authority_verify RPC, 20261010h migration) doğrulanıyor -
+// departman ADI metin eşleşmesi DEĞİL. Yeni bir SATIŞ rolü/departmanı OLUŞTURULMADI, mevcut
+// personelin yetkisi otomatik GENİŞLETİLMEDİ (bugünkü role_permissions verisinde İş Emirleri
+// CREATE/APPROVE ikisi de yalnız ADMIN+MANAGEMENT'a açık - davranış değişmedi). jobOrders[]
+// push'u artık SADECE bu paylaşılan fonksiyonda yapılır; çağıranlar kendi iş kuralını (eksik
+// üretim hesabı / vardiya bölme / makine rezervasyonu) önceden hazırlar, gerçek yazmayı
+// buraya devreder. Sunucu reddederse/ulaşılamazsa HARD FAIL-CLOSED: yerel iş emri AÇILMAZ.
+window.kmiVerifyAndCreateJobOrderFromSalesOrder=async function(permissionAction,orderId,lineId,jobOrderIdPreview,jobFields){
+ const client=window.kurutluSupabase;
+ if(!client||typeof client.rpc!=='function'){ alert('İş emri AÇILMADI: sunucu bağlantısı (Supabase) bu oturumda kullanılamıyor.'); return null; }
+ try{
+  const res=await client.rpc('work_order_open_authority_verify',{p_order_id:String(orderId),p_line_id:lineId==null?null:String(lineId),p_job_order_id:String(jobOrderIdPreview),p_permission_action:permissionAction});
+  if(res.error) throw new Error(res.error.message||'Sunucu yetkiyi doğrulamadı.');
+  if(!res.data||!res.data.verified) throw new Error('Sunucudan geçersiz doğrulama yanıtı alındı.');
+ }catch(e){
+  alert('İş emri AÇILMADI: sunucu yetkinizi doğrulayamadı ('+(e&&e.message||'bilinmeyen hata')+'). Lütfen bağlantınızı kontrol edip tekrar deneyin.');
+  console.warn('[KMI-UNIFY-001] work_order_open_authority_verify HARD FAIL-CLOSED - iş emri AÇILMADI:',e);
+  return null;
+ }
+ const job=Object.assign({id:jobOrderIdPreview},jobFields);
+ (window.jobOrders=window.jobOrders||[]).push(job);
+ try{if(Array.isArray(window.jobOrders))localStorage.setItem('jobOrders',JSON.stringify(window.jobOrders));}catch(e){}
+ return job;
+};
+window.v118ProductionNeed=async function(id){
+ // can('sales') artık SADECE UI/UX görünürlük rehberi (buton gösterme kararı) - GÜVENLİK SINIRI
+ // DEĞİL; gerçek yetki kmiVerifyAndCreateJobOrderFromSalesOrder içindeki sunucu RPC'sinde.
+ if(!can('sales'))return alert('Yetki yok.');
+ const o=V.orders.find(x=>x.id===id);if(!o)return;
+ let created=0;
+ for(const l of (o.lines||[])){
+  const ordered=Number(l.qty||0),reserved=Number(l.reserved||0),produced=Number(l.produced||0);
+  const activeWO=(Array.isArray(window.jobOrders)?window.jobOrders:[]).filter(j=>j.salesOrderId===o.id&&String(j.productId)===String(l.productId)&&!['Tamamlandı','CANCELLED','İptal'].includes(j.status)).reduce((s,j)=>s+Math.max(0,Number(j.targetQty||0)-Number(j.completedQty||0)),0);
+  const need=Math.max(0,ordered-reserved-produced-activeWO);
+  if(need<=0)continue;
+  const pp=product(l.productId),cc=customer(o.customerId);
+  const jobOrderIdPreview='WO-'+new Date().getFullYear()+'-'+String(Date.now()).slice(-6)+'-'+(created+1);
+  const jo=await window.kmiVerifyAndCreateJobOrderFromSalesOrder('CREATE',o.id,l.id,jobOrderIdPreview,{client:cc.shortName||cc.name||o.customerId,item:(pp.code||l.productId)+(pp.name?' · '+pp.name:''),project:(cc.shortName||cc.name||o.customerId)+' / '+o.customerPO,productId:l.productId,department:'CNC Üretim',targetQty:need,completedQty:0,status:'Açık',assignedTo:[],targetType:'production',durationMinutes:0,machine:'',dueAt:o.dueDate?o.dueDate+'T17:00':'',unitPrice:Number(l.unitPrice||0),salesOrderId:o.id,orderLineId:l.id,customerPO:o.customerPO,createdAt:now(),source:'KMI_ORDER_INTELLIGENCE',deleted:false});
+  if(!jo)continue; // sunucu reddetti/ulaşılamadı - bu satır atlanır, diğer satırlar denenmeye devam eder
+  created++;
   // KMI-OTS-FINAL-001 OTS-03: persist via the sanctioned RPC - jo.unitPrice above is
   // local-only convenience, stripped server-side on sync; this is the real record.
   try{window.kmiSetCommercialPrice?.(jo.id, jo.unitPrice, 'TRY');}catch(e){}
-  audit('CREATE','WORK_ORDER',jo.id,`${o.customerPO} · ${product(l.productId).code||l.productId} · ${need} adet`)});try{if(Array.isArray(window.jobOrders))localStorage.setItem('jobOrders',JSON.stringify(window.jobOrders))}catch(e){}persist();try{if(typeof refreshAllViews==='function')refreshAllViews()}catch(e){console.warn('KMI full refresh',e)}v118Render();if(created)alert(created+' üretim iş emri oluşturuldu. Yönetim ve Operatör panellerine işlendi.');else{const active=(Array.isArray(window.jobOrders)?window.jobOrders:[]).filter(j=>j.salesOrderId===o.id&&!['Tamamlandı','CANCELLED','İptal'].includes(j.status));alert(active.length?'Bu sipariş için üretim ihtiyacı zaten aktif iş emirleri ile karşılanıyor.':'Açık üretim ihtiyacı yok.')}return created;};
+  audit('CREATE','WORK_ORDER',jo.id,`${o.customerPO} · ${pp.code||l.productId} · ${need} adet`);
+ }
+ persist();
+ try{if(typeof refreshAllViews==='function')refreshAllViews()}catch(e){console.warn('KMI full refresh',e)}
+ v118Render();
+ if(created)alert(created+' üretim iş emri oluşturuldu. Yönetim ve Operatör panellerine işlendi.');
+ else{const active=(Array.isArray(window.jobOrders)?window.jobOrders:[]).filter(j=>j.salesOrderId===o.id&&!['Tamamlandı','CANCELLED','İptal'].includes(j.status));alert(active.length?'Bu sipariş için üretim ihtiyacı zaten aktif iş emirleri ile karşılanıyor.':'Açık üretim ihtiyacı yok.')}
+ return created;
+};
 // KMI-FIX (2026-09-26): Ender'in isteği - 1000 adetlik gibi büyük siparişler tek dev iş emri olarak değil,
 // yönetici tarafından belirlenen vardiya üretim hedefine göre otomatik ayrı vardiya iş emirlerine bölünebilsin.
 // Mevcut v118ProductionNeed'e (ve onu saran audit/event wrapper'a) hiç dokunulmadı; bu tamamen ek/opsiyonel bir yol.
-window.v118ProductionNeedShiftSplit=function(id){
+window.v118ProductionNeedShiftSplit=async function(id){
  if(!can('sales'))return alert('Yetki yok.');
  const o=V.orders.find(x=>x.id===id);if(!o)return;
  const raw=prompt('Vardiya başına üretim hedefi (adet) girin.\nBu sipariş için gereken toplam üretim, girdiğiniz hedef büyüklüğünde ayrı vardiya iş emirlerine otomatik bölünüp oluşturulacak.\n(Boş bırakıp Tamam derseniz, mevcut yönteme göre TEK iş emri oluşturulur.)','');
@@ -10466,39 +10613,73 @@ window.v118ProductionNeedShiftSplit=function(id){
  const shiftTarget=Math.floor(Number(raw));
  if(!Number.isFinite(shiftTarget)||shiftTarget<=0){alert('Vardiya hedefi geçerli bir pozitif sayı olmalı.');return;}
  let created=0;
- (o.lines||[]).forEach(l=>{
+ for(const l of (o.lines||[])){
   const ordered=Number(l.qty||0),reserved=Number(l.reserved||0),produced=Number(l.produced||0);
   const activeWO=(Array.isArray(window.jobOrders)?window.jobOrders:[]).filter(j=>j.salesOrderId===o.id&&String(j.productId)===String(l.productId)&&!['Tamamlandı','CANCELLED','İptal'].includes(j.status)).reduce((s,j)=>s+Math.max(0,Number(j.targetQty||0)-Number(j.completedQty||0)),0);
   const need=Math.max(0,ordered-reserved-produced-activeWO);
-  if(need<=0)return;
+  if(need<=0)continue;
   const parts=Math.ceil(need/shiftTarget);
   const pp=product(l.productId),cc=customer(o.customerId);
   for(let i=1;i<=parts;i++){
    const qtyThis=(i<parts)?shiftTarget:(need-shiftTarget*(parts-1));
-   created++;
-   const jo={id:'WO-'+new Date().getFullYear()+'-'+String(Date.now()).slice(-6)+'-'+created+'-V'+i,
+   const attemptNo=created+1;
+   const jobOrderIdPreview='WO-'+new Date().getFullYear()+'-'+String(Date.now()).slice(-6)+'-'+attemptNo+'-V'+i;
+   const jo=await window.kmiVerifyAndCreateJobOrderFromSalesOrder('CREATE',o.id,l.id,jobOrderIdPreview,{
     client:cc.shortName||cc.name||o.customerId,
     item:(pp.code||l.productId)+(pp.name?' · '+pp.name:''),
     project:(cc.shortName||cc.name||o.customerId)+' / '+o.customerPO,
     productId:l.productId,department:'CNC Üretim',targetQty:qtyThis,completedQty:0,status:'Açık',assignedTo:[],
     targetType:'production',durationMinutes:0,machine:'',dueAt:o.dueDate?o.dueDate+'T17:00':'',
-    unitPrice:Number(l.unitPrice||0),salesOrderId:o.id,customerPO:o.customerPO,createdAt:now(),
+    unitPrice:Number(l.unitPrice||0),salesOrderId:o.id,orderLineId:l.id,customerPO:o.customerPO,createdAt:now(),
     source:'KMI_ORDER_INTELLIGENCE',deleted:false,
-    shiftTargetQty:shiftTarget,shiftPartIndex:i,shiftPartsTotal:parts};
-   if(Array.isArray(window.jobOrders))window.jobOrders.push(jo);
+    shiftTargetQty:shiftTarget,shiftPartIndex:i,shiftPartsTotal:parts});
+   if(!jo)continue; // sunucu reddetti/ulaşılamadı - bu vardiya parçası atlanır, diğerleri denenmeye devam eder
+   created++;
    // KMI-OTS-FINAL-001 OTS-03: persist via the sanctioned RPC (see v118ProductionNeed above).
    try{window.kmiSetCommercialPrice?.(jo.id, jo.unitPrice, 'TRY');}catch(e){}
-   audit('CREATE','WORK_ORDER',jo.id,`${o.customerPO} · ${product(l.productId).code||l.productId} · Vardiya ${i}/${parts} · ${qtyThis} adet`);
+   audit('CREATE','WORK_ORDER',jo.id,`${o.customerPO} · ${pp.code||l.productId} · Vardiya ${i}/${parts} · ${qtyThis} adet`);
   }
- });
- try{if(Array.isArray(window.jobOrders))localStorage.setItem('jobOrders',JSON.stringify(window.jobOrders))}catch(e){}
+ }
  persist();
  try{if(typeof refreshAllViews==='function')refreshAllViews()}catch(e){}
  v118Render();
  if(created)alert(created+' adet vardiya bazlı üretim iş emri oluşturuldu (hedef: '+shiftTarget+' adet/parça).');
  else alert('Açık üretim ihtiyacı yok veya zaten aktif iş emirleri ile karşılanıyor.');
 };
-window.v118ReceiveFinished=function(id){if(!can('warehouse'))return alert('Bitmiş ürün girişi için Depo/Yönetim yetkisi gerekir.');const o=V.orders.find(x=>x.id===id);if(!o)return;const l=o.lines[0],q=Number(prompt('Bitmiş ürün giriş adedi','0'));if(!(q>0))return;stockRow(l.productId).onHand+=q;l.produced=(l.produced||0)+q;V.movements.unshift({id:uid('MOV'),at:now(),type:'FINISHED_IN',productId:l.productId,qty:q,ref:o.id});audit('FINISHED_GOODS_IN','SALES_ORDER',o.id,q+' adet');persist();v118Reserve(id,true);v118Render();return q;}
+// KMI-FIX (KMI-UNIFY-001 Final P0, 2026-10-10) - Owner directive: "v118ReceiveFinished üzerinden
+// kalite onayı olmadan kullanılabilir bitmiş ürün stoku oluşturulmasını engelle. Fiziksel depo
+// kabulü ile kalite onaylı stok serbest bırakmayı birbirinden ayır." This function used to credit
+// stockRow().onHand directly with NO quality check at all. It now ONLY records the physical
+// warehouse receipt and opens a FINISHED_GOODS_RECEIPT quality hold (the existing generic QMS
+// hold engine - no new parallel stock source, no new UI). Nothing is added to Available Finished
+// Goods / shippable stock until Kalite releases that hold, which credits stock through the SAME
+// canonical window.v118CreditProduction() writer approveKalite() already uses for automatic QC-pass
+// crediting - there remains exactly ONE function in the codebase that increments finished-goods
+// onHand as a result of a quality decision.
+window.v118ReceiveFinished=function(id){
+ if(!can('warehouse'))return alert('Bitmiş ürün girişi için Depo/Yönetim yetkisi gerekir.');
+ const o=V.orders.find(x=>x.id===id);if(!o)return;
+ const l=o.lines[0],q=Number(prompt('Bitmiş ürün giriş adedi (fiziksel depo kabulü - Kalite onayı bekleyecek)','0'));
+ if(!(q>0))return;
+ if(typeof window.kmiQmsOpenHold!=='function'){
+  alert('Kalite HOLD mekanizması yüklenemedi - fiziksel kabul KAYDEDİLMEDİ, stok artırılmadı.');
+  return;
+ }
+ const pp=(typeof product==='function')?product(l.productId):null;
+ const receiptId='FGR-'+String(Date.now()).slice(-9);
+ const reason='Fiziksel depo kabulü - '+q+' adet '+(pp&&pp.code||l.productId)+' · '+(o.customerPO||o.id)+' - Kalite onayı bekliyor (Quarantine)';
+ const hold=window.kmiQmsOpenHold('FINISHED_GOODS_RECEIPT',receiptId,reason);
+ if(!hold){
+  alert('Fiziksel kabul kaydedilemedi (HOLD açılamadı) - stok artırılmadı.');
+  return;
+ }
+ hold.meta={salesOrderId:o.id,orderLineId:l.id,productId:l.productId,qty:q,customerPO:o.customerPO};
+ try{qSave();}catch(e){}
+ audit('FINISHED_GOODS_RECEIPT_PENDING_QC','SALES_ORDER',o.id,q+' adet '+(pp&&pp.code||l.productId)+' fiziksel teslim alındı - Kalite Hold ('+receiptId+'), Available stoğa EKLENMEDİ.');
+ persist();
+ v118Render();
+ return q;
+}
 // KMI-FIX (2026-09-26): Ender'in bildirdiği kritik hata - iş emri kalite onayından geçip
 // tamamlanınca müşteri siparişinin "üretildi" adedi hiç güncellenmiyordu (yalnızca manuel
 // "Bitmiş Ürün" girişiyle artıyordu, ki kimse onu kullanmıyordu). Bu yüzden bir iş emri bitip
@@ -13051,15 +13232,37 @@ function enhancePurchaseCards(){
  });
 }
 // Muhasebe ödeme kaydını daha izlenebilir yap: yöntem + referans + not.
+// KMI-UNIFY-001: bu, Satınalma (D.purchases/workflowStatus) tarafının TEK ödeme
+// yazıcısıdır. Önceden burada hiçbir muhasebe/GL köprüsü yoktu - PO "Ödendi"
+// olurken Muhasebe defterinde (KMI_LEDGER/KMI_GL) karşılık gelen hiçbir kayıt
+// oluşmuyordu (bkz. kmiRenderAccounting'deki açık uyarı metni: "hiç bağlanmamış
+// bir kaynak"). Bu iki bağımsız durum gerçeğiydi: PO tarafı "ödendi" diyor,
+// muhasebe tarafı "hiç ödeme yok" diyordu. Şimdi GL kaydı BU fonksiyonun
+// İÇİNDE, PO durumu değiştirilmeden ÖNCE denenir - başarısız olursa (yetki
+// yok / tedarikçi boş / vb.) PO state'i HİÇ değişmez (yarım/çelişkili kayıt
+// bırakılmaz). _acctPaymentEntryId damgası (V118 legacy adapter'daki
+// _acctEntryId deseniyle aynı) tekrar tıklamada ikinci bir GL kaydı
+// oluşmasını engeller.
 window.v73MarkPaid=function(id){
  if(typeof v73IsAccounting==='function'&&!v73IsAccounting())return alert('Bu işlem yalnız Muhasebe yetkilisindedir.');
  const p=purchases().find(x=>String(x.id)===String(id));if(!p)return alert('PO bulunamadı.');
+ if(p.workflowStatus==='PAID'&&p._acctPaymentEntryId)return alert('Bu PO için ödeme zaten kaydedilmiş ve muhasebeleşmiş (Fiş: '+p._acctPaymentEntryId+').');
  const method=prompt('Ödeme yöntemi (Havale / EFT / Kart / Nakit vb.):',p.paymentMethod||'Havale / EFT');if(method===null)return;
  const ref=prompt('Banka / dekont / işlem referansı (isteğe bağlı):',p.paymentReference||'');if(ref===null)return;
  const note=prompt('Muhasebe ödeme notu (isteğe bağlı):',p.paymentNote||'');if(note===null)return;
  if(!confirm(p.id+' ödemesi yapıldı olarak işaretlensin mi?'))return;
- p.workflowStatus='PAID';p.status='Ödendi · Teslimat Bekleniyor';p.paidBy=currentUser?.name||'Muhasebe';p.paidAt=new Date().toISOString();p.paymentMethod=method.trim();p.paymentReference=ref.trim();p.paymentNote=note.trim();p.paymentAmountTL=typeof v72TotalTL==='function'?v72TotalTL(p):Number(p.qty||0)*Number(p.unitPrice||0);
- p.approvalHistory=Array.isArray(p.approvalHistory)?p.approvalHistory:[];p.approvalHistory.push({step:'PAID',by:p.paidBy,at:p.paidAt,method:p.paymentMethod,reference:p.paymentReference,note:p.paymentNote,amountTL:p.paymentAmountTL});
+ const paidAt=new Date().toISOString();
+ const paidBy=currentUser?.name||'Muhasebe';
+ const paymentAmountTL=typeof v72TotalTL==='function'?v72TotalTL(p):Number(p.qty||0)*Number(p.unitPrice||0);
+ let glEntry=null;
+ try{
+   if(!window.KMI_LEDGER||typeof window.KMI_LEDGER.postSupplierPayment!=='function')throw new Error('Muhasebe defteri modülü yüklenemedi.');
+   glEntry=window.KMI_LEDGER.postSupplierPayment({supplierId:p.supplier,amount:paymentAmountTL,currency:'TRY',entryDate:paidAt,sourceType:'PURCHASE_PAYMENT',sourceId:p.id,description:'Satınalma Ödemesi - '+p.id+(p.item?' ('+p.item+')':'')});
+ }catch(e){
+   return alert('Ödeme muhasebeleştirilemedi, PO durumu DEĞİŞTİRİLMEDİ: '+(e&&e.message?e.message:e));
+ }
+ p.workflowStatus='PAID';p.status='Ödendi · Teslimat Bekleniyor';p.paidBy=paidBy;p.paidAt=paidAt;p.paymentMethod=method.trim();p.paymentReference=ref.trim();p.paymentNote=note.trim();p.paymentAmountTL=paymentAmountTL;p._acctPaymentEntryId=glEntry&&glEntry.id?glEntry.id:null;
+ p.approvalHistory=Array.isArray(p.approvalHistory)?p.approvalHistory:[];p.approvalHistory.push({step:'PAID',by:p.paidBy,at:p.paidAt,method:p.paymentMethod,reference:p.paymentReference,note:p.paymentNote,amountTL:p.paymentAmountTL,acctEntryId:p._acctPaymentEntryId});
  if(typeof save==='function')save();if(typeof v73RenderQueues==='function')v73RenderQueues();setTimeout(()=>{renderQcHistory();enhancePurchaseCards()},50);
 };
 const oldRender=window.v73RenderQueues;
@@ -13316,34 +13519,25 @@ window.kmiApproveReservationAndOpenJobOrderC=async function(orderId,lineId){
  const st=kmiR5ReadV118();
  const o=st.orders.find(x=>String(x.id)===String(orderId));if(!o)return;
  const l=(o.lines||[]).find(x=>String(x.id)===String(lineId));if(!l||!l.reservation)return;
- // KMI-R5 MASTER #2 (2026-10-04): canManagementApprove(currentUser) kalır ama artık SADECE
- // UI/UX görünürlük rehberidir (buton gösterme kararı) - GÜVENLİK SINIRI değildir, çünkü
- // currentUser girişten sonra tarayıcı konsolundan değiştirilebilen salt JS durumudur. Canonical
- // yetki burada SUNUCUDA (auth.uid() + is_management(), reservation_wo_approval_verify RPC)
- // yeniden doğrulanır ve audit_log'a kaydedilir - aynı, zaten kanıtlanmış desen
- // (declaration_management_approve_verify, DEF-013). Sunucu reddederse/ulaşılamazsa HARD
- // FAIL-CLOSED: yerel iş emri AÇILMAZ.
+ // KMI-R5 MASTER #2 (2026-10-04) / KMI-UNIFY-001 Priority 4 (2026-10-10): canManagementApprove
+ // (currentUser) kalır ama artık SADECE UI/UX görünürlük rehberidir (buton gösterme kararı) -
+ // GÜVENLİK SINIRI değildir, çünkü currentUser girişten sonra tarayıcı konsolundan
+ // değiştirilebilen salt JS durumudur. Canonical yetki artık SUNUCUDA, "hızlı açma" (CREATE) ile
+ // AYNI tek mekanizmadan (work_order_open_authority_verify RPC, p_permission_action='APPROVE' -
+ // public.has_permission('İş Emirleri','APPROVE'), bugünkü veride yalnız ADMIN+MANAGEMENT)
+ // yeniden doğrulanır ve audit_log'a kaydedilir. Eski reservation_wo_approval_verify RPC'si
+ // (is_management() sabit kontrol) artık bu C-path tarafından ÇAĞRILMIYOR - yalnızca legacy
+ // System-B yolu (window.kmiApproveReservationAndOpenJobOrder, pre-§1-cutover tarihsel
+ // siparişler) onu hâlâ kullanıyor, ona hiç dokunulmadı. Sunucu reddederse/ulaşılamazsa HARD
+ // FAIL-CLOSED: yerel iş emri AÇILMAZ (bkz. kmiVerifyAndCreateJobOrderFromSalesOrder).
  if(!window.currentUser||!(typeof canManagementApprove==='function'&&canManagementApprove(window.currentUser))){alert('Rezervasyon onayı ve iş emri açma yalnız Yönetim yetkisiyle yapılabilir.');return;}
- const __client=window.kurutluSupabase;
- if(!__client || typeof __client.rpc!=='function'){ alert('Onay KAYDEDİLMEDİ: sunucu bağlantısı (Supabase) bu oturumda kullanılamıyor.'); return; }
- const __jobOrderIdPreview=window.v107NextJobOrderNo?window.v107NextJobOrderNo():`IE-${new Date().getFullYear()}-${String((window.jobOrders||[]).length+1).padStart(3,'0')}`;
- try{
-  const __res=await __client.rpc('reservation_wo_approval_verify',{p_order_id:String(orderId),p_line_id:String(lineId),p_job_order_id:__jobOrderIdPreview});
-  if(__res.error) throw new Error(__res.error.message||'Sunucu yetkiyi doğrulamadı.');
-  if(!__res.data || !__res.data.verified) throw new Error('Sunucudan geçersiz doğrulama yanıtı alındı.');
- }catch(__e){
-  alert('Onay KAYDEDİLMEDİ: sunucu yetkinizi doğrulayamadı ('+(__e&&__e.message||'bilinmeyen hata')+'). Lütfen bağlantınızı kontrol edip tekrar deneyin.');
-  console.warn('[KMI-MASTER-02] reservation_wo_approval_verify HARD FAIL-CLOSED - yerel iş emri AÇILMADI:',__e);
-  return;
- }
+ const jobOrderIdPreview=window.v107NextJobOrderNo?window.v107NextJobOrderNo():`IE-${new Date().getFullYear()}-${String((window.jobOrders||[]).length+1).padStart(3,'0')}`;
  const p=kmiR5Product(l.productId),cu=kmiR5Customer(o.customerId);
- const id=__jobOrderIdPreview;
- const job={id,client:cu?.shortName||cu?.name||o.customerId,item:`${p.code?p.code+' · ':''}${p.name}`,department:'Üretim',machine:`${l.reservation.machine} - ${l.reservation.machineName}`,assignedTo:[],targetType:'production',targetQty:Math.floor(l.qty),completedQty:0,price:Number(l.unitPrice||0),status:'Açık',durationMinutes:0,openedAt:new Date().toISOString(),dueAt:l.reservation.plannedEnd,source:'KMI_RESERVATION_C',salesOrderId:o.id,orderLineId:l.id,productId:l.productId,customerPO:o.customerPO};
- (window.jobOrders=window.jobOrders||[]).push(job);
+ const job=await window.kmiVerifyAndCreateJobOrderFromSalesOrder('APPROVE',orderId,lineId,jobOrderIdPreview,{client:cu?.shortName||cu?.name||o.customerId,item:`${p.code?p.code+' · ':''}${p.name}`,department:'Üretim',machine:`${l.reservation.machine} - ${l.reservation.machineName}`,assignedTo:[],targetType:'production',targetQty:Math.floor(l.qty),completedQty:0,price:Number(l.unitPrice||0),status:'Açık',durationMinutes:0,openedAt:new Date().toISOString(),dueAt:l.reservation.plannedEnd,source:'KMI_RESERVATION_C',salesOrderId:o.id,orderLineId:l.id,productId:l.productId,customerPO:o.customerPO});
+ if(!job)return; // sunucu reddetti/ulaşılamadı - alert zaten gösterildi, yerel durum değişmedi
  // KMI-OTS-FINAL-001 OTS-03: persist via the sanctioned RPC (see v118ProductionNeed above).
  try{window.kmiSetCommercialPrice?.(job.id, job.price, 'TRY');}catch(e){}
  l.reservation.approved=true;l.reservation.approvedBy=window.currentUser.name;l.reservation.approvedAt=new Date().toISOString();
- try{if(Array.isArray(window.jobOrders))localStorage.setItem('jobOrders',JSON.stringify(window.jobOrders));}catch(e){}
  st.audit.unshift({id:'AUD-'+Date.now().toString(36).toUpperCase(),at:new Date().toISOString(),by:window.currentUser?.name||'Sistem',action:'CREATE',entity:'WORK_ORDER',entityId:job.id,detail:`${o.customerPO||o.id} · ${p.code||l.productId} · ${l.qty} adet (rezervasyon onaylı)`});
  st.audit=st.audit.slice(0,500);
  kmiR5WriteV118(st);
@@ -13640,7 +13834,8 @@ function dueDays(o){
  const d=Math.ceil((new Date(o.dueDate)-new Date())/86400000);
  return Number.isFinite(d)?d:null;
 }
-const OPEN_PO_STATES=['PENDING_MANAGEMENT','PENDING_ACCOUNTING','PAID','INCOMING_QC','ORDERED','DRAFT'];
+// KMI-UNIFY-001: window.KMI_PURCHASE_OPEN_STATES - bkz. ~9058 tanım notu.
+window.KMI_PURCHASE_OPEN_STATES=window.KMI_PURCHASE_OPEN_STATES||['PENDING_MANAGEMENT','PENDING_ACCOUNTING','PAID','INCOMING_QC','ORDERED','DRAFT'];
 // Hammadde/ürün bazlı tedarik riski: siparişin üretim ihtiyacı olan bir kaleminde, aynı ürüne
 // bağlı henüz stoğa girmemiş (workflowStatus hâlâ açık) bir satınalma kaydı varsa uyar.
 function supplyReasons(o,m){
@@ -13651,7 +13846,7 @@ function supplyReasons(o,m){
  (o.lines||[]).forEach(l=>{
   const need=num(l.qty)-Math.max(num(l.reserved),num(l.produced));
   if(need<=0)return;
-  const openPO=purchases.find(p=>String(p.productId||'')===String(l.productId)&&OPEN_PO_STATES.includes(String(p.workflowStatus||'')));
+  const openPO=purchases.find(p=>String(p.productId||'')===String(l.productId)&&window.KMI_PURCHASE_OPEN_STATES.includes(String(p.workflowStatus||'')));
   if(openPO)reasons.push(`Hammadde/tedarik bekleniyor: PO ${esc(openPO.id)}${openPO.eta?' · ETA '+esc(openPO.eta):''} (${esc(openPO.item||openPO.productId||'')})`);
  });
  return reasons;
@@ -17896,14 +18091,36 @@ window.kmiQmsCloseHold=async function(holdId,note){
   qToast('HOLD kaldırıldı (sunucu onaylı): '+h.refType+' '+h.refId);
   return h;
  }
- // LOT/PURCHASE, or a JOB_ORDER hold opened before this slice / while the
- // canonical layer wasn't deployed (no canonicalId) - UNCHANGED local-only
+ // KMI-UNIFY-001 (P0 continuation, owner directive 2026-10-10): FINISHED_GOODS_RECEIPT
+ // HOLD'ları (window.v118ReceiveFinished tarafından fiziksel kabul anında açılır - bkz.
+ // o fonksiyonun kendi yorumu) bu AYNI jenerik Kalite HOLD motorundan geçer (yeni bir
+ // paralel karantina/stok kaynağı YOK). Fark: bu HOLD "Kapat" ile serbest bırakıldığında,
+ // ürün SADECE burada, kalite onaylı üretim kredisiyle AYNI canonical fonksiyonla
+ // (window.v118CreditProduction - approveKalite'nin otomatik akışıyla paylaşılan TEK
+ // kredi yazıcısı) gerçekten kullanılabilir stoğa (Available/sevkiyat hesaplarına giren
+ // stockRow().onHand) geçer. Sipariş/kalem/adet doğrulanamazsa veya kredi fonksiyonu
+ // hata verirse FAIL-CLOSED: HOLD aktif kalır, hiçbir stok kredisi verilmez.
+ if(h.refType==='FINISHED_GOODS_RECEIPT'){
+  const meta=h.meta||{};
+  const st=window.V118_STATE||{};
+  const ord=(Array.isArray(st.orders)?st.orders:[]).find(x=>String(x.id)===String(meta.salesOrderId));
+  const ln=ord&&(ord.lines||[]).find(x=>String(x.productId)===String(meta.productId));
+  if(!meta.salesOrderId||!meta.productId||!(Number(meta.qty)>0)||!ord||!ln||typeof window.v118CreditProduction!=='function'){
+   qToast('HOLD serbest bırakılamadı: bitmiş ürün kaydı/sipariş satırı doğrulanamadı - stok KREDİLENMEDİ, HOLD hâlâ aktif.','warn');
+   return null;
+  }
+  try{ window.v118CreditProduction(meta.salesOrderId, meta.productId, Number(meta.qty)); }
+  catch(e){ qToast('HOLD serbest bırakılamadı: stok kredisi sırasında hata ('+(e&&e.message||e)+') - HOLD hâlâ aktif.','warn'); return null; }
+  qAudit('RELEASE_TO_STOCK','HOLD',h.id,'Kalite serbest bıraktı - '+meta.qty+' adet '+meta.productId+' artık Available/sevkiyat stoğunda ['+(ord.customerPO||ord.id)+']');
+ }
+ // LOT/PURCHASE/FINISHED_GOODS_RECEIPT, or a JOB_ORDER hold opened before this slice /
+ // while the canonical layer wasn't deployed (no canonicalId) - UNCHANGED local-only
  // close, but now explicitly flagged as local-only so Kalite knows this
  // particular HOLD has no server-side record backing it.
  h.active=false; h.closedBy=(qUser()&&qUser().name)||'-'; h.closedAt=qNow(); h.closeNote=note||'';
  qAudit('CLOSE','HOLD',h.id,note||''); qSave();
  try{window.kmiRenderQualityTower&&window.kmiRenderQualityTower();}catch(e){}
- qToast(h.refType==='JOB_ORDER'?'HOLD kapatıldı (yalnızca yerel - sunucu kaydı yok): '+h.refType+' '+h.refId:'HOLD kapatıldı: '+h.refType+' '+h.refId,h.refType==='JOB_ORDER'?'warn':undefined);
+ qToast(h.refType==='JOB_ORDER'?'HOLD kapatıldı (yalnızca yerel - sunucu kaydı yok): '+h.refType+' '+h.refId:(h.refType==='FINISHED_GOODS_RECEIPT'?'HOLD kaldırıldı ve stok kredilendi: '+h.refId:'HOLD kapatıldı: '+h.refType+' '+h.refId),h.refType==='JOB_ORDER'?'warn':undefined);
  return h;
 };
 window.kmiQmsIsHoldActive=function(refType,refId){
@@ -22853,7 +23070,7 @@ window.kmiRenderAccounting=function(queueOnlyArg){
     </div>
     ${canViewSupplier?`<div class="bg-slate-900/60 border border-slate-700 rounded-2xl p-4">
      <h3 class="font-black mb-2">Cari Ekstre (Tedarikçi)</h3>
-     <div class="text-[10px] text-amber-300 mb-2"><i class="fa-solid fa-triangle-exclamation mr-1"></i>Satınalma (D.purchases/workflowStatus) tarafı için henüz bir muhasebe senkron köprüsü yok - yukarıdaki "Önceki Sistem (V118) Fatura/Tahsilat Senkronu" düğmesi SADECE satış tarafını (V.invoices/V.payments) işler. Bu bakiye bu nedenle her zaman 0 görünecektir - bu bir senkron eksikliği değil, hiç bağlanmamış bir kaynaktır.</div>
+     <div class="text-[10px] text-amber-300 mb-2"><i class="fa-solid fa-triangle-exclamation mr-1"></i>KMI-UNIFY-001: Satınalma ödeme kaydı ("Ödendi" işaretleme, v73MarkPaid) artık doğrudan bu deftere TEDİYE fişi düşürür - bu bakiye artık gerçek ödeme kayıtlarını içerir. Ancak satınalma ALIŞ FATURASI tarafı (mal/hizmet alındığında borç tarafı) henüz hiçbir ekrandan otomatik postalanmıyor; bu yüzden bakiye, fatura kaydı olmadan sadece ödemeleri yansıtabilir (eksi/aykırı görünebilir) - bu ayrı, bilinen bir eksikliktir, "hiç bağlanmamış kaynak" değildir.</div>
      <select id="acctSuppSel" class="w-full bg-slate-950 border border-slate-700 rounded p-2 text-sm mb-2"><option value="">Tedarikçi seç...</option>${suppOpts.map(s=>`<option value="${acctE(s.id)}">${acctE(s.legalName||s.name)}</option>`).join('')}</select>
      <div id="acctSuppOut" class="text-xs text-slate-400"></div>
     </div>`:''}
@@ -23397,10 +23614,10 @@ window.kmiR5GeneratePurchasingObligationAgingSnapshot=function(agedThresholdDays
   const Dx=window.D||window.KMI_MASTER_DATA||null;
   const purchases=Dx&&Array.isArray(Dx.purchases)?Dx.purchases:null;
   if(purchases===null) return {error:'SOURCE_MISSING', message:'D.purchases bulunamadı.'};
-  // KMI-R5: aynı açık-PO tanımı - src/index.html ~11420 (OPEN_PO_STATES) ile BİREBİR AYNI liste,
-  // ikinci bir "açık PO nedir" tanımı İCAT EDİLMEDİ.
-  const OPEN_PO_STATES_RP=['PENDING_MANAGEMENT','PENDING_ACCOUNTING','PAID','INCOMING_QC','ORDERED','DRAFT'];
-  const openPOs=purchases.filter(function(p){ return OPEN_PO_STATES_RP.indexOf(String(p.workflowStatus||''))!==-1; });
+  // KMI-UNIFY-001: window.KMI_PURCHASE_OPEN_STATES - bkz. ~9058 tanım notu. Eskiden
+  // burada 4. bağımsız kopyası vardı, şimdi tek paylaşılan listeye yakınsatıldı.
+  window.KMI_PURCHASE_OPEN_STATES=window.KMI_PURCHASE_OPEN_STATES||['PENDING_MANAGEMENT','PENDING_ACCOUNTING','PAID','INCOMING_QC','ORDERED','DRAFT'];
+  const openPOs=purchases.filter(function(p){ return window.KMI_PURCHASE_OPEN_STATES.indexOf(String(p.workflowStatus||''))!==-1; });
   function ageDays(p){ try{ if(!p.orderDate) return null; const ms=Date.now()-new Date(p.orderDate).getTime(); return (ms>=0)?ms/86400000:null; }catch(e){ return null; } }
   const agedOpen=openPOs.filter(function(p){ const a=ageDays(p); return a!==null && a>=threshold; });
   const unknownAge=openPOs.filter(function(p){ return ageDays(p)===null; });
@@ -24280,10 +24497,10 @@ function puEvalNcrAging(rule){
 function puEvalPurchasingObligationAging(rule){
   try{
     const Dx=window.D||window.KMI_MASTER_DATA||null; const purchases=Dx&&Array.isArray(Dx.purchases)?Dx.purchases:[];
-    // KMI-R5: Reporting'in ~19935 satırındaki OPEN_PO_STATES_RP ile BİREBİR AYNI liste.
-    const OPEN_PO_STATES_RP=['PENDING_MANAGEMENT','PENDING_ACCOUNTING','PAID','INCOMING_QC','ORDERED','DRAFT'];
+    // KMI-UNIFY-001: window.KMI_PURCHASE_OPEN_STATES - bkz. ~9058 tanım notu.
+    window.KMI_PURCHASE_OPEN_STATES=window.KMI_PURCHASE_OPEN_STATES||['PENDING_MANAGEMENT','PENDING_ACCOUNTING','PAID','INCOMING_QC','ORDERED','DRAFT'];
     const threshold=14, now=Date.now(), graceMs=(rule.graceMinutes||0)*60000;
-    purchases.filter(function(p){return OPEN_PO_STATES_RP.indexOf(String(p.workflowStatus||''))!==-1;}).forEach(function(p){
+    purchases.filter(function(p){return window.KMI_PURCHASE_OPEN_STATES.indexOf(String(p.workflowStatus||''))!==-1;}).forEach(function(p){
       if(!p.orderDate) return;
       const ageMs=now-new Date(p.orderDate).getTime();
       if(ageMs>=0 && ageMs/86400000>=threshold && ageMs>=graceMs){
@@ -24370,7 +24587,9 @@ function puDeepLinkFn(entityType, entityId){
   try{
     switch(entityType){
       case 'TASK': return function(){ document.getElementById('kmiPulseModal')?.remove(); window.kmiOpenTaskFloor&&window.kmiOpenTaskFloor(); };
-      case 'MAINTENANCE_ORDER': return function(){ document.getElementById('kmiPulseModal')?.remove(); window.switchTab&&window.switchTab('bakim'); };
+      // KMI-UNIFY-001: diğer case'ler (ORDER/HOLD/NCR) gibi, kanonik workspace
+      // fonksiyonu önce tercih edilir; switchTab yalnız o yoksa fallback'tir.
+      case 'MAINTENANCE_ORDER': return typeof window.kmiOpenMaintenanceWorkspace==='function' ? function(){ document.getElementById('kmiPulseModal')?.remove(); window.kmiOpenMaintenanceWorkspace(); } : function(){ document.getElementById('kmiPulseModal')?.remove(); window.switchTab&&window.switchTab('bakim'); };
       case 'ORDER': return typeof window.kmiOpenPassport==='function' ? function(){ document.getElementById('kmiPulseModal')?.remove(); window.kmiOpenPassport(entityId); } : null;
       case 'HOLD': case 'NCR': return typeof window.kmiOpenQualityWorkspace==='function' ? function(){ document.getElementById('kmiPulseModal')?.remove(); window.kmiOpenQualityWorkspace(); } : null;
       case 'PO': return typeof window.v62OpenPO==='function' ? function(){ document.getElementById('kmiPulseModal')?.remove(); window.v62OpenPO(entityId); } : null;
@@ -25957,7 +26176,17 @@ window.kmiOpenCanli = function(){
     if(window.KMI_AUTH.can(u,'MANAGEMENT') && typeof window.kmiOpenControlTowerHub==='function'){ window.kmiOpenControlTowerHub(); return; }
     if(window.KMI_AUTH.can(u,'QUALITY') && typeof window.kmiOpenQualityTower==='function'){ window.kmiOpenQualityTower(); return; }
     const roleDeptText = String((u.role||'')+' '+(u.dept||'')+' '+(u.department||'')).toUpperCase();
-    if(/BAKIM|MAINTENANCE/.test(roleDeptText) && typeof window.switchTab==='function'){ window.switchTab('bakim'); return; }
+    // KMI-UNIFY-001 (Owner, 2026-10-10): BAKIM dalı MANAGEMENT/QUALITY dallarının
+    // AYNI desenini KAÇIRMIŞTI - doğrudan eski #tab-bakim'e (switchTab) atlıyordu,
+    // kanonik kmiOpenMaintenanceWorkspace()'i hiç tercih etmiyordu. Sonuç: "Canlı"
+    // butonu (her zaman görünür, global üst çubukta) Bakım rolündeki birini eski
+    // çıplak ekrana, sol menüdeki "Bakım" ise YENİ KPI'lı workspace'e götürüyordu -
+    // AYNI oturumda, AYNI işlev için iki ayrı giriş noktası. switchTab fallback
+    // SADECE workspace fonksiyonu gerçekten yoksa kullanılır (yoksa boş ekran yerine).
+    if(/BAKIM|MAINTENANCE/.test(roleDeptText)){
+      if(typeof window.kmiOpenMaintenanceWorkspace==='function'){ window.kmiOpenMaintenanceWorkspace(); return; }
+      if(typeof window.switchTab==='function'){ window.switchTab('bakim'); return; }
+    }
     if(typeof window.kmiOpenShopFloorLive==='function'){ window.kmiOpenShopFloorLive(); return; }
     shToast('CANLI görünümü bulunamadı (VERİ GEREKLİ).');
   }catch(e){ shToast('CANLI açılamadı: '+e.message); }
@@ -27598,8 +27827,9 @@ window.kmiRenderPurchasingWorkspace = function(){
   // AYNI PO'yu kapalı saymasıyla çelişerek. FIX: src/index.html ~12099/
   // ~10324/~20812'deki AYNI (zaten 3 kopya halinde var olan, burada 4.
   // kopyası İCAT EDİLMEYEN) açık-PO beyaz listesine yakınsatıldı.
-  const OPEN_PO_STATES_PURCHWS=['PENDING_MANAGEMENT','PENDING_ACCOUNTING','PAID','INCOMING_QC','ORDERED','DRAFT'];
-  const openCount=reqs.filter(function(p){return OPEN_PO_STATES_PURCHWS.indexOf(String(p.workflowStatus||''))!==-1;}).length;
+  // KMI-UNIFY-001: window.KMI_PURCHASE_OPEN_STATES - bkz. ~9058 tanım notu (5. kopya İCAT EDİLMEDİ).
+  window.KMI_PURCHASE_OPEN_STATES=window.KMI_PURCHASE_OPEN_STATES||['PENDING_MANAGEMENT','PENDING_ACCOUNTING','PAID','INCOMING_QC','ORDERED','DRAFT'];
+  const openCount=reqs.filter(function(p){return window.KMI_PURCHASE_OPEN_STATES.indexOf(String(p.workflowStatus||''))!==-1;}).length;
   const pendingMgmt=reqs.filter(function(p){return p.workflowStatus==='PENDING_MANAGEMENT';}).length;
   const pendingAcct=reqs.filter(function(p){return p.workflowStatus==='PENDING_ACCOUNTING';}).length;
   const pendingRecv=reqs.filter(function(p){return ['PAID','INCOMING_QC','QC_REJECTED'].indexOf(p.workflowStatus)!==-1;}).length;
@@ -28405,12 +28635,25 @@ window.kmiStockCheckPurchaseItemConsistency = function(purchaseItemId){
   if(m.type==='PURCHASE_RECEIPT') replayedStock+=stNum(m.qty);
   else if(m.type==='MAINTENANCE_USE') replayedStock-=stNum(m.qty);
   else if(m.type==='WO_CONSUME') replayedStock-=stNum(m.qty);
+  // KMI-UNIFY-001: window.v71SavePurchaseItem artık stockQty'yi SESSİZCE
+  // yazmıyor - gerçek delta'yı (işaretli, +/-) bir MANUAL_ADJUSTMENT hareketi
+  // olarak kaydediyor. qty zaten işaretli saklandığı için doğrudan toplanır.
+  else if(m.type==='MANUAL_ADJUSTMENT') replayedStock+=stNum(m.qty);
+  // OPENING_BALANCE: hareket takibi başlamadan ÖNCEKİ gerçek bakiyenin geriye
+  // dönük tek seferlik kaydı (window.v71SavePurchaseItem tarafından, kalemin
+  // kendi o anki stockQty değeriyle, hiçbir şey uydurulmadan oluşturulur).
+  // Replay'de normal bir işaretli toplama girdisi gibi davranır.
+  else if(m.type==='OPENING_BALANCE') replayedStock+=stNum(m.qty);
+  // WO_RESERVE/MANUAL_ADJUSTMENT_RESERVED yalnız reservedQty'yi etkiler,
+  // stockQty'yi HİÇ değiştirmez - bilerek bu replay'e dahil edilmiyor
+  // (unhandled olarak yanlış işaretlenmesin diye, bu listede BİLEREK yok sayılır).
+  else if(m.type==='WO_RESERVE'||m.type==='MANUAL_ADJUSTMENT_RESERVED'){ /* stockQty'yi etkilemez, kasıtlı olarak atlanır */ }
   else { if(unhandledTypes.indexOf(m.type)===-1) unhandledTypes.push(m.type); }
  });
  var diff=obs.onHand-replayedStock;
  if(unhandledTypes.length) return {source:STOCK_SOURCES.PURCHASE_ITEM_MRP, identity:{purchaseItemId:purchaseItemId}, classification:STOCK_CLASS.UNKNOWN, reason:'Bilinmeyen hareket tipi/tipleri bulundu, güvenli replay yapılamadı: '+unhandledTypes.join(','), movementCount:movs.length};
  if(Math.abs(diff)<=stEps()) return {source:STOCK_SOURCES.PURCHASE_ITEM_MRP, identity:{purchaseItemId:purchaseItemId}, classification:STOCK_CLASS.MATCH, replayedStock:stRound2(replayedStock), declaredStock:obs.onHand, movementCount:movs.length};
- return {source:STOCK_SOURCES.PURCHASE_ITEM_MRP, identity:{purchaseItemId:purchaseItemId}, classification:STOCK_CLASS.MISSING_MOVEMENT, replayedStock:stRound2(replayedStock), declaredStock:obs.onHand, diff:stRound2(diff), movementCount:movs.length, reason:'stockQty, kayıtlı D.inventoryMovements hareketleriyle açıklanamıyor - window.v71SavePurchaseItem formu stockQty\'yi hareket kaydı OLUŞTURMADAN doğrudan yazabiliyor (bilinen, mevcut davranış, bu slice\'ta değiştirilmedi)'};
+ return {source:STOCK_SOURCES.PURCHASE_ITEM_MRP, identity:{purchaseItemId:purchaseItemId}, classification:STOCK_CLASS.MISSING_MOVEMENT, replayedStock:stRound2(replayedStock), declaredStock:obs.onHand, diff:stRound2(diff), movementCount:movs.length, reason:'stockQty, kayıtlı D.inventoryMovements hareketleriyle açıklanamıyor - KMI-UNIFY-001 ÖNCESİ (bu kayıt eski) window.v71SavePurchaseItem formu stockQty\'yi hareket kaydı OLUŞTURMADAN doğrudan yazabiliyordu; şimdi her değişiklik MANUAL_ADJUSTMENT hareketi üretiyor - bu bulgu artık yalnız KMI-UNIFY-001\'den ÖNCE oluşmuş geçmiş kayıtları yansıtabilir'};
 };
 
 // ---------------------------------------------------------------------------
