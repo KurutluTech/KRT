@@ -118,7 +118,7 @@ export async function renderOrdersScreen(container, api, banner) {
         return h('div', { 'data-testid': 'item-row', 'data-item-id': it.id, style: 'display:flex;gap:6px;flex-wrap:wrap;align-items:center;padding:4px 0;font-size:13px' }, h('span', {}, `${orderOf(it.orderId)?.customerPo ?? '?'} · ${productName(it.productId)} · ${it.qty} adet · termin ${it.dueDate}`), q, h('button', { type: 'button', 'data-testid': 'wo-create', onClick: () => void handleWorkOrder(it, Number(q.value)) }, 'İş emri aç'));
     }
     const screen = (h("div", { class: "orders-screen" },
-        h("h1", { "data-testid": "orders-heading" }, "Sipari\u015Fler (KMI NEXT \u2014 canonical Order)"),
+        h("h1", { "data-testid": "orders-heading" }, "Sipari\u015Fler"),
         banner ? (h("div", { "data-testid": "banner", "data-kind": banner.kind }, banner.text)) : null,
         loadError ? (h("div", { "data-testid": "load-error" },
             "Sipari\u015F listesi y\u00FCklenemedi: ",

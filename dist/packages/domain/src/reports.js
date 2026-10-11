@@ -25,7 +25,7 @@ export const REPORT_CATALOG = [
     { code: 'MONTHLY_PUANTAJ_CLOSE', titleTr: 'Aylık puantaj kapanışı', domain: 'PRODUCTION', kind: 'PERIODIC', defaultParams: {}, requiredAction: null, available: false,
         unavailableReason: 'Puantaj formülü canlı veriye bağlanmadı (owner kararı D-001).' },
     { code: 'ACCOUNTING_PERIOD_CLOSE', titleTr: 'Muhasebe dönem kapanışı', domain: 'SHIPMENT', kind: 'PERIODIC', defaultParams: {}, requiredAction: null, available: false,
-        unavailableReason: 'KMI NEXT’te muhasebe dönemi modeli yok; uydurulmaz.' },
+        unavailableReason: 'KMI’de muhasebe dönemi modeli yok; uydurulmaz.' },
     // ---- 0043 families ----
     { code: 'SHIFT_PRODUCTION', titleTr: 'Vardiya üretimi (makine × vardiya)', domain: 'PRODUCTION', kind: 'PERIODIC', defaultParams: { days: 2 }, requiredAction: null, available: true },
     { code: 'OEE_LOSSES', titleTr: 'OEE kayıp dağılımı', domain: 'PRODUCTION', kind: 'PERIODIC', defaultParams: { days: 7 }, requiredAction: null, available: true },

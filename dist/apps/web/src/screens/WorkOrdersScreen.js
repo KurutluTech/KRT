@@ -102,7 +102,7 @@ export async function renderWorkOrdersScreen(container, orderItemId, api, banner
                     .map((to) => h('button', { type: 'button', 'data-testid': `wo-transition-${to}`, 'data-wo-id': wo.id, onClick: () => handleTransition(wo.id, to) }, to)))));
     }
     const screen = (h("div", { class: "work-orders-screen" },
-        h("h1", { "data-testid": "wo-heading" }, "\u0130\u015F Emirleri (KMI NEXT \u2014 canonical WorkOrder)"),
+        h("h1", { "data-testid": "wo-heading" }, "\u0130\u015F Emirleri"),
         banner ? (h("div", { "data-testid": "wo-banner", "data-kind": banner.kind }, banner.text)) : null,
         loadError ? (h("div", { "data-testid": "wo-load-error" },
             "\u0130\u015F emri listesi y\u00FCklenemedi: ",

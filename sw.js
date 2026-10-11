@@ -1,10 +1,10 @@
-// KMI NEXT service worker — offline APP SHELL only. API calls (Supabase, other origins) are never
+// KMI service worker — offline APP SHELL only. API calls (Supabase, other origins) are never
 // intercepted or cached: no stale business data, and no queued writes (a write either reaches
 // the server, which is idempotent via client_request_id, or the user sees it failed).
-const CACHE = 'kmi-next-shell-v1';
+const CACHE = 'kmi-shell-v2';
 // './' is not precached: a static host may not map the directory to index.html, and one failed
 // entry rejects the whole install. Navigations fall back to index.html instead.
-const PRECACHE = ['./index.html', './manifest.webmanifest', './icon.svg'];
+const PRECACHE = ['./index.html', './manifest.webmanifest', './icon.svg', './assets/kurutlu-k-symbol.png', './assets/kurutlu-k-symbol-white.png', './assets/favicon-32.png', './assets/icon-192.png'];
 
 self.addEventListener('install', (event) => {
   event.waitUntil(caches.open(CACHE).then((c) => c.addAll(PRECACHE)).then(() => self.skipWaiting()));

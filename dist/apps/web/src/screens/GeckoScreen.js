@@ -130,7 +130,7 @@ export async function renderGeckoScreen(container, api, state = {}) {
     const screen = h('div', { class: 'gecko-screen', style: 'padding:0 16px;box-sizing:border-box;max-width:100%' }, h('h1', { 'data-testid': 'gecko-heading' }, 'Giriş-Çıkış (GEÇKO)'), h('p', { style: 'font-size:12px;color:#555' }, 'Turnike hareketleri değiştirilemez kayıttan okunur. Reddedilen geçiş ve yönü belli olmayan kayıt kişiyi içeri/dışarı almaz. Bu ekran puantaj hesabına girmez.'), banner, loadError ? h('div', { 'data-testid': 'gecko-load-error' }, `Yüklenemedi: ${loadError}`) : null, healthBox, schedulePanel, h('div', { style: 'margin:12px 0;display:flex;gap:8px;align-items:center' }, h('label', {}, 'Gün: '), dateIn), loadError ? null : rows.length === 0
         ? h('div', { 'data-testid': 'gecko-empty' }, health && health.feedState !== 'OK' ? 'Bu gün için kayıt yok — akış güncel olmadığı için bu "kimse gelmedi" anlamına gelmez.' : 'Bu gün için turnike hareketi yok.')
         : table, loadError ? null : h('h2', {}, 'Kart eşleştirme'), loadError ? null : people.length === 0
-        ? h('div', { 'data-testid': 'gecko-no-people', style: 'color:#b45309' }, 'KMI NEXT personel listesi boş — kartlar personele bağlanamaz (önce personel kaydı gerekir).')
+        ? h('div', { 'data-testid': 'gecko-no-people', style: 'color:#b45309' }, 'KMI personel listesi boş — kartlar personele bağlanamaz (önce personel kaydı gerekir).')
         : null, loadError ? null : h('div', { style: 'overflow-x:auto' }, h('table', { 'data-testid': 'gecko-ident-table' }, h('tbody', {}, ...idents.map(linkRow)))), grantsPanel);
     mount(container, screen);
 }

@@ -24,8 +24,8 @@ export function importRowStatus(p, ctx) {
 export const IMPORT_ISSUE_TR = {
     SOURCE_HAS_NO_DEPARTMENT: 'Kaynakta bölüm yok — bölüm seçin',
     DEPARTMENT_NOT_MAPPED: 'Bölüm adı eşleşmiyor — bölüm seçin',
-    NO_MAPPABLE_ROLE: 'Eski rolü KMI NEXT rolüne karşılık gelmiyor — rol seçin',
-    AUTH_LINK_ALREADY_USED_IN_KMI_NEXT: 'Bu giriş hesabı KMI NEXT\'te başka bir kişiye bağlı',
+    NO_MAPPABLE_ROLE: 'Eski rolü KMI rolüne karşılık gelmiyor — rol seçin',
+    AUTH_LINK_ALREADY_USED_IN_KMI_NEXT: 'Bu giriş hesabı KMI\'de başka bir kişiye bağlı',
     NO_LOGIN_IN_SOURCE: 'Giriş hesabı yok (kayıt aktarılır, giriş yapamaz)',
 };
 export const issueText = (code) => {

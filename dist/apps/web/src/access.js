@@ -1,6 +1,8 @@
 export const NO_ACCESS = { linked: false, roles: [], actions: [], economics: false, owner: false };
 export const OPEN_RULES = {
     '/ekonomi': { economics: true },
+    // D-007: the APPLICATION screen is separate from economic data. Seeing it grants nothing (the server decides); only ADMIN is offered it.
+    '/ekonomi-basvuru': { roles: ['ADMIN'] },
     '/alacaklar': { any: ['ACCOUNTING_MUTATION'], economics: true },
     '/muhasebe': { any: ['ACCOUNTING_MUTATION'], economics: true },
     '/tedarikci-fatura': { any: ['PURCHASE_ORDER_MANAGE', 'ACCOUNTING_MUTATION'], economics: true },
@@ -21,6 +23,8 @@ export function canOpen(path, a) {
     if (!r)
         return true;
     if (r.economics && a.economics)
+        return true;
+    if ((r.roles ?? []).some((x) => a.roles.includes(x)))
         return true;
     return (r.any ?? []).some((x) => a.actions.includes(x));
 }

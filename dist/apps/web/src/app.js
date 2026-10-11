@@ -26,6 +26,7 @@ import { renderAcademyScreen } from './screens/AcademyScreen.js';
 import { createAcademyApi } from './academyApi.js';
 import { renderPassportScreen } from './screens/PassportScreen.js';
 import { renderEconomicsScreen } from './screens/EconomicsScreen.js';
+import { renderOwnerApplicationScreen } from './screens/OwnerApplicationScreen.js';
 import { renderMyAttendanceScreen } from './screens/MyAttendanceScreen.js';
 import { renderCompetencyImportScreen } from './screens/CompetencyImportScreen.js';
 import { createCompetencyImportApi } from './competencyImportApi.js';
@@ -88,6 +89,8 @@ import { renderMaterialScreen } from './screens/MaterialScreen.js';
 import { createMaterialApi } from './materialApi.js';
 import { renderToolReadinessScreen } from './screens/ToolReadinessScreen.js';
 import { createToolReadinessApi } from './toolReadinessApi.js';
+import { THEME_CSS } from './theme.js';
+import { NAV_ITEM_BY_PATH, iconSvg, visibleNav } from './nav.js';
 const SESSION_KEY = 'kmi-next.session';
 function loadSession() {
     try {
@@ -176,6 +179,7 @@ export const ROUTES = [
     { path: '/canli', label: 'KMI LIVE — fabrika ekranı', group: 'Yönetim', inMenu: true, render: (el, c, s) => renderLiveScreen(el, createLiveApi(c, s), { mode: 'APP' }) },
     { path: '/alacaklar', label: 'Alacaklar & Vade', group: 'Yönetim', inMenu: true, render: (el, c, s) => renderReceivablesScreen(el, createReceivablesApi(c, s), { today: istanbulToday() }) },
     { path: '/ekonomi', label: 'Ekonomi & Kararlar (yalnız sahip)', group: 'Yönetim', inMenu: true, render: (el, c, s) => renderEconomicsScreen(el, createEconomicsApi(c, s), { from: addDays(istanbulToday(), -89), to: istanbulToday(), today: istanbulToday() }) },
+    { path: '/ekonomi-basvuru', label: 'Ekonomik sahiplik başvurusu', group: 'Yönetim', inMenu: true, render: (el, c, s) => renderOwnerApplicationScreen(el, createEconomicsApi(c, s)) },
     { path: '/giris-cikis', label: 'Giriş-Çıkış (GEÇKO)', group: 'Yönetim', inMenu: true, render: (el, c, s) => renderGeckoScreen(el, createGeckoApi(c, s)) },
     { path: '/yetkinlik-aktarim', label: 'Yetkinlik geçmişi aktarımı', group: 'Yönetim', inMenu: true, render: (el, c, s) => renderCompetencyImportScreen(el, createCompetencyImportApi(c, s)) },
     { path: '/akademi', label: 'Akademi & Yetkinlik', group: 'Yönetim', inMenu: true, render: (el, c, s) => renderAcademyScreen(el, createAcademyApi(c, s)) },
@@ -207,25 +211,28 @@ export function parseHash(hash) {
     const [path, qs] = raw.split('?');
     return { path: path || '/', query: new URLSearchParams(qs ?? '') };
 }
-const SHELL_CSS = `
-body{margin:0;background:#f4f6fa;font-family:system-ui,-apple-system,"Segoe UI",sans-serif;color:#0f172a}
-.shell-top{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px 16px;background:#0b1220;color:#fff;position:sticky;top:0;z-index:5}
-.shell-top a{color:#fff;text-decoration:none;font-weight:800}
-.shell-top span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:80px}
-.shell-top button{min-height:40px;border-radius:10px;border:0;padding:0 12px;font-weight:700}
-.shell-menu{padding:16px;max-width:820px;margin:0 auto;box-sizing:border-box}
-.shell-menu h2{font-size:13px;text-transform:uppercase;color:#64748b;margin:18px 0 8px}
-.shell-menu .tiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px}
-.shell-menu a{display:flex;align-items:center;min-height:64px;padding:12px;border-radius:14px;background:#fff;color:#0f172a;text-decoration:none;font-weight:700;box-shadow:0 1px 3px rgba(0,0,0,.08)}
-.login{max-width:360px;margin:12vh auto;padding:24px;background:#fff;border-radius:16px;box-shadow:0 2px 10px rgba(0,0,0,.08)}
-.login input,.login button{width:100%;min-height:48px;font-size:16px;margin:6px 0;border-radius:10px;box-sizing:border-box}
-.login input{border:1px solid #cbd5e1;padding:0 12px}.login button{border:0;background:#1d4ed8;color:#fff;font-weight:800}
-.offline{background:#fef3c7;color:#92400e;padding:8px 16px;font-weight:700}
+const SHELL_CSS = THEME_CSS + `
+.shell-menu{padding:16px;max-width:820px;margin:0 auto}
+.shell-menu a{color:#67e8f9;font-weight:700}
+.offline{background:rgba(245,158,11,.16);color:#fcd34d;padding:8px 16px;font-weight:700;position:sticky;top:0;z-index:50}
 `;
+const BRAND = 'KURUTLU MANUFACTURING INTELLIGENCE';
+const BRAND_SUB = 'Performance Center · Paperless Machining';
+const icon = (name, size = 20) => { const el = document.createElement('span'); el.className = 'ic'; el.innerHTML = iconSvg(name, size); return el; };
+const readCollapsed = () => { try {
+    return localStorage.getItem('kmiSidebarCollapsed') === '1';
+}
+catch {
+    return false;
+} };
+const writeCollapsed = (v) => { try {
+    localStorage.setItem('kmiSidebarCollapsed', v ? '1' : '0');
+}
+catch { /* storage may be blocked */ } };
 export async function startApp(root, opts = {}) {
     const cfg = window.KMI_NEXT_CONFIG;
     if (!opts.client && !cfg) {
-        mount(root, h('div', { class: 'login', 'data-testid': 'app-config-missing' }, h('h1', {}, 'KMI NEXT'), h('p', {}, 'Yapılandırma eksik: config.js bulunamadı (supabaseUrl / anonKey). Yayın ortamında doldurulur.')));
+        mount(root, h('div', { class: 'login', 'data-testid': 'app-config-missing' }, h('h1', {}, 'KMI'), h('p', {}, 'Yapılandırma eksik: config.js bulunamadı (supabaseUrl / anonKey). Yayın ortamında doldurulur.')));
         return;
     }
     const client = opts.client ?? createKmiNextClient({ url: cfg.supabaseUrl, apiKey: cfg.anonKey });
@@ -247,8 +254,8 @@ export async function startApp(root, opts = {}) {
     };
     const offlineBar = () => (navigator.onLine ? null : h('div', { class: 'offline', 'data-testid': 'app-offline' }, 'Bağlantı yok — kayıtlar gönderilemez, bağlantı gelince tekrar deneyin.'));
     const renderLogin = (message) => {
-        const email = h('input', { type: 'email', autocomplete: 'username', 'data-testid': 'login-email', placeholder: 'E-posta' });
-        const pass = h('input', { type: 'password', autocomplete: 'current-password', 'data-testid': 'login-password', placeholder: 'Şifre' });
+        const email = h('input', { type: 'email', autocomplete: 'username', 'data-testid': 'login-email', placeholder: 'E-posta', id: 'kmi-login-email' });
+        const pass = h('input', { type: 'password', autocomplete: 'current-password', 'data-testid': 'login-password', placeholder: 'Şifre', id: 'kmi-login-password' });
         const submit = async (e) => {
             e.preventDefault();
             try {
@@ -262,7 +269,7 @@ export async function startApp(root, opts = {}) {
                 renderLogin(err instanceof Error ? `Giriş başarısız: ${err.message}` : 'Giriş başarısız');
             }
         };
-        mount(root, h('div', {}, h('style', {}, SHELL_CSS), offlineBar(), h('form', { class: 'login', 'data-testid': 'login-form', onSubmit: (e) => void submit(e) }, h('h1', {}, 'KMI NEXT'), h('p', { style: 'color:#64748b' }, 'Kurutlu Manufacturing Intelligence'), message ? h('div', { 'data-testid': 'login-error', style: 'color:#b91c1c;margin:8px 0' }, message) : null, email, pass, h('button', { type: 'submit', 'data-testid': 'login-submit' }, 'Giriş'))));
+        mount(root, h('div', {}, h('style', {}, SHELL_CSS), offlineBar(), h('div', { class: 'kmi-login', 'data-testid': 'login-screen' }, h('div', { class: 'kmi-login-k', 'aria-hidden': 'true' }, h('img', { src: './assets/kurutlu-k-symbol-white.png', alt: '' })), h('form', { class: 'kmi-login-card', 'data-testid': 'login-form', onSubmit: (e) => void submit(e) }, h('div', { class: 'brand' }, h('img', { src: './assets/kurutlu-k-symbol-white.png', alt: 'Kurutlu' }), h('h1', {}, BRAND), h('p', { class: 'sub' }, BRAND_SUB), h('div', { class: 'rule' })), message ? h('div', { class: 'kmi-login-err', 'data-testid': 'login-error', role: 'alert' }, message) : null, h('label', { for: 'kmi-login-email' }, 'E-posta'), email, h('label', { for: 'kmi-login-password' }, 'Şifre'), pass, h('button', { type: 'submit', 'data-testid': 'login-submit' }, 'Giriş')))));
     };
     const route = async () => {
         {
@@ -292,9 +299,45 @@ export async function startApp(root, opts = {}) {
             location.hash = '#/';
             renderLogin('Çıkış yapıldı.');
         };
-        mount(root, h('div', {}, h('style', {}, SHELL_CSS), offlineBar(), h('div', { class: 'shell-top' }, h('a', { href: '#/', 'data-testid': 'app-home' }, 'KMI NEXT'), h('form', { 'data-testid': 'app-search-form', style: 'flex:1 1 140px;display:flex;min-width:0', onSubmit: (e) => { e.preventDefault(); const v = e.target.querySelector('input').value.trim(); if (v)
-                location.hash = `#/ara?q=${encodeURIComponent(v)}`; } }, h('input', { type: 'search', 'data-testid': 'app-search', placeholder: 'Ara…', value: path === '/ara' ? (query.get('q') ?? '') : '', style: 'flex:1;min-width:0;min-height:36px;font-size:16px;border-radius:8px;border:0;padding:0 10px' })), h('span', { style: 'font-size:12px;opacity:.8', 'data-testid': 'app-user' }, session.user.email ?? ''), h('button', { type: 'button', 'data-testid': 'app-logout', onClick: () => void logout() }, 'Çıkış')), content));
+        const collapsed0 = readCollapsed();
+        document.documentElement.style.setProperty('--kmi-side-w', collapsed0 ? '64px' : '260px');
+        const navHost = h('nav', { class: 'kmi-nav', 'data-testid': 'app-nav', 'aria-label': 'Modüller' });
+        const drawerNavHost = h('nav', { class: 'kmi-nav', 'data-testid': 'app-drawer-nav', 'aria-label': 'Modüller (menü)' });
+        const bottomHost = h('nav', { class: 'kmi-bottom', 'data-testid': 'app-bottom-nav', 'aria-label': 'Hızlı gezinme' });
+        const drawerBack = h('div', { class: 'kmi-drawer-back', 'data-testid': 'app-drawer' });
+        const closeDrawer = () => { drawerBack.classList.remove('open'); menuBtn.setAttribute('aria-expanded', 'false'); };
+        const openDrawer = () => { drawerBack.classList.add('open'); menuBtn.setAttribute('aria-expanded', 'true'); drawerNavHost.querySelector('a')?.focus(); };
+        const menuBtn = h('button', { type: 'button', class: 'btn kmi-menu-btn', 'data-testid': 'app-menu-btn', 'aria-label': 'Menüyü aç', 'aria-expanded': 'false', 'aria-controls': 'kmi-drawer', onClick: () => (drawerBack.classList.contains('open') ? closeDrawer() : openDrawer()) }, icon('menu'), h('span', { class: 'nl' }, 'Menü'));
+        drawerBack.addEventListener('click', (e) => { if (e.target === drawerBack)
+            closeDrawer(); });
+        drawerBack.addEventListener('keydown', (e) => { if (e.key === 'Escape') {
+            closeDrawer();
+            menuBtn.focus();
+        } });
+        drawerBack.append(h('aside', { class: 'kmi-drawer', id: 'kmi-drawer', role: 'dialog', 'aria-modal': 'true', 'aria-label': 'KMI menü' }, h('div', { class: 'kmi-side-head' }, h('a', { class: 'b', href: '#/', onClick: closeDrawer }, h('img', { src: './assets/kurutlu-k-symbol-white.png', alt: '' }), h('span', { class: 't' }, h('i', {}, 'KURUTLU'), h('b', {}, 'Performance Center'))), h('button', { type: 'button', class: 'kmi-side-collapse', 'aria-label': 'Menüyü kapat', onClick: closeDrawer }, '✕')), drawerNavHost));
+        const sideEl = h('aside', { class: `kmi-side${collapsed0 ? ' collapsed' : ''}`, 'data-testid': 'app-sidebar', 'aria-label': 'Ana gezinme' }, h('div', { class: 'kmi-side-head' }, h('a', { class: 'b', href: '#/', 'data-testid': 'app-side-home', title: BRAND }, h('img', { src: './assets/kurutlu-k-symbol-white.png', alt: 'Kurutlu' }), h('span', { class: 't' }, h('i', {}, 'KURUTLU'), h('b', {}, 'Performance Center'))), h('button', { type: 'button', class: 'kmi-side-collapse', 'data-testid': 'app-side-collapse', 'aria-label': collapsed0 ? 'Menüyü genişlet' : 'Menüyü daralt', title: collapsed0 ? 'Genişlet' : 'Daralt',
+            onClick: () => { const now = !sideEl.classList.contains('collapsed'); sideEl.classList.toggle('collapsed', now); writeCollapsed(now); document.documentElement.style.setProperty('--kmi-side-w', now ? '64px' : '260px'); collBtn.setAttribute('aria-label', now ? 'Menüyü genişlet' : 'Menüyü daralt'); collBtn.replaceChildren(icon(now ? 'chevrons-right' : 'chevrons-left', 16)); } }, icon(collapsed0 ? 'chevrons-right' : 'chevrons-left', 16))), navHost);
+        const collBtn = sideEl.querySelector('[data-testid="app-side-collapse"]');
+        mount(root, h('div', { class: 'kmi-has-bottom' }, h('style', {}, SHELL_CSS), offlineBar(), h('a', { class: 'kmi-skip', href: '#kmi-main', onClick: (e) => { e.preventDefault(); document.getElementById('kmi-main')?.focus(); } }, 'İçeriğe geç'), sideEl, drawerBack, h('div', { class: 'kmi-main' }, h('header', { class: 'kmi-top' }, h('a', { class: 'brand', href: '#/', 'data-testid': 'app-home', title: BRAND }, h('img', { src: './assets/kurutlu-k-symbol-white.png', alt: '' }), h('span', {}, 'KMI', h('small', {}, 'PERFORMANCE CENTER'))), h('form', { 'data-testid': 'app-search-form', role: 'search', onSubmit: (e) => { e.preventDefault(); const v = e.target.querySelector('input').value.trim(); if (v)
+                location.hash = `#/ara?q=${encodeURIComponent(v)}`; } }, h('input', { type: 'search', 'data-testid': 'app-search', 'aria-label': 'Ara', placeholder: 'Ara…', value: path === '/ara' ? (query.get('q') ?? '') : '' })), h('span', { class: 'user', 'data-testid': 'app-user' }, session.user.email ?? ''), menuBtn, h('button', { type: 'button', class: 'btn', 'data-testid': 'app-logout', onClick: () => void logout() }, icon('logout', 16), h('span', { class: 'nl' }, 'Çıkış'))), h('main', { class: 'kmi-content', id: 'kmi-main', tabindex: '-1' }, content)), bottomHost));
         const { value: access, failed: accessFailed } = await getAccess();
+        // navigation: only what this user may open (same rule as the home screen and the direct-URL guard); the server decides for real
+        const navGroups = visibleNav((p) => canOpen(p, access) && ROUTES.some((x) => x.path === p && x.inMenu));
+        const navLink = (it, testid, onNav) => {
+            const a = h('a', { href: `#${it.path}`, 'data-testid': testid, 'data-path': it.path, title: it.label, ...(it.path === path ? { 'aria-current': 'page' } : {}), ...(onNav ? { onClick: onNav } : {}) }, icon(it.icon), h('span', { class: 'nl' }, it.label));
+            return a;
+        };
+        const fillNav = (host, itemTestId, onNav) => {
+            host.replaceChildren(...navGroups.flatMap((g, gi) => [
+                ...(gi > 0 ? [h('hr', {})] : []),
+                ...(g.title ? [h('div', { class: 'lbl' }, g.title)] : []),
+                ...g.items.map((it) => navLink(it, itemTestId, onNav)),
+            ]));
+        };
+        fillNav(navHost, 'app-nav-item');
+        fillNav(drawerNavHost, 'app-drawer-item', closeDrawer);
+        const quick = ['/', ...featuredPaths(access, navGroups.flatMap((g) => g.items.map((i) => i.path))).filter((p) => p !== '/')].slice(0, 4);
+        bottomHost.replaceChildren(...quick.map((p) => navLink(NAV_ITEM_BY_PATH[p], 'app-bottom-item')), h('button', { type: 'button', 'data-testid': 'app-bottom-menu', 'aria-label': 'Tüm menü', onClick: openDrawer }, icon('menu'), 'Menü'));
         const r = ROUTES.find((x) => x.path === path);
         if (!r) {
             const landing = landingPath(access);
@@ -304,13 +347,16 @@ export async function startApp(root, opts = {}) {
             }
             const open = ROUTES.filter((x) => x.inMenu && canOpen(x.path, access));
             const featured = featuredPaths(access, open.map((x) => x.path)).map((p) => open.find((x) => x.path === p));
-            const groups = [...new Set(open.map((x) => x.group))];
-            const tile = (x, testid) => h('a', { href: `#${x.path}`, 'data-testid': testid, 'data-path': x.path }, x.label);
-            mount(content, h('div', { class: 'shell-menu', 'data-testid': 'app-menu' }, accessFailed ? h('div', { class: 'offline', 'data-testid': 'app-access-failed' }, 'Yetki bilgisi alınamadı; yalnız herkese açık ekranlar gösteriliyor. Sayfayı yenileyin.') : null, access.roles.length ? h('div', { 'data-testid': 'app-roles', style: 'font-size:13px;color:#475569;margin:4px 0' }, `Rolünüz: ${access.roles.join(', ')}${access.economics ? ' · ekonomi yetkisi' : ''}`) : null, featured.length ? h('div', { 'data-testid': 'app-featured' }, h('h2', {}, 'Sizin için'), h('div', { class: 'tiles' }, ...featured.map((x) => tile(x, 'app-featured-item')))) : null, h('details', { 'data-testid': 'app-all', ...(featured.length ? {} : { open: 'open' }) }, h('summary', { style: 'min-height:48px;display:flex;align-items:center;font-weight:800' }, 'Tüm ekranlar'), ...groups.map((g) => h('div', {}, h('h2', {}, g), h('div', { class: 'tiles' }, ...open.filter((x) => x.group === g).map((x) => tile(x, 'app-menu-item'))))))));
+            const tile = (x, testid, cls = '') => {
+                const n = NAV_ITEM_BY_PATH[x.path];
+                return h('a', { href: `#${x.path}`, class: `kmi-tile${cls}`, 'data-testid': testid, 'data-path': x.path }, icon(n?.icon ?? 'grid', 22), h('span', {}, n?.label ?? x.label, (() => { const rest = n && x.label.startsWith(n.label) ? x.label.slice(n.label.length).replace(/^[\s·—()-]+|[\s)]+$/g, '') : (n && n.label !== x.label ? x.label : ''); return rest ? h('small', {}, rest) : null; })()));
+            };
+            const homeGroups = navGroups.map((g) => ({ title: g.title, items: g.items.map((i) => open.find((x) => x.path === i.path)).filter((x) => !!x) })).filter((g) => g.items.length > 0);
+            mount(content, h('div', { class: 'shell-menu kmi-home', style: 'max-width:1200px', 'data-testid': 'app-menu' }, accessFailed ? h('div', { class: 'kmi-banner warn', 'data-testid': 'app-access-failed' }, 'Yetki bilgisi alınamadı; yalnız herkese açık ekranlar gösteriliyor. Sayfayı yenileyin.') : null, h('section', { class: 'kmi-hero' }, h('img', { src: './assets/kurutlu-k-symbol-white.png', alt: '' }), h('div', {}, h('h1', {}, BRAND), h('p', {}, BRAND_SUB), access.roles.length ? h('div', { class: 'chips', 'data-testid': 'app-roles' }, h('span', { class: 'kmi-chip' }, `Rolünüz: ${access.roles.join(', ')}`), access.economics ? h('span', { class: 'kmi-chip' }, 'ekonomi yetkisi') : null) : null)), featured.length ? h('div', { 'data-testid': 'app-featured' }, h('div', { class: 'kmi-section gold' }, 'SİZİN İÇİN'), h('div', { class: 'tiles' }, ...featured.map((x) => tile(x, 'app-featured-item', ' featured')))) : null, h('details', { 'data-testid': 'app-all', open: 'open', class: 'kmi-home' }, h('summary', {}, 'Tüm ekranlar'), ...homeGroups.map((g) => h('div', {}, g.title ? h('div', { class: 'kmi-section' }, g.title) : h('div', { style: 'height:8px' }), h('div', { class: 'tiles' }, ...g.items.map((x) => tile(x, 'app-menu-item'))))))));
             return;
         }
         if (!canOpen(r.path, access)) {
-            mount(content, h('div', { class: 'shell-menu', 'data-testid': 'app-closed' }, h('h2', {}, r.label), h('p', {}, accessFailed ? 'Yetki bilgisi alınamadığı için bu ekran açılmadı. Sayfayı yenileyin.' : 'Bu ekran rolünüze açık değil. Gerekliyse yöneticinize başvurun.'), h('a', { href: '#/', 'data-testid': 'app-closed-home' }, '← Ana sayfa')));
+            mount(content, h('div', { class: 'shell-menu kmi-closed', 'data-testid': 'app-closed' }, h('h2', {}, r.label), h('p', {}, accessFailed ? 'Yetki bilgisi alınamadığı için bu ekran açılmadı. Sayfayı yenileyin.' : 'Bu ekran rolünüze açık değil. Gerekliyse yöneticinize başvurun.'), h('a', { href: '#/', 'data-testid': 'app-closed-home' }, '← Ana sayfa')));
             return;
         }
         const missing = (r.needs ?? []).filter((k) => !query.get(k));
