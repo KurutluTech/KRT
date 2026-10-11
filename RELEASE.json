@@ -1,0 +1,736 @@
+{
+  "product": "KMI NEXT",
+  "commit": "48d433381fd7608f6e4fab5fe3cd39d8d31c3aa3",
+  "builtFrom": "clean git tree",
+  "fileCount": 145,
+  "migrationsInRepo": 70,
+  "lastMigration": "0070_document_types_cad_tool_list.sql",
+  "note": "Release candidate. Publishing to https://flow.kurutlu.com is a manual owner action; this file is not a publication permit.",
+  "files": [
+    {
+      "path": "config.example.js",
+      "bytes": 276,
+      "sha256": "32e128361c4d37ca8e915d9b4d405cd31486a0a83c8f5f3f79aeca8b9e941d47"
+    },
+    {
+      "path": "dist/apps/web/src/academyApi.js",
+      "bytes": 2491,
+      "sha256": "1e6f186588139eed58d370a53bdebf4f69094d5ed4ad34e9cad3994bd429072d"
+    },
+    {
+      "path": "dist/apps/web/src/access.js",
+      "bytes": 3067,
+      "sha256": "5d64eab4df781652a7be980d3f879d4be1b32c056695ee3b32e3e27550da7d84"
+    },
+    {
+      "path": "dist/apps/web/src/accountingApi.js",
+      "bytes": 1748,
+      "sha256": "9a1157c82ec22810a2957767d86013205a631529556cdfa74549a7bdf9a51e68"
+    },
+    {
+      "path": "dist/apps/web/src/app.js",
+      "bytes": 26504,
+      "sha256": "215d3d4d2d9c2f7dcd4eb853e767d2a435d9c27f47db4e8d8cb9652770cd1d6e"
+    },
+    {
+      "path": "dist/apps/web/src/badgesApi.js",
+      "bytes": 326,
+      "sha256": "8e3365aa4fd4f7ee695ecf80507ed0a1e1be883cc2e8ece9423094e71143660d"
+    },
+    {
+      "path": "dist/apps/web/src/commandCenterApi.js",
+      "bytes": 180,
+      "sha256": "fbcb46d0af20d4684331eb764d8fd340edc3d325b825f1229ded34f5829e6102"
+    },
+    {
+      "path": "dist/apps/web/src/commercialApprovalApi.js",
+      "bytes": 1267,
+      "sha256": "10d3977859292810f745ba15901e4e088f234ba4a35280bae7d224e236e7babb"
+    },
+    {
+      "path": "dist/apps/web/src/competencyImportApi.js",
+      "bytes": 658,
+      "sha256": "41120d68986f22d5fecaa3f32344874af84a77493828df9df987727b27c1099a"
+    },
+    {
+      "path": "dist/apps/web/src/devicesApi.js",
+      "bytes": 326,
+      "sha256": "3556db390751da574879ff16e3dfb0cc31bf49b88f94962dc92e994559c6e377"
+    },
+    {
+      "path": "dist/apps/web/src/documentsApi.js",
+      "bytes": 2486,
+      "sha256": "84bdb1ceed18bc2b92357857e6526c9a8a774683d183ea74a77f1fb0fd44fc9b"
+    },
+    {
+      "path": "dist/apps/web/src/economicsApi.js",
+      "bytes": 2582,
+      "sha256": "188256ac39fb7393ba47994a8de55cb97dfcb7a66bad935e7858e51d3658b720"
+    },
+    {
+      "path": "dist/apps/web/src/engineeringApi.js",
+      "bytes": 2440,
+      "sha256": "a29b8c38bebd3d0b724aad676fed301df649c4532ff4a442e93478a36a4506d3"
+    },
+    {
+      "path": "dist/apps/web/src/errorText.js",
+      "bytes": 3872,
+      "sha256": "1b9d3016654f42ff03aec39e504ca511090af0beda3ca369971ab8f16f510a76"
+    },
+    {
+      "path": "dist/apps/web/src/geckoApi.js",
+      "bytes": 1488,
+      "sha256": "0a2d583938125b188fe49bd8d09d54bfde21633d0275b5c1abf9bd275900d11f"
+    },
+    {
+      "path": "dist/apps/web/src/intelligenceApi.js",
+      "bytes": 546,
+      "sha256": "53487e40817df3150cfc47851432f113dc367ffc89b07ad3781db1d50c3e466a"
+    },
+    {
+      "path": "dist/apps/web/src/labelApi.js",
+      "bytes": 517,
+      "sha256": "bb273b62e689026a740560a5529ad04f07c409954915830e0db3ba221242f048"
+    },
+    {
+      "path": "dist/apps/web/src/liveApi.js",
+      "bytes": 801,
+      "sha256": "755755f4d3994c74c717330482a74dd3d345f044b64d336b117f6cf956124358"
+    },
+    {
+      "path": "dist/apps/web/src/maintenanceApi.js",
+      "bytes": 2183,
+      "sha256": "e0c635b514670fb02b35bb5b6c731242eb885da123b0871c4eb7d23744a0ef81"
+    },
+    {
+      "path": "dist/apps/web/src/masterImportApi.js",
+      "bytes": 1917,
+      "sha256": "5601d068a93df450e0fdb1c59fff54e9b553af058d6faa5045832bb73975c290"
+    },
+    {
+      "path": "dist/apps/web/src/materialApi.js",
+      "bytes": 970,
+      "sha256": "6871ce05f7b83885a3da0d919d32b3deb8239a18b59fb7ef54eb9928317f5634"
+    },
+    {
+      "path": "dist/apps/web/src/oeeApi.js",
+      "bytes": 1570,
+      "sha256": "00bb6e978177401056ff0205f7cfef3b75ef9c8675b95c7fae9a07fe313b4eca"
+    },
+    {
+      "path": "dist/apps/web/src/operatorHomeApi.js",
+      "bytes": 680,
+      "sha256": "e674feee9808cf8c9683242a41b050b0a8952e84806d6db2de81eb4c66da67a6"
+    },
+    {
+      "path": "dist/apps/web/src/ordersApi.js",
+      "bytes": 1496,
+      "sha256": "db89a73708594221d1028b71a93cf93a0f915e67c40ec6b0852b7c677f331b6c"
+    },
+    {
+      "path": "dist/apps/web/src/passportApi.js",
+      "bytes": 419,
+      "sha256": "bbec5ae52ce8f38058e8830fd3d6024f851d0e905902c433ecb9b37ef0f275aa"
+    },
+    {
+      "path": "dist/apps/web/src/personnelAccessApi.js",
+      "bytes": 884,
+      "sha256": "b90b238791beea53e9126b7e14f31c348bee07187501ddf11fd83624b8ca6c78"
+    },
+    {
+      "path": "dist/apps/web/src/personnelApi.js",
+      "bytes": 972,
+      "sha256": "da18c66696b182ae9555b405c7f3535a878aeb7f859bf662cc295bd56d59c53e"
+    },
+    {
+      "path": "dist/apps/web/src/personnelImportApi.js",
+      "bytes": 772,
+      "sha256": "fe87b3f6595d6c63ef1c36155a37fe1381c929e5c856bd8348a4c73ccdec4f2d"
+    },
+    {
+      "path": "dist/apps/web/src/planningApi.js",
+      "bytes": 1775,
+      "sha256": "747fd01725493e74d309e6169df589cee861513394afce24d1a4710a72400cea"
+    },
+    {
+      "path": "dist/apps/web/src/productionApi.js",
+      "bytes": 2074,
+      "sha256": "9bd8b75f90c3c5482982d1f15d3ec370f89e78f8624fa16202c5860c17ffcfb2"
+    },
+    {
+      "path": "dist/apps/web/src/purchaseRequestsApi.js",
+      "bytes": 1124,
+      "sha256": "d6a0d971fc2964720747793e7c9ad30cebb60bae69e85d3689e9a18a74e74da1"
+    },
+    {
+      "path": "dist/apps/web/src/purchasingApi.js",
+      "bytes": 1768,
+      "sha256": "8a9763e53a924224ebc7af2afff1d4f51cff36714f4795140e8ec2a12e890216"
+    },
+    {
+      "path": "dist/apps/web/src/readinessApi.js",
+      "bytes": 427,
+      "sha256": "4c75c4fe46c5e71b9e1d0f40ff135cb9664aaf4e89488eaa2a98312baa74918e"
+    },
+    {
+      "path": "dist/apps/web/src/receivablesApi.js",
+      "bytes": 377,
+      "sha256": "00b8710e3d70c8b3180489f1fcdfc66c42442ff4ea26ea95b249e1970a824916"
+    },
+    {
+      "path": "dist/apps/web/src/reportsApi.js",
+      "bytes": 1673,
+      "sha256": "d07e619313d7428d5720bc5b5c6dd8c4d0ee2209da3bb9b38e405248251498a9"
+    },
+    {
+      "path": "dist/apps/web/src/routingApi.js",
+      "bytes": 2905,
+      "sha256": "606161b38c49a755c1150f5b58daf87a297d2e6ba70194e6a51c65f387963201"
+    },
+    {
+      "path": "dist/apps/web/src/scanApi.js",
+      "bytes": 309,
+      "sha256": "229c33abf2df1c54adbfef951d2527fbb91e83026a80c4b56ba8a8afbec669cf"
+    },
+    {
+      "path": "dist/apps/web/src/screens/AcademyScreen.js",
+      "bytes": 14586,
+      "sha256": "7c10bea327ba2035a69b24a0d8d8f9c9554df4adda7d1769933ef3e34ac6a464"
+    },
+    {
+      "path": "dist/apps/web/src/screens/AccountingScreen.js",
+      "bytes": 4802,
+      "sha256": "91d9046323101f203cb2b4e61b833383cd5b37478d81ed7ebe70c93293531f43"
+    },
+    {
+      "path": "dist/apps/web/src/screens/BadgesScreen.js",
+      "bytes": 8758,
+      "sha256": "27d44b5fbf0eb6688805913e12715e77e4c5b6f49f164b72cfb8ae1d98a369b5"
+    },
+    {
+      "path": "dist/apps/web/src/screens/CatalogScreen.js",
+      "bytes": 4649,
+      "sha256": "859925b962c94974cfa72195d6a57daf8d4c8cfd7d94a17b001422947636234d"
+    },
+    {
+      "path": "dist/apps/web/src/screens/CommandCenterScreen.js",
+      "bytes": 8042,
+      "sha256": "fbc19f9254064d9928e27acce8d5eb0c60e83687a8bc29f5676e011b0b0cf77e"
+    },
+    {
+      "path": "dist/apps/web/src/screens/CommercialApprovalScreen.js",
+      "bytes": 5422,
+      "sha256": "38e38eb6daeebaba53de13411df0d88c4d8eaeaeb1197f5e81777aba7e76f778"
+    },
+    {
+      "path": "dist/apps/web/src/screens/CompetencyImportScreen.js",
+      "bytes": 7050,
+      "sha256": "c655bbdb2c9b5770c1e62d5120c0537ac14cbf02092d64a2099c8dd2b623ce74"
+    },
+    {
+      "path": "dist/apps/web/src/screens/DevicesScreen.js",
+      "bytes": 4440,
+      "sha256": "903744b27e6b1baad96b41572d58c1fe1ac947ae5b56f25f8a99961748d7fddb"
+    },
+    {
+      "path": "dist/apps/web/src/screens/DocumentsScreen.js",
+      "bytes": 19520,
+      "sha256": "43a8f60c26e173f319af0e07e09775bce1b7e10579485710640841aa73e1b8b0"
+    },
+    {
+      "path": "dist/apps/web/src/screens/EconomicsScreen.js",
+      "bytes": 32280,
+      "sha256": "726ae207b93d6c3af53e0156957ec95b4ce0cc4122c2c83ef1d2c79325c7eb9a"
+    },
+    {
+      "path": "dist/apps/web/src/screens/EngineeringScreen.js",
+      "bytes": 11670,
+      "sha256": "309df98c5a776fb30081d53d54953f783eac6e5ab752be881d260537806bbc05"
+    },
+    {
+      "path": "dist/apps/web/src/screens/GeckoScreen.js",
+      "bytes": 13633,
+      "sha256": "39fbe90e6fc14826597275beffdea89992367e442ef5d63754718f71f52bb1ac"
+    },
+    {
+      "path": "dist/apps/web/src/screens/IntelligenceScreen.js",
+      "bytes": 9394,
+      "sha256": "fc379d9b30bcf8870dd2b38210a93bd522b14c44160951880592e99fd3c8b639"
+    },
+    {
+      "path": "dist/apps/web/src/screens/LabelScreen.js",
+      "bytes": 5505,
+      "sha256": "e25509b5b6110ae160f20edd5bef5fb853b82d26104dd2ab0f3b9d287e64feb1"
+    },
+    {
+      "path": "dist/apps/web/src/screens/LiveScreen.js",
+      "bytes": 11030,
+      "sha256": "986f471e0b401a76f42e720792e5aab7f047b8ed808bfb89f0b28804db17ee25"
+    },
+    {
+      "path": "dist/apps/web/src/screens/MaintenanceScreen.js",
+      "bytes": 10613,
+      "sha256": "f7762647c20b0fe42583e17a823d101b5abf2d0ef4f2d9be8338907e2a79c0ad"
+    },
+    {
+      "path": "dist/apps/web/src/screens/MasterImportScreen.js",
+      "bytes": 14784,
+      "sha256": "a7c430668d029b907ad6cf2df036d550f884cc2404acb7e6cd50cdddc99759e2"
+    },
+    {
+      "path": "dist/apps/web/src/screens/MaterialScreen.js",
+      "bytes": 3698,
+      "sha256": "95d4bfc7ec57687a678cbb6561f6c964e3ce24702d864483db07d89d17f94de3"
+    },
+    {
+      "path": "dist/apps/web/src/screens/MyAttendanceScreen.js",
+      "bytes": 2766,
+      "sha256": "c3d21d70cf56f92b2608b15b90ed5ad48e48fec467f8795c04d7b8d99b3aa429"
+    },
+    {
+      "path": "dist/apps/web/src/screens/OeeScreen.js",
+      "bytes": 4837,
+      "sha256": "ce7b7e7abc87d72e32cebdaf93a2d287f1a9f95e5cb64a922c63a8eb0d6d48d1"
+    },
+    {
+      "path": "dist/apps/web/src/screens/OperatorHomeScreen.js",
+      "bytes": 11535,
+      "sha256": "0892c812054f73e36f59816b66418d7f821fb32375481eba1c2cebfc7d872051"
+    },
+    {
+      "path": "dist/apps/web/src/screens/OrdersScreen.js",
+      "bytes": 9496,
+      "sha256": "96dd4a8d4012216014f18e40fec9826d478bff77dd5857f5dde48e37a683fa75"
+    },
+    {
+      "path": "dist/apps/web/src/screens/PassportScreen.js",
+      "bytes": 15532,
+      "sha256": "7a47b88312a4e1500c9ac5e673f67fd1d1a811f9cb61a1aeac94db350f4f116a"
+    },
+    {
+      "path": "dist/apps/web/src/screens/PersonnelAccessScreen.js",
+      "bytes": 8148,
+      "sha256": "bb155da516058f4e89375c91b2c7eb6593591347d7dcc9e33e73d0258dd7d38a"
+    },
+    {
+      "path": "dist/apps/web/src/screens/PersonnelImportScreen.js",
+      "bytes": 9832,
+      "sha256": "211297132d11243e69df4b9c596e90c9f5da144035634cb67bbbeb3a4835637f"
+    },
+    {
+      "path": "dist/apps/web/src/screens/PersonnelScreen.js",
+      "bytes": 3248,
+      "sha256": "04d5e599d02601e92eb4f585eaf7a85cb2b79c7a9db68ed5967972a00c2554fb"
+    },
+    {
+      "path": "dist/apps/web/src/screens/PlanningScreen.js",
+      "bytes": 12977,
+      "sha256": "eaac756493c10e8b7c19ce296d6c3b5f06094ed72e1a9f329271a21eb2bbee5a"
+    },
+    {
+      "path": "dist/apps/web/src/screens/ProductionScreen.js",
+      "bytes": 9365,
+      "sha256": "09952b45915d5e5c2d433cfe42fbd7ae6274486765b5c2468560e07f2a0cb71e"
+    },
+    {
+      "path": "dist/apps/web/src/screens/PurchaseRequestsScreen.js",
+      "bytes": 4255,
+      "sha256": "a3d24368679d5544ea07b4e944ff71584bb8c3349c2c4f733e1eee6f98ffd275"
+    },
+    {
+      "path": "dist/apps/web/src/screens/PurchasingScreen.js",
+      "bytes": 5070,
+      "sha256": "7dc9bdbd8d20c1dbf895de1ecca42791a982d554116724848a59eedd9f964714"
+    },
+    {
+      "path": "dist/apps/web/src/screens/ReceivablesScreen.js",
+      "bytes": 5096,
+      "sha256": "7cf978eed8e53c191e63c3462813d85ba85fbf8ecb3ca31eb071f4186d9de937"
+    },
+    {
+      "path": "dist/apps/web/src/screens/ReportsScreen.js",
+      "bytes": 16221,
+      "sha256": "f83eecf002f64951cdaab4ab43189268bb49c197493b8b21ef5973dfa7c621f2"
+    },
+    {
+      "path": "dist/apps/web/src/screens/RoutingScreen.js",
+      "bytes": 17546,
+      "sha256": "b003905c0e68e68dbf80bda893bcd1bcfea60358d981ee38bd40d74a88f51e0b"
+    },
+    {
+      "path": "dist/apps/web/src/screens/ScanScreen.js",
+      "bytes": 2764,
+      "sha256": "367b06cf55305b591b9ae0a2b8364e7d36c6ec2274aad4f3c8df148b3e5bdfaf"
+    },
+    {
+      "path": "dist/apps/web/src/screens/SearchScreen.js",
+      "bytes": 2343,
+      "sha256": "7897f5b4fe3be3d6d238ba643e497bd0db6c3f5f573e461989daec46714eb2fc"
+    },
+    {
+      "path": "dist/apps/web/src/screens/ShipmentScreen.js",
+      "bytes": 4831,
+      "sha256": "2b533d11d0bf7c6fa72b73cff3cac60b80ea5e51b326aa6c3b9e95d5d997723a"
+    },
+    {
+      "path": "dist/apps/web/src/screens/StockScreen.js",
+      "bytes": 4006,
+      "sha256": "2f4270c70be8ad25e5b4123f43224a4fba7dda139d0b4cd472c41f8e156b08b2"
+    },
+    {
+      "path": "dist/apps/web/src/screens/SupplierInvoiceScreen.js",
+      "bytes": 6386,
+      "sha256": "ab6252da27788ff6e13f33464c2f9a1bb041c54c9693119b3172233d6d7c6ca0"
+    },
+    {
+      "path": "dist/apps/web/src/screens/TaskFloorScreen.js",
+      "bytes": 12189,
+      "sha256": "a54b59c53e35db07aa79c566d52d1d351794ac6a7890631be25904e0718860f2"
+    },
+    {
+      "path": "dist/apps/web/src/screens/TerminalScreen.js",
+      "bytes": 12842,
+      "sha256": "9b598cec75fcdad2b048a7ff7ef14b0ecca379d192e173a07488708e660fda27"
+    },
+    {
+      "path": "dist/apps/web/src/screens/ToolReadinessScreen.js",
+      "bytes": 3105,
+      "sha256": "ddf0f9bb8b8718590edc2a588bc3d4f1225f88d3bb9d9b08d6e0adcd1826bcfe"
+    },
+    {
+      "path": "dist/apps/web/src/screens/ToolroomScreen.js",
+      "bytes": 4672,
+      "sha256": "aed321b9ba147e4e226ccea17f82e548b26492c08cf29be4c65d93f3c32e2834"
+    },
+    {
+      "path": "dist/apps/web/src/screens/WorkOrderHubScreen.js",
+      "bytes": 12417,
+      "sha256": "8c29349083382c536a8a3b273b70d3ff265a6d54d07a1a3b2bb7dc9069429846"
+    },
+    {
+      "path": "dist/apps/web/src/screens/WorkOrdersScreen.js",
+      "bytes": 6828,
+      "sha256": "49a3863f0c7f47375ad53e2041a046e11582107e4ac146b49bbf7e6d7b03f88a"
+    },
+    {
+      "path": "dist/apps/web/src/screens/readinessPanel.js",
+      "bytes": 1363,
+      "sha256": "a22ab6b06c0e4c2f97add1d4bcfc362f47af749d24a751e6817c0cea1f10abf5"
+    },
+    {
+      "path": "dist/apps/web/src/searchApi.js",
+      "bytes": 152,
+      "sha256": "baec1462237d242c8ef588db34f6e573f5560180bb8944759ed3903126cd934c"
+    },
+    {
+      "path": "dist/apps/web/src/shipmentApi.js",
+      "bytes": 865,
+      "sha256": "716da57ee35a9418cf32ce43f7619862f498155b58673cbb125372b2f113b1d1"
+    },
+    {
+      "path": "dist/apps/web/src/stockApi.js",
+      "bytes": 833,
+      "sha256": "d2923d088a80e3c65d465238d282227c9d5dd3416e8492d7bdd5c7046916b8d9"
+    },
+    {
+      "path": "dist/apps/web/src/supplierInvoiceApi.js",
+      "bytes": 1892,
+      "sha256": "7a4537858f8e9a5945a66d05ba2bc4add7eca63c0de304312da755969f733023"
+    },
+    {
+      "path": "dist/apps/web/src/taskFloorApi.js",
+      "bytes": 1141,
+      "sha256": "958a4f2387da3e6f302aec94bd3fdea523dd9a9c53f6d084bbdb358104d11c41"
+    },
+    {
+      "path": "dist/apps/web/src/terminalApi.js",
+      "bytes": 1438,
+      "sha256": "aab3e07dd47b3db924cb5f71b2cc1bb178bb044fa13cc12505f089e05354bff2"
+    },
+    {
+      "path": "dist/apps/web/src/toolReadinessApi.js",
+      "bytes": 634,
+      "sha256": "a6963167006b23868b1b69424919accc647d2197c9a8492a3e1ca2ccdd8e6c3f"
+    },
+    {
+      "path": "dist/apps/web/src/toolroomApi.js",
+      "bytes": 1731,
+      "sha256": "3e92c3efc1a1ac691c86c4f063e4e765411c6759b0793e1081f83eb097e9b50f"
+    },
+    {
+      "path": "dist/apps/web/src/workOrderHubApi.js",
+      "bytes": 4344,
+      "sha256": "31f9b174a1ca057d36698c6cf564b5b6cf95bdf2cf55808e52c5c59ca5396b89"
+    },
+    {
+      "path": "dist/apps/web/src/workOrdersApi.js",
+      "bytes": 1318,
+      "sha256": "b74a4986a24299ffe5b15c536cad745dd393a05306a26975996c3284372156b2"
+    },
+    {
+      "path": "dist/packages/data-client/src/client.js",
+      "bytes": 6930,
+      "sha256": "5be9a53b2b14a5f59e29011b063fb8455bff25de5cf43083862f1fe8008158f2"
+    },
+    {
+      "path": "dist/packages/data-client/src/index.js",
+      "bytes": 29,
+      "sha256": "e8f76c98d4ad1e080155c93ff29eb75d80515bcf991a27153f283ddd4c288476"
+    },
+    {
+      "path": "dist/packages/domain/src/accounting.js",
+      "bytes": 1796,
+      "sha256": "abbd5a7fd68a968ae5288953d228b9624672b0451c6e5f62008ef7b5215789a4"
+    },
+    {
+      "path": "dist/packages/domain/src/asBuilt.js",
+      "bytes": 5105,
+      "sha256": "d122f403b5ef4d98830319a7905b7b81610076df9ee65079f40081dfd3f5b008"
+    },
+    {
+      "path": "dist/packages/domain/src/assignment.js",
+      "bytes": 2152,
+      "sha256": "57349dd08c8fd4bcc23261bf0b43a11d0c9c739bdedde1e7c14ead4403a719f1"
+    },
+    {
+      "path": "dist/packages/domain/src/authorization.js",
+      "bytes": 5215,
+      "sha256": "50f08f9c07e4e213e02d22cbdbabc319055731eaf47e303810d11ce8d8b9ce0c"
+    },
+    {
+      "path": "dist/packages/domain/src/badges.js",
+      "bytes": 2574,
+      "sha256": "7348a9647ebeeff159a6a3796adcb9ab57e4b97337bce60f07ab9e2390b5dc49"
+    },
+    {
+      "path": "dist/packages/domain/src/bom.js",
+      "bytes": 4451,
+      "sha256": "e70c9d93d6bad206f594a847ce14eadb54f7432e764617732679cddfc0c68329"
+    },
+    {
+      "path": "dist/packages/domain/src/commandCenter.js",
+      "bytes": 4135,
+      "sha256": "1d3774a75d56fab0a1a129612bee23cc4d2df4409243a7eba2485d1d606faae6"
+    },
+    {
+      "path": "dist/packages/domain/src/commercialApproval.js",
+      "bytes": 2866,
+      "sha256": "34b3edeefb3cfe67b8f4466ac485f4fb3631ef33f1ed6363b538968b916c8d9f"
+    },
+    {
+      "path": "dist/packages/domain/src/competency.js",
+      "bytes": 8965,
+      "sha256": "9632d87e27b0b95e7ec459ad0a223e6b760d94f3b533ebcf8960eeafab0827ff"
+    },
+    {
+      "path": "dist/packages/domain/src/competencyImport.js",
+      "bytes": 2972,
+      "sha256": "b998a8586a10baa8b2de5d5d8555ec91e811e4172b5cfdb926d5aced29153354"
+    },
+    {
+      "path": "dist/packages/domain/src/costModel.js",
+      "bytes": 8196,
+      "sha256": "a84f2f073648521bf3d86803ca0683914fc728efa17b82a176c25a0819942a44"
+    },
+    {
+      "path": "dist/packages/domain/src/devices.js",
+      "bytes": 1488,
+      "sha256": "5a32658bf9e11616c530c6c11d084ebab13f5e1bc9773e9ac0ca92f5ddeab20b"
+    },
+    {
+      "path": "dist/packages/domain/src/documents.js",
+      "bytes": 7304,
+      "sha256": "aeadaf51ce081db27909d8acab983ef9f31579e412a10ef010820ed94faf7c2d"
+    },
+    {
+      "path": "dist/packages/domain/src/economics.js",
+      "bytes": 11749,
+      "sha256": "e0f796391adae90d8b1492963f5eef28e841d669e8b4f02742f04d0e6d572257"
+    },
+    {
+      "path": "dist/packages/domain/src/gecko.js",
+      "bytes": 10349,
+      "sha256": "fbf290ca72b65977796169e0b8363722e4144098343a94954a4cbba4337d359d"
+    },
+    {
+      "path": "dist/packages/domain/src/index.js",
+      "bytes": 1175,
+      "sha256": "14277003736631bc37cbe3233a2c2d48caa49139722f7ffa29e5620a2c430e23"
+    },
+    {
+      "path": "dist/packages/domain/src/intelligence.js",
+      "bytes": 5081,
+      "sha256": "6e3e24da2f11941de3d7d6bc58d76cbd1eac20a2576ab6a1060451dd07531b4c"
+    },
+    {
+      "path": "dist/packages/domain/src/labels.js",
+      "bytes": 1697,
+      "sha256": "ce8edc165eea8fd0f5a93edfa5f80376e08064921d26597a4fe8f725b4c1744c"
+    },
+    {
+      "path": "dist/packages/domain/src/live.js",
+      "bytes": 1829,
+      "sha256": "3029f41903152684f59df861715216ffada14a5326980ce0e71095b728cbb12b"
+    },
+    {
+      "path": "dist/packages/domain/src/maintenance.js",
+      "bytes": 10534,
+      "sha256": "aa7f3da933ba4c32546fb1b4f33b950105768a8ac3d9b841b1070e283fd5c608"
+    },
+    {
+      "path": "dist/packages/domain/src/oee.js",
+      "bytes": 3122,
+      "sha256": "655b31409291675547bbfd27588c5d6e3bd799d9f666d445935c493fdc7a104c"
+    },
+    {
+      "path": "dist/packages/domain/src/operatorAssignment.js",
+      "bytes": 1509,
+      "sha256": "1c11dc566ae4c284e652fe4ae8154af6618774488b5674154ff015002ed4385b"
+    },
+    {
+      "path": "dist/packages/domain/src/order.js",
+      "bytes": 4094,
+      "sha256": "5e247bf28953125d4dd310d8237b23f90b61b744fc89400c518278c71e25a91b"
+    },
+    {
+      "path": "dist/packages/domain/src/passport.js",
+      "bytes": 4575,
+      "sha256": "ecf750abd8df8823db5847bf7688f605bd70d1091025119abc3b7890a86b014c"
+    },
+    {
+      "path": "dist/packages/domain/src/personnel.js",
+      "bytes": 1523,
+      "sha256": "fbad8925b6eb71808bb1710466cd9e7165482046629bdbd8273b1505c61034c7"
+    },
+    {
+      "path": "dist/packages/domain/src/personnelImport.js",
+      "bytes": 2190,
+      "sha256": "1d85cb59c942dfe726cde658d64bcd3da6b0f5eac46a08ff8c6e3d3a4548ae96"
+    },
+    {
+      "path": "dist/packages/domain/src/planning.js",
+      "bytes": 6191,
+      "sha256": "8fc3dba27fd09360d7ebc47935a65270411890916906fbe4ae4a19f6eeea7882"
+    },
+    {
+      "path": "dist/packages/domain/src/productionDeclaration.js",
+      "bytes": 3736,
+      "sha256": "eaae199fb083ff008975f0f5ea54f1c6b392ef103bc8e90a420ded79f7b4c0c3"
+    },
+    {
+      "path": "dist/packages/domain/src/puantaj.js",
+      "bytes": 8054,
+      "sha256": "1523342c28b720625577b24a1e86d876aa273bf5f61a9fb5c683d653681c8176"
+    },
+    {
+      "path": "dist/packages/domain/src/purchasing.js",
+      "bytes": 9194,
+      "sha256": "dce51e759f271ca816884ab0138f4f1b435c874c16a39a8279823117e4a2cb5b"
+    },
+    {
+      "path": "dist/packages/domain/src/qualityHold.js",
+      "bytes": 548,
+      "sha256": "64e2176fa841e755556b63c8db54f09d94948b234c723d0956be2a941d3f74c4"
+    },
+    {
+      "path": "dist/packages/domain/src/qualityNcr.js",
+      "bytes": 3552,
+      "sha256": "dcc97e265847aea9fc4477839d812504aae3fc87bafa5523bda4320ffcaae83e"
+    },
+    {
+      "path": "dist/packages/domain/src/readiness.js",
+      "bytes": 3876,
+      "sha256": "e3e62b1f00bb74c70ccf10d4e582d6b6b169977bace520fcb8feff3f459e9986"
+    },
+    {
+      "path": "dist/packages/domain/src/reports.js",
+      "bytes": 16023,
+      "sha256": "f9f49b1c2933c692ac2542fdbc44b67a5e566a3588fabcd144521da4174beddf"
+    },
+    {
+      "path": "dist/packages/domain/src/routing.js",
+      "bytes": 6146,
+      "sha256": "4fbcbe43e8d415d2cb13ef1b368c6a8cbda14b7305a169a8ba3fb8f1cd74ca65"
+    },
+    {
+      "path": "dist/packages/domain/src/scan.js",
+      "bytes": 2391,
+      "sha256": "ee5677a0cff36e8843becf32e878f17f9656149d15ef6568bf1a04cdcd36b330"
+    },
+    {
+      "path": "dist/packages/domain/src/shipment.js",
+      "bytes": 1535,
+      "sha256": "9f3e0dcb8bad8a0fcc035ac6339d8ebc2616f8fc4d0d47684eb6215f9c197c5c"
+    },
+    {
+      "path": "dist/packages/domain/src/smartAssignment.js",
+      "bytes": 4315,
+      "sha256": "ca50a0d4fcf78fa04fd56bc30da395cafd83256b115abb726ea08515a439635b"
+    },
+    {
+      "path": "dist/packages/domain/src/stock.js",
+      "bytes": 2588,
+      "sha256": "267f2ecf4e30db36cc9f6c14b9c029a76ab677c68e1317335294287283f00678"
+    },
+    {
+      "path": "dist/packages/domain/src/toolroom.js",
+      "bytes": 6569,
+      "sha256": "c100503e5293a58c3053039e67a1eb109bb0f08ae78d5d5841bb851c053ec3e1"
+    },
+    {
+      "path": "dist/packages/domain/src/workOrder.js",
+      "bytes": 3631,
+      "sha256": "a34e431f9ce629914a42a5b9e94894d76202a9196dcf9c1a3c4b44d492ffa9a9"
+    },
+    {
+      "path": "dist/packages/ui/src/badge.js",
+      "bytes": 2204,
+      "sha256": "64c8994c21c4921c6e311c3f6c79c8dce70ea9d3f9b6a4be8dec0a4982d8b334"
+    },
+    {
+      "path": "dist/packages/ui/src/badgeLadder.js",
+      "bytes": 4999,
+      "sha256": "9c2d2018d9cfba20de6e71b35eb7e6a5d27e5a3778063c339519925d0bdb2318"
+    },
+    {
+      "path": "dist/packages/ui/src/code128.js",
+      "bytes": 2954,
+      "sha256": "ddff499686b0ed34b2cb27b51c33ad6ba1bb3bfbada032afc5531e8d5e996355"
+    },
+    {
+      "path": "dist/packages/ui/src/h.js",
+      "bytes": 2596,
+      "sha256": "ec4f485334e9fe056712449d959334d5b8167f94a334dcee3c0319964318a5da"
+    },
+    {
+      "path": "dist/packages/ui/src/index.js",
+      "bytes": 24,
+      "sha256": "1f2e169bd2ef4f95bb12ff6cdc422dc9b4a6bfd8f389428a9836aa53bdde5595"
+    },
+    {
+      "path": "dist/packages/ui/src/qr.js",
+      "bytes": 13521,
+      "sha256": "f91adb0bef427c726702119d1246728c8261bfd8521735bfdb5c821cf51600bd"
+    },
+    {
+      "path": "icon.svg",
+      "bytes": 261,
+      "sha256": "4cd35ab68c373b80881937cfd66c513bb6b32b51b7c522d8238c993ea89cdea2"
+    },
+    {
+      "path": "index.html",
+      "bytes": 833,
+      "sha256": "b4105eb30a451b0cab7986553e9cebb4aa5e268a6b54be88a32ed7291c1fb5bd"
+    },
+    {
+      "path": "manifest.webmanifest",
+      "bytes": 642,
+      "sha256": "0b0ff6c1776fa8da0c5d94cc7f17179a9b74d383dedff4b66ec9809d39dff857"
+    },
+    {
+      "path": "sw.js",
+      "bytes": 1580,
+      "sha256": "46a77f4976072bc4146ddb101e2dab6467e6a576c915d78010e710d7cc2fe3f6"
+    }
+  ]
+}

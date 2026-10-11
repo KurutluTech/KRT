@@ -1,0 +1,19 @@
+{
+  "name": "KMI NEXT — Kurutlu Manufacturing Intelligence",
+  "short_name": "KMI NEXT",
+  "description": "Kurutlu üretim yönetimi: makine terminali, planlama, kalite, bakım, satınalma.",
+  "lang": "tr",
+  "start_url": "./index.html#/",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#f4f6fa",
+  "theme_color": "#0b1220",
+  "icons": [
+    { "src": "./icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ],
+  "shortcuts": [
+    { "name": "Makine Terminali", "url": "./index.html#/terminal" },
+    { "name": "Komuta Merkezi", "url": "./index.html#/komuta" }
+  ]
+}
