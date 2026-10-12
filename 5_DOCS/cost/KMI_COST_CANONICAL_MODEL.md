@@ -1,0 +1,4 @@
+# Canonical cost model (draft 0078)
+Tables: `cost_categories` (behaviour fixed/variable/semi, account hint) · `cost_centers` (Factory → Department → Machine; machines 111 and 113 are separate entities) · `cost_periods` (open/closed) · `cost_import_batches` / `cost_import_rows` (staging) · `cost_expenses` (period-attributed, status ACTUAL/PROVISIONAL/ESTIMATED) · `cost_allocations`.
+Rules enforced in the database: expense attributed to an open period only (`cost_expense_period_guard`); allocations never exceed the expense (`cost_allocation_guard`); closed periods change only by adjustment/reversal entries (`close_cost_period`); import needs a decision (`decide_cost_import`). All rows RLS-gated by the economic owner gate.
+Figures carry a status: GERÇEK / GEÇİCİ / TAHMİNİ / BİLİNMİYOR / MUTABAKAT. Three denominators for unit cost: started, good, shipped.

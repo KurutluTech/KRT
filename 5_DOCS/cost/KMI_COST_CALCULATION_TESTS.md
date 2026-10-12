@@ -1,0 +1,2 @@
+# Calculation tests (local)
+`costIntelligence.test.ts` 16 · `costImport.test.ts` 9 · `factoryMap.test.ts` 6 (domain). Covered: safe division (zero/unknown denominators → UNKNOWN), month attribution of multi-month expenses, driver allocation exactness, over-allocation refusal, machine hour cost with three denominators, tooling per part/100/1000 (unrounded intermediate), unit cost modes, order margins, labor split, break-even, energy scenario. Exact counts of the final run are in the regression report.

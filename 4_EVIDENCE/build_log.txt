@@ -1,0 +1,6 @@
+{
+  "commit": "390a1eb7eb892e71217ba5a6ad303346a09acb16",
+  "artifact": "/home/claude/kmi-wt4/release/kmi-next-390a1eb7eb89.tar.gz",
+  "sha256": "21cdf3221bf09815e129a4a52383868a4ff64e152a158dfc7d3a59ebe2053db5",
+  "files": 187
+}

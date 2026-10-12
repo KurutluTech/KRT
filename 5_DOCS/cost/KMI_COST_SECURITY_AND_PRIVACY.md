@@ -1,0 +1,2 @@
+# Security & privacy
+Access reuses the economic owner gate (`can_view_economics`, owner-only variants). Verified on the replica: a user without a grant reads zero rows from the cost tables (`visibility_matrix.sql`). Operators and non-economic roles do not see the workspace. Salary-level data is restricted and absent. No client-side mutation: writes only through RPCs. Spreadsheet formulas are neutralised. Local replica evidence only — not production.

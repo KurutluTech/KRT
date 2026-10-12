@@ -1,0 +1,16 @@
+0
+390a1eb7eb892e71217ba5a6ad303346a09acb16
+390a1eb TAHSİS: rename oversize_amount -> oversize_excess (money-key leak guard caught the 'amount' name; dimensional excess is not money); route-sweep evidence refreshed
+61936b7 Status docs: HOME per-department coverage, implementation status update
+f70dafa JWT: network/5xx during refresh no longer ends the session (real app bug) + test race removed + investigation doc; approved-scope matrix
+8f4de04 Cost deliverable docs (10) + Fusion 360 readiness (no unproven claim); app-shell JWT diagnostics
+61485c8 TAHSİS UI: dimensional-correction screen on the existing NCR machine (+ real-schema e2e 6/6)
+f3ea48c HOME management panels: schematic factory map (real registry, READY!=RUNNING), machine x shift matrix + plan-vs-actual honesty, KMI Zeka summary; fix extensionless ESM import + guard test
+9a31438 Maliyet Zekâsı workspace: 22 inner tabs, honest per-tab state, calculators (machine/tooling/unit/energy/break-even), CSV import preview; browser test 9/9
+407f5ca Cost Intelligence foundation: deterministic engines (expense periods, allocation, machine/tool/unit cost, labor concurrency, margins), CSV staging validator, 0078 draft (+rollback, replica proof)
+f6dfdec Security closure: 0077 commercial approval dedup draft, measured visibility matrix + doc
+3241814 Phase 0/TAHSIS drafts: 0075 customer-PO uniqueness, 0076 control plan + TAHSIS on existing NCR (+rollbacks, replica verification); max-3 cap proven already enforced
+c27be89 HOME: department cockpits (accounting DATA REQUIRED), real-schema cockpit e2e; ensure-replica.sh auto-start/health gate for local DB tests
+c8e868c docs: TAHSIS Phase 2 discovery (extends existing NCR state machine; control plan missing)
+9e69392 Header: production shift chip derived from canonical shift definitions (night = undefined, never guessed); queue TAHSIS (business definition resolved) + HOME/Phase 1 directives in status docs
+76833fc KMI-HOME-001 slice 1: role-adaptive KOKPİT (pure homeLayout + homeCockpit), UNKNOWN-not-0, freshness, sources, accounting/quality variants, tests + screenshots

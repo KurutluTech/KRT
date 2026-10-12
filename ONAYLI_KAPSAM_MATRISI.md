@@ -1,0 +1,23 @@
+# APPROVED SCOPE COMPLETION MATRIX (recovery-004 · local verification only)
+Vocabulary: DONE / PARTIAL / BLOCKED / DEFERRED / NOT STARTED / REGRESSION. "DONE" = built AND verified in the **local replica / headless browser**. Nothing is production-verified. Frozen 54-item register unchanged (no 55th item). Sources: the 23:16 PRIORITY COMPLETION directive and the Cost directive (`5bccfbf7`) as recorded in the session; the original text of any earlier directive not present in the uploads is NOT reconstructed here.
+
+| # | Requirement | Status | Evidence (local) | Missing / why / needed / blocks release? / 54-plan location |
+|---|---|---|---|---|
+| 1 | Role HOMEs (12 composition groups covering the 15 role views) | PARTIAL | `homeLayout.test`, `home-cockpit.e2e` (cards = independent SQL counts, RLS applied), `app-shell` 22 | Production manager and Toolroom have no dedicated DB role → served by MANAGEMENT/ADMIN and MAINTENANCE cards; accounting beyond counts (due dates, bank reconciliation, three-way match, period close) = DATA REQUIRED cards showing "VERİ GEREKLİ"; calibration, OTD = DATA REQUIRED. Needed: owner role decision + real data. Blocks release: no. Items 16/17/22 |
+| 2 | Visual system, factory map, KMI Intelligence summary | PARTIAL | `factoryMap.test` 6, `app-shell` (map, matrix, summary); READY≠RUNNING; plan-vs-actual says "plan verisi yok" | Map is schematic (no floor plan supplied); real telemetry NOT_CONNECTED. Owner visual acceptance (item 26/23/24) not given. Blocks: no |
+| 3 | Cost Intelligence (item 36) | PARTIAL | engines 25 tests, workspace 9/9, 10 docs in `docs/cost` | 19/22 tabs DATA REQUIRED, material valuation/allocation driver/labor mapping = BLOCKED — OWNER DECISION; .xlsx DEFERRED; 0078 unapplied. Blocks: no. Item 36 |
+| 4 | TAHSİS (dimensional correction on the existing NCR) | PARTIAL | `tahsis.e2e` 6/6 on the real schema with 0076 applied in a throwaway DB | Governance BLOCKED — OWNER DECISION: who enters control-plan data, who authorizes rework, how physical segregation is marked, operator self-declaration. 0076 unapplied; screen shows "Kurulum bekleniyor" until then. Blocks: no (feature inert). Items 3/16 |
+| 5 | PO duplicate guard | DONE (draft) | 0075 + rollback, replica proof | Not applied to live. DB package. Blocks: no |
+| 6 | Control plan | PARTIAL | 0076 draft + replica proof | owner decision on data entry role |
+| 7 | Max 3 active machines/operator | DONE (already existed) | `HARD_CAP_EXCEEDED` in `operator_multi_machine_refusal`; operator-regression e2e | Earlier doc said "missing" — corrected; no duplicate patch added |
+| 8 | Fusion 360 evidence | BLOCKED | `KMI_FUSION360_READINESS.md` | No evidence exists; no claim made. Needs licence/API + sample export + owner choice. Blocks: no. Item 13 |
+| 9 | JWT refresh | PARTIAL — fixed + locally verified, NOT field-verified | Single-flight refresh; NEW: network error/5xx during refresh no longer ends the session (real bug, `client.test` 14/14); test race removed; app-shell 16/16 consecutive 22/22; network trace in `KMI_JWT_FLAKE_INVESTIGATION.md` | Mock issues one-shot refresh tokens (real Supabase has a reuse window); not verified on live. Blocks: no |
+| 10 | Navigation deep links | DONE | `access.test`, `nav.test`, app-shell | local |
+| 11 | Commercial approval duplicate | DONE (draft) | 0077 + rollback, replica proof | unapplied |
+| 12 | audit_log scope / append-only | READY, NOT APPLIED | 0074 hardened + replica proof + review doc | Live still has broad read until the owner applies the DB package. **Release blocker for "security closed" claims**, not for frontend upload |
+| 13 | RLS `true` on customers/orders/suppliers/personnel | BLOCKED — OWNER DECISION | `visibility_matrix.sql` measured | Options A/B in `KMI_SECURITY_CLOSURE.md` |
+| 14 | Replica test infrastructure | DONE | `ensure-replica.sh` proven by kill -9; run-tests calls it | VM restarts are expected and not prevented |
+| 15 | Full regression on final RC `390a1eb` | DONE (local) | exit 0; 142 files; 1268 PASS lines; 0 FAIL; 0 skipped; 23m55s; run 1 (61936b7) caught 1 real defect (`oversize_amount` vs money-leak guard) → fixed → full re-run green | Local replica + headless Chromium only. Not production |
+| 16 | Manual deployment + rollback package | DONE (built, not deployed) | `KMI_RELEASE_004_390a1eb/`: frontend zip + full rollback zip, DB apply/rollback scripts, SHA-256 manifest, build log (deterministic: two builds, same SHA) | Owner uploads. Blocks: n/a |
+| 17 | Device integrations (40–42), LockCell, Nikken | BLOCKED | contracts only | physical devices |
+| 18 | Owner acceptance / pilot / production release (51,53,54,26,15) | BLOCKED | — | owner gates |

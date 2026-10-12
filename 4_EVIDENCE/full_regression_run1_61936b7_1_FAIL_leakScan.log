@@ -1,0 +1,1969 @@
+ensure-replica: ready (kmi_next tables=121)
+
+=== apps/web/test/academy-screen.browser.test.ts ===
+  PASS  badge ladder: USTA valid, expiring soon flagged, expired crossed out; inactive person hidden
+  PASS  approved count = ≥ BAĞIMSIZ and not expired (expired caliper does not count)
+  PASS  level change: short reason refused on the client (no server write), proper one renews the badge
+  PASS  self-approval is refused by the server rule (linked login = the person)
+  PASS  module: too-short content refused by the server; a proper module is listed
+  PASS  enroll: a trainer without USTA level is refused; with the Usta it is accepted
+  PASS  cancel without a reason is refused
+  PASS  training → assessment: below the pass mark refused, FAIL recorded, level unchanged
+  PASS  retry → PASS 85 raises Ali to BAĞIMSIZ via the Academy (badge appears, source ACADEMY)
+  PASS  machine requirement is saved and listed
+  PASS  without the role the server refuses (Turkish sentence + the server code)
+  PASS  no horizontal page scroll at phone width; no console errors
+
+12 passed, 0 failed
+
+=== apps/web/test/access.test.ts ===
+PASS  every action in OPEN_RULES exists in the SQL matrix
+PASS  every rule path and every featured path is a real route
+PASS  every role in the SQL matrix has a home
+PASS  operator cannot open accounting, economics, personnel, import; can open its own work
+PASS  economics opens only with the economic grant — MANAGEMENT/ADMIN alone never do
+PASS  D-007: only ADMIN is offered the owner APPLICATION screen; it never opens /ekonomi (data) and never grants economics
+PASS  accounting role sees accounting; quality does not
+PASS  no access (failed lookup) opens only unrestricted screens
+PASS  operator-only lands on /operator; mixed roles and empty roles do not
+PASS  featured: deduplicated, only openable, economics first when granted
+
+10 passed, 0 failed
+
+=== apps/web/test/accounting-queue-canonical.test.ts ===
+ok rpc allow-list
+ok table allow-list (read-only)
+ok no direct writes (insert/update/delete/patch)
+ok no browser-side state storage for approvals
+4 passed, 0 failed
+
+=== apps/web/test/accounting-queue-screen.browser.test.ts ===
+  PASS  every stage is its own list: request-waiting lot, management-waiting, decision-waiting, history with reason; lots with an open/approved request are not offered again
+  PASS  decision needs a reason; with a reason it calls ONLY decide_commercial_approval and the record moves to history (nothing lost, nothing doubled)
+  PASS  management release is a separate step that moves the request to the decision list; requesting adds exactly one pending request
+  PASS  server refusals are shown (Turkish), never swallowed; the list is unchanged
+  PASS  a lot with TWO pending requests is flagged ÇİFT TALEP
+  PASS  empty queue → meaningful empty states; migration missing → Kurulum bekleniyor, no raw error
+  PASS  no horizontal overflow at 1280 / 390 / 320
+
+7 passed, 0 failed
+
+=== apps/web/test/accounting-queue.e2e.test.ts ===
+NOTICE:  database "kmi_e2e_21577" does not exist, skipping
+ERROR:  FORBIDDEN: SHIPMENT_MANAGE
+CONTEXT:  PL/pgSQL function kmi_next.request_commercial_approval(uuid) line 9 at RAISE
+  PASS  SHIPPING requests the commercial approval; a QUALITY / unrelated role cannot
+        finding: second request → ACCEPTED (pending rows=2)
+  PASS  PROBE — a second request for the same lot while one is PENDING (double-processing behaviour is recorded, never hidden)
+page.waitForSelector: Timeout 20000ms exceeded.
+Call log:
+[2m  - waiting for locator('[data-testid="aq-root"]') to be visible[22m
+
+    at login (/home/claude/kmi-wt4/apps/web/test/accounting-queue.e2e.test.ts:55:82)
+    at async main (/home/claude/kmi-wt4/apps/web/test/accounting-queue.e2e.test.ts:57:3) {
+  name: 'TimeoutError'
+}
+
+=== apps/web/test/accounting-screen.browser.test.ts ===
+  PASS  partial shipment: 40 of 100 dispatched leaves a remaining obligation of 60, zero console errors
+  PASS  a DRAFT (not dispatched) shipment offers no invoice action; the dispatched one does
+  PASS  invoicing the dispatched shipment creates one invoice of 40 x 12.50 = 500 EUR and the action disappears
+  PASS  an overpayment is refused (PAYMENT_EXCEEDS_REMAINING) and nothing is recorded
+  PASS  a partial payment moves the invoice to PARTIAL
+  PASS  paying the remainder moves it to PAID and removes the payment action
+  PASS  after the second shipment is dispatched, the obligation drops to 25 and it becomes invoiceable
+
+7 passed, 0 failed
+
+=== apps/web/test/app-shell.browser.test.ts ===
+  PASS  login: DB status turns green only after a real health answer; red when unreachable; glare only on the K; no overflow at 390px
+  PASS  no session → login form; wrong password shows the server message
+  PASS  operator login (sicil + PIN, no e-mail): wrong PIN refused with a generic message; correct PIN opens the app as that person
+  PASS  correct login → grouped menu, user shown
+  PASS  navigation: department workspaces collapse, the choice is remembered, and the group of the current screen is always open
+  PASS  KOKPİT: role cards from the canonical snapshot; a counter the snapshot lacks is BİLİNMİYOR (never 0); freshness and source shown; critical alert listed with passport link
+  PASS  management HOME: schematic factory map from the registry (READY ≠ RUNNING, conflicts flagged), machine × shift matrix, plan-vs-actual honesty, KMI Zekâ summary; a failed read = BİLİNMİYOR for that panel only; not shown to other roles
+  PASS  KOKPİT variants: ACCOUNTING gets its own queue cards (unreadable queue = BİLİNMİYOR, never 0, no money anywhere); QUALITY gets quality cards only; screenshots when KMI_SHOTS is set
+  PASS  role home: featured screens for the role first; screens the role cannot open are not in the menu (economics closed, accounting hidden)
+  PASS  Header 2.0: seconds clock (Turkey format), LIVE/PULSE chips by access, avatar menu lists only openable shortcuts, Ctrl+K focuses search, no overflow at 390px
+  PASS  typing a closed screen URL shows "not open to your role" and never calls its server data
+  PASS  terminal: real adapters map real-shaped snake_case JSON (picker → active WO progress)
+  PASS  every RPC carried the session bearer token and the kmi_next content profile
+  PASS  a server refusal (MACHINE_BUSY) is shown to the operator as is
+  PASS  command center renders the real-shaped snapshot (camelized counters, alerts, PULSE)
+  PASS  operator-only account lands on its own work screen instead of the generic menu
+  PASS  PWA: manifest is valid and the service worker takes control
+  PASS  offline: the app shell still opens from the service worker cache and says it is offline
+  PASS  logout calls the auth endpoint and returns to the login form
+  PASS  expired JWT: silent refresh keeps the user signed in; a dead refresh token ends the session once with a clear message (no loop)
+  PASS  no page errors during the whole session
+  PASS  operator-login not enabled in config (Edge Function not deployed) → only the e-mail form, no operator tab
+
+22 passed, 0 failed
+
+=== apps/web/test/badges-screen.browser.test.ts ===
+  PASS  before evaluation: all medallions locked; next tier shows the real numbers
+  PASS  a family without a data source says so (no fake progress)
+  PASS  evaluate → celebration with the earned badge; medallion becomes EARNED
+  PASS  evaluate again: nothing new, told plainly; tool badge still locked (0 of 5 records)
+  PASS  a login without a personnel record: told so
+  PASS  no horizontal page scroll; no console errors
+
+6 passed, 0 failed
+
+=== apps/web/test/brand-name.test.ts ===
+PASS  no user-visible "KMI NEXT" in runtime sources, index.html or manifest
+
+1 passed, 0 failed
+
+=== apps/web/test/command-center-screen.browser.test.ts ===
+  PASS  empty shop (real live state): zeros, no-data domains UNKNOWN / VERİ YOK — never green; no sample data
+  PASS  OEE today without data shows UNKNOWN / VERİ GEREKLİ, not 100 %
+  PASS  refresh loads the next snapshot; alerts keep the server priority (critical first, oldest first)
+  PASS  PULSE lights per domain match the live snapshot
+  PASS  counters and live work orders from the same snapshot
+  PASS  no money on the management view (no currency / amount text)
+  PASS  tablet (820px) and phone (390px): no horizontal page scroll
+
+7 passed, 0 failed
+
+=== apps/web/test/command-center-v2.browser.test.ts ===
+  PASS  machine spins only for a fresh IN_PROGRESS work order; FIRST_PIECE_PENDING and stale data never spin
+  PASS  prefers-reduced-motion: no animation at all
+  PASS  15-minute freshness cue: 14 min = no warning, 16 min = warning
+  PASS  no data: no invented production, OEE or machine state (UNKNOWN / VERİ GEREKLİ kept)
+  PASS  fleet bar comes from canonical counters; running = distinct IN_PROGRESS machines
+  PASS  critical alerts first (hero) in server order; others in action panel; links go to the source module
+  PASS  Command Center 2.0: live production flow tones (red late/urgent, amber risk, blue active, green only when verified-fresh normal, gray unknown), legend, passport links, Istanbul second-precision stamps
+  PASS  no critical alert and UNKNOWN domains: hero is never "all clear" green
+  PASS  no horizontal overflow at 1280 / 820 / 390 / 320
+
+9 passed, 0 failed
+
+=== apps/web/test/commercial-approval-screen.browser.test.ts ===
+  PASS  Commercial Approval screen renders the RESERVED stock lot with zero console/page errors and no stage button yet
+  PASS  requesting a commercial approval actually calls the API and adds a PENDING row with approve/reject actions
+  PASS  approving WITHOUT a management release is refused (MANAGEMENT_RELEASE_MISSING) and nothing changes
+  PASS  granting the management release actually calls the API; the release button disappears (no double release)
+  PASS  approving the request actually calls the API, and a stage-for-shipment button appears
+  PASS  staging the lot for shipment actually calls the API and moves the lot to STAGED
+
+6 passed, 0 failed
+
+=== apps/web/test/competency-import-screen.browser.test.ts ===
+  PASS  paste 6 rows: 2 pending, 4 unresolved with the reason in Turkish
+  PASS  the loader cannot verify (four eyes); nothing changes
+  PASS  second approver: short note refused, then bulk verify — Veli cannot verify his own row
+  PASS  without the permission: refused, nothing shown
+  PASS  no horizontal page scroll; no console errors
+
+5 passed, 0 failed
+
+=== apps/web/test/cost-intelligence-screen.browser.test.ts ===
+  PASS  one workspace with exactly 22 inner tabs, each stating its honest state
+  PASS  every DATA_REQUIRED tab says VERİ GEREKLİ, says what is needed, and shows no figure (no fabricated zero)
+  PASS  machine economics: three separate figures from entered values; a missing component -> BİLİNMİYOR (not 0)
+  PASS  tooling: actual seconds -> cost per part/100/1000; unverified seconds -> BİLİNMİYOR
+  PASS  unit cost: provisional is labelled GEÇİCİ (never final); zero good quantity -> BİLİNMİYOR, no divide-by-zero
+  PASS  break-even and energy scenario are TAHMİNİ with the assumption visible; impossible inputs refused
+  PASS  import preview: valid rows counted, bad number / duplicate flagged with row numbers, formula neutralised, nothing written
+  PASS  phone size: no horizontal page scroll on any tab type
+  PASS  no page errors
+
+9 passed, 0 failed. (cost-intelligence-screen.browser.test.ts)
+
+=== apps/web/test/department-screen.browser.test.ts ===
+  PASS  Kalite: first-piece, HOLD, scrap and HOLD lots come from real records; links open the record screens
+  PASS  Sevkiyat: ready and shipped lots separated
+  PASS  Depo: per-state counts match the lots; HOLD/SCRAP listed
+  PASS  empty data: honest "Kayıt yok." — no invented rows; load error shown plainly
+  PASS  no horizontal overflow at 1280 / 390 / 320
+
+5 passed, 0 failed
+
+=== apps/web/test/devices-screen.browser.test.ts ===
+  PASS  all three integrations shown as BLOCKED with the evidence each needs
+  PASS  without ADMIN the registry is refused
+  PASS  ADMIN: CNC needs a real machine; registered device shows no invented serial and 0 live data
+
+3 passed, 0 failed
+
+=== apps/web/test/doc-intel-screen.browser.test.ts ===
+  PASS  nothing analysed yet: consistency says so per document
+  PASS  drawing PDF: proposal from the file name only, marked unverified and content-not-read
+  PASS  control plan text: revision B suspected; mismatch counts only after a human verifies it
+  PASS  gate rules: op number only for operation start; valid rule listed; removed
+  PASS  financial document types are not offered as production gates
+  PASS  no horizontal page scroll; no console errors
+
+6 passed, 0 failed
+
+=== apps/web/test/documents-screen.browser.test.ts ===
+  PASS  record opened: no active rule yet, the proposals are offered (owner decides)
+  PASS  upload a real PDF drawing → version 1 with its SHA-256 fingerprint
+  PASS  the same content as a new version is refused (DUPLICATE_CONTENT)
+  PASS  a program renamed to .pdf is refused by its real signature (CONTENT_TYPE_MISMATCH)
+  PASS  new content → version 2; download re-checks integrity and offers the file
+  PASS  rules: activation needs a reason; DRAWING present, CONTROL_PLAN missing
+  PASS  withdraw needs a reason; afterwards the drawing counts as MISSING (versions kept)
+  PASS  machine: calibration certificate needs a valid-until date; then it appears as expiring
+  PASS  customer PO document without the receivables role is refused by the server rule
+  PASS  no horizontal page scroll at phone width; no console errors
+
+10 passed, 0 failed
+
+=== apps/web/test/ds.test.ts ===
+PASS  every semantic kind has a style AND a glyph (colour is never the only signal)
+PASS  unknown and ai are visually distinct from ok/bad (dashed grey / purple)
+PASS  state blocks and provenance exist for loading/error/empty/unknown/ai
+
+3 passed, 0 failed. (ds.test.ts)
+
+=== apps/web/test/economics-owner-screen.browser.test.ts ===
+  PASS  D-007 unbound: locked screen asks for NO code — one button for the signed-in account; no data shown
+  PASS  D-007 request → pending card shows THIS account e-mail, time, reference and the single next step
+  PASS  D-007 another account asking at the same time voids both — nobody bound; a clean retry works
+  PASS  D-007 out-of-band approval: wrong e-mail refused; the confirmed one binds THIS account → owner view
+  PASS  D-013 no parameters: TAM MALİYET HESAPLANAMADI with every missing part named, no margin
+  PASS  D-013 exchange rate without a source is refused; nothing stored
+  PASS  D-013 all parameters → full cost = harness (6.380,00 TRY, unit 797,50), margin only with an invoice
+  PASS  corrective decision: short reason refused; correction is a NEW record, original untouched
+  PASS  D-007 revoke: short reason refused; with a reason the screen closes for everyone again
+  PASS  a person the owner named sees the model but cannot enter parameters
+  PASS  phone view: no horizontal scroll, no console errors
+
+11 passed, 0 failed
+
+=== apps/web/test/economics-screen.browser.test.ts ===
+  PASS  every role but no owner: locked, and no amount reaches the page
+  PASS  owner: period figures per currency, never summed across currencies
+  PASS  not-modelled costs always stated; aging by invoice age, payables by due bucket
+  PASS  seven proposals in severity order (invoice age = MEDIUM warning after D-016), each with its evidence
+  PASS  decision without a real note is refused before sending; nothing recorded
+  PASS  postpone needs a future date
+  PASS  accept / postpone / reject → board shows 4 open, decisions closed with their latest
+  PASS  a person the owner named sees the board but cannot change thresholds
+  PASS  owner: out-of-range thresholds refused; 90/7/20/5 → five proposals as in the harness
+  PASS  D-016 threshold record: reason required, previous value and who/when kept in the history, passive flag is stored
+  PASS  locking again hides everything (server answer, not screen hiding)
+  PASS  no horizontal page scroll at phone width; no console errors
+
+12 passed, 0 failed
+
+=== apps/web/test/errorText.test.ts ===
+  PASS  missing permission: Turkish action name + who to ask + the exact server code
+  PASS  every action in the role matrix has a Turkish label (0051 actions included)
+  PASS  session / network / business refusals
+  PASS  release-hardening refusals are Turkish with the code
+  PASS  an unexposed API schema is a clear admin message, not a raw error
+  PASS  a missing database function/table is "Kurulum bekleniyor", never a raw PostgREST message
+  PASS  NOT_AUTHORIZED: ACTION (database wording) is the same Turkish permission sentence
+
+7 passed, 0 failed
+
+=== apps/web/test/first-day-empty.e2e.test.ts ===
+NOTICE:  database "kmi_e2e_23826" does not exist, skipping
+  PASS  precondition: the database really is empty of business records (work orders, orders, customers, products, shipments)
+  PASS  mgr: home + every offered screen opens on an empty database (no crash, no route error, no fake data)
+  PASS  op: home + every offered screen opens on an empty database (no crash, no route error, no fake data)
+  PASS  qa: home + every offered screen opens on an empty database (no crash, no route error, no fake data)
+  PASS  ship: home + every offered screen opens on an empty database (no crash, no route error, no fake data)
+  PASS  acc: home + every offered screen opens on an empty database (no crash, no route error, no fake data)
+  PASS  cam: home + every offered screen opens on an empty database (no crash, no route error, no fake data)
+  PASS  none: home + every offered screen opens on an empty database (no crash, no route error, no fake data)
+  PASS  no uncaught page errors during the whole first-day walk
+  PASS  no request left localhost (no external CDN/font/script at runtime)
+  PASS  mgr home offers the core first-day screens (Command Center, work orders, orders, engineering)
+  PASS  catalog empty state shows a first-action guide for an authorized user
+  PASS  role-less account sees no business screens
+first-day-empty: 13 passed, 0 failed; visited {"mgr":37,"op":22,"qa":26,"ship":26,"acc":26,"cam":23,"none":22}
+
+=== apps/web/test/gecko-screen.browser.test.ts ===
+  PASS  before any sync: feed NOT_CONNECTED, warned, empty list is NOT "nobody came"
+  PASS  sync now: 7 mirrored, the row without a pass id rejected; feed OK
+  PASS  sync again is idempotent: 0 new, 7 already there
+  PASS  Istanbul times + open-session rule: back in after lunch → İÇERİDE (açık oturum)
+  PASS  a DENIED exit does not take Ayşe out, and is shown as a note
+  PASS  unlinked cards show the raw GEÇKO name marked eşlenmemiş — never a guessed person
+  PASS  verify without a person / with a short reason is refused; inactive person is not offered
+  PASS  verified link → the attendance row shows the KMI person; one audit entry
+  PASS  a lost card can be disabled (no person attached)
+  PASS  a failing sync turns the feed to HATALI with the error, list flagged as possibly old
+  PASS  schedule switch needs a reason; turning it on does not pretend a job is installed
+  PASS  HR / admin viewer: named with a reason, duplicate refused, revoked
+  PASS  no horizontal page scroll at phone width
+  PASS  without the role: server refusal shown, no attendance data rendered
+
+14 passed, 0 failed
+
+=== apps/web/test/golden-thread-ui.e2e.test.ts ===
+NOTICE:  database "kmi_e2e_24171" does not exist, skipping
+ERROR:  PRODUCT_MISMATCH
+CONTEXT:  PL/pgSQL function kmi_next.set_work_order_revision(uuid,uuid) line 19 at RAISE
+ERROR:  REVISION_NOT_RELEASED: DRAFT
+CONTEXT:  PL/pgSQL function kmi_next.set_work_order_revision(uuid,uuid) line 17 at RAISE
+  PASS  wrong-revision: only THIS product's released revision is offered; the server also refuses the other/draft ones
+  PASS  revision + CAM program + machine + operator linked through the hub (same work-order id)
+  PASS  missing material: the hub readiness names the shortage and the operator terminal refuses START
+  PASS  missing tool: after the material is reserved the terminal still refuses START (TOOL_NOT_READY)
+  PASS  operator STARTs on the terminal and declares 10 good parts (same work-order id)
+ERROR:  ILLEGAL_TRANSITION: IN_PROGRESS -> IN_PROGRESS
+CONTEXT:  PL/pgSQL function kmi_next.transition_work_order_status(uuid,text,text) line 12 at RAISE
+  PASS  second START on the same work order / machine is refused by the server
+ERROR:  FORBIDDEN: FIRST_PIECE_APPROVE
+CONTEXT:  PL/pgSQL function kmi_next.transition_work_order_status(uuid,text,text) line 15 at RAISE
+ERROR:  ILLEGAL_TRANSITION: FIRST_PIECE_PENDING -> COMPLETED
+CONTEXT:  PL/pgSQL function kmi_next.transition_work_order_status(uuid,text,text) line 12 at RAISE
+ERROR:  FORBIDDEN: FIRST_PIECE_APPROVE
+CONTEXT:  PL/pgSQL function kmi_next.transition_work_order_status(uuid,text,text) line 15 at RAISE
+  PASS  operator sends the first piece to Quality, then CANNOT approve it or release the order (unauthorized release)
+ERROR:  ILLEGAL_TRANSITION: ON_HOLD -> COMPLETED
+CONTEXT:  PL/pgSQL function kmi_next.transition_work_order_status(uuid,text,text) line 12 at RAISE
+ERROR:  FORBIDDEN: FIRST_PIECE_APPROVE
+CONTEXT:  PL/pgSQL function kmi_next.transition_work_order_status(uuid,text,text) line 15 at RAISE
+ERROR:  FORBIDDEN: FINAL_PRODUCTION_RELEASE
+CONTEXT:  PL/pgSQL function kmi_next.transition_work_order_status(uuid,text,text) line 19 at RAISE
+  PASS  Quality approves the first piece; an OPEN Quality HOLD blocks completion; releasing the hold allows it
+  PASS  stock lot is created for the SAME work order and walked FG → AVAILABLE → RESERVED
+ERROR:  LOT_NOT_SHIPPABLE_IN_STATE: RESERVED
+CONTEXT:  PL/pgSQL function kmi_next.create_shipment(uuid) line 16 at RAISE
+ERROR:  NOT_AUTHORIZED: COMMERCIAL_RELEASE
+CONTEXT:  PL/pgSQL function kmi_next.decide_commercial_approval(uuid,text,text) line 13 at RAISE
+  PASS  shipment without commercial approval is refused; Shipping cannot decide the commercial approval
+ERROR:  MANAGEMENT_RELEASE_MISSING
+CONTEXT:  PL/pgSQL function kmi_next.decide_commercial_approval(uuid,text,text) line 27 at RAISE
+  PASS  Management release (4-eyes) then the commercial approval; Accounting alone could not
+ERROR:  LOT_NOT_SHIPPABLE_IN_STATE: SHIPPED
+CONTEXT:  PL/pgSQL function kmi_next.create_shipment(uuid) line 16 at RAISE
+ERROR:  ILLEGAL_TRANSITION: DISPATCHED -> DISPATCHED
+CONTEXT:  PL/pgSQL function kmi_next.transition_shipment_status(uuid,text,text) line 20 at RAISE
+  PASS  Shipping stages, creates and dispatches ONE shipment; a second shipment / dispatch is refused (double shipment)
+ERROR:  FORBIDDEN: ACCOUNTING_MUTATION
+CONTEXT:  PL/pgSQL function kmi_next.create_invoice_for_shipment(uuid,text) line 13 at RAISE
+ERROR:  FORBIDDEN: ACCOUNTING_MUTATION
+CONTEXT:  PL/pgSQL function kmi_next.create_invoice_for_shipment(uuid,text) line 13 at RAISE
+  PASS  Accounting invoices the shipment exactly once (same order item); Shipping and a role-less user cannot
+  PASS  end state on one canonical chain: order SHIPPED, obligation 0, produced = shipped = 10; Management orders screen loads
+14 passed, 0 failed  (SYNTHETIC role accounts — not real-user factory acceptance)
+
+=== apps/web/test/header.test.ts ===
+  PASS  shortcuts: only openable, de-duplicated, capped, home excluded
+  PASS  identity line: Turkish labels, nothing invented when parts are unknown
+ok (0 failed)
+
+=== apps/web/test/history-search.e2e.test.ts ===
+NOTICE:  database "kmi_e2e_24560" does not exist, skipping
+  PASS  TODAY lists the server-stamped DOWN event with the real actor and a stamp equal to the DB audit time (Istanbul, seconds); passport link opens the machine
+  PASS  Istanbul day boundary: 23:59:59 belongs to Dün, 00:00:00 to Bugün (never the other way)
+  PASS  late report: recorded today but occurred yesterday — Bugün (record basis) shows it with the late note; on the OCCURRED basis it moves to Dün; nothing is re-dated silently
+  PASS  entity + action + text filters narrow the real rows; an empty result says so without inventing history
+  PASS  custom range needs both dates (clear message); a far-past range returns nothing
+  PASS  operator: the screen is closed in the UI (and the dashboard honestly notes the server policy is the real boundary — see migration draft)
+  PASS  no page errors
+
+7 passed, 0 failed
+
+=== apps/web/test/home-cockpit.e2e.test.ts ===
+NOTICE:  database "kmi_e2e_24742" does not exist, skipping
+  PASS  ADMIN: every table-backed card equals an independent SQL count on the real schema (RLS applied)
+  PASS  DATA REQUIRED cards show no number (accounting: bank reconciliation, period close, three-way match, overdue receivables)
+  PASS  SHIPPING user: shipping cards only — no personnel, invoice or approval cards
+  PASS  no page errors
+
+4 passed, 0 failed. (home-cockpit.e2e.test.ts)
+
+=== apps/web/test/homeData.test.ts ===
+PASS  counts are row counts of the canonical table; only ids are requested (no amounts / personal fields)
+PASS  a failed read is null (BİLİNMİYOR), never 0
+PASS  a capped read is a lower bound → null, not a wrong number
+PASS  date windows use the Istanbul calendar day (21:30Z on the 12th is already the 13th in Istanbul)
+PASS  tools past rated life: compared in code, unrated tools never counted
+PASS  awaiting-management-release counts pending approvals without a management release stamp
+
+6 passed, 0 failed. (homeData.test.ts)
+
+=== apps/web/test/hub-readiness.e2e.test.ts ===
+NOTICE:  database "kmi_e2e_25006" does not exist, skipping
+  PASS  before linking: start is refused for the real reason and only THIS product's released revision is offered
+  PASS  revision link without a choice is refused client-side; with the choice it is stored and audited
+  PASS  CAM program of that revision is offered, linked, and readiness now names the material shortage (no silent pass)
+ERROR:  FORBIDDEN: WORK_ORDER_ASSIGN_MACHINE
+CONTEXT:  PL/pgSQL function kmi_next.set_work_order_revision(uuid,uuid) line 6 at RAISE
+  PASS  operator typing the hub URL cannot change the link (server refuses, nothing stored)
+4 passed, 0 failed
+
+=== apps/web/test/hub-screen.browser.test.ts ===
+  PASS  list: the work order shows product, order, quantity and a link to its record
+  PASS  open the work order: summary, pick-lists (no typed ids), production + stock screens mounted
+  PASS  assigning without a selection is refused client-side; with a selection the server stub assigns
+  PASS  stock lot view: commercial approval and shipment screens are reachable from the lot
+  PASS  phone view: no horizontal scroll, no console errors
+
+5 passed, 0 failed
+
+=== apps/web/test/intelligence-screen.browser.test.ts ===
+  PASS  quality person: only the suggestion they can resolve; management sections hidden (server refused)
+  PASS  "111 neden duruyor?" → canonical facts with sources and the no-telemetry note
+  PASS  economic question: no numbers, refusal; unknown question: BİLMİYORUM
+  PASS  empty question refused
+  PASS  management: process mining names the bottleneck only with enough cases; operations VERİ YETERSİZ
+  PASS  digital twin: 14 machines with confidence; scenario labelled SENARYO with routing alternatives only
+  PASS  phone view: no horizontal scroll, no console errors
+
+7 passed, 0 failed
+
+=== apps/web/test/kmi-shell-visual.browser.test.ts ===
+  PASS  login: old-KMI identity — spinning K watermark (kurutluKSpin, 34 s), brand title and sub-identity, real PNG assets loaded
+  PASS  login: no "NEXT" anywhere visible; title is KMI
+  PASS  login: form labels, accessible names, and the animation is switched off for reduced-motion users
+  PASS  visual regression: desktop login
+  PASS  desktop: persistent 260 px sidebar with the 15 department workspaces; main content shifted
+  PASS  navigation is role-aware: nothing the role may not open (economics, accounting, owner application); screens the role may use are present
+  PASS  active module is marked (aria-current) and follows navigation
+  PASS  collapse to 64 px, labels hidden, state survives reload; expand back to 260 px
+  PASS  landmarks and names: skip link, main, labelled navs, every button/link has an accessible name
+  PASS  home hierarchy: hero with brand + roles, featured first, then department sections; no "NEXT"
+  PASS  visual regression: desktop home
+  PASS  no horizontal scroll on desktop; no page errors
+  PASS  ADMIN: owner application entry in the navigation (and no economic screen)
+  PASS  failed/empty access: navigation shows only unrestricted screens, never a privileged one
+  PASS  visual regression: mobile login
+  PASS  mobile: sidebar hidden, bottom navigation with the operator's own screens, touch targets ≥ 48 px
+  PASS  mobile: menu button opens the full drawer (role-filtered), Escape closes it, links navigate and close it
+  PASS  mobile: terminal opens inside the shell, readable (dark skin), no horizontal scroll
+  PASS  mobile manager home: hero + tiles stack, no horizontal scroll
+  PASS  visual regression: mobile home
+  PASS  PWA: manifest says KMI (no NEXT), dark colours, PNG icons incl. maskable, all icon files exist
+  PASS  PWA: service worker registers, precaches the brand assets, and never touches API calls
+  PASS  no uncaught page errors during the whole run
+
+23 passed, 0 failed
+
+=== apps/web/test/label-screen.browser.test.ts ===
+  PASS  first label: server label code, QR + Code128 rendered, fields from the canonical record
+  PASS  the QR as rendered by Chromium decodes (OpenCV) to exactly KMI:WO:<id>
+  PASS  thermal layout is 62 × 40 mm on screen (96 dpi: 234 × 151 px, ±2)
+  PASS  print media: controls, banner and history hidden; only the label prints
+  PASS  reprint without a reason is refused (REPRINT_REASON_REQUIRED)
+  PASS  reprint with reason on A4: same label code, TEKRAR BASKI #2, 99 × 57 mm, logged
+  PASS  double click logs ONE print (same request id)
+  PASS  tablet (820 px) layout: no horizontal page scroll, label fits the width
+  PASS  a user without LABEL_REPRINT cannot make a second physical label
+
+9 passed, 0 failed
+
+=== apps/web/test/live-screen.browser.test.ts ===
+  PASS  LIVE 2.0: title, 8 KPIs from the canonical log on Istanbul boundaries, honest panels (no fake OEE), passport links
+  PASS  14 real machines; manual state said plainly; no state record = BİLİNMİYOR; STALE production stated
+  PASS  office view: running work with operator name and customer PO on the late order
+  PASS  card shows plan / good / scrap, elapsed since last status change, operator photo placeholder, update time, downtime — from the canonical source only
+  PASS  machine state, production, hold and maintenance stay separate: a DOWN machine without work shows no production numbers
+  PASS  machine state is five separate facts: record vs work order vs physical (UNKNOWN) vs class
+  PASS  status filter tabs show only the matching machines
+  PASS  ekran görünümü (PUBLIC): no person, no customer, no money anywhere on the page
+  PASS  display token shown once as a link; revocable
+  PASS  phone view: no horizontal scroll, no console errors
+  PASS  command-centre source unavailable → UNKNOWN on the card (no invented numbers), no raw error
+  PASS  auto-refresh never disturbs the user: open management panel, typed text and the selected filter tab survive several refresh cycles
+  PASS  with the panel closed the screen still refreshes (data reloads) and keeps the filter
+  PASS  kiosk with a wrong / revoked token: refused, nothing shown
+  PASS  kiosk (TV size): PUBLIC only, display name shown, no management controls, no names
+
+15 passed, 0 failed
+
+=== apps/web/test/maintenance-screen.browser.test.ts ===
+  PASS  Maintenance screen renders the seeded machines with zero console/page errors
+  PASS  setting a machine DOWN via the real form actually calls the API, flips status, and opens a ticket
+  PASS  a DOWN machine shows the return-to-service control, not the set-down control
+  PASS  rich compact card: open-ticket count, down-since stamp (Istanbul, seconds), passport links for machine and ticket
+  PASS  return to service is refused while the fault ticket is untouched (TICKET_NOT_TESTED:OPEN)
+  PASS  repair started, repair done -> TEST_PENDING; return still refused without a passed test
+  PASS  a test result needs written notes; a FAILED test sends the ticket back to repair
+  PASS  re-repair, test PASSED, then return to service: machine UP, ticket RETURNED_TO_SERVICE, then closable
+  PASS  a second-piece machine can be sent to MAINTENANCE directly from UP, with a reason
+  PASS  P0-B: a MAINTENANCE machine shows BAKIM, needs the authorized test, and cannot be parked in BEKLEME
+  PASS  P0-B: BEKLEMEYE Al opens NO maintenance ticket and offers the no-test resume
+  PASS  P0-B: BEKLEME -> üretim needs a reason but NO maintenance test
+  PASS  P0-B: a fault found during BEKLEME goes to ARIZA and then requires the authorized test
+
+13 passed, 0 failed
+
+=== apps/web/test/master-import-screen.browser.test.ts ===
+  PASS  empty state states read-only source and no name matching
+  PASS  bad pasted JSON is refused before anything is sent
+  PASS  fetch from the old store: rows classified, stager sees four-eyes notice and no apply button
+  PASS  second person: demo-looking rows need the explicit “real” tick; incomplete row needs a name; duplicate is not applied
+  PASS  demo rows with the tick and a name filled for the incomplete row go through; re-fetch shows already present
+  PASS  catalog: add customer/supplier, duplicates refused with a clear message, deactivate
+  PASS  phone view: no horizontal scroll, no console errors
+
+7 passed, 0 failed
+
+=== apps/web/test/masterImportReadOnly.test.ts ===
+PASS  old KMI store is read-only in all 117 source files (1 reference it)
+
+=== apps/web/test/material-screen.browser.test.ts ===
+  PASS  requirements from the BOM are shown and production start is blocked (MATERIAL_SHORTAGE)
+  PASS  a lot still on incoming-quality HOLD cannot be reserved
+  PASS  a material that is not in the BOM cannot be reserved
+  PASS  reserving more than the free lot quantity is refused
+  PASS  reserving AL only still leaves the O-ring shortage blocking the start
+  PASS  reserving the O-rings clears the material gate: HAZIR
+  PASS  issue to production, then consuming more than issued is refused
+  PASS  actual consumption is recorded against the issued material
+  PASS  legacy WO without revision: UNKNOWN / VERİ GEREKLİ, never "no material needed"
+  PASS  legacy WO: reserving material is refused without a revision
+  PASS  an unauthorized user cannot record the "no material needed" exemption
+  PASS  authorized exemption needs a real reason (>= 10 chars)
+  PASS  authorized, reasoned exemption turns UNKNOWN into MUAF (and only then)
+
+13 passed, 0 failed
+
+=== apps/web/test/my-attendance-screen.browser.test.ts ===
+  PASS  login not linked to a person: told so, no rows
+  PASS  linked but no verified card: empty is explained, not "never came"
+  PASS  own verified card: two days, Istanbul times, denied pass counted but not an exit
+  PASS  another person's card never appears, even when it is verified
+  PASS  no horizontal page scroll; no console errors
+
+5 passed, 0 failed
+
+=== apps/web/test/nav.test.ts ===
+PASS  route table parsed (sanity)
+PASS  every menu route appears in the navigation exactly once
+PASS  every navigation path is a real route (or Ana Sayfa) and a menu route
+PASS  every icon used exists; labels are unique; no "NEXT" in any nav text
+PASS  compact department-aware groups; all 15 departments each have a real entry
+PASS  for every role (and combinations) the navigation equals what access.ts lets the role open — no widening, no lost module
+PASS  no access / failed lookup shows only unrestricted screens (no privileged module)
+PASS  economic data screen is shown only with the economic grant; the application entry only to ADMIN
+
+8 passed, 0 failed
+PASS  Puantaj stays in the menu for ADMIN/MANAGEMENT before migration 0073 and closed for operators; Zirvedekiler is open to everyone (screen picks the view)
+
+=== apps/web/test/object-passport-adapter.test.ts ===
+  PASS  RPC allow-list: exactly the four canonical writers
+  PASS  no direct table writes anywhere in adapter or screen; no browser clock used as an event time
+  PASS  tables read are canonical (declared list)
+  PASS  operator: customer / order / supplier / shipment passports refused BEFORE any data request
+  PASS  registry gates: management with ORDER_CREATE opens customer/order; operator never; personnel only for managers or own record
+  PASS  every kind has a card tab, a unique tab list, and a defined audit entity type
+  PASS  task creation refused client-side for kinds without a canonical task source (no fake workflow)
+
+7 passed, 0 failed
+
+=== apps/web/test/object-passport-screen.browser.test.ts ===
+  PASS  card face: title, status pill, KPIs and related passport links point at the canonical passport route
+  PASS  record not found / server refusal shows a plain sentence, not a raw error
+  PASS  tabs: every tab loads through api.tab; denied part says so; pending part is "Kurulum bekleniyor"; tables render links and pills
+  PASS  timeline: newest first, seconds-precision Istanbul stamps, source labelled, change history expandable
+  PASS  late report: reported event time is shown beside (never instead of) the server record time
+  PASS  presets use Istanbul day boundaries: "Dün" (now = 12 Oct 18:00 TR) keeps the event at 00:30 on 12 Oct OUT and 11 Oct 12:00 IN
+  PASS  action and text filters narrow the list; bad custom range is explained, not silently ignored
+  PASS  as-of: known state, before creation, and UNVERIFIABLE (never the current state) when events are missing
+  PASS  an object type without state history says TARİHSEL DURUM DOĞRULANAMIYOR instead of a fake as-of
+  PASS  actions: manager sees DOWN; fault report calls the canonical writer; server refusal is shown in plain Turkish
+  PASS  actions: an operator is not offered DOWN; objects without a task source say so (BLOCKED) instead of a fake button
+  PASS  work-order passport: task creation goes to the canonical writer; the server refusal is shown (not swallowed)
+  PASS  phone width 390: no horizontal overflow on card, tabs, timeline
+  PASS  no page errors anywhere
+
+14 passed, 0 failed
+
+=== apps/web/test/object-passport.e2e.test.ts ===
+NOTICE:  database "kmi_e2e_26700" does not exist, skipping
+  PASS  MACHINE: card shows the real machine; DOWN is the canonical status; the timeline has the server-stamped audit event with the real actor name
+  PASS  MACHINE: every tab opens against real RLS without an error
+  PASS  MACHINE as-of: computed from the real state events; before the first event → UP (from creation), after → DOWN; before creation → not existing; no events → UNVERIFIABLE
+  PASS  WORK_ORDER: card numbers = database; all tabs open; timeline shows audit rows with their source label
+  PASS  WORK_ORDER → related passports: product and machine chips open the right canonical objects
+  PASS  canonical writer: "Görev aç" from the work order creates ONE task linked to it (double click + same request id = one row); audit has the real actor
+  PASS  PRODUCT / ORDER / CUSTOMER / STOCK passports open for management; order shows remaining obligation = qty − shipped
+  PASS  MAINTENANCE_TICKET: maintenance user advances it through the canonical writer; audit has the real actor; operator is not offered the buttons
+  PASS  TOOL passport opens; usage tab empty state is honest
+  PASS  ACCESS: an operator opening the work order passport is refused by the SERVER when creating a task (no row, plain message); and cannot DOWN a machine
+  PASS  ACCESS: operator cannot open customer / order passports; no customers/orders were even requested for that operator
+  PASS  ACCESS: operator opens OWN personnel passport but not a colleague's; the colleague's record is never read
+  PASS  ACCESS: management opens any personnel passport; personal puantaj multiplier / money never appears
+  PASS  SEARCH → PASSPORT: a global search hit for the work order/product offers a passport link that opens the canonical object
+  PASS  no page errors
+
+15 passed, 0 failed
+
+=== apps/web/test/oee-screen.browser.test.ts ===
+  PASS  machine 101: A %75.0 · P %55.6 · Q %90.0 · OEE %37.5 (live SQL values, not recomputed)
+  PASS  missing ideal cycle time => Performance and OEE UNKNOWN / VERİ GEREKLİ, reason named
+  PASS  planned but never ran: availability %0.0, others UNKNOWN — never 100 %
+  PASS  losses are shown separately (setup / fault / other)
+  PASS  switching the grouping asks the server (one canonical calculation)
+  PASS  no planned production in range => explicit UNKNOWN message, not zeros
+  PASS  phone width (390px): no horizontal page scroll
+
+7 passed, 0 failed
+
+=== apps/web/test/operator-credentials-screen.browser.test.ts ===
+  PASS  operator section appears for an OPERATOR with sicil; not for a non-operator; no sicil → warning; hidden without PERSONNEL_LOGIN_LINK
+  PASS  set PIN → chip updates, PIN never shown back; invalid PIN shows the server message
+  PASS  badge: secret shown once with a "not stored" note, disappears on next action; replace/revoke need a reason; PIN reset needs a reason
+  PASS  no horizontal overflow at 390 / 320
+  PASS  migration 0072 not installed → operator section shows "Kurulum bekleniyor"; people list still works
+
+5 passed, 0 failed
+
+=== apps/web/test/operator-home.browser.test.ts ===
+  PASS  home: own name/shift, both active jobs, machine count, task chip, no money
+  PASS  assigned job shows the start refusal before the operator tries; terminal shortcut passes the machine
+  PASS  tool event: a lost answer keeps the form; the retry (same request id) is ONE event
+  PASS  tool event without a code is refused by the server and shown
+  PASS  day summary: missing declaration + quality pending + open issue are visible; confirm never changes production, repeat is harmless
+  PASS  unlinked account: clear message, no data
+  PASS  terminal: lost answer → numbers and request id are kept → retry is the same declaration; planned-stop label travels in the reason
+  PASS  phone 320px: no horizontal scroll, touch targets ≥44px
+  PASS  phone 390px: no horizontal scroll, touch targets ≥44px
+  PASS  phone 430px: no horizontal scroll, touch targets ≥44px
+  PASS  no console errors
+
+11 passed, 0 failed
+
+=== apps/web/test/operator-regression.e2e.test.ts ===
+NOTICE:  database "kmi_e2e_27376" does not exist, skipping
+ERROR:  MACHINE_BUSY
+CONTEXT:  PL/pgSQL function kmi_next.transition_work_order_status(uuid,text,text) line 30 at RAISE
+  PASS  A. second START on the same machine is blocked (UI refusal + server)
+ERROR:  MULTI_MACHINE_AUTHORIZATION_INSUFFICIENT
+CONTEXT:  PL/pgSQL function kmi_next.assign_work_order_operator(uuid,uuid) line 27 at RAISE
+ERROR:  MULTI_MACHINE_AUTHORIZATION_INSUFFICIENT
+CONTEXT:  PL/pgSQL function kmi_next.assign_work_order_operator(uuid,uuid) line 27 at RAISE
+ERROR:  HARD_CAP_EXCEEDED
+CONTEXT:  PL/pgSQL function kmi_next.assign_work_order_operator(uuid,uuid) line 27 at RAISE
+  PASS  B. one operator on 2 and 3 machines: refused without authorization, allowed at level 2/3, hard cap at 4
+  PASS  C. network drop: shown as NOT saved (error, values kept); retry with the same request id counts once
+  PASS  D. lost response: the server saved but the answer never arrived → UI says "not saved", retry does NOT double-count
+  PASS  E. double click on "Üretim Kaydet" counts once
+  PASS  F. page refresh keeps machine + progress from the server; session refresh (storage cleared) asks for login and sends nothing
+ERROR:  ILLEGAL_TRANSITION: ON_HOLD -> COMPLETED
+CONTEXT:  PL/pgSQL function kmi_next.transition_work_order_status(uuid,text,text) line 12 at RAISE
+  PASS  G. Quality HOLD: terminal shows the hold on a queued order and a hold blocks completion
+ERROR:  ILLEGAL_TRANSITION: IN_PROGRESS -> COMPLETED
+CONTEXT:  PL/pgSQL function kmi_next.transition_work_order_status(uuid,text,text) line 12 at RAISE
+ERROR:  FORBIDDEN: FIRST_PIECE_APPROVE
+CONTEXT:  PL/pgSQL function kmi_next.transition_work_order_status(uuid,text,text) line 15 at RAISE
+  PASS  I. missing First Piece: the order cannot be completed from IN_PROGRESS, and the operator cannot approve it
+ERROR:  MACHINE_NOT_PRODUCTION_ELIGIBLE
+CONTEXT:  PL/pgSQL function kmi_next.transition_work_order_status(uuid,text,text) line 30 at RAISE
+  PASS  H. Maintenance DOWN: fault reported on the terminal makes the machine not eligible; a new order cannot start there
+  PASS  J. shift change: an operator of another shift is refused for a planned slot (OPERATOR_NOT_IN_SHIFT); own shift passes the shift rule
+ERROR:  FORBIDDEN: PRODUCTION_DECLARE
+CONTEXT:  PL/pgSQL function kmi_next.declare_production_idempotent(uuid,numeric,numeric,boolean,text) line 9 at RAISE
+SQL function "declare_production" statement 1
+ERROR:  MACHINE_NOT_PRODUCTION_ELIGIBLE
+CONTEXT:  PL/pgSQL function kmi_next.transition_work_order_status(uuid,text,text) line 30 at RAISE
+ERROR:  FORBIDDEN: PRODUCTION_DECLARE
+CONTEXT:  PL/pgSQL function kmi_next.declare_production_idempotent(uuid,numeric,numeric,boolean,text) line 9 at RAISE
+SQL function "declare_production" statement 1
+ERROR:  MACHINE_NOT_PRODUCTION_ELIGIBLE
+CONTEXT:  PL/pgSQL function kmi_next.transition_work_order_status(uuid,text,text) line 30 at RAISE
+  PASS  K. unauthorized operation: Quality / Warehouse users cannot start or declare production; a person who is not the operator is refused
+  PASS  L. KMI LIVE vs Command Center (same canonical rows): every running work order appears on exactly one machine card with the same operator; at most one active session per machine; an operator on several machines appears on each; no figure differs between the two views
+12 passed, 0 failed  (SYNTHETIC role accounts — not real-user factory acceptance)
+
+=== apps/web/test/operatorLoginCore.test.ts ===
+  PASS  success: session for the per-person account, roles mirrored, no email exposed
+  PASS  existing bound account is reused
+  PASS  missing PIN, bad PIN format, or no identifier never reaches verification (badge alone cannot log in)
+  PASS  failures map to generic 401 / 423 / 429 and issue no session
+  PASS  platform errors fail closed (500, no detail leaked, no session)
+  PASS  synthetic account e-mail is non-routable and per person
+
+6 passed, 0 failed
+
+=== apps/web/test/orders-screen.browser.test.ts ===
+  PASS  Orders screen renders the seeded order with zero console/page errors
+  PASS  a DRAFT order offers a CONFIRMED transition button (domain-predicted) and no SHIPPED button
+  PASS  creating an order via the real form adds a new DRAFT row (API actually called, screen actually re-rendered)
+  PASS  clicking CONFIRMED on the seeded row actually transitions it (status cell updates), while the new row stays DRAFT
+  PASS  order item: validation, add (idempotent request id), then a work order is opened from the item
+
+5 passed, 0 failed
+
+=== apps/web/test/owner-application-screen.browser.test.ts ===
+  PASS  ADMIN-style account sees the application screen: one button, no code, NO economic data
+  PASS  the screen only ever calls bindingStatus — no economic read at all
+  PASS  request → pending card with THIS account e-mail, reference, 30 min; access unchanged (still NONE, nothing bound)
+  PASS  repeat request keeps ONE pending request (same reference); cancel works
+  PASS  concurrent request from another account voids both; nobody bound
+  PASS  wrong e-mail approval refused; after an expired request nothing is bound; the screen shows the state
+  PASS  once the owner is bound the screen offers no new application
+  PASS  phone view: no horizontal scroll, no console errors
+
+8 passed, 0 failed
+
+=== apps/web/test/passport-screen.browser.test.ts ===
+  PASS  scan link opens the finished-lot passport: COMPLETE, label, supplier lot, shipment
+  PASS  as built: documents used at production are shown; a newer drawing version is flagged, never substituted
+  PASS  economic passport is LOCKED for a normal user — no figure on the page
+  PASS  backward → forward: raw material lot shows supplier, incoming QC and where it was used; Geri returns
+  PASS  product DNA: production, revision/CAM and recent work orders with their gap counts
+  PASS  a poorly traced work order lists every missing link, in order, in Turkish
+  PASS  unknown label and an unsupported label type are refused with the server message
+  PASS  the owner sees the economic passport: product EUR + TRY material is NOT summed (no margin)
+  PASS  owner, finished lot: 450 − 40 = 410,00 EUR after material
+  PASS  document links point at the exact record (lot and its work order)
+  PASS  no horizontal page scroll at phone width; no console errors
+
+11 passed, 0 failed
+
+=== apps/web/test/personnel-access.e2e.test.ts ===
+NOTICE:  database "kmi_e2e_28028" does not exist, skipping
+  PASS  admin sees the unlinked operator and the unlinked-account warning
+  PASS  linking without choosing an account is refused (nothing is guessed from names)
+  PASS  admin explicitly picks the account; it is linked, audited, and the account roles are shown
+  PASS  shift and multi-machine authorization are saved (gerekçe zorunlu)
+  PASS  MANAGEMENT may set shift / multi-machine but has NO account-link controls (server would refuse anyway)
+  PASS  the linked person logs in and lands on their own work screen with their name and shift
+  PASS  operator cannot open the access screen
+  PASS  no page errors
+
+8 passed, 0 failed
+
+=== apps/web/test/personnel-import-screen.browser.test.ts ===
+  PASS  empty: explains the source is read-only and matching is never by name
+  PASS  fetch: 5 people, counts by state, the fetcher sees the four-eyes notice and no apply button
+  PASS  second person: S003 without a chosen department is refused; with a department it is imported
+  PASS  USER-only person can be left out explicitly; inactive is never imported; re-fetch shows already imported
+  PASS  phone view: no horizontal scroll, no console errors
+
+5 passed, 0 failed
+
+=== apps/web/test/personnel-screen.browser.test.ts ===
+  PASS  Personnel screen renders the seeded person with zero console/page errors and the correct skill tier
+  PASS  creating a person via the real form adds a second active row
+  PASS  toggling active status actually calls the API and flips the row
+
+3 passed, 0 failed
+
+=== apps/web/test/planning-screen.browser.test.ts ===
+  PASS  board shows capacity, readiness (UNKNOWN) and no suggestion without a run-time estimate
+  PASS  entering a run time produces a SUGGESTION only — nothing is written
+  PASS  accepting the suggestion is an authorized decision, logged as "followed"
+  PASS  a work order bound to a DOWN machine gets no suggestion and can not be planned there
+  PASS  shift capacity is enforced (400 + 100 > 480)
+  PASS  operator must belong to the planned shift
+  PASS  operator already planned on another machine in the slot needs multi-machine authorization
+  PASS  a valid manual decision is saved; "followed" is decided by the SERVER, not claimed by the client
+  PASS  tablet (820px) and phone (390px): no horizontal page scroll
+  PASS  a user without WORK_ORDER_ASSIGN_MACHINE can see suggestions but not decide
+  PASS  Smart Assignment: the slot suggestion names the server top operator (Can: qualified + experienced)
+  PASS  Smart Assignment panel ranks everyone with the reason; ineligible people say why
+  PASS  choosing an unqualified operator is refused by the plan gate (same rule as the server)
+  PASS  "Seç" fills the operator; the manual commit is recorded as followed by the server
+
+14 passed, 0 failed
+
+=== apps/web/test/production-screen.browser.test.ts ===
+  PASS  Production screen renders the IN_PROGRESS work order snapshot with zero console/page errors
+  PASS  declaring production actually calls the API and the running totals update
+  PASS  opening a quality hold moves the work order to ON_HOLD and disables the declare form
+  PASS  releasing the hold returns the work order to IN_PROGRESS and the declare form reappears
+  PASS  recording a production correction requires a reason
+  PASS  recording a valid production correction actually calls the real RPC-equivalent and updates the totals
+  PASS  quality reject without a reason is refused and nothing changes
+  PASS  rejecting 3 parts opens an NCR, removes them from good qty and puts the work order ON_HOLD
+  PASS  the hold cannot be released before the NCR has a disposition (NCR_DISPOSITION_PENDING)
+  PASS  an OPEN NCR offers rework/scrap but never direct acceptance (re-inspection cannot be skipped)
+  PASS  disposition REWORK, then the hold releases back to IN_PROGRESS
+  PASS  rework done -> re-inspection accepted returns the 3 parts to good qty
+
+12 passed, 0 failed
+
+=== apps/web/test/puantaj-authority.e2e.test.ts ===
+NOTICE:  database "kmi_e2e_28694" does not exist, skipping
+ERROR:  FORBIDDEN: PUANTAJ_MANAGE
+CONTEXT:  PL/pgSQL function kmi_next.puantaj_month_facts(text) line 4 at RAISE
+ERROR:  FORBIDDEN: PUANTAJ_MANAGE
+CONTEXT:  PL/pgSQL function kmi_next.puantaj_month_facts(text) line 4 at RAISE
+ERROR:  FORBIDDEN: PUANTAJ_MANAGE
+CONTEXT:  PL/pgSQL function kmi_next.puantaj_month_facts(text) line 4 at RAISE
+  PASS  operator, accounting and an unlinked account cannot read puantaj facts (FORBIDDEN) — no premium data leaves the server
+ERROR:  FORBIDDEN: PUANTAJ_MANAGE
+CONTEXT:  PL/pgSQL function kmi_next.set_puantaj_input(text,uuid,jsonb,text) line 5 at RAISE
+ERROR:  FORBIDDEN: ECONOMICS
+CONTEXT:  PL/pgSQL function kmi_next.set_puantaj_pool(text,numeric,text) line 4 at RAISE
+ERROR:  FORBIDDEN: PUANTAJ_MANAGE
+CONTEXT:  PL/pgSQL function kmi_next.close_puantaj_period(text,jsonb,jsonb,jsonb) line 4 at RAISE
+  PASS  operator cannot write puantaj input, pool or close the period
+  PASS  management may read facts, but the pool amount is hidden unless the person has economic access (poolVisible=false, poolAmount=null)
+
+3 passed, 0 failed
+
+=== apps/web/test/puantaj-screen.browser.test.ts ===
+  PASS  nothing entered: every person is EKSİK VERİ with named gaps, points are UNKNOWN, no number invented, distribution refused
+  PASS  entering absence + care factor with a reason computes the V47 points; reason is mandatory
+  PASS  five or more absence days → excluded (V47), no points
+  PASS  without economic access: pool and bonus amounts are not shown at all; points still are
+  PASS  economic user with everyone computable: bonuses sum to the pool; multi-machine is shown but does not change points
+  PASS  close: needs confirmation; sends results for ALL people; incomplete data → distribution sent as null; then period is closed and read-only
+  PASS  no horizontal overflow at 1280 / 390 / 320
+  PASS  migration 0073 not installed → calm "Kurulum bekleniyor", no error panel, no blank page
+
+8 passed, 0 failed
+
+=== apps/web/test/purchase-requests-screen.browser.test.ts ===
+  PASS  a request without a reason is refused
+  PASS  a work order material shortage becomes a purchase request (only the short material)
+  PASS  repeating the shortage request does not duplicate it
+  PASS  converting with no approved request is refused (PO_MUST_HAVE_AT_LEAST_ONE_LINE)
+  PASS  approved request needs a positive unit price to become a PO line
+  PASS  with supplier, currency and price the approved request becomes a PO and is CONVERTED
+
+6 passed, 0 failed
+
+=== apps/web/test/purchasing-screen.browser.test.ts ===
+  PASS  Purchasing screen renders the seeded PO/line with zero console/page errors
+  PASS  recording a partial goods receipt via the real form actually calls the API and updates qty_received + PO status
+  PASS  a second goods receipt covering the rest of the ordered qty moves the PO to RECEIVED
+  PASS  attempting to over-receive beyond the ordered qty is refused by the real domain rule (surfaced as an error banner)
+
+4 passed, 0 failed
+
+=== apps/web/test/receivables-screen.browser.test.ts ===
+  PASS  without accounting right (and no economic access): the server refuses, no amount shown
+  PASS  no payment term: due date BİLİNMİYOR — never "not overdue", even for a 70-day invoice
+  PASS  term needs a reason; 30-day term → 70-day invoice 40 days OVERDUE, 10-day invoice not due (= harness)
+  PASS  phone view: no horizontal scroll, no console errors
+
+4 passed, 0 failed
+
+=== apps/web/test/report-families-screen.browser.test.ts ===
+  PASS  families: groups by report family, formula v2 marked, economic report not even listed for a manager
+  PASS  scheduler panel: master switch OFF and NOT installed is said plainly; in-app only, no e-mail
+  PASS  schedule change needs a reason; the owner-only economic schedule is refused for a manager
+  PASS  capacity: missing estimate is BİLİNMİYOR + EKSİK VERİ banner, not free capacity; scope shown
+  PASS  scrap by product / operation (routed op 20 = %20.0); weekly: OEE without data = BİLİNMİYOR
+  PASS  manager phone view: no horizontal scroll, no console errors
+  PASS  owner: economic report listed, generated, and says which cost parts are missing (no full cost)
+
+7 passed, 0 failed
+
+=== apps/web/test/reports-screen.browser.test.ts ===
+  PASS  reports link back to the event history (time search)
+  PASS  pool: 20 reports (owner-only economic one invisible), 2 listed as not available WITH the reason, purchasing report shows its required role
+  PASS  generate overdue shipments: one row (PO-LATE, 6 left, 3 days late), immutable fingerprint shown
+  PASS  CSV export = the snapshot (BOM, ";" separator, Turkish headers)
+  PASS  quality KPI: scrap rate %6.0 and PPM 60000 from the server snapshot
+  PASS  no production in the window → HESAPLANAMADI with the missing input, no numbers
+  PASS  OEE without planned time → HESAPLANAMADI (never %100)
+  PASS  purchasing report without PURCHASING_APPROVE is refused by the server rule
+  PASS  history: re-open an earlier snapshot, fingerprint verified
+  PASS  KPI dictionary lists every KPI with formula and unknown rule
+  PASS  no horizontal page scroll at phone width; no console errors
+
+11 passed, 0 failed
+
+=== apps/web/test/route-sweep.browser.test.ts ===
+OK (içerik/boş durum)          /gecmis
+BLOCKED (Kurulum bekleniyor)   /gorevler
+BLOCKED (Kurulum bekleniyor)   /operator
+BLOCKED (Kurulum bekleniyor)   /terminal
+OK (içerik/boş durum)          /is-emirleri
+OK (içerik/boş durum)          /tara
+BLOCKED (Kurulum bekleniyor)   /dokumanlar
+OK (içerik/boş durum)          /pasaport
+BLOCKED (Kurulum bekleniyor)   /giris-cikislarim
+BLOCKED (Kurulum bekleniyor)   /rozetlerim
+BLOCKED (Kurulum bekleniyor)   /bakim
+OK (içerik/boş durum)          /kalite
+OK (içerik/boş durum)          /sevkiyat
+OK (içerik/boş durum)          /depo
+BLOCKED (Kurulum bekleniyor)   /takimhane
+BLOCKED (Kurulum bekleniyor)   /komuta
+OK (içerik/boş durum)          /rota
+BLOCKED (Kurulum bekleniyor)   /planlama
+BLOCKED (Kurulum bekleniyor)   /oee
+OK (içerik/boş durum)          /raporlar
+BLOCKED (Kurulum bekleniyor)   /cihazlar
+BLOCKED (Kurulum bekleniyor)   /zeka
+BLOCKED (Kurulum bekleniyor)   /canli
+OK (içerik/boş durum)          /onay-kuyrugu
+BLOCKED (Kurulum bekleniyor)   /alacaklar
+OK (içerik/boş durum)          /tahsis
+OK (içerik/boş durum)          /maliyet
+BLOCKED (Kurulum bekleniyor)   /ekonomi
+OK (içerik/boş durum)          /ekonomi-basvuru
+BLOCKED (Kurulum bekleniyor)   /giris-cikis
+OK (içerik/boş durum)          /yetkinlik-aktarim
+BLOCKED (Kurulum bekleniyor)   /akademi
+OK (içerik/boş durum)          /siparisler
+OK (içerik/boş durum)          /muhendislik
+OK (içerik/boş durum)          /katalog
+OK (içerik/boş durum)          /ana-veri-aktarim
+OK (içerik/boş durum)          /personel
+BLOCKED (Kurulum bekleniyor)   /puantaj
+BLOCKED (Kurulum bekleniyor)   /zirvedekiler
+BLOCKED (Kurulum bekleniyor)   /personel-yetki
+OK (içerik/boş durum)          /personel-aktarim
+OK (içerik/boş durum)          /satinalma
+OK (içerik/boş durum)          /talepler
+
+43 clean, 0 problems (43 routes)
+
+=== apps/web/test/routing-screen.browser.test.ts ===
+  PASS  op 20 cannot start before op 10 is done (server wording in Turkish)
+  PASS  smart suggestion: ranked with explained factors, ineligible shown with the reason, never assigns
+  PASS  unqualified operator refused; qualified start → İLK PARÇA ONAYI
+  PASS  first piece: the operator cannot approve his own; quality approves → ÜRETİMDE
+  PASS  output never above the input; 8 good + 1 scrap; finish → KALİTE KONTROL
+  PASS  QC PASS → op 10 TAMAM, op 20 receives 8 as input
+  PASS  D-012: VIBROMAK requirements UNKNOWN → refused until a 30-day clearance; then it starts
+  PASS  last operation done (no QC) → final release ready
+  PASS  matrix review: DEFINED without requirements refused; NONE_REQUIRED with a reason
+  PASS  no horizontal page scroll; no console errors
+
+10 passed, 0 failed
+
+=== apps/web/test/scan-screen.browser.test.ts ===
+  PASS  scanner wedge: a KMI machine label + Enter resolves the machine
+  PASS  a phone camera link (?scan=) is unwrapped and resolved
+  PASS  an unknown work order is reported NOT FOUND but still recorded
+  PASS  a legacy plain code (old KMI labels) is recorded, not dropped
+  PASS  an invalid KMI label type is refused before reaching the server
+  PASS  camera availability shown matches the real BarcodeDetector support of the browser
+
+6 passed, 0 failed
+
+=== apps/web/test/screens-vs-database.e2e.test.ts ===
+NOTICE:  database "kmi_e2e_29981" does not exist, skipping
+  PASS  ADMIN opens /nesne against the real database
+  PASS  ADMIN opens /gecmis against the real database
+  PASS  ADMIN opens /ara against the real database
+  PASS  ADMIN opens /gorevler against the real database
+  PASS  ADMIN opens /operator against the real database
+  PASS  ADMIN opens /terminal against the real database
+  PASS  ADMIN opens /is-emirleri against the real database
+  PASS  ADMIN opens /muhasebe against the real database
+  PASS  ADMIN opens /tara against the real database
+  PASS  ADMIN opens /dokumanlar against the real database
+  PASS  ADMIN opens /pasaport against the real database
+  PASS  ADMIN opens /giris-cikislarim against the real database
+  PASS  ADMIN opens /rozetlerim against the real database
+  PASS  ADMIN opens /bakim against the real database
+  PASS  ADMIN opens /kalite against the real database
+  PASS  ADMIN opens /sevkiyat against the real database
+  PASS  ADMIN opens /depo against the real database
+  PASS  ADMIN opens /takimhane against the real database
+  PASS  ADMIN opens /komuta against the real database
+  PASS  ADMIN opens /rota against the real database
+  PASS  ADMIN opens /planlama against the real database
+  PASS  ADMIN opens /oee against the real database
+  PASS  ADMIN opens /raporlar against the real database
+  PASS  ADMIN opens /cihazlar against the real database
+  PASS  ADMIN opens /zeka against the real database
+  PASS  ADMIN opens /canli against the real database
+  PASS  ADMIN opens /onay-kuyrugu against the real database
+  PASS  ADMIN opens /alacaklar against the real database
+  PASS  ADMIN opens /tahsis against the real database
+  PASS  ADMIN opens /maliyet against the real database
+  PASS  ADMIN opens /ekonomi against the real database
+  PASS  ADMIN opens /ekonomi-basvuru against the real database
+  PASS  ADMIN opens /giris-cikis against the real database
+  PASS  ADMIN opens /yetkinlik-aktarim against the real database
+  PASS  ADMIN opens /akademi against the real database
+  PASS  ADMIN opens /siparisler against the real database
+  PASS  ADMIN opens /muhendislik against the real database
+  PASS  ADMIN opens /katalog against the real database
+  PASS  ADMIN opens /ana-veri-aktarim against the real database
+  PASS  ADMIN opens /personel against the real database
+  PASS  ADMIN opens /puantaj against the real database
+  PASS  ADMIN opens /zirvedekiler against the real database
+  PASS  ADMIN opens /personel-yetki against the real database
+  PASS  ADMIN opens /personel-aktarim against the real database
+  PASS  ADMIN opens /satinalma against the real database
+  PASS  ADMIN opens /talepler against the real database
+  PASS  ADMIN opens /tedarikci-fatura against the real database
+  PASS  ADMIN opens /etiket against the real database
+  PASS  ADMIN opens /malzeme against the real database
+  PASS  ADMIN opens /takim-hazirlik against the real database
+  PASS  OPERATOR lands on the operator home (linked personnel, shift TeamK1) with no data
+  PASS  OPERATOR opens /terminal without server errors
+  PASS  OPERATOR opens /gorevler without server errors
+  PASS  OPERATOR opens /tara without server errors
+  PASS  OPERATOR opens /giris-cikislarim without server errors
+  PASS  OPERATOR opens /rozetlerim without server errors
+  PASS  OPERATOR opens /takimhane without server errors
+  PASS  OPERATOR opens /is-emirleri without server errors
+  PASS  OPERATOR opens /bakim without server errors
+  PASS  OPERATOR cannot open /ekonomi (closed in the app) and the app never calls its data
+  PASS  OPERATOR cannot open /muhasebe (closed in the app) and the app never calls its data
+  PASS  OPERATOR cannot open /personel (closed in the app) and the app never calls its data
+  PASS  OPERATOR cannot open /ana-veri-aktarim (closed in the app) and the app never calls its data
+  PASS  OPERATOR cannot open /alacaklar (closed in the app) and the app never calls its data
+
+64 passed, 0 failed
+
+=== apps/web/test/search-screen.browser.test.ts ===
+  PASS  results are grouped by type and each hit links to the record’s own screen
+  PASS  a query shorter than 2 characters never reaches the server and explains why
+  PASS  no match says so without revealing whether hidden records exist; server refusal is shown in Turkish
+  PASS  phone view: no horizontal scroll, no console errors
+
+4 passed, 0 failed
+
+=== apps/web/test/shipment-screen.browser.test.ts ===
+  PASS  Shipment screen renders the STAGED stock lot with zero console/page errors and offers "Sevkiyat Oluştur"
+  PASS  creating a shipment actually calls the API and adds a DRAFT row with a dispatch action
+  PASS  dispatching the shipment actually calls the API, moves it to DISPATCHED, and drives the stock lot to SHIPPED
+  PASS  delivering the shipment actually calls the API and reaches the terminal DELIVERED state with no further actions
+
+4 passed, 0 failed
+
+=== apps/web/test/stock-screen.browser.test.ts ===
+  PASS  Stock screen renders the COMPLETED work order with full available qty and zero console/page errors
+  PASS  creating a stock lot within available qty actually calls the API and adds a WIP row
+  PASS  WIP lot offers a transition to FG but not to SHIPPED, and transitioning updates the row
+  PASS  creating a second lot exceeding the remaining available qty is rejected by the stub (same rule as the live RPC)
+
+4 passed, 0 failed
+
+=== apps/web/test/supplier-invoice-screen.browser.test.ts ===
+  PASS  3-way match view: ordered / received / QC accepted / rejected / pending / invoiceable
+  PASS  rejected / still-in-QC quantity can not be invoiced (EXCEEDS_ACCEPTED_NOT_INVOICED)
+  PASS  a price different from the PO price is refused (PRICE_MISMATCH)
+  PASS  partial invoice (40 of 60 accepted) is recorded with the server-computed amount
+  PASS  double submit of the same form creates ONE invoice (same request id)
+  PASS  the same invoice number in another spelling is a duplicate (DUPLICATE_INVOICE_NO)
+  PASS  partial payment, overpay refused, final payment closes the invoice
+  PASS  double click on a payment records it once
+  PASS  an unpaid invoice past its due date is flagged VADESİ GEÇTİ
+  PASS  phone width (390px): no horizontal page scroll, tables scroll inside their box
+  PASS  a user without accounting / purchasing-approval rights sees no money data
+
+11 passed, 0 failed
+
+=== apps/web/test/tahsis.e2e.test.ts ===
+NOTICE:  database "kmi_e2e_30657" does not exist, skipping
+  PASS  before the DB package: the screen says "Kurulum bekleniyor" (no broken page, existing NCRs untouched)
+  PASS  quality opens a TAHSİS case from the UI: server stamps kind + detection source, quantity leaves production once, lot is held
+  PASS  dimension record: oversize accepted and shown with the excess; an in-tolerance value is refused by the server; records cannot be edited
+  PASS  existing NCR workflow drives the stages; accepted rework returns the quantity ONCE; no production declaration is created; scrap unchanged
+  PASS  operator: the TAHSİS screen is closed
+  PASS  no page errors
+
+6 passed, 0 failed. (tahsis.e2e.test.ts)
+
+=== apps/web/test/task-floor-screen.browser.test.ts ===
+  PASS  operator: sees own late task and only his role’s derived work; no assign form, no scope switch
+  PASS  completing without the mandatory evidence is refused with a clear message; with evidence it waits for approval
+  PASS  manager: assigns a new task (needs a target), then approval is only possible by someone other than the completer
+  PASS  a manager who completed a task himself sees the four-eyes notice and no approve button
+  PASS  phone view: touch targets ≥44px, no horizontal scroll, no console errors
+
+5 passed, 0 failed
+
+=== apps/web/test/terminal-screen.browser.test.ts ===
+  PASS  machine picker, then the choice is remembered on reload
+  PASS  queue shows the server start-gate preview: missing BOM blocks, the other can start
+  PASS  start → active card; the other work order now shows MACHINE_BUSY
+  PASS  double tap on "Üretim Kaydet" records ONE declaration
+  PASS  declaring more than planned is refused by the same rule as the server
+  PASS  first piece goes to quality (FIRST_PIECE_PENDING)
+  PASS  BEKLEME needs a reason; with reason + category the machine waits and the WO is held
+  PASS  resume from BEKLEME without a maintenance test
+  PASS  operator reports a fault: ARIZA, nothing can start, no resume button
+  PASS  phone: no horizontal scroll and every button is a ≥ 44 px touch target
+
+10 passed, 0 failed
+
+=== apps/web/test/tool-readiness-screen.browser.test.ts ===
+  PASS  CAM tool list shown, production blocked until tools are mounted (TOOL_NOT_READY)
+  PASS  a tool type that is not in the CAM program cannot be mounted for this work order
+  PASS  a worn-out tool cannot be mounted
+  PASS  mounting one drill + the end mill still leaves DR-6 short
+  PASS  mounting the second drill clears the tool gate: HAZIR
+  PASS  a CAM program with a tool list can not be exempted (data governs)
+  PASS  WO without CAM program: UNKNOWN / VERİ GEREKLİ, never "no tool needed"
+  PASS  an unauthorized user cannot record the "no tool needed" exemption
+  PASS  authorized, reasoned exemption: MUAF
+
+9 passed, 0 failed
+
+=== apps/web/test/toolroom-screen.browser.test.ts ===
+  PASS  Toolroom screen renders the seeded tools with zero console/page errors
+  PASS  mounting a CABINET tool via the real form actually calls the API and flips location to MOUNTED
+  PASS  unmounting the now-MOUNTED tool returns it to CABINET via the real API
+  PASS  scrapping a tool via the real form moves it to SCRAP and removes the mount/unmount controls
+
+4 passed, 0 failed
+
+=== apps/web/test/visual-contrast.browser.test.ts ===
+PASS academy-fixture.html: 27 text nodes, none < 3:1 (0 < 4.5:1)
+PASS acc-fixture.html: 20 text nodes, none < 3:1 (0 < 4.5:1)
+PASS aq-fixture.html: 18 text nodes, none < 3:1 (0 < 4.5:1)
+PASS badges-fixture.html: 18 text nodes, none < 3:1 (0 < 4.5:1)
+PASS capp-fixture.html: 5 text nodes, none < 3:1 (0 < 4.5:1)
+PASS cc-fixture.html: 93 text nodes, none < 3:1 (0 < 4.5:1)
+PASS cc2-fixture.html: 3 text nodes, none < 3:1 (0 < 4.5:1)
+PASS competency-import-fixture.html: 3 text nodes, none < 3:1 (0 < 4.5:1)
+PASS cost-fixture.html: 29 text nodes, none < 3:1 (0 < 4.5:1)
+PASS dept-fixture.html: 0 text nodes, none < 3:1 (0 < 4.5:1)
+PASS devices-fixture.html: 22 text nodes, none < 3:1 (0 < 4.5:1)
+PASS doc-intel-fixture.html: 36 text nodes, none < 3:1 (0 < 4.5:1)
+PASS documents-fixture.html: 20 text nodes, none < 3:1 (0 < 4.5:1)
+PASS economics-fixture.html: 4 text nodes, none < 3:1 (0 < 4.5:1)
+PASS economics-owner-fixture.html: 7 text nodes, none < 3:1 (0 < 4.5:1)
+PASS gecko-fixture.html: 20 text nodes, none < 3:1 (0 < 4.5:1)
+PASS hub-fixture.html: 6 text nodes, none < 3:1 (0 < 4.5:1)
+PASS intelligence-fixture.html: 12 text nodes, none < 3:1 (0 < 4.5:1)
+PASS label-fixture.html: 3 text nodes, none < 3:1 (0 < 4.5:1)
+PASS live-fixture.html: 318 text nodes, none < 3:1 (2 < 4.5:1)
+PASS maintenance-fixture.html: 53 text nodes, none < 3:1 (0 < 4.5:1)
+PASS master-import-fixture.html: 5 text nodes, none < 3:1 (0 < 4.5:1)
+PASS mat-fixture.html: 20 text nodes, none < 3:1 (0 < 4.5:1)
+PASS my-attendance-fixture.html: 3 text nodes, none < 3:1 (0 < 4.5:1)
+PASS oee-fixture.html: 63 text nodes, none < 3:1 (0 < 4.5:1)
+PASS opcred-fixture.html: 26 text nodes, none < 3:1 (0 < 4.5:1)
+PASS operator-home-fixture.html: 30 text nodes, none < 3:1 (0 < 4.5:1)
+PASS owner-application-fixture.html: 6 text nodes, none < 3:1 (0 < 4.5:1)
+PASS passport-fixture.html: 2 text nodes, none < 3:1 (0 < 4.5:1)
+PASS personnel-fixture.html: 26 text nodes, none < 3:1 (0 < 4.5:1)
+PASS personnel-import-fixture.html: 4 text nodes, none < 3:1 (0 < 4.5:1)
+PASS plan-fixture.html: 69 text nodes, none < 3:1 (0 < 4.5:1)
+PASS pp-fixture.html: 0 text nodes, none < 3:1 (0 < 4.5:1)
+PASS pr-fixture.html: 4 text nodes, none < 3:1 (0 < 4.5:1)
+PASS prod-fixture.html: 11 text nodes, none < 3:1 (0 < 4.5:1)
+PASS purchasing-fixture.html: 8 text nodes, none < 3:1 (0 < 4.5:1)
+PASS pz-demo-fixture.html: 45 text nodes, none < 3:1 (0 < 4.5:1)
+PASS pz-fixture.html: 1 text nodes, none < 3:1 (0 < 4.5:1)
+PASS receivables-fixture.html: 19 text nodes, none < 3:1 (0 < 4.5:1)
+PASS report-families-fixture.html: 190 text nodes, none < 3:1 (0 < 4.5:1)
+PASS reports-fixture.html: 190 text nodes, none < 3:1 (0 < 4.5:1)
+PASS routing-fixture.html: 19 text nodes, none < 3:1 (0 < 4.5:1)
+PASS scan-fixture.html: 3 text nodes, none < 3:1 (0 < 4.5:1)
+PASS search-fixture.html: 9 text nodes, none < 3:1 (0 < 4.5:1)
+PASS ship-fixture.html: 5 text nodes, none < 3:1 (0 < 4.5:1)
+PASS sinv-fixture.html: 40 text nodes, none < 3:1 (0 < 4.5:1)
+PASS stock-fixture.html: 7 text nodes, none < 3:1 (0 < 4.5:1)
+PASS task-floor-fixture.html: 29 text nodes, none < 3:1 (0 < 4.5:1)
+PASS term-fixture.html: 6 text nodes, none < 3:1 (0 < 4.5:1)
+PASS toolroom-fixture.html: 20 text nodes, none < 3:1 (0 < 4.5:1)
+PASS tr-fixture.html: 10 text nodes, none < 3:1 (0 < 4.5:1)
+PASS wo-fixture.html: 13 text nodes, none < 3:1 (0 < 4.5:1)
+PASS wo-release-fixture.html: 55 text nodes, none < 3:1 (0 < 4.5:1)
+PASS zv-fixture.html: 0 text nodes, none < 3:1 (0 < 4.5:1)
+
+54 screens, 1655 text nodes: 0 below 3:1, 2 below 4.5:1
+
+=== apps/web/test/work-order-release.browser.test.ts ===
+  PASS  renders all six seeded work orders with zero console/page errors
+  PASS  2nd concurrent machine without authorization is refused (MULTI_MACHINE_AUTHORIZATION_INSUFFICIENT)
+  PASS  after a level-2 grant, the same assignment succeeds through the real screen action
+  PASS  missing first-piece approval: a FIRST_PIECE_PENDING work order is never offered COMPLETED
+  PASS  final release with nothing produced is refused (NOTHING_PRODUCED)
+  PASS  final release with an OPEN quality hold is refused (OPEN_QUALITY_HOLD)
+  PASS  final release of an approved, produced, hold-free work order moves it to COMPLETED
+
+7 passed, 0 failed
+
+=== apps/web/test/work-orders-screen.browser.test.ts ===
+  PASS  Work Orders screen renders the seeded PLANNED work order with zero console/page errors
+  PASS  a PLANNED work order offers "Makine Ata" and no IN_PROGRESS button yet (must assign machine first)
+  PASS  assigning a machine actually calls the API and the row updates to MACHINE_ASSIGNED with the machine id shown
+  PASS  creating a new work order via the real form adds a second PLANNED row
+
+4 passed, 0 failed
+
+=== apps/web/test/zirvedekiler-badges.e2e.test.ts ===
+NOTICE:  database "kmi_e2e_32242" does not exist, skipping
+  PASS  the employee sees exactly the awards recorded for them; profile history = badge_awards rows
+ERROR:  FORBIDDEN: BADGES
+CONTEXT:  PL/pgSQL function kmi_next.badge_profile(uuid) line 4 at RAISE
+ERROR:  FORBIDDEN: BADGES
+CONTEXT:  PL/pgSQL function kmi_next.badge_profile(uuid) line 4 at RAISE
+  PASS  an employee cannot read another employee's profile (server), a manager can; the other employee has no awards
+  PASS  a withdrawn award stays in history marked withdrawn and is not counted as earned
+  PASS  UI (employee, real data): own earned count = 1 (withdrawn excluded); ranking BLOCKED; puantaj facts were never requested
+  PASS  UI (management, real data): management view; facts requested by the manager only; no pool amount without economic access
+  PASS  no page errors
+
+6 passed, 0 failed
+
+=== apps/web/test/zirvedekiler-screen.browser.test.ts ===
+  PASS  everyone computable: top 3 podium ordered by V47 points, with badge count and no bonus/pool amount anywhere
+  PASS  anyone with missing inputs → "Hesaplama için veri bekleniyor", no ranking invented
+  PASS  no participants → waiting state; migration 0073 missing → "Kurulum bekleniyor — Migration 0073 gerekli"; forbidden → readable
+  PASS  EMPLOYEE view: own badges and level only; never calls the puantaj source; no pool / bonus / wage; general ranking is BLOCKED (server view missing), not filtered client-side
+  PASS  EMPLOYEE view without a linked personnel record explains it instead of failing
+  PASS  period selector reloads another month
+  PASS  no horizontal overflow at 1280 / 390 / 320
+
+7 passed, 0 failed
+
+=== packages/data-client/test/client.test.ts ===
+PASS: signInWithPassword posts to the correct GoTrue endpoint with apikey + body, and parses the session
+PASS: signInWithPassword with bad credentials throws AuthError carrying the HTTP status
+PASS: rpc() targets kmi_next via content-profile, sends the session bearer token, and returns the parsed body
+PASS: rpc() surfaces a server-side rejection (e.g. ILLEGAL_TRANSITION) as a PostgrestError, never silently
+PASS: select() builds a PostgREST query string (select/filters/order/limit) and targets kmi_next via accept-profile
+PASS: rpc()/select() convert PostgREST snake_case columns to the camelCase row shape every screen reads
+PASS: select() with no session falls back to the apikey as bearer (unauthenticated request, RLS will reject server-side)
+PASS: command_center snapshot: nested keys camelized, domain/kind VALUES untouched
+PASS: expired JWT: ONE silent refresh, request retried with the new token, session object + callback updated
+PASS: concurrent 401s share a single refresh (refresh tokens are single-use)
+PASS: refresh refused: SESSION_EXPIRED once, onSessionExpired fires, NO retry loop
+PASS: refresh network failure / 5xx is TRANSIENT: session kept, onSessionExpired NOT fired, later call refreshes normally
+PASS: still 401 after a successful refresh: ends the session instead of looping
+PASS: no refresh token / no session (kiosk): a 401 is just an error, no refresh attempt
+
+14 passed, 0 failed. (client.test.ts)
+
+=== packages/domain/test/accounting.test.ts ===
+PASS: invoice requires a DISPATCHED or DELIVERED shipment (old KMI: "Önce sevkiyat yapılmalı")
+PASS: a purchasing-sourced lot has no customer order to invoice
+PASS: currency must be one of the known set (TRY/EUR/USD/GBP), never guessed
+PASS: computeInvoiceAmount: qty x unit price, rounded to 2 decimals
+PASS: canRecordPayment: positive and never more than the remaining balance
+PASS: computeInvoiceStatus: OPEN -> PARTIAL -> PAID
+PASS: computeShipmentObligation: partial shipment leaves a remaining obligation
+PASS: computeShipmentObligation: fully shipped across several partial shipments -> nothing remaining
+PASS: computeShipmentObligation: over-shipment is flagged, remaining never negative
+
+9 passed, 0 failed. (accounting.test.ts)
+
+=== packages/domain/test/architecture-invariants.test.ts ===
+PASS: Item 7 — projectPlanning() never mutates the OrderItem it is given (no B/C dual-write is possible)
+PASS: Item 7 — PlanningProjection has no field that could overwrite a CanonicalOrder/OrderItem fact
+PASS: Item 3 / structural precedent — kmi_next.orders grants SELECT + specific RPC EXECUTE only, never direct INSERT/UPDATE/DELETE
+PASS: Item 11 — packages/domain source has zero references to old KMI legacy tables/APIs by name
+PASS: NULL-safe gates (OLD-KMI-SEC-001 class) — every four-eyes "actor = x" check is preceded by an unlinked-actor refusal (0049)
+
+5 passed, 0 failed. (architecture-invariants.test.ts)
+
+=== packages/domain/test/asBuilt.test.ts ===
+  PASS  harness proposals reproduced exactly (fields + type)
+  PASS  flags = harness (CONTENT_NOT_READ for PDF, revision mismatch, expired, wrong type)
+  PASS  Turkish and English names: uppercase I in English stays i (DRAWING), İ becomes i
+  PASS  drift = harness: produced with v1, now v2; unchanged documents not listed
+  PASS  gate scope, presence and rule refusals
+  PASS  server enforcement on every path; history append-only; no OCR pretended
+
+6 passed, 0 failed
+
+=== packages/domain/test/authorization.test.ts ===
+PASS: denies when there is no auth context at all
+PASS: denies a context with no matching role
+PASS: allows QUALITY to release a Quality HOLD
+PASS: allows ADMIN on every critical action (superuser-equivalent, matches existing KMI convention)
+PASS: a per-user override can deny even a role-matched action
+PASS: a per-user override can grant an action the role matrix would otherwise refuse
+PASS: an unrecognized action is refused, never silently allowed
+PASS: MAINTENANCE role cannot release a Quality HOLD (cross-department boundary preserved)
+PASS: DEFAULT_ROLE_MATRIX matches the role_action_matrix rows seeded across supabase/migrations
+
+9 passed, 0 failed. (authorization.test.ts)
+
+=== packages/domain/test/badgesAssignment.test.ts ===
+  PASS  criteria: all must hold; null metric never meets; empty list false
+  PASS  harness awards: QUALITY 1, SETUP 1, MEASUREMENT 1; re-evaluation adds nothing; no data source = nothing
+  PASS  upper tiers get harder and need a verified skill; tiers in order only
+  PASS  progress bars: ratio and unknown
+  PASS  a badge is never authority: no badge in any start gate / skill writer (structural)
+  PASS  assignment ranking = harness: A (same step ×6, level 3) first; with A busy elsewhere B first
+  PASS  decision: not following needs a reason; ineligible refused with its code; followed computed
+  PASS  multi-machine rule + it sits right after OPERATOR_INACTIVE in the start gate
+  PASS  suggestion never assigns; presence never ranks; GEÇKO only for viewers with an OK feed
+
+9 passed, 0 failed
+
+=== packages/domain/test/bom.test.ts ===
+PASS: a revision can only be released from DRAFT and never with an empty BOM
+PASS: BOM lines are locked once the revision is released; qty/allowance validated
+PASS: requirement = planned x qty/unit x (1 + allowance), rounded UP to 3 decimals
+PASS: ledger movements: reserve -> issue -> consume / return keep the balance consistent
+PASS: reserve: only AVAILABLE lots (incoming-quality accepted), never more than free qty
+PASS: issue/unreserve limited to this work order reservation; consume/return limited to issued
+PASS: material shortage gate names the first uncovered material
+PASS: consumption variance vs standard
+
+8 passed, 0 failed. (bom.test.ts)
+
+=== packages/domain/test/commandCenter.test.ts ===
+PASS: critical first, then the one waiting longest
+PASS: PULSE: empty shop is UNKNOWN, never green; RED on critical, AMBER on high, GREEN only with current data
+PASS: coverage: no records = NO_DATA; running work without an update for 8 h = STALE; maintenance is manual
+PASS: live golden: the alert list the SQL produced orders and lights up the same in TS
+PASS: SQL lockstep 0037: pulse order and 8-hour stale rule identical
+PASS: SQL lockstep: every alert kind has the same severity and domain in migration 0027
+
+6 passed, 0 failed. (commandCenter.test.ts)
+
+=== packages/domain/test/commercialApproval.test.ts ===
+PASS: canRequestCommercialApproval: true for AVAILABLE and RESERVED lots
+PASS: canRequestCommercialApproval: false for WIP/FG/HOLD/SCRAP/SHIPPED
+PASS: canDecideCommercialApproval: allows deciding a PENDING request
+PASS: canDecideCommercialApproval: refuses deciding an already-decided request (no double decision)
+PASS: canStageForShipment: refuses staging a lot that is not RESERVED, even AVAILABLE, regardless of approval (matches stock.ts — AVAILABLE cannot skip straight to STAGED)
+PASS: canStageForShipment: refuses staging a RESERVED lot with no approval at all
+PASS: canStageForShipment: refuses staging a RESERVED lot whose approval is still PENDING or was REJECTED
+PASS: canStageForShipment: allows staging a RESERVED lot with an APPROVED approval
+PASS: canGrantManagementRelease: only on a PENDING request, and only once
+PASS: canDecideCommercialApprovalWithRelease: APPROVED requires a prior management release (old KMI MANAGEMENT_RELEASE_MISSING)
+PASS: canDecideCommercialApprovalWithRelease: REJECTED never needs a management release
+
+11 passed, 0 failed. (commercialApproval.test.ts)
+
+=== packages/domain/test/competency.test.ts ===
+  PASS  seed catalog = old KMI 18 defaults + Vibrasyon (tesviye once), same 19 rows as the migration
+  PASS  level change refusals = harness (order: role, reason, person, skill, self, level, inactive, expiry, unchanged)
+  PASS  expiry: valid_until today = EXPIRING_SOON and still qualified; tomorrow = EXPIRED and not
+  PASS  qualification checks requirements in skill-code order (deterministic first refusal)
+  PASS  enroll refusals = harness: trainer is trainee, trainer not Usta, duplicate, already at target
+  PASS  enrollment transitions: no skipping training; FAILED → IN_TRAINING retry; cancel needs a reason
+  PASS  assessment refusals = harness: not pending, self, evidence, pass mark, score required
+  PASS  PASS raises to the target, never lowers a higher level, restarts expiry (12 months)
+  PASS  approved count (≥ BAĞIMSIZ, not expired) is informational — the puantaj module does not import competency
+  PASS  SQL lockstep: every refusal code used here exists in migration 0031
+
+10 passed, 0 failed
+
+=== packages/domain/test/costImport.test.ts ===
+PASS: TR and EN number formats are parsed per the declared locale; ambiguous or non-numbers are null (never guessed)
+PASS: dates: DD.MM.YYYY / DD/MM/YYYY / ISO only; impossible dates rejected (no month/day guessing)
+PASS: formula-like cells are flagged, never evaluated
+PASS: valid rows stage OK; batch fingerprint is deterministic
+PASS: duplicate detection: same row twice in a file, and a row already imported earlier (idempotent re-import)
+PASS: row-level errors: bad number, bad date, bad currency, unknown category, reversed period, missing required, missing mapping
+PASS: a formula in a text cell is neutralised (kept as text, flagged), and does not block an otherwise valid row
+PASS: CSV: semicolon (TR Excel), comma, quoted fields with delimiters and newlines, BOM
+PASS: fingerprint is case/space-insensitive and distinguishes different values
+
+9 passed, 0 failed. (costImport.test.ts)
+
+=== packages/domain/test/costIntelligence.test.ts ===
+PASS: expense period attribution: by SERVICE days (Jan 17 days / Feb 14 days of 31), never by payment month; parts sum exactly
+PASS: capital item is not operating expense; draft/reversed excluded; bad period excluded (never silently 0-booked)
+PASS: allocation: weights split exactly to the cent (largest remainder), no cent lost or created
+PASS: allocation: unknown driver or zero total -> nothing invented, whole amount stays UNALLOCATED
+PASS: double allocation guard: cannot allocate more than the expense in total
+PASS: machine cost: productive-hour rate, available-hour rate and idle capacity cost are separate, consistent figures
+PASS: machine cost: ONE missing component makes the pool UNKNOWN (never treated as 0); zero hours -> UNKNOWN, not Infinity
+PASS: machines 111 and 113 are distinct assets (separate pools)
+PASS: labor: one operator on 2 machines at the same time -> each minute split, person total NEVER exceeds wall time
+PASS: labor: partial overlap (m1 0-60, m2 30-90) -> 45/45 of 90 min; three concurrent machines -> thirds
+PASS: tooling: cost per part / 100 / 1000 from ACTUAL cutting seconds; unverified seconds -> UNKNOWN, estimated -> ESTIMATED
+PASS: unit cost: per started / per good / per shipped are different denominators; breakdown preserved
+PASS: unit cost: provisional is never labelled actual; FINAL needs a closed period else RECONCILIATION_REQUIRED; quote mode = ESTIMATED
+PASS: unit cost: zero/unknown quantities and missing components are UNKNOWN with the list of what is missing (no divide by zero, no fake 0)
+PASS: order margins: contribution vs gross are separate; foreign currency needs an explicit rate (else UNKNOWN); fixed cost unknown -> gross UNKNOWN only
+PASS: safeDivide, break-even and energy scenario state their assumptions and refuse impossible inputs
+
+16 passed, 0 failed. (costIntelligence.test.ts)
+
+=== packages/domain/test/costModel.test.ts ===
+  PASS  partial parameters = harness: INCOMPLETE "TAM MALİYET HESAPLANAMADI", missing listed, no total, no margin
+  PASS  full parameters = harness: 6380.00 TL, unit 797.5, scrap share 1740, components as on the server
+  PASS  effective dating = harness: a rate valid from tomorrow does not touch yesterday; same-day correction wins → 6524
+  PASS  missing material facts never become zero cost; no run time = RUN_TIME
+  PASS  parameter validation = table checks: FX needs source + date, plant rules only PLANT, overhead ≤ 500 %
+  PASS  D-016 due dates = harness: no term = UNKNOWN (not "not due"); 70-day invoice with 30-day term = 40 days overdue
+  PASS  D-016 scrap thresholds = harness: most specific wins; op10 9.09 % < 15 % override, op20 20 % ≥ global 5 %
+  PASS  corrective decisions = harness: original immutable, only the latest can be corrected, reason ≥ 10 chars
+  PASS  D-007 binding = harness: database-level issue only, sha256 only, 5 attempts, single use, never by name / e-mail
+  PASS  D-007 signed-in request = harness owner_binding_request.sql: account itself, never name/e-mail guess; conflicts void all
+
+10 passed, 0 failed
+
+=== packages/domain/test/devices.test.ts ===
+  PASS  every adapter today is fail-closed; simulator data is never live
+  PASS  inbox = harness: idempotent per device + message id, always QUARANTINED, never applied
+  PASS  no protocol, URL, credential or canonical write exists in the framework
+
+3 passed, 0 failed
+
+=== packages/domain/test/documents.test.ts ===
+  PASS  types and proposals = seed (same codes, sensitivity, expiry; proposals all inactive in SQL)
+  PASS  refusals = harness (same codes, same order)
+  PASS  new version: duplicate content refused, withdrawn refused, type must match
+  PASS  real signatures: pdf / png / jpeg / webp; text and CAD have none (accepted)
+  PASS  expiry + required-document state = harness (EXPIRING_SOON at +10 days; withdraw → MISSING)
+  PASS  SQL lockstep: every refusal code exists; shared Storage is never touched
+
+6 passed, 0 failed
+
+=== packages/domain/test/economicAccess.test.ts ===
+PASS: can_view_economics checks only the owner binding and named grants — no role lookup
+PASS: no economic critical action exists in any role matrix (SQL or TS)
+
+2 passed, 0 failed. (economicAccess.test.ts)
+
+=== packages/domain/test/economics.test.ts ===
+  PASS  sumByCurrency never adds currencies; sorted like collate "C"
+  PASS  aging and due buckets match the SQL case expressions (70 days → D61_90; harness payables)
+  PASS  price change and scrap material allocation
+  PASS  decisionProposals = harness proposals (codes, severities, order, evidence)
+  PASS  owner thresholds 90/7/20/5 → the same five proposals as the harness
+  PASS  no proposal crosses currencies; missing data gives no proposal
+  PASS  canRecordDecision = harness refusals in the same order
+  PASS  proposalOpen: harness board_after open=4/7
+  PASS  SQL twin: same codes, keys, thresholds and owner-only gate everywhere
+
+9 passed, 0 failed
+
+=== packages/domain/test/esmImports.test.ts ===
+PASS: every relative import in browser-loaded sources carries an explicit extension
+
+1 passed, 0 failed. (esmImports.test.ts)
+
+=== packages/domain/test/factoryMap.test.ts ===
+PASS: real registry codes, grouped by class; unclassified machines stay in their own group (never guessed); 111 and 113 are separate tiles
+PASS: READY is not RUNNING: UP with no work order = READY_IDLE; ACTIVE only with an IN_PROGRESS work order; physical state never claimed
+PASS: DOWN/MAINTENANCE/HOLD beat activity; a conflict (down but work order active) is flagged; unknown status = UNKNOWN not READY
+PASS: registry machines absent from the live board are reported, not silently dropped
+PASS: plan vs actual: percentage only with a positive plan; unknown otherwise
+PASS: shift table: days newest first, a missing shift is absent (not zero)
+
+6 passed, 0 failed. (factoryMap.test.ts)
+
+=== packages/domain/test/gecko.test.ts ===
+  PASS  a fresh passId is not a duplicate
+  PASS  a passId already in the ledger is a duplicate (3-run idempotency proof, carried forward)
+  PASS  canIngestGeckoPassEvent refuses a duplicate passId
+  PASS  canIngestGeckoPassEvent accepts a new passId
+  PASS  an UNMATCHED mapping refuses attribution
+  PASS  a VERIFIED mapping with a personId allows attribution
+  PASS  open-session rule: last movement IN with no matching OUT => INSIDE + openSession true (the real fixed bug case)
+  PASS  a day ending in OUT is OUTSIDE with no open session
+  PASS  no events at all for the day is OUTSIDE with no open session (not a crash)
+  PASS  computeWorkedMinutesForClosedSession refuses an open session
+  PASS  computeWorkedMinutesForClosedSession computes minutes for a closed session
+
+11 passed, 0 failed
+
+=== packages/domain/test/geckoLedger.test.ts ===
+  PASS  ledger admission = harness: seen 8, inserted 5, already 1, rejected 2
+  PASS  fixture day = harness: in 08:00, out 12:00 (Istanbul), INSIDE/open, 5 events, 1 denied, 1 unknown
+  PASS  a DENIED exit does not take a person out; a direction-less pass does not either
+  PASS  equal timestamps: the later ledger row decides (SQL: occurred_at desc, id desc)
+  PASS  feed state: NOT_CONNECTED / FAILING / STALE after 30 min / OK
+  PASS  identity link: same codes and order as set_gecko_identifier_link (harness codes included)
+  PASS  SQL lockstep: every link refusal code, the feed states and 30-min default exist in migration 0030
+
+7 passed, 0 failed
+
+=== packages/domain/test/geckoSchedule.test.ts ===
+  PASS  tick: disabled → SKIPPED_DISABLED, lock held → SKIPPED_OVERLAP, else RAN (same order as SQL)
+  PASS  inside now: a number only when the feed is OK (harness: FAILING → null, FEED_FAILING)
+  PASS  attendance visibility: role or named grant; self view only through own VERIFIED cards
+  PASS  competency staging problems = harness rows 2..6, row 1 and 7 pending
+  PASS  verify results: four eyes, self approval, not pending (harness bulk + re-decide)
+  PASS  paste parser: header skipped, empty fields become null, no name matching
+  PASS  GEÇKO never feeds puantaj: no puantaj function or table reads gecko_* in any migration
+
+7 passed, 0 failed
+
+=== packages/domain/test/homeLayout.test.ts ===
+PASS: operator gets NO management cockpit (own work screen instead)
+PASS: each role sees its own composition; quality sees quality, not shipping or approvals
+PASS: accounting HOME is its own composition, led by the commercial-release queue; counts only (no money field exists on any card)
+PASS: a user with several roles gets the de-duplicated union, in role-priority order
+PASS: role-restricted cards never reach a user without the role (approvals not for purchasing)
+PASS: economic cards require the separate grant even for ADMIN (none exist yet; the gate is enforced)
+PASS: missing or invalid counters are UNKNOWN, never 0 / never "all clear"
+PASS: tones: zero is ok, >0 warns, critical rules go red, neutral is info
+PASS: freshness: fresh / stale after 15 min / unknown when the stamp is missing or garbage
+PASS: alert domains: management all, quality limited, operator none
+PASS: shift at an instant (Istanbul): 1. 08–16, 2. 16–24, night undefined → null, garbage → null
+PASS: department cockpits follow server-validated ACTIONS: warehouse, HR, IT, orders, CAM
+PASS: reservation is labelled as NOT yet physically issued (reserved ≠ issued)
+PASS: DATA REQUIRED cards have no number source, and accounting shows them instead of inventing values
+PASS: invoice cards are accounting/admin only, even for MANAGEMENT or a warehouse user
+
+15 passed, 0 failed. (homeLayout.test.ts)
+
+=== packages/domain/test/intelligence.test.ts ===
+  PASS  process mining = harness: 7 cases, 6 complete, rework 1, bottleneck IN_PROGRESS→COMPLETED 7 h (n=6)
+  PASS  process mining: < 5 complete cases → VERİ YETERSİZ, no bottleneck; SQL uses the same thresholds
+  PASS  digital twin: confidence LOW with reasons; scenario is labelled and never writes
+  PASS  process mining is a pure read (CTEs, stable): no temp table, no truncate — as applied live
+  PASS  next best action: a rule is visible only with its resolving action; nothing is executed
+  PASS  copilot intents = SQL (harness questions); "karar" is not "kâr"; unknown stays unknown
+
+6 passed, 0 failed
+
+=== packages/domain/test/labels.test.ts ===
+PASS: label code format KL + 6 digits, bounded
+PASS: QR payload round-trips through the scan parser to the same type/ref
+PASS: first print free; reprint needs LABEL_REPRINT and a reason
+PASS: SQL lockstep: migration 0024 uses the same codes, layouts and reason length
+
+4 passed, 0 failed. (labels.test.ts)
+
+=== packages/domain/test/leakScan.test.ts ===
+  FAIL  no client table read names a money column
+        AssertionError [ERR_ASSERTION]: tahsisApi.ts: quality_ncr_characteristics → id,operation_no,characteristic_code,feature,nominal,tol_lower,tol_upper,measured,oversize_amount,unit,qty,machine_id,tool_id,operator_id,evidence_ref,instructions,recorded_at
+  PASS  client column grants on order_items / purchase_order_lines exclude unit_price
+  PASS  money-key rule: same pattern as SQL json_has_money_key; keys hidden, string values not
+  PASS  audit policy uses the 4-argument rule (snapshot-aware), fail-closed to owner economics
+
+3 passed, 1 failed
+
+=== packages/domain/test/live.test.ts ===
+  PASS  freshness = harness: running work, last event 10 h ago → STALE; none running → NO_RUNNING_WORK
+  PASS  order state = SQL: due yesterday LATE, within 2 days DUE_SOON, later ON_TRACK
+  PASS  PUBLIC profile carries no person, customer or money key; OFFICE adds names but never money
+  PASS  no simulated telemetry; kiosk = token (sha256 only) + PUBLIC only; anon schema access stays an owner gate
+
+4 passed, 0 failed
+
+=== packages/domain/test/liveKpi.test.ts ===
+  PASS  periods use Istanbul boundaries: 23:30Z on the 13th is already the 14th in Istanbul
+  PASS  fetch lower bound covers a week that starts in the previous month
+  PASS  no declarations ⇒ zero declarations count (caller distinguishes "no data" from a real zero)
+  PASS  distinct active work orders / ranking / deadline risk / scrap rate / mean OEE
+ok (0 failed)
+
+=== packages/domain/test/machineState.test.ts ===
+  PASS  UP with no work order is "HAZIR · BOŞTA" — not "running"
+  PASS  physical running is ALWAYS UNKNOWN, whatever the other facts say
+  PASS  IN_PROGRESS work order → "aktif iş emri" (work-order fact only); first-piece states are separate
+  PASS  DOWN / MAINTENANCE / HOLD outrank an active work order and the conflict is flagged, not hidden
+  PASS  missing / unknown status stays UNKNOWN — never "ready"
+  PASS  classes are distinct display names (CMM / forklift / CNC are not one kind)
+
+6 passed, 0 failed
+
+=== packages/domain/test/maintenance.test.ts ===
+  PASS  the 14 canonical machine identities are preserved exactly (codes + count)
+  PASS  only UP machines are production-eligible
+  PASS  setting DOWN requires currently-UP and a reason
+  PASS  MAINTENANCE from any other state; HOLD (BEKLEME) only from UP so it can never bypass a test
+  PASS  authorized return-to-service state shape (DOWN / MAINTENANCE; HOLD routed by ticket count in the RPC)
+  PASS  downtime KPI accrues only for a literal DOWN period, not MAINTENANCE/HOLD
+  PASS  maintenance ticket lifecycle follows OPEN -> IN_PROGRESS -> TEST_PENDING -> RETURNED_TO_SERVICE -> CLOSED
+  PASS  authorized test release requires the ticket to actually be TEST_PENDING
+  PASS  health score: -20 flat if DOWN, -12/open CRITICAL ticket, -7/open HIGH ticket, floor 0
+  PASS  a ticket can no longer be closed without the test (OPEN/IN_PROGRESS -> CLOSED refused)
+  PASS  RETURNED_TO_SERVICE is never reachable through a manual ticket move
+  PASS  a test result needs TEST_PENDING and written notes; FAIL sends the ticket back to repair
+  PASS  return to service: needs a ticket, every open ticket tested and PASSED
+  PASS  P0-B: BEKLEME -> UP needs no maintenance test, but is blocked by any open ticket
+  PASS  P0-B: one canonical eligibility — only UP is eligible; return path depends on the state
+  PASS  P0-B SQL lockstep: migration 0022 carries the same rules and labels
+
+16 passed, 0 failed
+
+=== packages/domain/test/oee.test.ts ===
+PASS: SQL golden — machine 101: A 0.7500 P 0.5556 Q 0.9000 OEE 0.3750
+PASS: SQL golden — machine 102: no ideal cycle time => P and OEE UNKNOWN (not 100 %)
+PASS: SQL golden — machine 103: planned but never ran => A 0, P/Q/OEE UNKNOWN
+PASS: SQL golden — TOTAL is the sum of components, not an average of ratios
+PASS: no planned time => everything UNKNOWN; labels never show a fake 100 %
+
+5 passed, 0 failed. (oee.test.ts)
+
+=== packages/domain/test/operatorAssignment.test.ts ===
+PASS: 1st machine: allowed with no special authorization
+PASS: 2nd machine without authorization: denied
+PASS: 2nd machine with level 2: allowed
+PASS: 3rd machine with level 2: denied; with level 3: allowed
+PASS: 4th machine: HARD_CAP_EXCEEDED even with the highest level
+PASS: duplicate running ids for the same machine count once
+PASS: target machine not production-eligible (DOWN/MAINTENANCE/HOLD): denied
+PASS: inactive person or non-OPERATOR person: denied
+PASS: canGrantMultiMachineAuthorization: only levels 2..3 are grantable
+
+9 passed, 0 failed. (operatorAssignment.test.ts)
+
+=== packages/domain/test/order.test.ts ===
+PASS: projectPlanning: returns a projection tagged DERIVED_FROM_CANONICAL_ORDER, never a bare fact
+PASS: projectPlanning: fully-produced item needs no further planning
+PASS: projectPlanning: no available machine window -> UNKNOWN risk, nothing invented
+PASS: projectPlanning: a window finishing after the due date is flagged AT_RISK
+PASS: projectPlanning: picks the earliest-available window with free capacity
+PASS: canTransitionOrderStatus: allows DRAFT -> CONFIRMED
+PASS: canTransitionOrderStatus: refuses skipping straight from DRAFT to SHIPPED
+PASS: canTransitionOrderStatus: refuses any transition out of a terminal CLOSED state
+PASS: canTransitionOrderStatus: refuses a no-op transition to the same status
+PASS: computeOpenProductionNeed: subtracts produced qty AND active WO coverage
+PASS: computeOpenProductionNeed: never goes negative when WOs over-cover the remaining need
+PASS: 0054: shipping status derived from shipments (partial → PARTIALLY_SHIPPED, all → SHIPPED, added item → back)
+
+12 passed, 0 failed. (order.test.ts)
+
+=== packages/domain/test/passport.test.ts ===
+  PASS  fully traced work order = harness: no gaps → COMPLETE
+  PASS  poorly traced work order = harness w2_gaps (same order)
+  PASS  purchased lot gaps = harness: pending QC / rejected / accepted
+  PASS  input classification = passport_resolve (label code any case, payload, ?scan= link, uuid, product code)
+  PASS  economic = harness: work order EUR 450 − 40 = 410 (OK); product EUR+TRY material → CURRENCY_MISMATCH, no margin
+  PASS  SQL lockstep: gap codes in the same order, money only behind can_view_economics, no writes
+
+6 passed, 0 failed
+
+=== packages/domain/test/personnel.test.ts ===
+PASS: canCreatePerson: refuses a person with zero roles (fail-closed authorization dead end)
+PASS: canCreatePerson: refuses a puantajMultiplier outside 0.5..2
+PASS: canCreatePerson: allows a person with at least one role and a valid multiplier
+PASS: canSetPersonActive: refuses a no-op toggle
+PASS: canSetPersonActive: allows an actual change
+PASS: canUpdatePuantajMultiplier: enforces the same 0.5..2 range as canCreatePerson
+PASS: hasRole: checks membership in the person's role list
+PASS: classifySkillTier: mirrors puantaj.ts's own skill-count thresholds exactly (8/10)
+
+8 passed, 0 failed. (personnel.test.ts)
+
+=== packages/domain/test/personnelImport.test.ts ===
+  PASS  harness rows: S001 NEW, S002 NEW (no login), S003/S004/S005 NEEDS_DECISION, S006 INACTIVE
+  PASS  mapping is per department name / legacy role code, never per person; USER maps to nothing
+  PASS  SQL lockstep: every mapping pair is in the migration text; identity = source id; four eyes; source read-only
+  PASS  issue texts are Turkish and keep the detail
+
+4 passed, 0 failed
+
+=== packages/domain/test/planning.test.ts ===
+PASS: plan decision: capacity, shift, machine state, status
+PASS: plan decision: operator shift and multi-machine rule (same as running rule)
+PASS: suggestion: earliest slot, never a DOWN machine, free operator of that shift
+PASS: suggestion keeps the WO on its machine and moves to the next shift when full
+PASS: suggestion is advisory: no minutes / no machine / blockers are reported, not hidden
+PASS: one active production session per machine (other WO running there -> MACHINE_BUSY)
+PASS: SQL lockstep: shifts, codes and capacities equal migration 0025
+
+7 passed, 0 failed. (planning.test.ts)
+
+=== packages/domain/test/productionDeclaration.test.ts ===
+PASS: canDeclareProduction: true for IN_PROGRESS and FIRST_PIECE_PENDING, false otherwise
+PASS: canDeclare: refuses a declaration when the work order is not in a declarable status
+PASS: canDeclare: refuses negative quantities
+PASS: canDeclare: refuses a zero (no-op) declaration
+PASS: canDeclare: refuses a declaration that would push produced+scrap past qtyPlanned
+PASS: canDeclare: allows a declaration exactly up to qtyPlanned
+PASS: applyDeclaration: adds good to qtyProduced and scrap to qtyScrap, never mutates the input
+PASS: canCreateProductionCorrection: requires a non-empty reason
+PASS: canCreateProductionCorrection: refuses a zero (no-op) correction
+PASS: canCreateProductionCorrection: refuses a correction that would push a total negative
+PASS: canCreateProductionCorrection: refuses reducing qtyProduced below what is already lotted into stock
+PASS: canCreateProductionCorrection: allows reducing qtyProduced down to exactly the already-lotted qty
+PASS: canCreateProductionCorrection: refuses a correction that would exceed qtyPlanned (increasing case)
+PASS: canCreateProductionCorrection: allows increasing a previously under-declared qty
+PASS: applyCorrection: adds signed deltas, never mutates the input
+PASS: isDuplicateProductionCorrection: a client_request_id already seen is a duplicate; null is never a duplicate
+PASS: canDeclare / canCreateProductionCorrection: quantity held on open NCRs still counts against qtyPlanned
+
+17 passed, 0 failed. (productionDeclaration.test.ts)
+
+=== packages/domain/test/puantaj.test.ts ===
+PASS: DEFAULT_PUANTAJ_CONFIG matches the old V47 engine defaults exactly (old doc §2/§3 — never change without owner proof)
+PASS: isBonusPoolOnlyPerson: ported hardcoded name match (P1-6, carried forward as-is)
+PASS: calculatePuantajScore: a perfect-input person yields baseScore=100, and finalPoints=120 because absenceDays=0 triggers the zero-absence Kdevam=1.20 bonus by definition (not a bug — this IS the formula)
+PASS: calculatePuantajScore: 5+ absence days disqualifies the whole score to zero (old doc §2/§3)
+PASS: calculatePuantajScore: owner names are always zeroed regardless of other inputs (isBonusPoolOnlyPerson)
+PASS: calculatePuantajScore: a monthly exclusion (puantajExclusionsV47) zeroes the score
+PASS: calculatePuantajScore: zero-absence bonus (Kdevam=1.20) only applies at exactly zero days
+PASS: calculatePuantajScore: an ineligible job contributes nothing to goodProduct/lowScrap (full exclusion of that job, old doc §3)
+PASS: calculatePuantajScore: careFactor=0 ("uygun_degil" handover) zeroes only the machine component of baseScore, not the whole Pson (old doc §2)
+PASS: calculatePuantajScore: management adjustment is capped at ±50% even if a caller passes more
+PASS: calculatePuantajScore: personal multiplier (person.puantajMultiplier) scales finalPoints linearly
+PASS: calculatePuantajScore: is deterministic — identical inputs always produce identical output (old doc §10 property preserved)
+
+12 passed, 0 failed. (puantaj.test.ts)
+
+=== packages/domain/test/puantajMonth.test.ts ===
+  PASS  complete person: result equals the V47 engine on the derived inputs (no second formula)
+  PASS  owner multipliers reproduced by the engine: no absence ×1.20, 8 skills ×1.10, 10+ ×1.20, 5 absences → excluded
+  PASS  missing absence or care factor → INCOMPLETE with a named reason; NO points are produced from missing data
+  PASS  person with no production in the month is a real zero (not missing) and says so
+  PASS  quality fail makes the job ineligible (V47: ineligible job contributes nothing)
+  PASS  monthly exclusion and the owner-name exclusion yield EXCLUDED, never a score
+  PASS  multi-machine level is carried for display only; it never changes points (V47 has no such multiplier)
+  PASS  distribution: refused without pool, refused while anyone is incomplete, otherwise sums to the pool to the cent
+  PASS  excluded people take nothing; all-excluded pool has no recipients
+
+9 passed, 0 failed
+
+=== packages/domain/test/purchasing.test.ts ===
+PASS: canTransitionPurchaseOrderStatus: DRAFT -> SUBMITTED -> APPROVED -> SENT allowed
+PASS: canTransitionPurchaseOrderStatus: cannot skip DRAFT straight to SENT/APPROVED
+PASS: canTransitionPurchaseOrderStatus: RECEIVED and CANCELLED are terminal
+PASS: canTransitionPurchaseOrderStatus: PARTIALLY_RECEIVED -> PARTIALLY_RECEIVED is deliberately allowed (a second partial receipt), unlike every other same-state no-op
+PASS: canCreatePurchaseOrder: refuses a PO with zero lines, or any non-positive line qty
+PASS: canCreatePurchaseOrder: allows a PO with at least one positive-qty line
+PASS: canApprovePurchaseOrder: only a SUBMITTED PO may be approved — refuses DRAFT, already-APPROVED (duplicate approval), and CANCELLED
+PASS: canRecordGoodsReceipt: refuses receiving against a PO not yet SENT
+PASS: canRecordGoodsReceipt: allows a partial receipt within ordered qty, and a second partial receipt afterward
+PASS: canRecordGoodsReceipt: refuses a receipt that would exceed the ordered qty (never over-receive)
+PASS: canRecordGoodsReceipt: refuses a non-positive receipt quantity
+PASS: computePurchaseOrderReceiptStatus: RECEIVED only once every line is fully received, else PARTIALLY_RECEIVED
+PASS: canRecordIncomingQualityDecision: only a HOLD-state lot can receive an accept/reject decision
+PASS: purchase request: SUBMITTED -> APPROVED/REJECTED -> (APPROVED only) CONVERTED; terminal states
+PASS: purchase request needs material, positive qty and a reason
+PASS: only approved requests with a positive price and a known currency become a PO
+PASS: supplier invoice 3-way match: price must equal PO price, qty within QC-accepted-not-yet-invoiced
+PASS: work-order material shortage becomes purchase request quantities
+PASS: #679 A: invoice numbers are deduplicated case/space-insensitively
+PASS: #679 A: incoming QC reject needs a reason; decision only on HOLD lots
+PASS: #679 A: PO line match — partial receipt, partial QC, partial invoice
+PASS: #679 A: payment status and overpay guard (partial payments)
+PASS: #679 A SQL lockstep: migrations 0018 (payments) + 0023 (invoice/QC) enforce the same codes
+
+23 passed, 0 failed. (purchasing.test.ts)
+
+=== packages/domain/test/qualityHold.test.ts ===
+PASS: canOpenQualityHold: true for MACHINE_ASSIGNED, IN_PROGRESS, FIRST_PIECE_PENDING
+PASS: canOpenQualityHold: false for PLANNED and terminal statuses (nothing to hold yet, or already done)
+PASS: canReleaseQualityHold: allows releasing an OPEN hold
+PASS: canReleaseQualityHold: refuses releasing an already-RELEASED hold (no double release)
+
+4 passed, 0 failed. (qualityHold.test.ts)
+
+=== packages/domain/test/qualityNcr.test.ts ===
+PASS: reject requires a written reason (old KMI: "Ret nedeni yazmadan reddedemezsiniz")
+PASS: reject qty must be positive and within good, not-yet-lotted qty
+PASS: NCR state machine: OPEN -> SCRAPPED | REWORK -> RECHECK_PENDING -> ACCEPTED | SCRAPPED
+PASS: rework can never skip re-inspection (REWORK -> ACCEPTED refused, OPEN -> ACCEPTED refused)
+PASS: ACCEPTED and SCRAPPED are terminal
+PASS: quantity effects: reject removes from good, scrap adds to scrap, accept returns to good
+PASS: hold cannot be released while an NCR has no disposition yet
+PASS: final release blocked while rework/re-inspection still holds quantity
+
+8 passed, 0 failed. (qualityNcr.test.ts)
+
+=== packages/domain/test/readiness.test.ts ===
+PASS: no revision is UNKNOWN / VERİ GEREKLİ, never "no material needed"
+PASS: a bound revision with an empty BOM is UNKNOWN too (legacy data)
+PASS: no CAM program / CAM program without tools is UNKNOWN
+PASS: only an explicit exemption turns missing data into EXEMPT
+PASS: a defined BOM always wins over an exemption (data governs)
+PASS: start gate: UNKNOWN blocks, material reported before tool, missing evaluation blocks
+PASS: exemption rules: reason, status, requirement already defined, duplicate
+PASS: exemption is a critical action: ADMIN/MANAGEMENT only, never OPERATOR/CAM/ACCOUNTING by default
+PASS: SQL ↔ TS lockstep: every reason code the domain produces exists in migration 0021
+
+9 passed, 0 failed. (readiness.test.ts)
+
+=== packages/domain/test/reportFamilies.test.ts ===
+  PASS  plant output = harness: plain 20/0 + op10 10/1 (not final) + op20 8/2 (final) → 28 good, 3 scrap, 0.0968
+  PASS  D-014 slots = harness (Europe/Istanbul): shift end crosses midnight, daily 07:30, Monday 08:00, 1st 08:00
+  PASS  missing data is never "fine": tool without life, work without estimate, shipped without record
+  PASS  SQL lockstep: thresholds and states in the generators are the twin values
+  PASS  catalog: 21 definitions, 19 available, one economic (no required role — economic access only), versions
+  PASS  economic gates: definitions policy, can_access_report, generate_report and schedule change all need can_view_economics
+  PASS  D-014 is safe by default: switch off, no cron job created, in-app only, idempotent per slot
+
+7 passed, 0 failed
+
+=== packages/domain/test/reports.test.ts ===
+  PASS  catalog = report_definitions seed (code, days default, required action, availability)
+  PASS  shipment overdue = harness: only PO-LATE, 6 remaining, 3 days late (cancelled/closed/shipped/future excluded)
+  PASS  quality KPI = harness: 30-day window, corrections included → 94 good, 6 scrap, 0.06, 60 000 PPM
+  PASS  days parameter = report_normalize_params: 5.9→5, "abc"→default 3, −3→0, 999→365
+  PASS  KPI dictionary: unique codes; every source is a real server function or a catalogued report
+  PASS  SQL lockstep: every available report has a generator branch; no money column in any report
+  PASS  CSV: BOM, ";" separator, quoting, camelized row keys, arrays joined
+
+7 passed, 0 failed
+
+=== packages/domain/test/roleMatrixParity.test.ts ===
+PASS  same set of actions in SQL and TypeScript
+PASS  ACADEMY_MANAGE: same roles
+PASS  ACCOUNTING_MUTATION: same roles
+PASS  BOM_RELEASE: same roles
+PASS  COMMERCIAL_RELEASE: same roles
+PASS  COMPETENCY_APPROVE: same roles
+PASS  DEVICE_MANAGE: same roles
+PASS  DOCUMENT_MANAGE: same roles
+PASS  FINAL_PRODUCTION_RELEASE: same roles
+PASS  FIRST_PIECE_APPROVE: same roles
+PASS  GECKO_ATTENDANCE_VIEW: same roles
+PASS  GECKO_MAPPING_VERIFY: same roles
+PASS  GECKO_SYNC_RUN: same roles
+PASS  GECKO_VIEW_GRANT: same roles
+PASS  LABEL_REPRINT: same roles
+PASS  LIVE_DISPLAY_MANAGE: same roles
+PASS  MACHINE_SKILL_VERIFY: same roles
+PASS  MAINTENANCE_TEST_RELEASE: same roles
+PASS  MANAGEMENT_RELEASE: same roles
+PASS  MASTER_DATA_IMPORT: same roles
+PASS  MATERIAL_ISSUE: same roles
+PASS  OPERATION_QC_RECORD: same roles
+PASS  ORDER_CANCEL: same roles
+PASS  ORDER_CONFIRM: same roles
+PASS  ORDER_CREATE: same roles
+PASS  PERSONNEL_LOGIN_LINK: same roles
+PASS  PERSONNEL_MANAGE: same roles
+PASS  PRODUCTION_CORRECTION: same roles
+PASS  PUANTAJ_MANAGE: same roles
+PASS  PURCHASE_ORDER_MANAGE: same roles
+PASS  PURCHASING_APPROVE: same roles
+PASS  QUALITY_HOLD_RELEASE: same roles
+PASS  QUALITY_REJECT: same roles
+PASS  READINESS_EXEMPTION_GRANT: same roles
+PASS  REPORT_SCHEDULE_MANAGE: same roles
+PASS  ROUTING_MANAGE: same roles
+PASS  SHIPMENT_MANAGE: same roles
+PASS  TASK_MANAGE: same roles
+PASS  TOOL_RECORD: same roles
+PASS  WAREHOUSE_RECORD: same roles
+PASS  WORK_ORDER_ASSIGN_MACHINE: same roles
+PASS  WORK_ORDER_CREATE: same roles
+PASS  WORK_ORDER_MULTI_MACHINE_ASSIGN: same roles
+
+43 passed, 0 failed
+
+=== packages/domain/test/routing.test.ts ===
+  PASS  harness start refusals in the same order
+  PASS  order matters: earlier gates win (not pending before everything, busy before operator)
+  PASS  D-012: unknown machine + no operation skill → clearance needed; a valid clearance or an operation skill passes
+  PASS  CAM, hold, material, tools
+  PASS  lifecycle: first piece, output limits, QC, WIP handover, final quantities = harness 7/2
+  PASS  D-012 review rules = harness
+  PASS  SQL lockstep: every refusal code exists in the migration and has a Turkish text
+  PASS  bypass guards exist as triggers; permission checks are NULL-safe (0039c)
+  PASS  0053: a running routed work order keeps its counters current with the completion formula (assignment, no double count)
+
+9 passed, 0 failed
+
+=== packages/domain/test/scan.test.ts ===
+PASS: encode/parse round trip for every KMI label type
+PASS: a phone-camera link is unwrapped to its ?scan= code (old KMI behaviour)
+PASS: legacy plain codes are kept (recorded, not dropped)
+PASS: invalid scans: empty, unknown KMI type, empty ref, too long
+PASS: encode refuses empty refs and refs that would break the format
+
+5 passed, 0 failed. (scan.test.ts)
+
+=== packages/domain/test/shipment.test.ts ===
+PASS: canTransitionShipmentStatus: DRAFT -> DISPATCHED allowed
+PASS: canTransitionShipmentStatus: cannot skip DRAFT straight to DELIVERED
+PASS: canTransitionShipmentStatus: DELIVERED and CANCELLED are terminal
+PASS: canTransitionShipmentStatus: refuses a no-op transition
+PASS: canCreateShipment: refuses creating a shipment from a lot that is not STAGED
+PASS: canCreateShipment: refuses creating a shipment from an already-SHIPPED lot (shipment already exists)
+PASS: canCreateShipment: allows creating a shipment from a STAGED lot
+PASS: canDispatchShipment/canDeliverShipment/canCancelShipment: mirror the same state machine
+
+8 passed, 0 failed. (shipment.test.ts)
+
+=== packages/domain/test/smartAssignment.test.ts ===
+  PASS  ranking = live harness: Ahmet, Burak, Cem, Emre, Gül, Deniz, Fatma
+  PASS  competency outranks experience; experience outranks scrap; no history ranks after any history
+  PASS  scrap rate = SQL round(scrap / (good + scrap), 4); nothing produced = null
+  PASS  plan refusal order = SQL plan_operator_refusal (person, role, shift, competency, cap, authorization)
+  PASS  canCommitPlan carries the competency refusal right after the shift check (same as commit v2)
+  PASS  start gate: requirements need a named qualified operator; machines without requirements unchanged
+  PASS  SQL lockstep: ranking keys, refusal codes and the server-computed "followed" are in migration 0032
+
+7 passed, 0 failed
+
+=== packages/domain/test/stock.test.ts ===
+PASS: canTransitionStockState: WIP -> FG allowed (production completed into finished goods)
+PASS: canTransitionStockState: cannot skip straight from WIP to SHIPPED
+PASS: canTransitionStockState: SHIPPED and SCRAP are terminal
+PASS: canTransitionStockState: HOLD can only resume to AVAILABLE or be written off to SCRAP
+PASS: canTransitionStockState: refuses a no-op transition
+PASS: canCreateStockLot: refuses creating a lot from a work order with no eligible produced qty yet (PLANNED)
+PASS: canCreateStockLot: allows creating a lot from a COMPLETED work order within produced qty
+PASS: canCreateStockLot: refuses a lot qty exceeding the work order's available produced qty
+PASS: canCreateStockLot: refuses a non-positive qty
+PASS: canCreateStockLotFromGoodsReceipt: allows a lot within the received qty (raw material, owner talimatı §2)
+PASS: canCreateStockLotFromGoodsReceipt: refuses exceeding the available received qty (never double-lot a receipt)
+PASS: canCreateStockLotFromGoodsReceipt: refuses a non-positive qty
+
+12 passed, 0 failed. (stock.test.ts)
+
+=== packages/domain/test/temporal.test.ts ===
+  PASS  stamp: UTC → Istanbul with seconds, example format
+  PASS  day boundary: 21:30Z on 11 Oct is already 12 Oct 00:30 in Istanbul
+  PASS  yesterday / week (Monday start) / month / last month / year / 30 days
+  PASS  custom range: whole end day included; hour range; bad input → null
+  PASS  late report: machine stopped 10:15, reported 10:22 → 7 min late, record time unchanged
+  PASS  filter: day basis follows RECORDED by default; OCCURRED re-files a late report to its real day without changing its stamp
+  PASS  filter: action/actor/text, newest first
+  PASS  audit row → event: actor + before/after + reason; unknown action humanised
+  PASS  as-of: state between events, before first event, not yet existing, after last
+  PASS  as-of: no events / unknown creation / broken chain → UNVERIFIABLE (never the current state)
+  PASS  as-of: a late entry changes history only on the OCCURRED basis, and says so (revised)
+  PASS  change history: field, old, new; unchanged omitted; missing side not invented
+  PASS  Istanbul local input → UTC
+  PASS  inRange / filterEvents compare instants: +03:00, +00:00 and Z forms land on the right side of the Istanbul midnight
+
+14 passed, 0 failed
+
+=== packages/domain/test/toolroom.test.ts ===
+PASS: canTransitionToolLocation: CABINET -> MOUNTED/ISSUED/SCRAP all allowed
+PASS: canTransitionToolLocation: MOUNTED and ISSUED can only return to CABINET or be scrapped, never cross directly
+PASS: canTransitionToolLocation: SCRAP is terminal, and refuses a no-op transition
+PASS: canMountTool: requires CABINET location AND a production-eligible (UP) machine
+PASS: canUnmountTool/canIssueTool/canReturnTool: each requires its own matching source location
+PASS: canScrapTool: allowed from any non-terminal location, refused if already scrapped
+PASS: computeToolWearPercent: linear percentage, capped at 100, never divides by zero
+PASS: canUseToolInProduction: refuses a fully worn (100%) tool, allows anything below
+PASS: isDuplicateToolMovement: a client_request_id already in the ledger is a duplicate; null is never a duplicate
+PASS: CAM program: released only from DRAFT and never without tools
+PASS: CAM program binds only to a planned work order of the same product revision, and only when released
+PASS: mount for a work order: life left, open WO, same machine, tool type in the CAM program
+PASS: start gate names the first CAM tool type not mounted in the needed quantity
+
+13 passed, 0 failed. (toolroom.test.ts)
+
+=== packages/domain/test/workOrder.test.ts ===
+PASS: canTransitionWorkOrderStatus: PLANNED -> MACHINE_ASSIGNED allowed
+PASS: canTransitionWorkOrderStatus: cannot skip PLANNED straight to IN_PROGRESS (must assign machine first)
+PASS: canTransitionWorkOrderStatus: terminal COMPLETED/CANCELLED allow no further transition
+PASS: canTransitionWorkOrderStatus: ON_HOLD can resume to IN_PROGRESS or go back to MACHINE_ASSIGNED
+PASS: canTransitionWorkOrderStatus: refuses a no-op transition
+PASS: canAssignMachine: true only for PLANNED or ON_HOLD
+PASS: computeRemainingWorkOrderQty: subtracts produced and scrap, never negative
+PASS: canCreateWorkOrder: refuses a non-positive qty
+PASS: canCreateWorkOrder: refuses planning more than the order item has open (Golden Thread discipline)
+PASS: canCreateWorkOrder: allows a qty within the open production need
+PASS: canFinalReleaseWorkOrder: missing first-piece approval can never reach COMPLETED (IN_PROGRESS/FIRST_PIECE_PENDING refused)
+PASS: canFinalReleaseWorkOrder: an OPEN quality hold blocks final release
+PASS: canFinalReleaseWorkOrder: nothing produced cannot be released as COMPLETED
+PASS: canFinalReleaseWorkOrder: FIRST_PIECE_APPROVED, produced, no open hold -> allowed
+
+14 passed, 0 failed. (workOrder.test.ts)
+
+=== packages/ui/test/badge.test.ts ===
+  PASS  pip count = level, title names the level in Turkish
+  PASS  expired is grey, dashed, crossed and says SÜRESİ DOLDU; expiring soon has an amber ring
+  PASS  labels are escaped; invalid level throws
+
+3 passed, 0 failed
+
+=== packages/ui/test/badgeLadder.test.ts ===
+  PASS  earned medallion: tier pips, track glyph, metallic gradient, accessible title
+  PASS  locked and withdrawn are greyscale and marked (never mistaken for earned)
+  PASS  master tier has the prismatic rim; ids are unique per instance; bad input refused
+
+3 passed, 0 failed
+
+=== packages/ui/test/code128.test.ts ===
+PASS: all 107 symbol patterns equal the independent reference table
+PASS: complete symbols (values, checksum, all bar/space widths) equal the independent encoder
+PASS: every symbol is 11 modules (stop 13) and patterns are unique
+PASS: checksum: start B 104 + Σ position × value, mod 103
+PASS: non-printable / non-ASCII characters are refused (no silent mangling)
+PASS: SVG is scaled in millimetres with quiet zones
+
+6 passed, 0 failed. (code128.test.ts)
+
+=== packages/ui/test/qr.test.ts ===
+PASS: module-for-module identical to an independent encoder (29 vectors, versions 1-10, L/M/Q/H, masks 0-7)
+PASS: Reed–Solomon: ISO worked example HELLO WORLD 1-M
+PASS: format information equals the published table (L and M rows)
+PASS: version information v7 and data capacities match the standard
+PASS: too long for version 10 is refused, never silently truncated
+PASS: SVG has a quiet zone and one dark path
+PASS: auto-masked symbols decode back to the exact text with OpenCV (incl. Turkish UTF-8)
+
+7 passed, 0 failed. (qr.test.ts)
+
+=== packages/ui/test/smoke.browser.test.ts ===
+  PASS  page loaded with zero console/page errors
+  PASS  JSX-compiled heading rendered real text content
+  PASS  counter starts at 0
+  PASS  onClick listener (wired by h()) mutates real DOM on click
+
+4 passed, 0 failed
+
+SOME TEST FILES FAILED.
+exit=1
