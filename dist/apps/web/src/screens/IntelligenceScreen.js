@@ -9,7 +9,7 @@ import { percentLabel } from '../../../../packages/domain/src/oee.js';
 import { errorText as sharedErrorText } from '../errorText.js';
 const RISK_TR = { HIGH: 'YÜKSEK', MEDIUM: 'ORTA', LOW: 'DÜŞÜK' };
 const RISK_COLOR = { HIGH: '#b91c1c', MEDIUM: '#a16207', LOW: '#475569' };
-const STATUS_TR = { UP: 'ÇALIŞIR', DOWN: 'ARIZA', MAINTENANCE: 'BAKIMDA', HOLD: 'BEKLEMEDE' };
+const STATUS_TR = { UP: 'HAZIR', DOWN: 'ARIZA', MAINTENANCE: 'BAKIMDA', HOLD: 'BEKLETMEDE' };
 const LOAD_TR = { OK: 'normal', HIGH: 'yüksek', OVERLOAD: 'AŞIRI YÜK', UNKNOWN: 'BİLİNMİYOR' };
 const errText = (e) => sharedErrorText(e);
 const box = 'border:1px solid #e2e8f0;border-radius:12px;padding:8px 10px;margin:8px 0';

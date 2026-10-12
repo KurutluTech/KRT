@@ -115,7 +115,7 @@ export async function renderOrdersScreen(container, api, banner) {
     const productName = (id) => products.find((p) => p.id === id)?.code ?? id;
     function itemRow(it) {
         const q = h('input', { type: 'number', min: '1', step: 'any', value: String(it.qty), 'data-testid': 'wo-qty', style: 'width:80px' });
-        return h('div', { 'data-testid': 'item-row', 'data-item-id': it.id, style: 'display:flex;gap:6px;flex-wrap:wrap;align-items:center;padding:4px 0;font-size:13px' }, h('span', {}, `${orderOf(it.orderId)?.customerPo ?? '?'} · ${productName(it.productId)} · ${it.qty} adet · termin ${it.dueDate}`), q, h('button', { type: 'button', 'data-testid': 'wo-create', onClick: () => void handleWorkOrder(it, Number(q.value)) }, 'İş emri aç'));
+        return h('div', { 'data-testid': 'item-row', 'data-item-id': it.id, style: 'display:flex;gap:6px;flex-wrap:wrap;align-items:center;padding:4px 0;font-size:13px' }, h('span', {}, `${orderOf(it.orderId)?.customerPo ?? '?'} · ${productName(it.productId)} · ${it.qty} adet · termin ${it.dueDate}`), q, h('button', { type: 'button', 'data-testid': 'wo-create', onClick: () => void handleWorkOrder(it, Number(q.value)), style: 'background:#1d4ed8;color:#fff;font-weight:700;border-radius:8px;padding:8px 14px' }, 'İŞ EMRİ AÇ'));
     }
     const screen = (h("div", { class: "orders-screen" },
         h("h1", { "data-testid": "orders-heading" }, "Sipari\u015Fler"),

@@ -32,51 +32,56 @@ export const ICON_PATHS = {
     'chevrons-right': 'M5 6l6 6-6 6M12 6l6 6-6 6',
     logout: 'M10 4H5v16h5M15 8l4 4-4 4M19 12H9',
 };
+/** Compact, department-aware sidebar (reference layout). The 15 departments are: Yönetim/Komuta, Üretim/Operatör, Üretim Planlama, CAM,
+ *  Takım Odası, Kalite, Bakım, Depo/Stok, Satınalma, Muhasebe, Sevkiyat, Personel/İK, Puantaj/Prim, Doküman/Pasaport, Raporlama.
+ *  Every entry is a real screen; access.ts decides who sees it (the server decides for real). */
 export const NAV_GROUPS = [
     { title: null, items: [
             { path: '/', label: 'Ana Sayfa', icon: 'home' },
             { path: '/komuta', label: 'Komuta Merkezi', icon: 'grid' },
             { path: '/canli', label: 'KMI LIVE', icon: 'factory' },
-            { path: '/gorevler', label: 'Görev Zemini', icon: 'tasks' },
+        ] },
+    { title: 'ÜRETİM', items: [
             { path: '/operator', label: 'Benim İşlerim', icon: 'user' },
-        ] },
-    { title: 'YÜRÜTME', items: [
             { path: '/terminal', label: 'Makine Terminali', icon: 'chip' },
+            { path: '/gorevler', label: 'Görev Zemini', icon: 'tasks' },
             { path: '/is-emirleri', label: 'İş Emirleri', icon: 'factory' },
-            { path: '/tara', label: 'QR / Barkod', icon: 'scan' },
-            { path: '/dokumanlar', label: 'Dokümanlar', icon: 'file' },
-            { path: '/pasaport', label: 'Dijital Pasaport', icon: 'layers' },
-            { path: '/giris-cikislarim', label: 'Giriş-çıkışlarım', icon: 'clock' },
-            { path: '/rozetlerim', label: 'Rozetlerim', icon: 'badge' },
-        ] },
-    { title: 'ÜRETİM AİLESİ', items: [
-            { path: '/planlama', label: 'Planlama', icon: 'layers' },
-            { path: '/rota', label: 'Rota / Operasyon', icon: 'link' },
-            { path: '/muhendislik', label: 'Ürün Mühendisliği', icon: 'gear' },
-            { path: '/bakim', label: 'Bakım', icon: 'wrench' },
-            { path: '/takimhane', label: 'Takımhane', icon: 'wrench' },
-            { path: '/oee', label: 'OEE / KPI', icon: 'chart' },
-        ] },
-    { title: 'TEDARİK ZİNCİRİ', items: [
             { path: '/siparisler', label: 'Siparişler', icon: 'truck' },
-            { path: '/katalog', label: 'Katalog', icon: 'book' },
+            { path: '/planlama', label: 'Üretim Planlama', icon: 'layers' },
+            { path: '/tara', label: 'QR / Barkod', icon: 'scan' },
+        ] },
+    { title: 'YARDIMCI', items: [
+            { path: '/muhendislik', label: 'CAM / Programlama', icon: 'gear' },
+            { path: '/rota', label: 'Rota / Operasyon', icon: 'link' },
+            { path: '/takimhane', label: 'Takım Odası', icon: 'wrench' },
+            { path: '/kalite', label: 'Kalite / Metroloji', icon: 'shield' },
+            { path: '/bakim', label: 'Bakım', icon: 'wrench' },
+            { path: '/depo', label: 'Depo / Stok', icon: 'box' },
             { path: '/satinalma', label: 'Satınalma / Mal Kabul', icon: 'cart' },
             { path: '/talepler', label: 'Satınalma Talepleri', icon: 'box' },
+            { path: '/alacaklar', label: 'Muhasebe', icon: 'calc' },
+            { path: '/sevkiyat', label: 'Sevkiyat / Lojistik', icon: 'truck' },
         ] },
-    { title: 'DESTEK FONKSİYONLAR', items: [
-            { path: '/alacaklar', label: 'Alacaklar & Vade', icon: 'calc' },
-            { path: '/ekonomi', label: 'Ekonomi & Kararlar', icon: 'lock' },
-            { path: '/ekonomi-basvuru', label: 'Ekonomik Sahiplik Başvurusu', icon: 'shield' },
-            { path: '/personel', label: 'Personel', icon: 'users' },
+    { title: 'İNSAN KAYNAKLARI', items: [
+            { path: '/personel', label: 'Personel / İK', icon: 'users' },
+            { path: '/puantaj', label: 'Puantaj & Prim Havuzu', icon: 'calc' },
             { path: '/personel-yetki', label: 'Personel Erişimi', icon: 'shield' },
             { path: '/giris-cikis', label: 'Giriş-Çıkış (GEÇKO)', icon: 'clock' },
+            { path: '/giris-cikislarim', label: 'Giriş-çıkışlarım', icon: 'clock' },
+            { path: '/rozetlerim', label: 'Rozetler / Yetenekler', icon: 'badge' },
             { path: '/akademi', label: 'KMI Academy', icon: 'cap' },
         ] },
-    { title: 'RAPORLAR & ANALİTİK', items: [
-            { path: '/raporlar', label: 'Raporlar', icon: 'chart' },
+    { title: 'DİJİTAL', items: [
+            { path: '/dokumanlar', label: 'Dokümanlar', icon: 'file' },
+            { path: '/pasaport', label: 'Dijital Pasaport', icon: 'layers' },
+            { path: '/raporlar', label: 'Raporlama', icon: 'chart' },
+            { path: '/oee', label: 'OEE / KPI', icon: 'chart' },
             { path: '/zeka', label: 'KMI Zekâ', icon: 'bolt' },
         ] },
-    { title: 'VERİ AKTARIMI & CİHAZ', items: [
+    { title: 'YÖNETİM & SİSTEM', items: [
+            { path: '/katalog', label: 'Katalog', icon: 'book' },
+            { path: '/ekonomi', label: 'Ekonomi & Kararlar', icon: 'lock' },
+            { path: '/ekonomi-basvuru', label: 'Ekonomik Sahiplik Başvurusu', icon: 'shield' },
             { path: '/ana-veri-aktarim', label: 'Ana Veri Aktarımı', icon: 'upload' },
             { path: '/personel-aktarim', label: 'Personel Aktarımı', icon: 'upload' },
             { path: '/yetkinlik-aktarim', label: 'Yetkinlik Aktarımı', icon: 'upload' },

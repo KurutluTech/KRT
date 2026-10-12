@@ -24,7 +24,7 @@ export function publicBoardLeak(board) {
     const m = PUBLIC_FORBIDDEN.exec(JSON.stringify(board));
     return m ? m[1] : null;
 }
-export const MACHINE_STATUS_TR = { UP: 'ÇALIŞIR', DOWN: 'ARIZA', MAINTENANCE: 'BAKIMDA', HOLD: 'BEKLEMEDE' };
+export const MACHINE_STATUS_TR = { UP: 'HAZIR', DOWN: 'ARIZA', MAINTENANCE: 'BAKIMDA', HOLD: 'BEKLETMEDE' };
 export const FRESHNESS_TR = {
     FRESH: 'Üretim kayıtları güncel',
     STALE: `GECİKMİŞ — çalışan iş var ama ${LIVE_STALE_HOURS} saattir kayıt yok`,

@@ -3,6 +3,7 @@
 // UNKNOWN ≠ PASS (0037): a domain without records shows VERİ YOK, stopped updates show GECİKMİŞ.
 // (kmi_next.command_center), the same canonical functions as every other screen. No sample data:
 // an empty shop shows zeros and "uyarı yok". No money on this screen (D-006).
+import { WO_STATUS_TR } from './WorkOrderHubScreen.js';
 import { h, mount } from '../../../../packages/ui/src/h.js';
 import { PULSE_DOMAINS, PULSE_DOMAIN_TR, ALERT_KINDS, COVERAGE_REASON_TR } from '../../../../packages/domain/src/commandCenter.js';
 import { percentLabel } from '../../../../packages/domain/src/oee.js';
@@ -157,7 +158,7 @@ export async function renderCommandCenterScreen(container, api, opts = {}) {
             ? h('div', { class: 'mut', style: 'margin-top:10px', 'data-testid': 'cc-no-live' }, 'Şu an çalışan iş emri yok.')
             : h('div', { class: 'machines', 'data-testid': 'cc-live' }, ...s.liveWorkOrders.map((w) => {
                 const st = w.status === 'IN_PROGRESS' ? (fresh ? 'RUN' : 'STALE') : 'WAIT';
-                return h('div', { class: `mc ${st}`, 'data-testid': 'cc-live-row', 'data-status': w.status }, h('div', { class: 'row' }, h('span', { class: 'cnc' }, cncIcon(38)), h('div', {}, h('div', { class: 'code' }, w.machineCode ?? '—'), h('div', { class: 'mut' }, w.productCode ?? '—')), h('span', { class: 'tag' }, w.status)), h('div', { class: 'bar', role: 'img', 'aria-label': `${w.qtyProduced} / ${w.qtyPlanned}` }, h('i', { style: `width:${pct(w.qtyProduced, w.qtyPlanned)}%` })), h('div', { class: 'mut' }, `${w.qtyProduced} / ${w.qtyPlanned} adet · fire ${w.qtyScrap} · ${w.operatorName ?? '—'}`));
+                return h('div', { class: `mc ${st}`, 'data-testid': 'cc-live-row', 'data-status': w.status }, h('div', { class: 'row' }, h('span', { class: 'cnc' }, cncIcon(38)), h('div', {}, h('div', { class: 'code' }, w.machineCode ?? '—'), h('div', { class: 'mut' }, w.productCode ?? '—')), h('span', { class: 'tag' }, WO_STATUS_TR[w.status] ?? w.status)), h('div', { class: 'bar', role: 'img', 'aria-label': `${w.qtyProduced} / ${w.qtyPlanned}` }, h('i', { style: `width:${pct(w.qtyProduced, w.qtyPlanned)}%` })), h('div', { class: 'mut' }, `${w.qtyProduced} / ${w.qtyPlanned} adet · fire ${w.qtyScrap} · ${w.operatorName ?? '—'}`));
             }));
         const actionEl = h('section', { class: 'panel', 'data-testid': 'cc-actions' }, h('h2', {}, ic('bolt', 16), 'Aksiyon gerektiren işler'), others.length ? h('div', { 'data-testid': 'cc-alerts-other' }, ...others.map(alertRow)) : h('div', { class: 'mut' }, 'Bekleyen yüksek/orta öncelikli uyarı yok.'), h('div', { class: 'acts' }, ...ACTION_KEYS.map(([k, tone, icn]) => {
             const n = c[k] ?? 0;

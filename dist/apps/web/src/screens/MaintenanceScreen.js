@@ -4,6 +4,7 @@
 // (kmi_next.machine_eligibility / domain machineEligibility), never decided on the screen.
 import { h, Fragment, mount } from '../../../../packages/ui/src/h.js';
 import { errorText as sharedErrorText } from '../errorText.js';
+import { DS_CSS, kpi } from '../ds.js';
 function errorText(err) {
     return sharedErrorText(err);
 }
@@ -99,7 +100,7 @@ export async function renderMaintenanceScreen(container, deps, banner) {
         }
     }
     function ticketActions(t) {
-        const btn = (testid, label, onClick) => h('button', { type: 'button', 'data-testid': testid, onClick }, label);
+        const btn = (testid, label, onClick) => h('button', { type: 'button', class: testid === 'test-fail-btn' ? 'danger' : testid === 'test-pass-btn' || testid === 'ticket-close-btn' ? 'okb' : 'primary', 'data-testid': testid, onClick }, label);
         if (t.status === 'OPEN')
             return [btn('ticket-start-btn', 'Bakıma Başla', () => handleTicket(t.id, 'IN_PROGRESS'))];
         if (t.status === 'IN_PROGRESS')
@@ -128,59 +129,75 @@ export async function renderMaintenanceScreen(container, deps, banner) {
     const UNKNOWN_ELIGIBILITY = { eligible: false, label: 'BAKIM', returnPath: 'AUTHORIZED_TEST_REQUIRED', reason: 'ELIGIBILITY_UNKNOWN' };
     // Fail-closed: a machine missing from the canonical eligibility list is treated as NOT eligible.
     const eligibilityOf = (m) => eligibility.find((e) => e.machineId === m.id) ?? UNKNOWN_ELIGIBILITY;
-    const screen = (h("div", { class: "maintenance-screen" },
+    const MACHINE_TR = {
+        UP: ['Üretimde / Hazır', 'ok'], HOLD: ['Beklemede', 'warn'], DOWN: ['Arıza / Duruş', 'bad'], MAINTENANCE: ['Bakımda', 'info'],
+    };
+    const TICKET_TR = {
+        OPEN: ['Açık', 'bad'], IN_PROGRESS: ['Onarımda', 'warn'], TEST_PENDING: ['Yetkili test bekliyor', 'info'], RETURNED_TO_SERVICE: ['Servise döndü', 'ok'], CLOSED: ['Kapalı', ''],
+    };
+    const KIND_TR = { FAULT: 'Arıza', PLANNED: 'Planlı bakım', INSPECTION: 'Muayene' };
+    const SEV_TR = { LOW: ['Düşük', ''], MEDIUM: ['Orta', 'warn'], HIGH: ['Yüksek', 'bad'], CRITICAL: ['Kritik', 'bad'] };
+    const machineName = (id) => machines.find((m) => m.id === id)?.code ?? 'Makine';
+    const n = (st) => machines.filter((m) => m.status === st).length;
+    const openTickets = tickets.filter((t) => t.status !== 'CLOSED').length;
+    const mkBtn = (cls, testid, machineId, label, onClick) => h('button', { type: 'button', class: cls, 'data-testid': testid, 'data-machine-id': machineId, onClick }, label);
+    const screen = (h("div", { class: "maintenance-screen kd" },
+        h("style", null, DS_CSS + '.kd .mrow{display:grid;grid-template-columns:minmax(150px,1fr) minmax(200px,2fr);gap:12px;align-items:center}.kd .mrow .acts{display:flex;gap:8px;flex-wrap:wrap;align-items:center}.kd .mrow.down{border-left:4px solid #dc2626;padding-left:10px}.kd .mrow.maint{border-left:4px solid #3b82f6;padding-left:10px}.kd .mrow.hold{border-left:4px solid #d97706;padding-left:10px}.kd .mrow.up{border-left:4px solid #16a34a;padding-left:10px}@media(max-width:700px){.kd .mrow{grid-template-columns:1fr}}'),
         h("h1", { "data-testid": "maintenance-heading" }, "Bak\u0131m / Makine Sa\u011Fl\u0131\u011F\u0131"),
-        banner ? (h("div", { "data-testid": "maintenance-banner", "data-kind": banner.kind }, banner.text)) : null,
-        loadError ? (h("div", { "data-testid": "maintenance-load-error" },
+        banner ? (h("div", { class: `banner ${banner.kind}`, "data-testid": "maintenance-banner", "data-kind": banner.kind }, banner.text)) : null,
+        loadError ? (h("div", { class: "banner error", "data-testid": "maintenance-load-error" },
             "Y\u00FCklenemedi: ",
             loadError)) : (h(Fragment, null,
-            h("table", { "data-testid": "machines-table" },
-                h("tbody", { "data-testid": "machines-tbody" }, machines.map((m) => (h("tr", { "data-testid": "machine-row", "data-machine-id": m.id, "data-machine-code": m.code },
-                    h("td", { "data-testid": "machine-code" }, m.code),
-                    h("td", { "data-testid": "machine-name" }, m.name),
-                    h("td", { "data-testid": "machine-status" }, m.status),
-                    h("td", { "data-testid": "machine-down-minutes" }, String(m.totalDownMinutes)),
-                    h("td", null, reasonInputFor(m.id)),
-                    h("td", { "data-testid": "machine-eligibility", "data-eligible": String(eligibilityOf(m).eligible), "data-return-path": eligibilityOf(m).returnPath }, eligibilityOf(m).label),
-                    h("td", null,
-                        m.status === 'UP' || m.status === 'HOLD'
-                            ? h('button', { type: 'button', 'data-testid': 'set-down-btn', 'data-machine-id': m.id, onClick: () => handleSetDown(m.id) }, 'ARIZA / DURUŞ Bildir')
-                            : null,
-                        eligibilityOf(m).returnPath === 'RESUME_FROM_HOLD'
-                            ? h('button', { type: 'button', 'data-testid': 'resume-from-hold-btn', 'data-machine-id': m.id, onClick: () => handleResumeFromHold(m.id) }, 'Üretime Döndür (bakım testi gerekmez)')
-                            : null,
-                        eligibilityOf(m).returnPath === 'AUTHORIZED_TEST_REQUIRED'
-                            ? h('button', {
-                                type: 'button',
-                                'data-testid': 'return-to-service-btn',
-                                'data-machine-id': m.id,
-                                onClick: () => handleReturnToService(m.id),
-                            }, 'Servise Döndür (Yetkili Test)')
-                            : null,
-                        m.status !== 'MAINTENANCE'
-                            ? h('button', {
-                                type: 'button',
-                                'data-testid': 'enter-maintenance-btn',
-                                'data-machine-id': m.id,
-                                onClick: () => handleEnterCondition(m.id, 'MAINTENANCE'),
-                            }, 'BAKIM\'a Al')
-                            : null,
-                        m.status === 'UP' ? holdCategoryFor(m.id) : null,
-                        m.status === 'UP'
-                            ? h('button', {
-                                type: 'button',
-                                'data-testid': 'enter-hold-btn',
-                                'data-machine-id': m.id,
-                                onClick: () => handleEnterCondition(m.id, 'HOLD'),
-                            }, 'BEKLEMEYE Al')
-                            : null)))))),
-            h("table", { "data-testid": "tickets-table" },
-                h("tbody", { "data-testid": "tickets-tbody" }, tickets.map((t) => (h("tr", { "data-testid": "ticket-row", "data-ticket-id": t.id },
-                    h("td", { "data-testid": "ticket-machine-id" }, t.machineId),
-                    h("td", { "data-testid": "ticket-kind" }, t.kind),
-                    h("td", { "data-testid": "ticket-severity" }, t.severity),
-                    h("td", { "data-testid": "ticket-status" }, t.status),
-                    h("td", { "data-testid": "ticket-reason" }, t.reason),
-                    h("td", null, ticketActions(t)))))))))));
+            h("div", { class: "kpis" },
+                kpi('ÜRETİMDE / HAZIR', String(n('UP'))),
+                kpi('BEKLEMEDE', String(n('HOLD'))),
+                kpi('ARIZA / DURUŞ', String(n('DOWN'))),
+                kpi('BAKIMDA', String(n('MAINTENANCE'))),
+                kpi('AÇIK BAKIM KAYDI', String(openTickets))),
+            h("div", { class: "panel", "data-testid": "machines-table" },
+                h("h2", null, "Makineler"),
+                h("div", { "data-testid": "machines-tbody" },
+                    machines.length === 0 ? h("div", { class: "empty" }, "Kay\u0131tl\u0131 makine yok.") : null,
+                    machines.map((m) => {
+                        const st = MACHINE_TR[m.status] ?? [m.status, ''];
+                        const el = eligibilityOf(m);
+                        const cls = m.status === 'DOWN' ? 'down' : m.status === 'MAINTENANCE' ? 'maint' : m.status === 'HOLD' ? 'hold' : 'up';
+                        return (h("div", { class: `item mrow ${cls}`, "data-testid": "machine-row", "data-machine-id": m.id, "data-machine-code": m.code },
+                            h("div", null,
+                                h("div", null,
+                                    h("b", { "data-testid": "machine-code" }, m.code),
+                                    " ",
+                                    h("span", { class: "mut", "data-testid": "machine-name" }, m.name)),
+                                h("div", { style: "display:flex;gap:6px;flex-wrap:wrap;margin-top:6px;align-items:center" },
+                                    h("span", { class: `pill ${st[1]}`, "data-testid": "machine-status", "data-code": m.status }, st[0]),
+                                    h("span", { class: `pill ${el.eligible ? 'ok' : 'warn'}`, "data-testid": "machine-eligibility", "data-eligible": String(el.eligible), "data-return-path": el.returnPath }, el.label),
+                                    h("span", { class: "mut" },
+                                        "Toplam duru\u015F: ",
+                                        h("span", { "data-testid": "machine-down-minutes" }, String(m.totalDownMinutes)),
+                                        " dk"))),
+                            h("div", { class: "acts" },
+                                reasonInputFor(m.id),
+                                m.status === 'UP' || m.status === 'HOLD' ? mkBtn('danger', 'set-down-btn', m.id, 'ARIZA / DURUŞ Bildir', () => handleSetDown(m.id)) : null,
+                                el.returnPath === 'RESUME_FROM_HOLD' ? mkBtn('okb', 'resume-from-hold-btn', m.id, 'Üretime Döndür (bakım testi gerekmez)', () => handleResumeFromHold(m.id)) : null,
+                                el.returnPath === 'AUTHORIZED_TEST_REQUIRED' ? mkBtn('okb', 'return-to-service-btn', m.id, 'Servise Döndür (Yetkili Test)', () => handleReturnToService(m.id)) : null,
+                                m.status !== 'MAINTENANCE' ? mkBtn('primary', 'enter-maintenance-btn', m.id, "BAKIM'a Al", () => handleEnterCondition(m.id, 'MAINTENANCE')) : null,
+                                m.status === 'UP' ? holdCategoryFor(m.id) : null,
+                                m.status === 'UP' ? mkBtn('warnb', 'enter-hold-btn', m.id, 'BEKLEMEYE Al', () => handleEnterCondition(m.id, 'HOLD')) : null)));
+                    }))),
+            h("div", { class: "panel", "data-testid": "tickets-table" },
+                h("h2", null, "Bak\u0131m kay\u0131tlar\u0131"),
+                h("div", { "data-testid": "tickets-tbody" },
+                    tickets.length === 0 ? h("div", { class: "empty" }, "A\u00E7\u0131k bak\u0131m kayd\u0131 yok.") : null,
+                    tickets.map((t) => {
+                        const ts = TICKET_TR[t.status] ?? [t.status, ''];
+                        const sv = SEV_TR[t.severity] ?? [t.severity, ''];
+                        return (h("div", { class: "item", "data-testid": "ticket-row", "data-ticket-id": t.id },
+                            h("b", { "data-testid": "ticket-machine-id", "data-code": t.machineId }, machineName(t.machineId)),
+                            h("span", { class: "pill", "data-testid": "ticket-kind", "data-code": t.kind }, KIND_TR[t.kind] ?? t.kind),
+                            h("span", { class: `pill ${sv[1]}`, "data-testid": "ticket-severity", "data-code": t.severity }, sv[0]),
+                            h("span", { class: `pill ${ts[1]}`, "data-testid": "ticket-status", "data-code": t.status }, ts[0]),
+                            h("span", { class: "mut grow", "data-testid": "ticket-reason" }, t.reason),
+                            h("div", { class: "acts", style: "display:flex;gap:8px;flex-wrap:wrap" }, ticketActions(t))));
+                    })))))));
     mount(container, screen);
 }

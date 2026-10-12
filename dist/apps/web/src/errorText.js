@@ -23,6 +23,7 @@ export const ACTION_TR = {
     COMPETENCY_APPROVE: 'yetkinlik onayı',
     ACADEMY_MANAGE: 'akademi yönetimi',
     PERSONNEL_LOGIN_LINK: 'personel hesabı bağlama',
+    PUANTAJ_MANAGE: 'puantaj ve prim yönetimi',
     DOCUMENT_MANAGE: 'doküman yönetimi',
     ROUTING_MANAGE: 'rota tanımlama',
     OPERATION_QC_RECORD: 'operasyon kalite kaydı',
@@ -69,4 +70,15 @@ export function humanError(raw) {
 }
 export function errorText(err) {
     return humanError(err instanceof Error ? err.message : String(err));
+}
+/** True when the backend piece a screen needs is not installed yet (RPC/table/column missing), as opposed to a real failure.
+ *  The screen then shows "Kurulum bekleniyor" instead of a broken page. Duck-typed on PostgrestError (status/code/message). */
+export function isSetupPending(err) {
+    const e = err;
+    if (!e || typeof e !== 'object')
+        return false;
+    const msg = String(e.message ?? '');
+    if (e.code === 'PGRST202' || e.code === '42883' || e.code === '42P01' || e.code === '42703')
+        return true;
+    return /Could not find the function|does not exist|unknown rpc|schema cache/i.test(msg) || (e.status === 404 && /function|rpc/i.test(msg));
 }

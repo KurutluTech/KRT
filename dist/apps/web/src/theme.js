@@ -25,6 +25,7 @@ a{color:var(--kmi-cyan2)}
 .kmi-login-card h1{margin:8px 0 2px;font-size:20px;letter-spacing:.04em;color:#fff;font-weight:800;line-height:1.25}
 .kmi-login-card .sub{margin:0;font-size:12px;color:var(--kmi-mut)}
 .kmi-login-card .rule{height:2px;width:56px;margin:12px auto 0;background:var(--kmi-gold);border-radius:2px}
+.kmi-login-tabs{display:flex;gap:6px;margin:6px 0 4px}.kmi-login-card .kmi-login-tab{flex:1;min-height:44px;border-radius:10px;border:1px solid var(--kmi-line2);background:#0f172a;color:#cbd5e1;font-weight:700;font-size:13px;cursor:pointer;margin:0;width:auto}.kmi-login-card .kmi-login-tab.on{background:var(--kmi-blue,#1d4ed8);color:#fff;border-color:#3b82f6}.kmi-login-hint{font-size:12px;color:var(--kmi-mut);margin:10px 0 0}
 .kmi-login-card label{display:block;font-size:12px;font-weight:700;color:#cbd5e1;margin:12px 0 4px}
 .kmi-login-card input{width:100%;min-height:48px;font-size:16px;border-radius:10px;border:1px solid var(--kmi-line2);background:#0f172a;color:#fff;padding:0 12px}
 .kmi-login-card button{width:100%;min-height:48px;margin-top:16px;font-size:16px;border:0;border-radius:10px;background:var(--kmi-blue);color:#fff;font-weight:800;cursor:pointer}
@@ -92,6 +93,13 @@ a{color:var(--kmi-cyan2)}
 .kmi-section{margin:22px 0 8px;display:flex;align-items:center;gap:8px;font-size:11px;font-weight:800;letter-spacing:.14em;color:var(--kmi-mut)}
 .kmi-section:after{content:"";flex:1;height:1px;background:var(--kmi-line)}
 .kmi-section.gold{color:var(--kmi-gold2)}
+.kmi-pulse[hidden]{display:none}.kmi-pulse .stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
+.kmi-stat{display:flex;align-items:baseline;gap:10px;padding:12px 14px;border-radius:14px;border:1px solid var(--kmi-line2);background:linear-gradient(145deg,#0f172a,#111c2e);color:#e2e8f0;text-decoration:none}
+.kmi-stat b{font-size:28px;font-variant-numeric:tabular-nums}.kmi-stat span{font-size:12px;color:var(--kmi-mut)}.kmi-stat.bad{border-color:#7f1d1d;background:linear-gradient(145deg,#2a0f14,#111c2e)}.kmi-stat.bad b{color:#fca5a5}.kmi-stat.warn{border-color:#78350f}.kmi-stat.warn b{color:#fcd34d}
+.kmi-mut{font-size:12px;color:var(--kmi-mut);margin-top:6px}
+.kmi-dept{margin-top:4px}.kmi-links{display:flex;flex-wrap:wrap;gap:8px}
+.kmi-content a.kmi-link{display:inline-flex;align-items:center;gap:8px;min-height:40px;padding:8px 12px;border-radius:10px;border:1px solid var(--kmi-line2);background:#0f172a;color:#e2e8f0;text-decoration:none;font-size:13px;font-weight:600}
+.kmi-link:hover{border-color:var(--kmi-cyan)}
 .tiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(168px,1fr));gap:10px}
 .kmi-content a.kmi-tile,.kmi-tile{display:flex;align-items:center;gap:12px;min-height:64px;padding:12px;border-radius:14px;border:1px solid var(--kmi-line2);background:linear-gradient(145deg,#0f172a,#111c2e);color:#e2e8f0;text-decoration:none;font-weight:700;font-size:14px;box-shadow:0 6px 18px rgba(2,6,23,.3);transition:border-color .12s,transform .12s}
 .kmi-content a.kmi-tile{color:#e2e8f0;text-decoration:none}

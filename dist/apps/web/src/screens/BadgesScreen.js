@@ -8,10 +8,10 @@ import { METRIC_TR, criterionProgress } from '../../../../packages/domain/src/ba
 import { camelKey } from '../../../../packages/domain/src/reports.js';
 import { errorText as sharedErrorText } from '../errorText.js';
 const CSS = `
-.bdg{padding:0 16px;box-sizing:border-box;max-width:100%}
-.bdg .fam{border:1px solid #e2e8f0;border-radius:14px;padding:10px 12px;margin:10px 0;background:linear-gradient(180deg,#ffffff,#f8fafc)}
+.bdg{padding:0 16px;box-sizing:border-box;max-width:100%;color:#e2e8f0}.bdg h1{color:#fff;font-size:20px}.bdg b{color:#fff}.bdg button{min-height:44px;border-radius:10px;border:0;background:#1d4ed8;color:#fff;font-weight:700;padding:0 14px;cursor:pointer}
+.bdg .fam{border:1px solid #1e293b;border-radius:14px;padding:12px 14px;margin:10px 0;background:linear-gradient(180deg,#111c2e,#0f172a)}
 .bdg .row{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
-.bdg .bar{height:8px;border-radius:99px;background:#e2e8f0;overflow:hidden;flex:1 1 120px;min-width:80px}
+.bdg .bar{height:8px;border-radius:99px;background:#1e293b;overflow:hidden;flex:1 1 120px;min-width:80px}
 .bdg .bar>i{display:block;height:100%;background:linear-gradient(90deg,#22d3ee,#6366f1)}
 .bdg .crit{display:flex;gap:8px;align-items:center;font-size:12px;margin:3px 0}
 .bdg .crit span{flex:0 1 auto;min-width:0;overflow-wrap:anywhere}
@@ -47,20 +47,20 @@ export async function renderBadgesScreen(container, api, state = {}) {
     const go = (next) => void renderBadgesScreen(container, api, { personnelId: pid, ...next });
     const familyCard = (p, f) => {
         const next = f.tiers.find((t) => !t.award);
-        return h('section', { class: 'fam', 'data-testid': 'bdg-family', 'data-code': f.code }, h('div', { style: 'display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap' }, h('b', {}, f.nameTr), h('span', { style: 'font-size:12px;color:#64748b' }, f.descriptionTr)), h('div', { class: 'row', style: 'margin:8px 0' }, ...f.tiers.map((t) => {
+        return h('section', { class: 'fam', 'data-testid': 'bdg-family', 'data-code': f.code }, h('div', { style: 'display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap' }, h('b', {}, f.nameTr), h('span', { style: 'font-size:12px;color:#94a3b8' }, f.descriptionTr)), h('div', { class: 'row', style: 'margin:8px 0' }, ...f.tiers.map((t) => {
             const st = t.award ? (t.award.withdrawn ? 'WITHDRAWN' : 'EARNED') : 'LOCKED';
             const el = h('span', { 'data-testid': 'bdg-medal', 'data-tier': String(t.tier), 'data-state': st, title: LADDER_TIER_NAME[t.tier] });
             el.innerHTML = ladderBadgeSvg(f.track, t.tier, st, 52, f.nameTr);
             return el;
         })), !f.dataSourceAvailable
-            ? h('div', { 'data-testid': 'bdg-no-source', style: 'font-size:12px;color:#b45309;font-weight:700' }, 'VERİ KAYNAĞI YOK — KMI bu alanda henüz kayıt tutmuyor; bu rozet şimdilik kazanılamaz.')
+            ? h('div', { 'data-testid': 'bdg-no-source', style: 'font-size:12px;color:#fbbf24;font-weight:700' }, 'VERİ KAYNAĞI YOK — KMI bu alanda henüz kayıt tutmuyor; bu rozet şimdilik kazanılamaz.')
             : next
                 ? h('div', { 'data-testid': 'bdg-next', 'data-tier': String(next.tier) }, h('div', { style: 'font-size:12px;font-weight:700;margin-bottom:2px' }, `Sıradaki: ${LADDER_TIER_NAME[next.tier]}`), ...next.criteria.map((c) => {
                     const v = metricOf(p, c.metric);
                     const pr = criterionProgress(c, v);
                     return h('div', { class: 'crit', 'data-testid': 'bdg-crit', 'data-metric': c.metric }, h('span', {}, `${METRIC_TR[c.metric]} ${c.op === '>=' ? '≥' : '≤'} ${c.value}`), h('div', { class: 'bar' }, h('i', { style: `width:${Math.round(pr.ratio * 100)}%` })), h('span', { 'data-testid': 'bdg-crit-value' }, pr.unknown ? 'VERİ YOK' : String(v)));
-                }), next.requiresSkillCategory ? h('div', { style: 'font-size:12px;color:#475569' }, `Ayrıca: doğrulanmış ${next.requiresSkillCategory} yetkinliği ≥ ${next.requiresSkillLevel}`) : null)
-                : h('div', { 'data-testid': 'bdg-complete', style: 'font-size:12px;color:#15803d;font-weight:700' }, 'Tüm basamaklar tamam.'));
+                }), next.requiresSkillCategory ? h('div', { style: 'font-size:12px;color:#94a3b8' }, `Ayrıca: doğrulanmış ${next.requiresSkillCategory} yetkinliği ≥ ${next.requiresSkillLevel}`) : null)
+                : h('div', { 'data-testid': 'bdg-complete', style: 'font-size:12px;color:#4ade80;font-weight:700' }, 'Tüm basamaklar tamam.'));
     };
     const celebrate = state.celebrate && state.celebrate.length && profile
         ? (() => {
@@ -87,5 +87,5 @@ export async function renderBadgesScreen(container, api, state = {}) {
             go({ message: errText(e) });
         }
     };
-    mount(container, h('div', { class: 'bdg' }, h('style', {}, CSS), h('h1', { 'data-testid': 'bdg-heading' }, 'Rozetlerim'), h('p', { style: 'font-size:12px;color:#555' }, 'Rozet bir takdirdir, yetki değildir: hiçbir rozet tek başına makine yetkisi vermez. Her basamak gerçek kayıtlarla ölçülür.'), loadError ? h('div', { 'data-testid': 'bdg-error', style: 'padding:10px;border-radius:8px;background:#fee2e2' }, `Yüklenemedi: ${loadError}`) : null, !loadError && !pid ? h('div', { 'data-testid': 'bdg-not-linked', style: 'padding:10px;border-radius:8px;background:#fef3c7' }, 'Giriş hesabınız bir personel kaydına bağlı değil.') : null, state.message ? h('div', { 'data-testid': 'bdg-message', style: 'padding:10px;border-radius:8px;background:#e0f2fe;margin:6px 0' }, state.message) : null, profile ? h('div', { style: 'display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:6px 0' }, h('b', { 'data-testid': 'bdg-name' }, profile.name), h('span', { 'data-testid': 'bdg-count', style: 'font-size:12px;color:#475569' }, `Kazanılan: ${profile.history.filter((x) => !x.withdrawn).length}`), h('button', { type: 'button', 'data-testid': 'bdg-evaluate', onClick: () => void evaluate() }, 'Rozetlerimi kontrol et')) : null, ...(profile ? profile.families.map((f) => familyCard(profile, f)) : []), profile && profile.history.length ? h('section', { 'data-testid': 'bdg-history', style: 'margin:10px 0' }, h('h2', { style: 'font-size:16px' }, 'Başarı geçmişi'), ...profile.history.map((x) => h('div', { 'data-testid': 'bdg-history-item', style: 'font-size:12px;border-top:1px solid #f1f5f9;padding:3px 0' }, `${x.awardedAt.slice(0, 10)} · ${profile.families.find((f) => f.code === x.familyCode)?.nameTr ?? x.familyCode} — ${LADDER_TIER_NAME[x.tier]}${x.withdrawn ? ' (geri alındı)' : ''}`))) : null, celebrate));
+    mount(container, h('div', { class: 'bdg' }, h('style', {}, CSS), h('h1', { 'data-testid': 'bdg-heading' }, 'Rozetlerim'), h('p', { style: 'font-size:12px;color:#94a3b8' }, 'Rozet bir takdirdir, yetki değildir: hiçbir rozet tek başına makine yetkisi vermez. Her basamak gerçek kayıtlarla ölçülür.'), loadError ? h('div', { 'data-testid': 'bdg-error', style: 'padding:10px;border-radius:8px;background:#7f1d1d;color:#fecaca' }, `Yüklenemedi: ${loadError}`) : null, !loadError && !pid ? h('div', { 'data-testid': 'bdg-not-linked', style: 'padding:10px;border-radius:8px;background:#78350f;color:#fde68a' }, 'Giriş hesabınız bir personel kaydına bağlı değil.') : null, state.message ? h('div', { 'data-testid': 'bdg-message', style: 'padding:10px;border-radius:8px;background:#1e3a8a;color:#dbeafe;margin:6px 0' }, state.message) : null, profile ? h('div', { style: 'display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:6px 0' }, h('b', { 'data-testid': 'bdg-name' }, profile.name), h('span', { 'data-testid': 'bdg-count', style: 'font-size:12px;color:#94a3b8' }, `Kazanılan: ${profile.history.filter((x) => !x.withdrawn).length}`), h('button', { type: 'button', 'data-testid': 'bdg-evaluate', onClick: () => void evaluate() }, 'Rozetlerimi kontrol et')) : null, ...(profile ? profile.families.map((f) => familyCard(profile, f)) : []), profile && profile.history.length ? h('section', { 'data-testid': 'bdg-history', style: 'margin:10px 0' }, h('h2', { style: 'font-size:16px' }, 'Başarı geçmişi'), ...profile.history.map((x) => h('div', { 'data-testid': 'bdg-history-item', style: 'font-size:12px;border-top:1px solid #f1f5f9;padding:3px 0' }, `${x.awardedAt.slice(0, 10)} · ${profile.families.find((f) => f.code === x.familyCode)?.nameTr ?? x.familyCode} — ${LADDER_TIER_NAME[x.tier]}${x.withdrawn ? ' (geri alındı)' : ''}`))) : null, celebrate));
 }

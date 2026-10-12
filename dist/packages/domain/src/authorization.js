@@ -35,6 +35,7 @@ const DEFAULT_ROLE_MATRIX = {
     COMPETENCY_APPROVE: ['ADMIN', 'MANAGEMENT'],
     ACADEMY_MANAGE: ['ADMIN', 'MANAGEMENT'],
     PERSONNEL_LOGIN_LINK: ['ADMIN'],
+    PUANTAJ_MANAGE: ['ADMIN', 'MANAGEMENT'],
     DOCUMENT_MANAGE: ['ADMIN', 'MANAGEMENT', 'QUALITY'],
     // Migration 0039: routing definition, operation QC, D-012 operator clearance on an unreviewed machine.
     ROUTING_MANAGE: ['ADMIN', 'MANAGEMENT', 'CAM'],

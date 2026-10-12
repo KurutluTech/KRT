@@ -15,6 +15,10 @@
 // writes `public`. All KMI NEXT mutations go through SECURITY DEFINER RPCs (never a direct
 // table INSERT/UPDATE/DELETE from the client) — the tables only grant SELECT to
 // `authenticated`, enforced server-side by RLS, so a client-side bug here cannot bypass it.
+function operatorLabel(person) {
+    const p = person;
+    return p && typeof p.name === 'string' && p.name ? `${p.name}${typeof p.employeeNo === 'string' && p.employeeNo ? ` · ${p.employeeNo}` : ''}` : undefined;
+}
 export class AuthError extends Error {
     status;
     constructor(message, status) {
@@ -97,6 +101,29 @@ export class KmiNextClient {
                 accessToken: String(body['access_token']),
                 refreshToken: typeof body['refresh_token'] === 'string' ? body['refresh_token'] : null,
                 user: { id: String(user?.['id'] ?? ''), email: user?.['email'] ?? null },
+            };
+        },
+        /** Operator login without e-mail: sicil and/or badge secret + personal PIN, verified server-side (Edge Function operator-login). */
+        signInOperator: async (input) => {
+            const res = await this.fetchImpl(`${this.url}/functions/v1/operator-login`, {
+                method: 'POST',
+                headers: { apikey: this.apiKey, 'content-type': 'application/json' },
+                body: JSON.stringify(input),
+            });
+            const body = (await parseJsonSafe(res));
+            if (!res.ok || !body || typeof body['accessToken'] !== 'string') {
+                const code = body && typeof body['error'] === 'string' ? body['error'] : '';
+                const msg = code === 'ACCOUNT_LOCKED' ? 'Hesap geçici olarak kilitli. 15 dakika sonra deneyin veya yöneticiye başvurun.'
+                    : code === 'RATE_LIMITED' ? 'Çok fazla deneme. Biraz sonra tekrar deneyin.'
+                        : res.status >= 500 || res.status === 404 ? 'Operatör girişi şu anda kullanılamıyor.'
+                            : 'Sicil/rozet veya PIN hatalı.';
+                throw new AuthError(msg, res.status);
+            }
+            const user = body['user'];
+            return {
+                accessToken: String(body['accessToken']),
+                refreshToken: typeof body['refreshToken'] === 'string' ? body['refreshToken'] : null,
+                user: { id: String(user?.['id'] ?? ''), email: null, label: operatorLabel(body['person']) },
             };
         },
         signOut: async (session) => {

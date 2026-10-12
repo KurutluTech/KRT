@@ -9,6 +9,8 @@ import { renderTerminalScreen, rememberedMachine, remember as rememberMachine } 
 import { canOpen, featuredPaths, landingPath, NO_ACCESS } from './access.js';
 import { renderPersonnelAccessScreen } from './screens/PersonnelAccessScreen.js';
 import { createPersonnelAccessApi } from './personnelAccessApi.js';
+import { renderPuantajScreen } from './screens/PuantajScreen.js';
+import { createPuantajApi } from './puantajApi.js';
 import { renderEngineeringScreen } from './screens/EngineeringScreen.js';
 import { createEngineeringApi } from './engineeringApi.js';
 import { renderOperatorHomeScreen } from './screens/OperatorHomeScreen.js';
@@ -78,6 +80,8 @@ import { createAccountingApi } from './accountingApi.js';
 import { renderAccountingScreen } from './screens/AccountingScreen.js';
 import { renderPersonnelImportScreen } from './screens/PersonnelImportScreen.js';
 import { renderToolroomScreen } from './screens/ToolroomScreen.js';
+import { renderDepartmentScreen } from './screens/DepartmentScreen.js';
+import { createDepartmentApi } from './departmentApi.js';
 import { createToolroomApi } from './toolroomApi.js';
 import { renderScanScreen } from './screens/ScanScreen.js';
 import { createScanApi } from './scanApi.js';
@@ -168,6 +172,9 @@ export const ROUTES = [
     { path: '/giris-cikislarim', label: 'Giriş-çıkışlarım', group: 'Saha', inMenu: true, render: (el, c, s) => renderMyAttendanceScreen(el, createGeckoApi(c, s), { today: istanbulToday() }) },
     { path: '/rozetlerim', label: 'Rozetlerim', group: 'Saha', inMenu: true, render: (el, c, s, q) => renderBadgesScreen(el, createBadgesApi(c, s), { personnelId: q.get('kisi') }) },
     { path: '/bakim', label: 'Bakım / Makine Sağlığı', group: 'Saha', inMenu: true, render: (el, c, s) => renderMaintenanceScreen(el, { api: createMaintenanceApi(c, s) }) },
+    { path: '/kalite', label: 'Kalite Kontrol / Metroloji', group: 'Saha', inMenu: true, render: (el, c, s) => renderDepartmentScreen(el, createDepartmentApi(c, s, createWorkOrderHubApi(c, s)), 'KALITE') },
+    { path: '/sevkiyat', label: 'Sevkiyat / Lojistik', group: 'Saha', inMenu: true, render: (el, c, s) => renderDepartmentScreen(el, createDepartmentApi(c, s, createWorkOrderHubApi(c, s)), 'SEVKIYAT') },
+    { path: '/depo', label: 'Depo / Stok / Malzeme', group: 'Satınalma / Depo', inMenu: true, render: (el, c, s) => renderDepartmentScreen(el, createDepartmentApi(c, s, createWorkOrderHubApi(c, s)), 'DEPO') },
     { path: '/takimhane', label: 'Takımhane', group: 'Saha', inMenu: true, render: (el, c, s) => renderToolroomScreen(el, { api: createToolroomApi(c, s) }) },
     { path: '/komuta', label: 'Komuta Merkezi · PULSE', group: 'Yönetim', inMenu: true, render: (el, c, s) => renderCommandCenterScreen(el, createCommandCenterApi(c, s), { refreshMs: 60_000 }) },
     { path: '/rota', label: 'Rota / Operasyonlar', group: 'Yönetim', inMenu: true, render: (el, c, s) => renderRoutingScreen(el, createRoutingApi(c, s)) },
@@ -188,6 +195,7 @@ export const ROUTES = [
     { path: '/katalog', label: 'Katalog (müşteri · tedarikçi · ürün)', group: 'Yönetim', inMenu: true, render: (el, c, s) => renderCatalogScreen(el, createCatalogApi(c, s)) },
     { path: '/ana-veri-aktarim', label: 'Ana veri aktarımı (eski KMI)', group: 'Yönetim', inMenu: true, render: (el, c, s) => renderMasterImportScreen(el, createMasterImportApi(c, s)) },
     { path: '/personel', label: 'Personel', group: 'Yönetim', inMenu: true, render: (el, c, s) => renderPersonnelScreen(el, { api: createPersonnelApi(c, s) }) },
+    { path: '/puantaj', label: 'Puantaj & Prim Havuzu', group: 'Yönetim', inMenu: true, render: (el, c, s) => renderPuantajScreen(el, createPuantajApi(c, s)) },
     { path: '/personel-yetki', label: 'Personel erişimi (hesap · vardiya · çoklu makine)', group: 'Yönetim', inMenu: true, render: (el, c, s) => renderPersonnelAccessScreen(el, createPersonnelAccessApi(c, s)) },
     { path: '/personel-aktarim', label: 'Personel aktarımı (eski KMI)', group: 'Yönetim', inMenu: true, render: (el, c, s) => renderPersonnelImportScreen(el, createPersonnelImportApi(c, s)) },
     { path: '/satinalma', label: 'Satınalma / Mal Kabul', group: 'Satınalma / Depo', inMenu: true, render: (el, c, s) => renderPurchasingScreen(el, { api: createPurchasingApi(c, s) }) },
@@ -253,23 +261,41 @@ export async function startApp(root, opts = {}) {
         return accessCache;
     };
     const offlineBar = () => (navigator.onLine ? null : h('div', { class: 'offline', 'data-testid': 'app-offline' }, 'Bağlantı yok — kayıtlar gönderilemez, bağlantı gelince tekrar deneyin.'));
-    const renderLogin = (message) => {
+    // Operator (sicil/PIN) login needs the operator-login Edge Function + migration 0072. Until the owner turns it on (config.js: operatorLogin: true)
+    // the tab is not shown at all, so nobody is sent to a login path that cannot work. E-mail login is unchanged.
+    const operatorLoginEnabled = window.KMI_NEXT_CONFIG?.operatorLogin === true;
+    const renderLogin = (message, requestedMode = 'EMAIL') => {
+        const mode = operatorLoginEnabled ? requestedMode : 'EMAIL';
         const email = h('input', { type: 'email', autocomplete: 'username', 'data-testid': 'login-email', placeholder: 'E-posta', id: 'kmi-login-email' });
         const pass = h('input', { type: 'password', autocomplete: 'current-password', 'data-testid': 'login-password', placeholder: 'Şifre', id: 'kmi-login-password' });
+        const sicil = h('input', { type: 'text', autocomplete: 'off', 'data-testid': 'login-sicil', placeholder: 'Sicil no (ör. S-1001)', id: 'kmi-login-sicil' });
+        const badge = h('input', { type: 'password', autocomplete: 'off', 'data-testid': 'login-badge', placeholder: 'Rozet / QR (isteğe bağlı — okutun)', id: 'kmi-login-badge' });
+        const pin = h('input', { type: 'password', inputmode: 'numeric', pattern: '[0-9]*', maxlength: '6', autocomplete: 'off', 'data-testid': 'login-pin', placeholder: '6 haneli PIN', id: 'kmi-login-pin' });
         const submit = async (e) => {
             e.preventDefault();
             try {
-                session = await client.auth.signInWithPassword(email.value.trim(), pass.value);
+                if (mode === 'OPERATOR') {
+                    if (!sicil.value.trim() && !badge.value.trim())
+                        throw new Error('Sicil numarası veya rozet gerekli.');
+                    session = await client.auth.signInOperator({ ...(sicil.value.trim() ? { employeeNo: sicil.value.trim() } : {}), ...(badge.value.trim() ? { badge: badge.value.trim() } : {}), pin: pin.value });
+                }
+                else {
+                    session = await client.auth.signInWithPassword(email.value.trim(), pass.value);
+                }
                 accessCache = null;
                 saveSession(session);
                 location.hash = '#/';
                 await route();
             }
             catch (err) {
-                renderLogin(err instanceof Error ? `Giriş başarısız: ${err.message}` : 'Giriş başarısız');
+                renderLogin(err instanceof Error ? `Giriş başarısız: ${err.message}` : 'Giriş başarısız', mode);
             }
         };
-        mount(root, h('div', {}, h('style', {}, SHELL_CSS), offlineBar(), h('div', { class: 'kmi-login', 'data-testid': 'login-screen' }, h('div', { class: 'kmi-login-k', 'aria-hidden': 'true' }, h('img', { src: './assets/kurutlu-k-symbol-white.png', alt: '' })), h('form', { class: 'kmi-login-card', 'data-testid': 'login-form', onSubmit: (e) => void submit(e) }, h('div', { class: 'brand' }, h('img', { src: './assets/kurutlu-k-symbol-white.png', alt: 'Kurutlu' }), h('h1', {}, BRAND), h('p', { class: 'sub' }, BRAND_SUB), h('div', { class: 'rule' })), message ? h('div', { class: 'kmi-login-err', 'data-testid': 'login-error', role: 'alert' }, message) : null, h('label', { for: 'kmi-login-email' }, 'E-posta'), email, h('label', { for: 'kmi-login-password' }, 'Şifre'), pass, h('button', { type: 'submit', 'data-testid': 'login-submit' }, 'Giriş')))));
+        const tab = (m, label, tid) => h('button', { type: 'button', class: `kmi-login-tab${mode === m ? ' on' : ''}`, 'data-testid': tid, 'aria-pressed': String(mode === m), onClick: () => renderLogin(undefined, m) }, label);
+        mount(root, h('div', {}, h('style', {}, SHELL_CSS), offlineBar(), h('div', { class: 'kmi-login', 'data-testid': 'login-screen', 'data-mode': mode }, h('div', { class: 'kmi-login-k', 'aria-hidden': 'true' }, h('img', { src: './assets/kurutlu-k-symbol-white.png', alt: '' })), h('form', { class: 'kmi-login-card', 'data-testid': 'login-form', onSubmit: (e) => void submit(e) }, h('div', { class: 'brand' }, h('img', { src: './assets/kurutlu-k-symbol-white.png', alt: 'Kurutlu' }), h('h1', {}, BRAND), h('p', { class: 'sub' }, BRAND_SUB), h('div', { class: 'rule' })), operatorLoginEnabled ? h('div', { class: 'kmi-login-tabs' }, tab('EMAIL', 'E-posta', 'login-tab-email'), tab('OPERATOR', 'Operatör girişi', 'login-tab-operator')) : null, message ? h('div', { class: 'kmi-login-err', 'data-testid': 'login-error', role: 'alert' }, message) : null, ...(mode === 'OPERATOR'
+            ? [h('label', { for: 'kmi-login-sicil' }, 'Sicil numarası'), sicil, h('label', { for: 'kmi-login-badge' }, 'Rozet / QR'), badge, h('label', { for: 'kmi-login-pin' }, 'Kişisel PIN'), pin,
+                h('p', { class: 'kmi-login-hint' }, 'Rozet tek başına giriş yaptırmaz; PIN gerekir. Paylaşılan tablette işiniz bitince Çıkış yapın.')]
+            : [h('label', { for: 'kmi-login-email' }, 'E-posta'), email, h('label', { for: 'kmi-login-password' }, 'Şifre'), pass]), h('button', { type: 'submit', 'data-testid': 'login-submit' }, 'Giriş')))));
     };
     const route = async () => {
         {
@@ -319,7 +345,7 @@ export async function startApp(root, opts = {}) {
             onClick: () => { const now = !sideEl.classList.contains('collapsed'); sideEl.classList.toggle('collapsed', now); writeCollapsed(now); document.documentElement.style.setProperty('--kmi-side-w', now ? '64px' : '260px'); collBtn.setAttribute('aria-label', now ? 'Menüyü genişlet' : 'Menüyü daralt'); collBtn.replaceChildren(icon(now ? 'chevrons-right' : 'chevrons-left', 16)); } }, icon(collapsed0 ? 'chevrons-right' : 'chevrons-left', 16))), navHost);
         const collBtn = sideEl.querySelector('[data-testid="app-side-collapse"]');
         mount(root, h('div', { class: 'kmi-has-bottom' }, h('style', {}, SHELL_CSS), offlineBar(), h('a', { class: 'kmi-skip', href: '#kmi-main', onClick: (e) => { e.preventDefault(); document.getElementById('kmi-main')?.focus(); } }, 'İçeriğe geç'), sideEl, drawerBack, h('div', { class: 'kmi-main' }, h('header', { class: 'kmi-top' }, h('a', { class: 'brand', href: '#/', 'data-testid': 'app-home', title: BRAND }, h('img', { src: './assets/kurutlu-k-symbol-white.png', alt: '' }), h('span', {}, 'KMI', h('small', {}, 'PERFORMANCE CENTER'))), h('form', { 'data-testid': 'app-search-form', role: 'search', onSubmit: (e) => { e.preventDefault(); const v = e.target.querySelector('input').value.trim(); if (v)
-                location.hash = `#/ara?q=${encodeURIComponent(v)}`; } }, h('input', { type: 'search', 'data-testid': 'app-search', 'aria-label': 'Ara', placeholder: 'Ara…', value: path === '/ara' ? (query.get('q') ?? '') : '' })), h('span', { class: 'user', 'data-testid': 'app-user' }, session.user.email ?? ''), menuBtn, h('button', { type: 'button', class: 'btn', 'data-testid': 'app-logout', onClick: () => void logout() }, icon('logout', 16), h('span', { class: 'nl' }, 'Çıkış'))), h('main', { class: 'kmi-content', id: 'kmi-main', tabindex: '-1' }, content)), bottomHost));
+                location.hash = `#/ara?q=${encodeURIComponent(v)}`; } }, h('input', { type: 'search', 'data-testid': 'app-search', 'aria-label': 'Ara', placeholder: 'Ara…', value: path === '/ara' ? (query.get('q') ?? '') : '' })), h('span', { class: 'user', 'data-testid': 'app-user' }, session.user.email ?? session.user.label ?? ''), menuBtn, h('button', { type: 'button', class: 'btn', 'data-testid': 'app-logout', onClick: () => void logout() }, icon('logout', 16), h('span', { class: 'nl' }, 'Çıkış'))), h('main', { class: 'kmi-content', id: 'kmi-main', tabindex: '-1' }, content)), bottomHost));
         const { value: access, failed: accessFailed } = await getAccess();
         // navigation: only what this user may open (same rule as the home screen and the direct-URL guard); the server decides for real
         const navGroups = visibleNav((p) => canOpen(p, access) && ROUTES.some((x) => x.path === p && x.inMenu));
@@ -352,7 +378,26 @@ export async function startApp(root, opts = {}) {
                 return h('a', { href: `#${x.path}`, class: `kmi-tile${cls}`, 'data-testid': testid, 'data-path': x.path }, icon(n?.icon ?? 'grid', 22), h('span', {}, n?.label ?? x.label, (() => { const rest = n && x.label.startsWith(n.label) ? x.label.slice(n.label.length).replace(/^[\s·—()-]+|[\s)]+$/g, '') : (n && n.label !== x.label ? x.label : ''); return rest ? h('small', {}, rest) : null; })()));
             };
             const homeGroups = navGroups.map((g) => ({ title: g.title, items: g.items.map((i) => open.find((x) => x.path === i.path)).filter((x) => !!x) })).filter((g) => g.items.length > 0);
-            mount(content, h('div', { class: 'shell-menu kmi-home', style: 'max-width:1200px', 'data-testid': 'app-menu' }, accessFailed ? h('div', { class: 'kmi-banner warn', 'data-testid': 'app-access-failed' }, 'Yetki bilgisi alınamadı; yalnız herkese açık ekranlar gösteriliyor. Sayfayı yenileyin.') : null, h('section', { class: 'kmi-hero' }, h('img', { src: './assets/kurutlu-k-symbol-white.png', alt: '' }), h('div', {}, h('h1', {}, BRAND), h('p', {}, BRAND_SUB), access.roles.length ? h('div', { class: 'chips', 'data-testid': 'app-roles' }, h('span', { class: 'kmi-chip' }, `Rolünüz: ${access.roles.join(', ')}`), access.economics ? h('span', { class: 'kmi-chip' }, 'ekonomi yetkisi') : null) : null)), featured.length ? h('div', { 'data-testid': 'app-featured' }, h('div', { class: 'kmi-section gold' }, 'SİZİN İÇİN'), h('div', { class: 'tiles' }, ...featured.map((x) => tile(x, 'app-featured-item', ' featured')))) : null, h('details', { 'data-testid': 'app-all', open: 'open', class: 'kmi-home' }, h('summary', {}, 'Tüm ekranlar'), ...homeGroups.map((g) => h('div', {}, g.title ? h('div', { class: 'kmi-section' }, g.title) : h('div', { style: 'height:8px' }), h('div', { class: 'tiles' }, ...g.items.map((x) => tile(x, 'app-menu-item'))))))));
+            mount(content, h('div', { class: 'shell-menu kmi-home', style: 'max-width:1200px', 'data-testid': 'app-menu' }, accessFailed ? h('div', { class: 'kmi-banner warn', 'data-testid': 'app-access-failed' }, 'Yetki bilgisi alınamadı; yalnız herkese açık ekranlar gösteriliyor. Sayfayı yenileyin.') : null, h('section', { class: 'kmi-hero' }, h('img', { src: './assets/kurutlu-k-symbol-white.png', alt: '' }), h('div', {}, h('h1', {}, BRAND), h('p', {}, BRAND_SUB), access.roles.length ? h('div', { class: 'chips', 'data-testid': 'app-roles' }, h('span', { class: 'kmi-chip' }, `Rolünüz: ${access.roles.join(', ')}`), access.economics ? h('span', { class: 'kmi-chip' }, 'ekonomi yetkisi') : null) : null)), h('section', { class: 'kmi-pulse', 'data-testid': 'app-today', hidden: true }), featured.length ? h('div', { 'data-testid': 'app-featured' }, h('div', { class: 'kmi-section gold' }, 'SİZİN İÇİN'), h('div', { class: 'tiles' }, ...featured.slice(0, 6).map((x) => tile(x, 'app-featured-item', ' featured')))) : null, h('details', { 'data-testid': 'app-all', class: 'kmi-home' }, h('summary', {}, 'Tüm departmanlar ve ekranlar'), ...homeGroups.map((g) => h('div', { class: 'kmi-dept' }, g.title ? h('div', { class: 'kmi-section' }, g.title) : null, h('div', { class: 'kmi-links' }, ...g.items.map((x) => {
+                const n = NAV_ITEM_BY_PATH[x.path];
+                return h('a', { href: `#${x.path}`, class: 'kmi-link', 'data-testid': 'app-menu-item', 'data-path': x.path }, icon(n?.icon ?? 'grid', 16), n?.label ?? x.label);
+            })))))));
+            // "Bugün": real counters from the canonical command_center snapshot only — nothing is shown when it is unavailable (no placeholders, no invented numbers)
+            void (async () => {
+                try {
+                    const snap = await createCommandCenterApi(client, session).snapshot();
+                    const host = content.querySelector('[data-testid="app-today"]');
+                    if (!host)
+                        return;
+                    const c = snap.counters;
+                    const crit = snap.alerts.filter((a) => a.severity === 'CRITICAL').length;
+                    const action = (c.orderItemsOverdue ?? 0) + (c.qualityHoldsOpen ?? 0) + (c.ncrsOpen ?? 0) + (c.incomingQcWaiting ?? 0) + (c.purchaseRequestsWaiting ?? 0);
+                    const stat = (n, label, tone, href) => h('a', { href, class: `kmi-stat ${tone}`, 'data-testid': 'app-today-stat' }, h('b', {}, String(n)), h('span', {}, label));
+                    host.replaceChildren(h('div', { class: 'kmi-section' }, 'BUGÜN'), h('div', { class: 'stats' }, stat(crit, 'kritik uyarı', crit > 0 ? 'bad' : '', '#/komuta'), stat(action, 'aksiyon bekleyen iş', action > 0 ? 'warn' : '', '#/komuta'), stat(c.workOrdersRunning ?? 0, 'çalışan iş emri', '', '#/is-emirleri'), stat(c.workOrdersWaiting ?? 0, 'bekleyen iş emri', '', '#/is-emirleri')), h('div', { class: 'kmi-mut' }, `Veri anı: ${snap.generatedAt.slice(0, 16).replace('T', ' ')}`));
+                    host.hidden = false;
+                }
+                catch { /* snapshot unavailable for this user: show nothing */ }
+            })();
             return;
         }
         if (!canOpen(r.path, access)) {
