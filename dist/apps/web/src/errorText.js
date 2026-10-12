@@ -52,11 +52,14 @@ const BUSINESS_TR = [
     [/^OVER_SHIPMENT/, 'Sipariş miktarından fazla sevk edilemez.'],
     [/Invalid schema|PGRST106|schema must be one of/i, 'Sunucu ayarı eksik: veri şeması (kmi_next) Supabase API ayarında açık değil. Sistem yöneticisine bildirin; bu bir kullanıcı hatası değildir.'],
 ];
+export const SETUP_PENDING_TR = 'Kurulum bekleniyor: bu bölümün veritabanı kurulumu henüz yapılmadı. Mevcut kayıtlarınız etkilenmedi; kurulum tamamlanınca bu bölüm açılır.';
 export function humanError(raw) {
+    if (/Could not find the function|PGRST202|PGRST205|schema cache|unknown rpc/i.test(raw))
+        return SETUP_PENDING_TR;
     const b = BUSINESS_TR.find(([re]) => re.test(raw.trim()));
     if (b)
         return `${b[1]} [${raw.trim()}]`;
-    const m = /^FORBIDDEN: ([A-Z0-9_]+)$/.exec(raw.trim()) ?? /^FORBIDDEN: .* requires authorization for ([A-Z0-9_]+)$/.exec(raw.trim());
+    const m = /^(?:FORBIDDEN|NOT_AUTHORIZED): ([A-Z0-9_]+)$/.exec(raw.trim()) ?? /^FORBIDDEN: .* requires authorization for ([A-Z0-9_]+)$/.exec(raw.trim());
     if (m) {
         const key = m[1];
         const label = ACTION_TR[key] ?? key.toLowerCase().replace(/_/g, ' ');

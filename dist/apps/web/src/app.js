@@ -11,6 +11,9 @@ import { renderPersonnelAccessScreen } from './screens/PersonnelAccessScreen.js'
 import { createPersonnelAccessApi } from './personnelAccessApi.js';
 import { renderPuantajScreen } from './screens/PuantajScreen.js';
 import { createPuantajApi } from './puantajApi.js';
+import { renderAccountingQueueScreen } from './screens/AccountingQueueScreen.js';
+import { createAccountingQueueApi } from './accountingQueueApi.js';
+import { renderZirvedekilerScreen } from './screens/ZirvedekilerScreen.js';
 import { renderEngineeringScreen } from './screens/EngineeringScreen.js';
 import { createEngineeringApi } from './engineeringApi.js';
 import { renderOperatorHomeScreen } from './screens/OperatorHomeScreen.js';
@@ -184,6 +187,7 @@ export const ROUTES = [
     { path: '/cihazlar', label: 'Cihaz entegrasyonları (kanıt bekliyor)', group: 'Diğer', inMenu: true, render: (el, c, s) => renderDevicesScreen(el, createDevicesApi(c, s)) },
     { path: '/zeka', label: 'KMI Zekâ — sor, sıradaki adımlar', group: 'Yönetim', inMenu: true, render: (el, c, s) => renderIntelligenceScreen(el, createIntelligenceApi(c, s), { today: istanbulToday() }) },
     { path: '/canli', label: 'KMI LIVE — fabrika ekranı', group: 'Yönetim', inMenu: true, render: (el, c, s) => renderLiveScreen(el, createLiveApi(c, s), { mode: 'APP' }) },
+    { path: '/onay-kuyrugu', label: 'Muhasebe Kuyruğu (ticari onay)', group: 'Yönetim', inMenu: true, render: (el, c, s) => renderAccountingQueueScreen(el, createAccountingQueueApi(c, s)) },
     { path: '/alacaklar', label: 'Alacaklar & Vade', group: 'Yönetim', inMenu: true, render: (el, c, s) => renderReceivablesScreen(el, createReceivablesApi(c, s), { today: istanbulToday() }) },
     { path: '/ekonomi', label: 'Ekonomi & Kararlar (yalnız sahip)', group: 'Yönetim', inMenu: true, render: (el, c, s) => renderEconomicsScreen(el, createEconomicsApi(c, s), { from: addDays(istanbulToday(), -89), to: istanbulToday(), today: istanbulToday() }) },
     { path: '/ekonomi-basvuru', label: 'Ekonomik sahiplik başvurusu', group: 'Yönetim', inMenu: true, render: (el, c, s) => renderOwnerApplicationScreen(el, createEconomicsApi(c, s)) },
@@ -196,6 +200,7 @@ export const ROUTES = [
     { path: '/ana-veri-aktarim', label: 'Ana veri aktarımı (eski KMI)', group: 'Yönetim', inMenu: true, render: (el, c, s) => renderMasterImportScreen(el, createMasterImportApi(c, s)) },
     { path: '/personel', label: 'Personel', group: 'Yönetim', inMenu: true, render: (el, c, s) => renderPersonnelScreen(el, { api: createPersonnelApi(c, s) }) },
     { path: '/puantaj', label: 'Puantaj & Prim Havuzu', group: 'Yönetim', inMenu: true, render: (el, c, s) => renderPuantajScreen(el, createPuantajApi(c, s)) },
+    { path: '/zirvedekiler', label: 'Zirvedekiler', group: 'Yönetim', inMenu: true, render: (el, c, s, _q, a) => renderZirvedekilerScreen(el, { facts: createPuantajApi(c, s).facts, badges: createBadgesApi(c, s), view: a.roles.some((r) => r === 'ADMIN' || r === 'MANAGEMENT') || a.actions.includes('PUANTAJ_MANAGE') ? 'MANAGEMENT' : 'EMPLOYEE' }) },
     { path: '/personel-yetki', label: 'Personel erişimi (hesap · vardiya · çoklu makine)', group: 'Yönetim', inMenu: true, render: (el, c, s) => renderPersonnelAccessScreen(el, createPersonnelAccessApi(c, s)) },
     { path: '/personel-aktarim', label: 'Personel aktarımı (eski KMI)', group: 'Yönetim', inMenu: true, render: (el, c, s) => renderPersonnelImportScreen(el, createPersonnelImportApi(c, s)) },
     { path: '/satinalma', label: 'Satınalma / Mal Kabul', group: 'Satınalma / Depo', inMenu: true, render: (el, c, s) => renderPurchasingScreen(el, { api: createPurchasingApi(c, s) }) },
@@ -410,7 +415,7 @@ export async function startApp(root, opts = {}) {
             return;
         }
         try {
-            await r.render(content, client, session, query);
+            await r.render(content, client, session, query, access);
         }
         catch (err) {
             mount(content, h('div', { class: 'shell-menu', 'data-testid': 'app-route-error' }, `Ekran açılamadı: ${err instanceof Error ? err.message : String(err)}`));

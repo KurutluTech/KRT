@@ -1,8 +1,8 @@
 {
   "product": "KMI NEXT",
-  "commit": "a69176eb07ff7c019b64e0be45368726ad7cac6a",
+  "commit": "cecd7decd935b23b0cc26c38e131130a6ba5a6ad",
   "builtFrom": "clean git tree",
-  "fileCount": 165,
+  "fileCount": 168,
   "migrationsInRepo": 73,
   "lastMigration": "0073_kmi_next_puantaj_month.sql",
   "note": "Release candidate. Publishing to https://flow.kurutlu.com is a manual owner action; this file is not a publication permit.",
@@ -64,8 +64,8 @@
     },
     {
       "path": "dist/apps/web/src/access.js",
-      "bytes": 3699,
-      "sha256": "40b1720611b0cc048d5cacf230198b5127c83f975b0e3e93988a9c0408353a9f"
+      "bytes": 4363,
+      "sha256": "0286ced47a1e5352b350f66a236ced877afd436824d6c2b744b276914f9af552"
     },
     {
       "path": "dist/apps/web/src/accountingApi.js",
@@ -73,9 +73,14 @@
       "sha256": "9a1157c82ec22810a2957767d86013205a631529556cdfa74549a7bdf9a51e68"
     },
     {
+      "path": "dist/apps/web/src/accountingQueueApi.js",
+      "bytes": 2364,
+      "sha256": "fa8ea8c82d427c5a0e9798b251c79384b9e895bbc53d6e997d2f43ffc9118569"
+    },
+    {
       "path": "dist/apps/web/src/app.js",
-      "bytes": 37792,
-      "sha256": "20d9ebd46821f4418a4dcd67d69f9e03b200e121b552fba01a3f8c756abe11cc"
+      "bytes": 38569,
+      "sha256": "7c159e961b7dc37fc20bfda4477cf513e1c186a4ce0e79aa97e9fdd3c54dfe58"
     },
     {
       "path": "dist/apps/web/src/badgesApi.js",
@@ -129,8 +134,8 @@
     },
     {
       "path": "dist/apps/web/src/errorText.js",
-      "bytes": 4596,
-      "sha256": "c2632f6c666236db05a66f8a08bcb57cbaf5fcfc744fe8cb938f10a95e2732a2"
+      "bytes": 4931,
+      "sha256": "98d8ad46653c6fef8fe984de74c75af9243477cbefb2cb6452147d3320b92d98"
     },
     {
       "path": "dist/apps/web/src/geckoApi.js",
@@ -149,8 +154,8 @@
     },
     {
       "path": "dist/apps/web/src/liveApi.js",
-      "bytes": 935,
-      "sha256": "d518769c17f288076ebe3f91594849e07cec567ff3daf1f56326f46c6711e6e1"
+      "bytes": 1039,
+      "sha256": "2ea8dfb4dbf149f1bf9c93ca1de3e4eb49a5d6ccbf0b5d1b3f2cf90e8a2fa77e"
     },
     {
       "path": "dist/apps/web/src/machineIcons.js",
@@ -174,8 +179,8 @@
     },
     {
       "path": "dist/apps/web/src/nav.js",
-      "bytes": 7385,
-      "sha256": "171ee31f5f8df02c73720b56292e0992597fe9b6a48474e064d9e9e811ba552f"
+      "bytes": 7544,
+      "sha256": "6e54fb51c8517b0019f863b86537c3554925edd4235bf7b968ce401fd003d8cc"
     },
     {
       "path": "dist/apps/web/src/oeeApi.js",
@@ -268,6 +273,11 @@
       "sha256": "f43030486584129dbf9b0c1d82e76d8f63b32f3a7e1d6630b9145d93e8d4b56b"
     },
     {
+      "path": "dist/apps/web/src/screens/AccountingQueueScreen.js",
+      "bytes": 7710,
+      "sha256": "ec502baef09795ed2ac5780c3ee8d5b1188565610ab6a06f2ff1bd2582ab0ad1"
+    },
+    {
       "path": "dist/apps/web/src/screens/AccountingScreen.js",
       "bytes": 6924,
       "sha256": "e4f444468cdef03d94334834ec29efe685af0efd8e6c232f852791f0ed176041"
@@ -339,8 +349,8 @@
     },
     {
       "path": "dist/apps/web/src/screens/LiveScreen.js",
-      "bytes": 16667,
-      "sha256": "65ebd5a3d058138d1ef8429d39748c861730e6beff4e9fc092ff77350d8b0d88"
+      "bytes": 20539,
+      "sha256": "259a0827ddea6102079db6ebb1bcdedd38af02a9c8856fca33f8caae6464a6ed"
     },
     {
       "path": "dist/apps/web/src/screens/MaintenanceScreen.js",
@@ -389,8 +399,8 @@
     },
     {
       "path": "dist/apps/web/src/screens/PersonnelAccessScreen.js",
-      "bytes": 12494,
-      "sha256": "37fbb6d695ad6df8e93db524d01de8803a2a482911b2aec091790865d1fe5da3"
+      "bytes": 12805,
+      "sha256": "284ef86d1a144f82ec77f29931b63e3cb0d393e56d33af85599fb12d0dc5a429"
     },
     {
       "path": "dist/apps/web/src/screens/PersonnelImportScreen.js",
@@ -414,8 +424,8 @@
     },
     {
       "path": "dist/apps/web/src/screens/PuantajScreen.js",
-      "bytes": 15580,
-      "sha256": "642b0cf3828689911e1b2b9f5c39b780bded91001d2fc07b1ce5b3d9d8c833b1"
+      "bytes": 15812,
+      "sha256": "331c6fb11f49dd9f1589f94414c13cc4ff86b9057d8e4dcaf2bfda211728c1b2"
     },
     {
       "path": "dist/apps/web/src/screens/PurchaseRequestsScreen.js",
@@ -424,8 +434,8 @@
     },
     {
       "path": "dist/apps/web/src/screens/PurchasingScreen.js",
-      "bytes": 5070,
-      "sha256": "7dc9bdbd8d20c1dbf895de1ecca42791a982d554116724848a59eedd9f964714"
+      "bytes": 6516,
+      "sha256": "1484226f3f79cd93fccec9806778776c1a581d33bb85930c770860c26cc520cb"
     },
     {
       "path": "dist/apps/web/src/screens/ReceivablesScreen.js",
@@ -434,8 +444,8 @@
     },
     {
       "path": "dist/apps/web/src/screens/ReportsScreen.js",
-      "bytes": 16252,
-      "sha256": "58cd5e2bf73157692b4f72d04147ec503aae0a756237d51fbe8fa419238ed851"
+      "bytes": 16461,
+      "sha256": "d383974d8af9a8fbccb64cf5a6c6e7bd577d496420bcbfa95f93d025ba80350d"
     },
     {
       "path": "dist/apps/web/src/screens/RoutingScreen.js",
@@ -496,6 +506,11 @@
       "path": "dist/apps/web/src/screens/WorkOrdersScreen.js",
       "bytes": 6790,
       "sha256": "11fec9c47b72b03a596f2ad5eef3aaff9a55b50947e6fc284570649e82066f48"
+    },
+    {
+      "path": "dist/apps/web/src/screens/ZirvedekilerScreen.js",
+      "bytes": 10577,
+      "sha256": "573e94bcd1bac0b7611ce8eafd3d0546b9c701f180d35607a8f5f1963597cb1a"
     },
     {
       "path": "dist/apps/web/src/screens/readinessPanel.js",
@@ -832,5 +847,44 @@
       "bytes": 1694,
       "sha256": "538dab8e158045807462d6a9595f76efa14cdf8cd281c80688542c6f6e4feb62"
     }
-  ]
+  ],
+  "verification": {
+    "regression": {
+      "headCommit": "cecd7decd935b23b0cc26c38e131130a6ba5a6ad",
+      "testFiles": 125,
+      "filesWithSummaryLine": 121,
+      "passed": 1044,
+      "failed": 0,
+      "runnerExit": 0,
+      "classification": {
+        "PASS": "all",
+        "FLAKY": 0,
+        "FAIL": 0,
+        "BLOCKED": 0
+      },
+      "note": "full run on this exact HEAD; DB e2e ran against local replica, never production"
+    },
+    "acceptanceMatrix": {
+      "routes": 40,
+      "WORKING": 31,
+      "PARTIAL": 7,
+      "BLOCKED": 1,
+      "DEFERRED": 1,
+      "ERROR": 0,
+      "basis": "WORKING = screen-specific function test (mock backend or local replica); no live-data verification",
+      "doc": "docs/ACCEPTANCE_MATRIX.md"
+    },
+    "knownBlockers": [
+      "Migration 0071-0073 and operator-login not deployed: Puantaj shows Kurulum bekleniyor; operator PIN/badge section blocked",
+      "Duplicate PENDING commercial approval request is NOT prevented by the server (needs unique partial index migration, owner approval); UI only warns",
+      "General ranking has no safe server view (BLOCKED)"
+    ],
+    "replaces": {
+      "liveCommit": "f42c9f0f292b273b56382491430604c85de8af5b",
+      "liveFileCount": 157
+    },
+    "changedFiles": 26,
+    "addedFiles": 11,
+    "configJsIncluded": false
+  }
 }

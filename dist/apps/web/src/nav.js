@@ -60,11 +60,13 @@ export const NAV_GROUPS = [
             { path: '/satinalma', label: 'Satınalma / Mal Kabul', icon: 'cart' },
             { path: '/talepler', label: 'Satınalma Talepleri', icon: 'box' },
             { path: '/alacaklar', label: 'Muhasebe', icon: 'calc' },
+            { path: '/onay-kuyrugu', label: 'Muhasebe Kuyruğu', icon: 'tasks' },
             { path: '/sevkiyat', label: 'Sevkiyat / Lojistik', icon: 'truck' },
         ] },
     { title: 'İNSAN KAYNAKLARI', items: [
             { path: '/personel', label: 'Personel / İK', icon: 'users' },
             { path: '/puantaj', label: 'Puantaj & Prim Havuzu', icon: 'calc' },
+            { path: '/zirvedekiler', label: 'Zirvedekiler', icon: 'badge' },
             { path: '/personel-yetki', label: 'Personel Erişimi', icon: 'shield' },
             { path: '/giris-cikis', label: 'Giriş-Çıkış (GEÇKO)', icon: 'clock' },
             { path: '/giris-cikislarim', label: 'Giriş-çıkışlarım', icon: 'clock' },

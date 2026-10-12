@@ -6,14 +6,17 @@ import { h, mount } from '../../../../packages/ui/src/h.js';
 import { errorText, isSetupPending } from '../errorText.js';
 import { setupPending } from '../ds.js';
 const CSS = `
-.pa{font-family:system-ui,-apple-system,"Segoe UI",sans-serif;padding:12px;max-width:760px;margin:0 auto;box-sizing:border-box;color:#0f172a}
-.pa button{min-height:44px;font-size:16px;font-weight:700;border-radius:12px;border:0;padding:0 14px;cursor:pointer}
-.pa select,.pa input{min-height:44px;font-size:16px;border-radius:10px;border:1px solid #cbd5e1;padding:0 10px;box-sizing:border-box;width:100%}
-.pa .card{background:#fff;border-radius:16px;padding:14px;margin:10px 0;box-shadow:0 1px 3px rgba(0,0,0,.08)}
-.pa .chip{display:inline-block;padding:3px 10px;border-radius:999px;font-weight:800;font-size:12px;margin:2px 4px 2px 0}
-.pa .ok{background:#dcfce7;color:#166534}.pa .warn{background:#fef3c7;color:#92400e}.pa .bad{background:#fee2e2;color:#991b1b}.pa .info{background:#e0e7ff;color:#3730a3}
-.pa .primary{background:#1d4ed8;color:#fff}.pa .ghost{background:#e2e8f0;color:#0f172a}
+.pa{font-family:system-ui,-apple-system,"Segoe UI",sans-serif;padding:12px;max-width:760px;margin:0 auto;box-sizing:border-box;color:#e2e8f0}
+.pa h1{color:#fff;font-size:20px}
+.pa button{min-height:44px;font-size:15px;font-weight:700;border-radius:10px;border:0;padding:0 14px;cursor:pointer}
+.pa select,.pa input{min-height:44px;font-size:16px;border-radius:10px;border:1px solid #334155;background:#0f172a;color:#fff;padding:0 10px;box-sizing:border-box;width:100%}
+.pa .card{background:linear-gradient(180deg,#111c2e,#0f172a);border:1px solid #1e293b;border-radius:14px;padding:14px;margin:10px 0;color:#e2e8f0}
+.pa .chip{display:inline-block;padding:2px 9px;border-radius:999px;font-weight:800;font-size:11px;margin:2px 4px 2px 0;background:#1e293b;color:#e6edf7}
+.pa .ok{background:#14532d;color:#bbf7d0}.pa .warn{background:#78350f;color:#fde68a}.pa .bad{background:#7f1d1d;color:#fecaca}.pa .info{background:#1e3a8a;color:#dbeafe}
+.pa .card.bad{background:#7f1d1d;color:#fecaca;border-color:#991b1b}.pa .card.warn{background:#78350f;color:#fde68a;border-color:#92400e}
+.pa .primary{background:#1d4ed8;color:#fff}.pa .ghost{background:#1e293b;color:#e2e8f0}
 .pa .row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}.pa .grid{display:grid;gap:8px;margin-top:8px}
+.pa label{color:#cbd5e1;font-size:12px}
 `;
 const rid = () => Math.random().toString(36).slice(2);
 export async function renderPersonnelAccessScreen(container, api, state = {}) {
@@ -119,5 +122,5 @@ export async function renderPersonnelAccessScreen(container, api, state = {}) {
             : null);
     };
     const people = ov.people;
-    mount(container, h('div', { class: 'pa', 'data-testid': 'pa-root' }, h('style', {}, CSS), h('h1', {}, 'Personel Erişimi'), h('p', { style: 'color:#475569' }, 'Hesap bağlama, vardiya ve çoklu makine yetkisi. Eşleştirme ad benzerliğiyle yapılmaz; hesabı siz seçersiniz.'), state.banner ? h('div', { class: `card ${state.banner.kind === 'error' ? 'bad' : 'ok'}`, 'data-testid': 'pa-banner', 'data-kind': state.banner.kind }, state.banner.text) : null, h('div', { 'data-testid': 'pa-summary', style: 'color:#cbd5e1;font-size:13px' }, `${people.filter((p) => p.active).length} aktif · ${people.filter((p) => p.active && !p.linked).length} hesabı bağlı değil`), ...people.map(card)));
+    mount(container, h('div', { class: 'pa', 'data-testid': 'pa-root' }, h('style', {}, CSS), h('h1', {}, 'Personel Erişimi'), h('p', { style: 'color:#94a3b8' }, 'Hesap bağlama, vardiya ve çoklu makine yetkisi. Eşleştirme ad benzerliğiyle yapılmaz; hesabı siz seçersiniz.'), state.banner ? h('div', { class: `card ${state.banner.kind === 'error' ? 'bad' : 'ok'}`, 'data-testid': 'pa-banner', 'data-kind': state.banner.kind }, state.banner.text) : null, h('div', { 'data-testid': 'pa-summary', style: 'color:#cbd5e1;font-size:13px' }, `${people.filter((p) => p.active).length} aktif · ${people.filter((p) => p.active && !p.linked).length} hesabı bağlı değil`), ...people.map(card)));
 }

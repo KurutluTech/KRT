@@ -30,7 +30,7 @@ export async function renderPuantajScreen(container, api, state = {}) {
         facts = await api.facts(month);
     }
     catch (e) {
-        mount(container, h('div', { class: 'pz', 'data-testid': 'pz-root' }, h('style', {}, CSS), isSetupPending(e) ? setupPending('Puantaj ve Prim Havuzu') : h('div', { class: 'panel', 'data-testid': 'pz-error' }, `Yüklenemedi: ${errorText(e)}`)));
+        mount(container, h('div', { class: 'pz', 'data-testid': 'pz-root' }, h('style', {}, CSS), isSetupPending(e) ? setupPending('Puantaj ve Prim Havuzu — Migration 0073 gerekli', 'Kurulum bekleniyor — Migration 0073 gerekli. Ekran, aylık dönem, prim havuzu ve personel bazlı puantaj bu kurulumdan sonra açılır. Mevcut kayıtlarınız etkilenmedi; hiçbir rakam üretilmedi.') : h('div', { class: 'panel', 'data-testid': 'pz-error' }, `Yüklenemedi: ${errorText(e)}`)));
         return;
     }
     let busy = false;

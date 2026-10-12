@@ -9,6 +9,7 @@ import { FRESHNESS_TR } from '../../../../packages/domain/src/live.js';
 import { machineState, HEADLINE_TR, AVAILABILITY_TR, PHYSICAL_TR, MACHINE_CLASS_TR, MACHINE_CLASS_UNKNOWN_TR } from '../../../../packages/domain/src/machineState.js';
 import { machineIcon } from '../machineIcons.js';
 import { percentLabel } from '../../../../packages/domain/src/oee.js';
+import { initials } from '../ds.js';
 import { errorText as sharedErrorText } from '../errorText.js';
 const CSS = `
 .live{--card:#111c2e;--card2:#0f172a;--line:#1e293b;--line2:#334155;--txt:#e6edf7;--mut:#94a3b8;--red:#ef4444;--amber:#f59e0b;--green:#22c55e;--cyan:#22d3ee;--violet:#a78bfa;
@@ -31,6 +32,8 @@ const CSS = `
 .live .m[data-headline="ACTIVE_WORK_ORDER"]{border-top-color:var(--cyan)}.live .m[data-headline="FIRST_PIECE"]{border-top-color:var(--amber)}.live .m[data-headline="READY_IDLE"]{border-top-color:#3b82f6}
 .live .m[data-headline="DOWN"]{border-top-color:var(--red)}.live .m[data-headline="MAINTENANCE"]{border-top-color:var(--violet)}.live .m[data-headline="HOLD"]{border-top-color:var(--amber)}
 .live .mh{display:flex;gap:10px;align-items:center}.live .ico{color:var(--cyan);flex:none}.live .m[data-headline="DOWN"] .ico{color:var(--red)}
+.live .opr{display:flex;gap:8px;align-items:center;margin-top:4px}.live .photo{width:30px;height:30px;border-radius:50%;background:#1e293b;border:1px solid #334155;color:#67e8f9;font-weight:800;font-size:11px;display:flex;align-items:center;justify-content:center;flex:none}.live .photo.anon{color:#64748b}
+.live .qty{display:flex;gap:10px;flex-wrap:wrap;font-size:12px;margin-top:4px}.live .qty b{font-size:15px}.live .down{font-size:12px;font-weight:800;color:#fca5a5}
 .live .code{font-size:24px;font-weight:900;letter-spacing:.02em;overflow-wrap:anywhere;min-width:0}
 .live .code.long{font-size:17px;letter-spacing:0}
 .live .num.unk{font-size:12px;color:var(--mut);line-height:1.6}
@@ -77,13 +80,36 @@ export async function renderLiveScreen(container, api, state) {
         }
         catch { /* names/classes are optional: codes only */ }
     }
+    const b0 = board; // tiles are only built when the board loaded
+    let details = null;
+    if (state.mode === 'APP' && profile === 'OFFICE' && api.workDetail) {
+        try {
+            details = await api.workDetail();
+        }
+        catch {
+            details = null; /* UNKNOWN on the cards, never invented */
+        }
+    }
     const go = (patch) => void renderLiveScreen(container, api, { ...state, message: null, error: null, newToken: null, ...patch });
+    const elapsed = (from, to) => {
+        if (!from)
+            return 'BİLİNMİYOR';
+        const mins = Math.max(0, Math.round((new Date(to).getTime() - new Date(from).getTime()) / 60000));
+        return mins >= 60 ? `${Math.floor(mins / 60)} sa ${mins % 60} dk` : `${mins} dk`;
+    };
+    const detailFor = (code, product) => details?.find((d) => d.machineCode === code && (d.productCode ?? null) === (product ?? null)) ?? null;
     const machineTile = (m) => {
         const ms = machineState({ status: m.status, active: m.active });
         const mi = info.get(m.code);
         const cls = mi?.machineClass ?? null;
         const clsTr = cls && cls in MACHINE_CLASS_TR ? MACHINE_CLASS_TR[cls] : MACHINE_CLASS_UNKNOWN_TR;
-        return h('div', { class: 'm', 'data-testid': 'live-machine', 'data-code': m.code, 'data-status': m.status, 'data-headline': ms.headline, 'data-class': cls ?? 'UNKNOWN' }, h('div', { class: 'mh' }, h('span', { class: 'ico' }, machineIcon(cls, 38)), h('div', { style: 'min-width:0' }, h('div', { class: m.code.length > 5 ? 'code long' : 'code' }, m.code), mi ? h('div', { class: 'small', 'data-testid': 'live-name' }, mi.name) : null), h('span', { class: 'st', 'data-testid': 'live-status', title: AVAILABILITY_TR[ms.availability] }, HEADLINE_TR[ms.headline])), h('div', { class: 'small', 'data-testid': 'live-class' }, clsTr), ms.conflict ? h('div', { class: 'conflict', 'data-testid': 'live-conflict' }, `Kayıt: ${AVAILABILITY_TR[ms.availability]} — ama aktif iş emri var`) : null, h('div', { class: 'small', 'data-testid': 'live-since' }, `Durum kaydı: ${fmt(m.since)}`), ...m.active.map((a) => h('div', { class: 'wo', 'data-testid': 'live-active' }, `${a.productCode ?? '—'}${a.opNo !== null ? ` · op ${a.opNo}` : ''} · İE ${a.wo}`, h('div', { class: 'small' }, a.operator !== undefined ? `Operatör: ${a.operator ?? 'yok'}` : a.hasOperator ? 'Operatör var' : 'Operatör yok'))), m.active.length ? null : h('div', { class: 'small' }, 'Çalışan iş yok'), h('div', { class: 'row3' }, h('div', {}, h('div', { class: 'small' }, 'Sağlam'), h('div', { class: 'num', 'data-testid': 'live-good' }, NUM.format(m.shiftGood))), h('div', {}, h('div', { class: 'small' }, 'Fire'), h('div', { class: 'num', 'data-testid': 'live-scrap' }, NUM.format(m.shiftScrap))), h('div', {}, h('div', { class: 'small' }, 'OEE bugün'), h('div', { class: m.oeeToday === null ? 'num unk' : 'num', 'data-testid': 'live-oee' }, m.oeeToday === null ? 'VERİ YOK' : percentLabel(m.oeeToday)))), m.openHolds ? h('div', { 'data-testid': 'live-hold', style: 'font-size:12px;font-weight:800;color:#fca5a5' }, `${m.openHolds} kalite bekletmesi`) : null, m.openMaintenance ? h('div', { 'data-testid': 'live-maint', style: 'font-size:12px;font-weight:800;color:#fcd34d' }, `${m.openMaintenance} açık bakım kaydı`) : null);
+        return h('div', { class: 'm', 'data-testid': 'live-machine', 'data-code': m.code, 'data-status': m.status, 'data-headline': ms.headline, 'data-class': cls ?? 'UNKNOWN' }, h('div', { class: 'mh' }, h('span', { class: 'ico' }, machineIcon(cls, 38)), h('div', { style: 'min-width:0' }, h('div', { class: m.code.length > 5 ? 'code long' : 'code' }, m.code), mi ? h('div', { class: 'small', 'data-testid': 'live-name' }, mi.name) : null), h('span', { class: 'st', 'data-testid': 'live-status', title: AVAILABILITY_TR[ms.availability] }, HEADLINE_TR[ms.headline])), h('div', { class: 'small', 'data-testid': 'live-class' }, clsTr), ms.conflict ? h('div', { class: 'conflict', 'data-testid': 'live-conflict' }, `Kayıt: ${AVAILABILITY_TR[ms.availability]} — ama aktif iş emri var`) : null, h('div', { class: 'small', 'data-testid': 'live-since' }, `Durum kaydı: ${fmt(m.since)}`), ...m.active.map((a) => {
+            const d = detailFor(m.code, a.productCode);
+            const opName = a.operator !== undefined ? a.operator : d?.operatorName ?? null;
+            const named = a.operator !== undefined || d !== null;
+            return h('div', { class: 'wo', 'data-testid': 'live-active' }, `${a.productCode ?? '—'}${a.opNo !== null ? ` · op ${a.opNo}` : ''} · İE ${a.wo}`, h('div', { class: 'opr', 'data-testid': 'live-operator' }, h('span', { class: opName ? 'photo' : 'photo anon', 'data-testid': 'live-photo', title: 'Fotoğraf henüz yüklenmedi (güvenli yer tutucu)', 'aria-hidden': 'true' }, opName ? initials(opName) : '•'), h('span', { class: 'small' }, named ? `Operatör: ${opName ?? 'yok'}` : a.hasOperator ? 'Operatör var' : 'Operatör yok')), d ? h('div', { class: 'qty', 'data-testid': 'live-qty' }, h('span', {}, 'Planlanan ', h('b', {}, NUM.format(d.qtyPlanned))), h('span', {}, 'Sağlam ', h('b', {}, NUM.format(d.qtyProduced))), h('span', {}, 'Hurda ', h('b', {}, NUM.format(d.qtyScrap)))) : null, d ? h('div', { class: 'small', 'data-testid': 'live-wo-since' }, `Son durum değişimi: ${fmt(d.since)} · geçen süre ${elapsed(d.since, b0.generatedAt)}`)
+                : h('div', { class: 'small', 'data-testid': 'live-wo-unknown' }, state.mode === 'KIOSK' || profile === 'PUBLIC' ? 'Ayrıntı ekran görünümünde gösterilmez.' : 'Planlanan / sağlam / hurda ve geçen süre: BİLİNMİYOR (kaynak okunamadı)'));
+        }), m.active.length > 1 ? h('div', { class: 'conflict', 'data-testid': 'live-multi-active' }, `${m.active.length} aktif oturum görünüyor — makine başına yalnız biri olabilir, kontrol edin`) : null, (ms.availability === 'DOWN' || ms.availability === 'MAINTENANCE') ? h('div', { class: 'down', 'data-testid': 'live-downtime' }, `${AVAILABILITY_TR[ms.availability]}: ${m.since ? `kayıttan beri ${elapsed(m.since, b0.generatedAt)}` : 'ne zamandan beri BİLİNMİYOR'}`) : null, m.active.length ? null : h('div', { class: 'small' }, 'Çalışan iş yok'), h('div', { class: 'row3' }, h('div', {}, h('div', { class: 'small' }, 'Sağlam'), h('div', { class: 'num', 'data-testid': 'live-good' }, NUM.format(m.shiftGood))), h('div', {}, h('div', { class: 'small' }, 'Fire'), h('div', { class: 'num', 'data-testid': 'live-scrap' }, NUM.format(m.shiftScrap))), h('div', {}, h('div', { class: 'small' }, 'OEE bugün'), h('div', { class: m.oeeToday === null ? 'num unk' : 'num', 'data-testid': 'live-oee' }, m.oeeToday === null ? 'VERİ YOK' : percentLabel(m.oeeToday)))), m.openHolds ? h('div', { 'data-testid': 'live-hold', style: 'font-size:12px;font-weight:800;color:#fca5a5' }, `${m.openHolds} kalite bekletmesi`) : null, h('div', { class: 'small', 'data-testid': 'live-updated' }, `Güncellendi: ${fmt(b0.generatedAt)}`), m.openMaintenance ? h('div', { 'data-testid': 'live-maint', style: 'font-size:12px;font-weight:800;color:#fcd34d' }, `${m.openMaintenance} açık bakım kaydı`) : null);
     };
     const displaysPanel = (rows) => {
         const name = h('input', { type: 'text', 'data-testid': 'live-display-name', placeholder: 'Ekran adı (ör. Atölye girişi TV)', style: 'flex:1 1 160px;min-width:0' });
@@ -116,7 +142,8 @@ export async function renderLiveScreen(container, api, state) {
         const row = h('div', { class: 'tabs', 'data-testid': 'live-tabs', role: 'group', 'aria-label': 'Makine filtresi' });
         for (const [key, label, heads] of GROUPS) {
             const count = heads ? st.filter((x) => heads.includes(x.headline)).length : st.length;
-            row.append(h('button', { type: 'button', class: 'tab', 'data-group': key, 'aria-pressed': key === 'ALL' ? 'true' : 'false', onClick: (e) => {
+            row.append(h('button', { type: 'button', class: 'tab', 'data-group': key, 'aria-pressed': key === (state.group ?? 'ALL') ? 'true' : 'false', onClick: (e) => {
+                    state.group = key;
                     for (const t of Array.from(row.children))
                         t.setAttribute('aria-pressed', t === e.currentTarget ? 'true' : 'false');
                     container.querySelectorAll('[data-testid="live-machine"]').forEach((el) => { el.hidden = !!heads && !heads.includes(el.dataset.headline ?? ''); });
@@ -128,8 +155,22 @@ export async function renderLiveScreen(container, api, state) {
     mount(container, h('div', { class: `live${state.mode === 'KIOSK' ? ' kiosk' : ''}`, 'data-testid': 'live', 'data-profile': profile }, h('style', {}, CSS), h('div', { class: 'bar' }, h('h1', { style: 'margin:6px 0', 'data-testid': 'live-heading' }, b?.display ? `KMI LIVE — ${b.display}` : 'KMI LIVE'), b ? h('span', { class: 'chip', 'data-testid': 'live-shift' }, b.shift ? `Vardiya ${b.shift}` : 'Üretim vardiyası dışında') : null, state.mode === 'APP' ? h('button', { type: 'button', 'data-testid': 'live-profile-toggle', onClick: () => go({ profile: profile === 'OFFICE' ? 'PUBLIC' : 'OFFICE' }) }, profile === 'OFFICE' ? 'Ekran görünümü (atölye)' : 'Ofis görünümü') : null), loadError ? h('div', { 'data-testid': 'live-error', style: 'padding:10px;border-radius:8px;background:#7f1d1d;color:#fecaca' }, loadError === 'DISPLAY_TOKEN_INVALID' ? 'Ekran anahtarı geçersiz veya iptal edilmiş.' : `Yüklenemedi: ${loadError}`) : null, state.error ? h('div', { 'data-testid': 'live-action-error', style: 'padding:8px;border-radius:8px;background:#7f1d1d;color:#fecaca' }, state.error) : null, state.message ? h('div', { 'data-testid': 'live-message', style: 'padding:8px;border-radius:8px;background:#14532d;color:#bbf7d0' }, state.message) : null, state.newToken ? h('div', { 'data-testid': 'live-new-link', style: 'padding:8px;border-radius:8px;background:#422006;color:#fde68a;font-size:12px;overflow-wrap:anywhere' }, 'Bu bağlantı yalnız şimdi gösterilir, saklanmaz: ', h('code', {}, state.newToken)) : null, b ? h('div', { 'data-testid': 'live-honesty', style: 'padding:8px 12px;border-radius:10px;background:#2a1c05;border:1px solid #78350f;color:#fde68a;font-size:12px' }, `Telemetri bağlı değil: ${b.sourceNote} · ${PHYSICAL_TR} · ${FRESHNESS_TR[b.productionFreshness]} · Son üretim kaydı: ${fmt(b.lastProductionEventAt)} · Güncellendi: ${fmt(b.generatedAt)}`) : null, b ? kpiStrip(b) : null, b ? h('section', { class: 'panel' }, h('h2', {}, 'Makine durumu'), tabsRow(b), h('div', { class: 'grid', 'data-testid': 'live-grid' }, ...b.machines.map(machineTile))) : null, b ? h('section', { class: 'panel' }, h('h2', {}, 'Sipariş ilerlemesi (en yakın termin)'), b.orders.length ? h('div', { style: 'overflow-x:auto' }, h('table', { 'data-testid': 'live-orders' }, h('tbody', {}, ...b.orders.map((o) => h('tr', { 'data-testid': 'live-order', 'data-state': o.state }, h('td', {}, o.productCode ?? '—'), o.customerPo !== undefined ? h('td', {}, o.customerPo ?? '—') : null, h('td', {}, o.dueDate), h('td', {}, `${NUM.format(o.produced)}/${NUM.format(o.qty)} üretim · ${NUM.format(o.shipped)} sevk`), h('td', { style: 'font-weight:800' }, ORDER_TR[o.state] ?? o.state))))))
         : h('div', { class: 'small' }, 'Açık sipariş satırı yok.')) : null, b ? h('section', { class: 'panel' }, h('h2', {}, 'Vardiya karşılaştırması (dün / bugün)'), b.shiftCompare.length ? h('table', { 'data-testid': 'live-compare' }, h('tbody', {}, ...b.shiftCompare.map((x) => h('tr', {}, h('td', {}, x.day), h('td', {}, x.shift === 'OUT_OF_SHIFT' ? 'vardiya dışı' : x.shift), h('td', {}, `${NUM.format(x.good)} sağlam`), h('td', {}, `${NUM.format(x.scrap)} fire`)))))
         : h('div', { class: 'small', 'data-testid': 'live-compare-empty' }, 'Dün ve bugün üretim kaydı yok (VERİ YOK — "sıfır üretim" anlamına gelmez).')) : null, displays ? displaysPanel(displays) : null));
+    const sel = GROUPS.find((g) => g[0] === state.group);
+    if (sel && sel[2])
+        container.querySelectorAll('[data-testid="live-machine"]').forEach((el) => { el.hidden = !sel[2].includes(el.dataset.headline ?? ''); });
     const ms = state.refreshMs ?? 30000;
+    // Auto-refresh re-renders the whole screen; never do that while the person is working in the screen-management panel
+    // (it would collapse the panel and wipe what they are typing) — try again on the next tick instead.
+    const tick = () => {
+        if (!container.isConnected || !container.querySelector('[data-testid="live"]'))
+            return;
+        const busy = !!container.querySelector('[data-testid="live-displays"][open]') || (container.contains(document.activeElement) && document.activeElement instanceof HTMLInputElement);
+        if (busy) {
+            setTimeout(tick, ms);
+            return;
+        }
+        void renderLiveScreen(container, api, { ...state, message: null, error: null, newToken: null });
+    };
     if (ms > 0)
-        setTimeout(() => { if (container.isConnected && container.querySelector('[data-testid="live"]'))
-            void renderLiveScreen(container, api, { ...state, message: null, error: null, newToken: null }); }, ms);
+        setTimeout(tick, ms);
 }
