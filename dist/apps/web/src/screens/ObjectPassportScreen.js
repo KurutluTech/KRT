@@ -77,6 +77,20 @@ export async function renderObjectPassportScreen(container, api, state, ctx) {
     shell(h('div', { class: 'head' }, h('a', { class: 'btn ghost', href: '#/ara', 'data-testid': 'pp-search' }, '← Arama')), head, tabs, h('div', { class: `pp-cols${actions ? ' has-actions' : ''}` }, body, actions));
     if (tabKey === 'zaman')
         await renderTimeline(body);
+    else if (tabKey === 'iz') {
+        if (!ctx.trace)
+            body.appendChild(h('div', { class: 'panel', 'data-testid': 'setup-pending' }, 'İzlenebilirlik zinciri bu oturumda bağlı değil.'));
+        else {
+            const host = h('div', { class: 'panel', 'data-testid': 'pp-trace-host', style: 'background:#fff;color:#0f172a;border-radius:12px;padding:8px 4px' });
+            body.appendChild(host);
+            try {
+                await ctx.trace(host, state.kind, state.id);
+            }
+            catch (e) {
+                host.appendChild(h('div', { class: 'banner error', 'data-testid': 'pp-error' }, errorText(e)));
+            }
+        }
+    }
     else {
         let res;
         try {

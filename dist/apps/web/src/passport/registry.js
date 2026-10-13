@@ -1,13 +1,19 @@
 import { canOpen } from '../access.js';
 const T = (key, label) => ({ key, label });
 const COMMON = [T('zaman', 'Zaman çizelgesi'), T('belgeler', 'Belgeler')];
+/** Traceability chain (missing links, as-built, raw material, lots, shipments, economic lock): the former /pasaport screen, now a tab of the ONE canonical passport. */
+export const TRACE_TAB = T('iz', 'İzlenebilirlik zinciri');
+export const TRACE_KINDS = ['WORK_ORDER', 'PRODUCT', 'STOCK_LOT'];
+/** Legacy /pasaport kinds → canonical kinds. A lot IS a stock lot: there is no second identity, only a second vocabulary. */
+export const LEGACY_TO_CANONICAL = { LOT: 'STOCK_LOT', WORK_ORDER: 'WORK_ORDER', PRODUCT: 'PRODUCT' };
+export const CANONICAL_TO_LEGACY = { STOCK_LOT: 'LOT', WORK_ORDER: 'WORK_ORDER', PRODUCT: 'PRODUCT' };
 export const KINDS = {
     MACHINE: { kind: 'MACHINE', tr: 'Makine', plural: 'Makineler', auditTypes: ['MACHINE'], taskSource: null, docEntity: 'MACHINE', gate: null,
         tabs: [T('genel', 'Genel'), T('canli', 'Canlı operasyon'), T('ariza', 'Arıza & bakım'), T('performans', 'Performans'), ...COMMON] },
     WORK_ORDER: { kind: 'WORK_ORDER', tr: 'İş emri', plural: 'İş emirleri', auditTypes: ['WORK_ORDER'], taskSource: 'WORK_ORDER', docEntity: 'WORK_ORDER', gate: null,
-        tabs: [T('genel', 'Genel'), T('operasyonlar', 'Operasyonlar'), T('uretim', 'Üretim'), T('kalite', 'Kalite'), T('takim', 'Takım & ekipman'), ...COMMON] },
+        tabs: [T('genel', 'Genel'), T('operasyonlar', 'Operasyonlar'), T('uretim', 'Üretim'), T('kalite', 'Kalite'), T('takim', 'Takım & ekipman'), TRACE_TAB, ...COMMON] },
     PRODUCT: { kind: 'PRODUCT', tr: 'Ürün', plural: 'Ürünler', auditTypes: ['PRODUCT', 'PRODUCT_REVISION', 'CAM_PROGRAM'], taskSource: null, docEntity: null, gate: null,
-        tabs: [T('genel', 'Genel'), T('revizyonlar', 'Revizyonlar & CAM'), T('uretim', 'Üretim geçmişi'), T('kalite', 'Kalite'), ...COMMON] },
+        tabs: [T('genel', 'Genel'), T('revizyonlar', 'Revizyonlar & CAM'), T('uretim', 'Üretim geçmişi'), T('kalite', 'Kalite'), TRACE_TAB, ...COMMON] },
     PERSONNEL: { kind: 'PERSONNEL', tr: 'Personel', plural: 'Personel', auditTypes: ['PERSONNEL'], taskSource: null, docEntity: null, personal: true,
         gate: { any: ['PERSONNEL_MANAGE', 'COMPETENCY_APPROVE', 'ACADEMY_MANAGE', 'PERSONNEL_LOGIN_LINK'], roles: ['ADMIN', 'MANAGEMENT'] },
         tabs: [T('genel', 'Genel'), T('yetkinlik', 'Yetkinlik & eğitim'), T('rozetler', 'Rozetler'), T('aktif', 'Aktif görevler'), T('zaman', 'Zaman çizelgesi')] },
@@ -22,7 +28,7 @@ export const KINDS = {
         gate: { any: ['ORDER_CREATE', 'ORDER_CONFIRM', 'WORK_ORDER_CREATE', 'COMMERCIAL_RELEASE', 'MANAGEMENT_RELEASE', 'ACCOUNTING_MUTATION', 'SHIPMENT_MANAGE'], roles: ['ADMIN', 'MANAGEMENT'] },
         tabs: [T('genel', 'Genel'), T('kalemler', 'Kalemler & iş emirleri'), ...COMMON] },
     STOCK_LOT: { kind: 'STOCK_LOT', tr: 'Stok partisi', plural: 'Partiler', auditTypes: ['STOCK_LOT'], taskSource: null, docEntity: 'STOCK_LOT', gate: null,
-        tabs: [T('genel', 'Genel'), T('hareket', 'Stok hareketleri'), T('sevkiyat', 'Ticari onay & sevkiyat'), ...COMMON] },
+        tabs: [T('genel', 'Genel'), T('hareket', 'Stok hareketleri'), T('sevkiyat', 'Ticari onay & sevkiyat'), TRACE_TAB, ...COMMON] },
     SUPPLIER: { kind: 'SUPPLIER', tr: 'Tedarikçi', plural: 'Tedarikçiler', auditTypes: ['SUPPLIER'], taskSource: null, docEntity: null,
         gate: { any: ['PURCHASE_ORDER_MANAGE', 'PURCHASING_APPROVE', 'WAREHOUSE_RECORD', 'ACCOUNTING_MUTATION'], roles: ['ADMIN', 'MANAGEMENT'] },
         tabs: [T('genel', 'Genel'), T('zaman', 'Zaman çizelgesi')] },
@@ -48,6 +54,8 @@ export function canOpenPassport(kind, a, ownPersonnel = false) {
         return true;
     return (rule.any ?? []).some((x) => a.actions.includes(x));
 }
+/** Where an old /pasaport target lives now (the traceability tab of the canonical passport). */
+export const canonicalHref = (legacyKind, id, tab = TRACE_TAB.key) => passportHref(LEGACY_TO_CANONICAL[legacyKind], id, tab);
 export const passportHref = (kind, id, tab) => `#/nesne?t=${kind}&id=${encodeURIComponent(id)}${tab ? `&tab=${tab}` : ''}`;
 /** Map a universal-search / board record type to a passport kind (types without a passport stay on their own screen). */
 export const SEARCH_TYPE_TO_KIND = { MACHINE: 'MACHINE', WORK_ORDER: 'WORK_ORDER', PRODUCT: 'PRODUCT', CUSTOMER: 'CUSTOMER', ORDER: 'ORDER', SHIPMENT: 'SHIPMENT', SUPPLIER: 'SUPPLIER', QUALITY_NCR: 'QUALITY_NCR', TASK: 'TASK' };

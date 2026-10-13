@@ -8,8 +8,6 @@ import { formatStamp } from '../../../packages/domain/src/temporal.js';
 const TONE_TR = { ok: 'TAMAM', warn: 'DİKKAT', bad: 'KRİTİK', info: 'BİLGİ', unknown: 'BİLİNMİYOR' };
 const GLYPH = { ok: '✓', warn: '!', bad: '✕', info: 'i', unknown: '?' };
 const PASSPORT_ENTITY = { MACHINE: 'MACHINE', WORK_ORDER: 'WORK_ORDER', STOCK_LOT: 'STOCK_LOT' };
-const PULSE_TR = { PRODUCTION: 'Üretim', QUALITY: 'Kalite', MAINTENANCE: 'Bakım', MATERIAL: 'Malzeme', PURCHASING: 'Satınalma', SHIPMENT: 'Sevkiyat' };
-const LIGHT_TR = { GREEN: 'YEŞİL', AMBER: 'SARI', RED: 'KIRMIZI', UNKNOWN: 'BİLİNMİYOR', STALE: 'BAYAT' };
 export function renderCockpit(host, input) {
     const { snapshot, extras, access, nowMs } = input;
     const cards = homeCardsFor(access);
@@ -34,8 +32,6 @@ export function renderCockpit(host, input) {
     const signals = h('div', { class: 'cp-signals', 'data-testid': 'cockpit-signals' }, h('div', { class: 'kmi-section' }, 'KRİTİK SİNYALLER'), alerts.length === 0
         ? h('div', { class: 'kmi-mut', 'data-testid': 'cockpit-signals-empty' }, snapshot ? 'Bu rol için açık uyarı yok (komuta merkezi kayıtlarına göre).' : 'Uyarılar alınamadı — "uyarı yok" anlamına gelmez.')
         : h('div', {}, ...alerts.map((a) => h('div', { class: `cp-sig ${a.severity === 'CRITICAL' ? 'bad' : 'warn'}`, 'data-testid': 'cockpit-signal' }, h('b', {}, a.severity === 'CRITICAL' ? '✕ KRİTİK' : '! UYARI'), h('span', {}, ` ${a.title}`), a.detail ? h('span', { class: 'kmi-mut' }, ` — ${a.detail}`) : null, PASSPORT_ENTITY[a.entityType] && a.entityId ? h('a', { href: passportHref(PASSPORT_ENTITY[a.entityType], a.entityId), 'data-testid': 'cockpit-signal-passport' }, ' Pasaport →') : null))));
-    const lights = snapshot ? Object.entries(snapshot.pulse).filter(([d]) => inScope(d)) : [];
-    const pulse = lights.length ? h('div', { class: 'cp-pulse', 'data-testid': 'cockpit-pulse' }, h('div', { class: 'kmi-section' }, 'PULSE'), h('div', { class: 'cp-lights' }, ...lights.map(([d, l]) => h('span', { class: `cp-light ${String(l).toLowerCase()}`, 'data-testid': 'cockpit-light', 'data-domain': d, 'data-light': String(l) }, `${PULSE_TR[d] ?? d}: ${LIGHT_TR[String(l)] ?? l}`)))) : null;
-    host.append(head, ...(input.failed ? [h('div', { class: 'kmi-banner warn', 'data-testid': 'cockpit-failed' }, 'Komuta merkezi verisi alınamadı. Aşağıdaki değerler BİLİNMİYOR olarak gösterilir; "0" anlamına gelmez.')] : []), grid, ...(pulse ? [pulse] : []), signals);
+    host.append(head, ...(input.failed ? [h('div', { class: 'kmi-banner warn', 'data-testid': 'cockpit-failed' }, 'Komuta merkezi verisi alınamadı. Aşağıdaki değerler BİLİNMİYOR olarak gösterilir; "0" anlamına gelmez.')] : []), grid, signals);
     host.hidden = false;
 }

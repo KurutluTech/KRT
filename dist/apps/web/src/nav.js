@@ -32,90 +32,114 @@ export const ICON_PATHS = {
     'chevrons-right': 'M5 6l6 6-6 6M12 6l6 6-6 6',
     logout: 'M10 4H5v16h5M15 8l4 4-4 4M19 12H9',
 };
-/** Compact, department-aware sidebar (reference layout). The 15 departments are: Yönetim/Komuta, Üretim/Operatör, Üretim Planlama, CAM,
- *  Takım Odası, Kalite, Bakım, Depo/Stok, Satınalma, Muhasebe, Sevkiyat, Personel/İK, Puantaj/Prim, Doküman/Pasaport, Raporlama.
- *  Every entry is a real screen; access.ts decides who sees it (the server decides for real). */
-export const NAV_GROUPS = [
-    { title: null, items: [
+/** THE navigation tree: 15 workspaces, 44 routes. The sidebar, the drawer, the home page and the role tests are all built from this one list
+ *  (there is no second menu). Whether a user sees an entry is decided by access.ts (canOpen); the server decides for real. */
+export const NAV_TREE = [
+    { id: 'pc', title: 'PERFORMANCE CENTER', icon: 'grid', items: [
             { path: '/', label: 'Ana Sayfa', icon: 'home' },
-            { path: '/komuta', label: 'Komuta Merkezi', icon: 'grid' },
-            { path: '/yonetim', label: 'Yönetim Zekâsı', icon: 'chart' },
+            { path: '/komuta', label: 'Komuta · PULSE', icon: 'grid' },
             { path: '/canli', label: 'KMI LIVE', icon: 'factory' },
-            { path: '/operator', label: 'Benim İşlerim', icon: 'user' },
+            { path: '/oee', label: 'Eğilim · OEE', icon: 'chart' },
+            { path: '/yonetim', label: 'Kararlar (Yönetim Zekâsı)', icon: 'chart' },
         ] },
-    { title: 'MÜŞTERİ & SİPARİŞ', items: [
+    { id: 'order', title: 'MÜŞTERİ & SİPARİŞ', icon: 'truck', items: [
             { path: '/siparisler', label: 'Siparişler', icon: 'truck' },
             { path: '/katalog', label: 'Katalog', icon: 'book' },
         ] },
-    { title: 'ÜRETİM', items: [
-            { path: '/terminal', label: 'Makine Terminali', icon: 'chip' },
+    { id: 'prod', title: 'ÜRETİM', icon: 'factory', items: [
+            { path: '/operator', label: 'Benim İşlerim', icon: 'user' },
             { path: '/gorevler', label: 'Görev Zemini', icon: 'tasks' },
             { path: '/is-emirleri', label: 'İş Emirleri', icon: 'factory' },
+            { path: '/terminal', label: 'Makine Terminali', icon: 'chip' },
             { path: '/tara', label: 'QR / Barkod', icon: 'scan' },
         ] },
-    { title: 'ÜRETİM PLANLAMA', items: [
+    { id: 'plan', title: 'ÜRETİM PLANLAMA', icon: 'layers', items: [
             { path: '/planlama', label: 'Üretim Planlama', icon: 'layers' },
         ] },
-    { title: 'CAM & MÜHENDİSLİK', items: [
+    { id: 'cam', title: 'CAM & MÜHENDİSLİK', icon: 'gear', items: [
             { path: '/muhendislik', label: 'CAM / Programlama', icon: 'gear' },
             { path: '/rota', label: 'Rota / Operasyon', icon: 'link' },
         ] },
-    { title: 'TAKIM ODASI', items: [
+    { id: 'tool', title: 'TAKIMHANE', icon: 'wrench', items: [
             { path: '/takimhane', label: 'Takım Odası', icon: 'wrench' },
         ] },
-    { title: 'KALİTE & METROLOJİ', items: [
+    { id: 'qc', title: 'KALİTE & METROLOJİ', icon: 'shield', items: [
             { path: '/kalite', label: 'Kalite / Metroloji', icon: 'shield' },
             { path: '/tahsis', label: 'TAHSİS (ölçü düzeltme)', icon: 'tasks' },
         ] },
-    { title: 'BAKIM', items: [
+    { id: 'maint', title: 'BAKIM', icon: 'wrench', items: [
             { path: '/bakim', label: 'Bakım', icon: 'wrench' },
         ] },
-    { title: 'DEPO & STOK', items: [
+    { id: 'wh', title: 'DEPO & STOK', icon: 'box', items: [
             { path: '/depo', label: 'Depo / Stok', icon: 'box' },
         ] },
-    { title: 'SATINALMA', items: [
+    { id: 'buy', title: 'SATINALMA', icon: 'cart', items: [
             { path: '/satinalma', label: 'Satınalma / Mal Kabul', icon: 'cart' },
             { path: '/talepler', label: 'Satınalma Talepleri', icon: 'box' },
         ] },
-    { title: 'LOJİSTİK & SEVKİYAT', items: [
+    { id: 'ship', title: 'LOJİSTİK & SEVKİYAT', icon: 'truck', items: [
             { path: '/sevkiyat', label: 'Sevkiyat / Lojistik', icon: 'truck' },
         ] },
-    { title: 'İNSAN KAYNAKLARI', items: [
+    { id: 'hr', title: 'İNSAN KAYNAKLARI', icon: 'users', items: [
             { path: '/personel', label: 'Personel / İK', icon: 'users' },
             { path: '/puantaj', label: 'Puantaj & Prim Havuzu', icon: 'calc' },
             { path: '/zirvedekiler', label: 'Zirvedekiler', icon: 'badge' },
             { path: '/personel-yetki', label: 'Personel Erişimi', icon: 'shield' },
             { path: '/giris-cikis', label: 'Giriş-Çıkış (GEÇKO)', icon: 'clock' },
-            { path: '/giris-cikislarim', label: 'Giriş-çıkışlarım', icon: 'clock' },
-            { path: '/rozetlerim', label: 'Rozetler / Yetenekler', icon: 'badge' },
             { path: '/akademi', label: 'KMI Academy', icon: 'cap' },
-            { path: '/personel-aktarim', label: 'Personel Aktarımı', icon: 'upload' },
-            { path: '/yetkinlik-aktarim', label: 'Yetkinlik Aktarımı', icon: 'upload' },
+            { path: '/giris-cikislarim', label: 'Giriş-çıkışlarım', icon: 'clock', personal: true },
+            { path: '/rozetlerim', label: 'Rozetler / Yetenekler', icon: 'badge', personal: true },
         ] },
-    { title: 'DİJİTAL ZEKÂ', items: [
-            { path: '/pasaport', label: 'Dijital Pasaport', icon: 'layers' },
-            { path: '/dokumanlar', label: 'Dokümanlar', icon: 'file' },
-            { path: '/raporlar', label: 'Raporlama', icon: 'chart' },
-            { path: '/gecmis', label: 'Olay Geçmişi', icon: 'clock' },
-            { path: '/oee', label: 'OEE / KPI', icon: 'chart' },
+    { id: 'intel', title: 'DİJİTAL ZEKÂ', icon: 'bolt', items: [
             { path: '/zeka', label: 'KMI Zekâ', icon: 'bolt' },
+            { path: '/raporlar', label: 'Raporlama', icon: 'chart' },
+            { path: '/dokumanlar', label: 'Dokümanlar', icon: 'file' },
+            { path: '/gecmis', label: 'Olay Geçmişi', icon: 'clock' },
         ] },
-    { title: 'FİNANS & MALİYET ZEKÂSI', items: [
+    { id: 'fin', title: 'FİNANS & MALİYET ZEKÂSI', icon: 'calc', items: [
             { path: '/alacaklar', label: 'Muhasebe', icon: 'calc' },
             { path: '/onay-kuyrugu', label: 'Muhasebe Kuyruğu', icon: 'tasks' },
             { path: '/maliyet', label: 'Maliyet Zekâsı', icon: 'chart' },
             { path: '/ekonomi', label: 'Ekonomi & Kararlar', icon: 'lock' },
-            { path: '/ekonomi-basvuru', label: 'Ekonomik Sahiplik Başvurusu', icon: 'shield' },
         ] },
-    { title: 'BT & SİSTEM YÖNETİMİ', items: [
+    { id: 'it', title: 'BT & SİSTEM YÖNETİMİ', icon: 'chip', items: [
             { path: '/cihazlar', label: 'Cihaz Entegrasyonları', icon: 'chip' },
             { path: '/ana-veri-aktarim', label: 'Ana Veri Aktarımı', icon: 'upload' },
+            { path: '/personel-aktarim', label: 'Personel Aktarımı', icon: 'upload' },
+            { path: '/yetkinlik-aktarim', label: 'Yetkinlik Aktarımı', icon: 'upload' },
+            { path: '/ekonomi-basvuru', label: 'Ekonomik Sahiplik Başvurusu', icon: 'shield' },
         ] },
 ];
-export const NAV_ITEM_BY_PATH = Object.fromEntries(NAV_GROUPS.flatMap((g) => g.items).map((i) => [i.path, i]));
-/** Groups reduced to what `can` allows; empty groups vanish. */
+export const NAV_ITEM_BY_PATH = Object.fromEntries(NAV_TREE.flatMap((g) => g.items).map((i) => [i.path, i]));
+export const WORKSPACE_OF_PATH = Object.fromEntries(NAV_TREE.flatMap((g) => g.items.map((i) => [i.path, g.id])));
+/** Workspaces reduced to what `can` allows; empty workspaces vanish. */
 export function visibleNav(can) {
-    return NAV_GROUPS.map((g) => ({ title: g.title, items: g.items.filter((i) => i.path === '/' || can(i.path)) })).filter((g) => g.items.length > 0);
+    return NAV_TREE.map((g) => ({ ...g, items: g.items.filter((i) => i.path === '/' || can(i.path)) })).filter((g) => g.items.length > 0);
+}
+/** Operator-simple menu: a user whose only role is OPERATOR sees one short list (their own work), not the factory tree. */
+export function isOperatorOnly(roles) { return roles.length > 0 && roles.every((r) => r === 'OPERATOR'); }
+export function simpleNav(tree, preferred) {
+    const byPath = new Map(tree.flatMap((g) => g.items).map((i) => [i.path, i]));
+    const items = preferred.map((p) => byPath.get(p)).filter((i) => !!i);
+    return items.length ? [{ id: 'mine', title: 'BENİM İŞLERİM', icon: 'user', items }] : tree;
+}
+/** Remembered "where I was": the last workspace and favourite screens (per browser; never a permission). */
+export const NAV_STATE_KEY = 'kmi-nav-state-v1';
+export function readNavState(storage) {
+    try {
+        const v = JSON.parse(storage?.getItem(NAV_STATE_KEY) ?? 'null');
+        return { last: typeof v?.last === 'string' ? v.last : null, favorites: Array.isArray(v?.favorites) ? v.favorites.filter((x) => typeof x === 'string' && x in NAV_ITEM_BY_PATH).slice(0, 8) : [] };
+    }
+    catch {
+        return { last: null, favorites: [] };
+    }
+}
+export function nextNavState(prev, ev) {
+    const favorites = ev.toggleFavorite && ev.toggleFavorite in NAV_ITEM_BY_PATH
+        ? (prev.favorites.includes(ev.toggleFavorite) ? prev.favorites.filter((f) => f !== ev.toggleFavorite) : [...prev.favorites, ev.toggleFavorite].slice(-8))
+        : prev.favorites;
+    const ws = ev.visit ? WORKSPACE_OF_PATH[ev.visit] : undefined;
+    return { last: ws && ws !== 'pc' ? ws : prev.last, favorites };
 }
 /** Inline SVG markup for an icon (static, trusted strings only). */
 export function iconSvg(name, size = 20) {

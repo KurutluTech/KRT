@@ -228,7 +228,7 @@ export function createObjectPassportApi(client, session, access, myUserId = sess
                     const rev = w.productRevisionId ? (await sel('product_revisions', 'revision,status', { id: `eq.${w.productRevisionId}` }, undefined, 1))[0] : undefined;
                     const cam = w.camProgramId ? (await sel('cam_programs', 'program_no,revision', { id: `eq.${w.camProgramId}` }, undefined, 1))[0] : undefined;
                     return [{ title: 'Kimlik', kv: [['İş emri kimliği', id], ['Açılış', ts(w.createdAt)], ['Planlanan gün', w.plannedDate ?? '—'], ['Planlanan vardiya', w.plannedShiftCode ?? '—'], ['Planlanan süre', w.plannedMinutes === null ? 'BİLİNMİYOR' : `${w.plannedMinutes} dk`], ['Ürün revizyonu', rev ? `${rev.revision} (${rev.status})` : 'atanmadı'], ['CAM programı', cam ? `${cam.programNo} rev ${cam.revision}` : 'atanmadı']],
-                            note: 'Ayrıntılı izlenebilirlik zinciri (eksik halkalar, as-built, malzeme, parti, sevkiyat) kanonik iş emri pasaportunda: #/pasaport' }];
+                            note: 'Ayrıntılı izlenebilirlik zinciri (eksik halkalar, as-built, malzeme, parti, sevkiyat) bu pasaportun "İzlenebilirlik zinciri" sekmesinde.' }];
                 }
                 if (key === 'operasyonlar') {
                     const ops = await sel('work_order_operations', 'op_no,name,status,machine_id,operator_id,qty_good,qty_scrap,completed_at,qc_result', { work_order_id: `eq.${id}` }, 'op_no.asc');

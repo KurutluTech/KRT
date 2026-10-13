@@ -31,17 +31,21 @@ function economicBox(e) {
 }
 const shipmentLine = (s) => h('div', { 'data-testid': 'pp-shipment' }, `İrsaliye ${s.deliveryNoteNo ?? '—'} · ${s.status} · çıkış ${fmt(s.dispatchedAt)}${s.deliveredAt ? ` · teslim ${fmt(s.deliveredAt)}` : ''}`);
 export async function renderPassportScreen(container, api, state = {}) {
-    const go = (next) => void renderPassportScreen(container, api, next);
-    const open = (kind, id) => go({ input: state.input, view: { kind, id }, back: state.view ? [...(state.back ?? []), state.view] : state.back ?? [] });
+    const go = (next) => void renderPassportScreen(container, api, { navigate: state.navigate, embedded: state.embedded, ...next });
+    const open = (kind, id) => state.navigate ? state.navigate(kind, id) : go({ input: state.input, view: { kind, id }, back: state.view ? [...(state.back ?? []), state.view] : state.back ?? [] });
     const link = (testid, text, kind, id, extra = {}) => h('button', { type: 'button', 'data-testid': testid, ...extra, style: 'background:none;border:0;color:#1d4ed8;text-decoration:underline;cursor:pointer;padding:0;font:inherit', onClick: () => open(kind, id) }, text);
     const input = h('input', { 'data-testid': 'pp-input', value: state.input ?? '', placeholder: 'Etiket kodu (KL…), QR, ürün kodu', style: 'flex:1;min-width:0;min-height:44px;font-size:16px' });
-    let notice = null;
+    let notice = state.notice ?? null;
     const submit = async () => {
         const c = classifyPassportInput(input.value);
         if (c.kind === 'EMPTY')
             return go({ ...state, input: '', view: null });
         try {
             const r = await api.resolve(input.value);
+            if (state.navigate) {
+                state.navigate(r.kind, r.id);
+                return;
+            }
             go({ input: input.value, view: r, back: [] });
         }
         catch (err) {
@@ -68,11 +72,11 @@ export async function renderPassportScreen(container, api, state = {}) {
     }
     mountScreen(notice, body);
     function mountScreen(msg, content) {
-        mount(container, h('div', { class: 'passport-screen', style: 'padding:0 16px;box-sizing:border-box;max-width:100%' }, h('h1', { 'data-testid': 'pp-heading' }, 'Pasaport / Dijital DNA'), h('div', { style: 'display:flex;gap:8px' }, input, h('button', { type: 'button', 'data-testid': 'pp-open', style: 'min-height:44px', onClick: () => void submit() }, 'Aç')), msg ? h('div', { 'data-testid': 'pp-notice', style: 'margin:8px 0;padding:10px;border-radius:8px;background:#fee2e2' }, msg) : null, (state.back ?? []).length ? h('button', { type: 'button', 'data-testid': 'pp-back', style: 'margin:8px 0', onClick: () => {
+        mount(container, h('div', { class: 'passport-screen', style: 'padding:0 16px;box-sizing:border-box;max-width:100%' }, state.embedded ? null : h('h1', { 'data-testid': 'pp-heading' }, state.navigate ? 'Nesne bul — etiket / QR / ürün kodu' : 'Pasaport / Dijital DNA'), state.embedded ? null : h('div', { style: 'display:flex;gap:8px' }, input, h('button', { type: 'button', 'data-testid': 'pp-open', style: 'min-height:44px', onClick: () => void submit() }, 'Aç')), msg ? h('div', { 'data-testid': 'pp-notice', style: 'margin:8px 0;padding:10px;border-radius:8px;background:#fee2e2' }, msg) : null, (state.back ?? []).length && !state.embedded ? h('button', { type: 'button', 'data-testid': 'pp-back', style: 'margin:8px 0', onClick: () => {
                 const back = [...(state.back ?? [])];
                 const prev = back.pop();
                 go({ input: state.input, view: prev, back });
-            } }, '← Geri') : null, state.view ? h('div', { 'data-testid': 'pp-kind', 'data-kind': state.view.kind, style: 'font-size:12px;text-transform:uppercase;color:#64748b;margin-top:8px' }, KIND_TR[state.view.kind]) : null, content));
+            } }, '← Geri') : null, state.view && !state.embedded ? h('div', { 'data-testid': 'pp-kind', 'data-kind': state.view.kind, style: 'font-size:12px;text-transform:uppercase;color:#64748b;margin-top:8px' }, KIND_TR[state.view.kind]) : null, content));
     }
     function woView(p, withTrace) {
         const w = p.workOrder;
