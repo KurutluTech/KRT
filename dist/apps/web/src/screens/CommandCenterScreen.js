@@ -8,6 +8,8 @@ import { h, mount } from '../../../../packages/ui/src/h.js';
 import { PULSE_DOMAINS, PULSE_DOMAIN_TR, ALERT_KINDS, COVERAGE_REASON_TR } from '../../../../packages/domain/src/commandCenter.js';
 import { percentLabel } from '../../../../packages/domain/src/oee.js';
 import { errorText as sharedErrorText } from '../errorText.js';
+import { formatStamp } from '../../../../packages/domain/src/temporal.js';
+import { passportHref } from '../passport/registry.js';
 const CSS = `
 .cc{--bg:#0b1220;--card:#111c2e;--card2:#0f172a;--line:#1e293b;--line2:#334155;--txt:#e6edf7;--mut:#94a3b8;--red:#ef4444;--amber:#f59e0b;--green:#22c55e;--cyan:#22d3ee;--gold:#d4af37;--violet:#a78bfa;
   color:var(--txt);font-family:system-ui,-apple-system,"Segoe UI",sans-serif;box-sizing:border-box;max-width:100%;display:flex;flex-direction:column;gap:14px}
@@ -59,6 +61,18 @@ const CSS = `
 .cc .gauge .num{font-size:12px;font-weight:800;line-height:1.25;color:var(--mut)} .cc .gauge .g.ok .num{font-size:26px;color:var(--txt)}
 .cc .sub{display:grid;gap:6px} .cc .sub>div{border:1px solid var(--line);border-radius:10px;padding:6px 10px;background:rgba(2,6,23,.4);display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap} .cc .sub .num{order:2;text-align:right} .cc .sub .num{font-size:12px;font-weight:800;color:var(--mut)} .cc .sub .lbl,.cc .flow .lbl{font-size:11px;color:var(--mut)}
 .cc .flow{display:grid;grid-template-columns:repeat(auto-fit,minmax(96px,1fr));gap:8px;margin-top:8px} .cc .flow>div{border:1px solid var(--line);border-radius:10px;padding:8px;background:rgba(2,6,23,.4)} .cc .flow .num{font-size:20px;font-weight:800}
+/* live production flow + semantic tones */
+.cc .fsteps{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:8px}
+.cc .fstep{position:relative;border:1px solid var(--line2);border-radius:12px;padding:10px;background:rgba(2,6,23,.45);min-width:0}
+.cc .fstep .n{font-size:22px;font-weight:800;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}.cc .fstep .lbl{font-size:11px;color:var(--mut)}
+.cc .fstep .arr{position:absolute;right:-9px;top:50%;transform:translateY(-50%);color:var(--mut);font-size:18px;pointer-events:none}
+.cc .fstep.red{border-color:#7f1d1d;background:rgba(127,29,29,.22)}.cc .fstep.red .n{color:#fca5a5}
+.cc .fstep.amber{border-color:#78350f;background:rgba(120,53,15,.22)}.cc .fstep.amber .n{color:#fcd34d}
+.cc .fstep.green{border-color:#14532d;background:rgba(20,83,45,.2)}.cc .fstep.green .n{color:#86efac}
+.cc .fstep.blue{border-color:#1e3a8a;background:rgba(30,58,138,.22)}.cc .fstep.blue .n{color:#93c5fd}
+.cc .fstep.gray .n{color:var(--mut);font-size:15px}
+.cc .tn-red{background:#ef4444}.cc .tn-amber{background:#f59e0b}.cc .tn-green{background:#22c55e}.cc .tn-blue{background:#3b82f6}.cc .tn-gray{background:#64748b}
+@media (max-width:640px){.cc .fstep .arr{display:none}}
 @keyframes ccSpin{to{transform:rotate(360deg)}} @keyframes ccBeat{0%,100%{opacity:1}50%{opacity:.35}}
 @media (max-width:1100px){.cc .cols{grid-template-columns:minmax(0,1fr)}}
 @media (max-width:640px){.cc .top button{padding:6px 10px;font-size:13px} .cc .stat .num,.cc .act .num{font-size:18px}.cc .pulse{grid-template-columns:repeat(3,minmax(0,1fr))} .cc .perf{grid-template-columns:minmax(0,1fr)} .cc .big{font-size:32px}}
@@ -77,6 +91,23 @@ const ACTION_KEYS = [
     ['incomingQcWaiting', 'amber', 'box'], ['purchaseRequestsWaiting', 'amber', 'cart'], ['workOrdersOnHold', 'amber', 'pause'],
 ];
 const FLOW_KEYS = ['openOrders', 'purchaseOrdersOpen', 'shipmentsDraft'];
+export function flowTone(key, n, fresh) {
+    if (n === undefined || n === null)
+        return 'gray';
+    switch (key) {
+        case 'orderItemsOverdue':
+        case 'qualityHoldsOpen': return n > 0 ? 'red' : fresh ? 'green' : 'gray';
+        case 'workOrdersOnHold':
+        case 'ncrsOpen': return n > 0 ? 'amber' : fresh ? 'green' : 'gray';
+        case 'workOrdersRunning': return n > 0 ? 'blue' : 'gray';
+        case 'workOrdersWaiting':
+        case 'shipmentsDraft': return n > 0 ? 'blue' : 'gray';
+        default: return 'gray';
+    }
+}
+const FLOW_STEPS = [['workOrdersWaiting', 'Bekleyen iş emri'], ['workOrdersRunning', 'Çalışan iş emri'], ['workOrdersOnHold', 'Duran iş emri'], ['qualityHoldsOpen', 'Kalite bekletmesi'], ['orderItemsOverdue', 'Termini geçen kalem'], ['shipmentsDraft', 'Hazırlanan sevkiyat']];
+const TONE_TR = { red: 'Geciken / acil', amber: 'Risk', green: 'Doğrulanmış normal', blue: 'Aktif', gray: 'Bilinmiyor / boşta' };
+const PASSPORT_ENTITY = { MACHINE: 'MACHINE', WORK_ORDER: 'WORK_ORDER', STOCK_LOT: 'STOCK_LOT' };
 const timers = new WeakMap();
 const ICONS = {
     PRODUCTION: '<path d="M3 20V9l6 3V9l6 3V5h6v15z"/>', QUALITY: '<path d="M12 3l8 3v6c0 4.5-3.2 7.8-8 9-4.8-1.2-8-4.5-8-9V6z"/><path d="M8.5 12l2.5 2.5L15.5 10"/>',
@@ -121,7 +152,7 @@ export async function renderCommandCenterScreen(container, api, opts = {}) {
     const refresh = () => void renderCommandCenterScreen(container, api, opts);
     const counter = (k, cls = '', labelOverride) => h('div', { class: cls, 'data-testid': 'cc-counter', 'data-key': k }, h('div', { class: 'num' }, k === 'machinesEligible' ? `${snap.counters[k] ?? 0}/${snap.counters.machinesTotal ?? 0}` : String(snap.counters[k] ?? 0)), h('div', { class: 'lbl' }, labelOverride ?? COUNTER_LABEL[k]));
     const SRC = { MACHINE: ['#/bakim', 'Bakım'], WORK_ORDER: ['#/is-emirleri', 'İş emirleri'], ORDER_ITEM: ['#/siparisler', 'Siparişler'], STOCK_LOT: ['#/malzeme', 'Malzeme'], PURCHASE_REQUEST: ['#/talepler', 'Talepler'] };
-    const alertRow = (a) => h('div', { class: `alert ${a.severity}`, 'data-testid': 'cc-alert', 'data-kind': a.kind, 'data-severity': a.severity }, h('span', { class: 'sev' }, SEV_TR[a.severity]), h('div', { style: 'min-width:0' }, h('div', { style: 'font-weight:600' }, a.title), h('div', { class: 'mut' }, [ALERT_KINDS[a.kind]?.label ?? a.kind, a.detail, a.since ? `· ${a.since.slice(0, 16).replace('T', ' ')}` : null].filter(Boolean).join(' — '))), SRC[a.entityType] ? h('a', { href: SRC[a.entityType][0], 'data-testid': 'cc-alert-link', style: 'margin-left:auto;color:var(--cyan);font-size:12px;white-space:nowrap' }, `${SRC[a.entityType][1]} →`) : null);
+    const alertRow = (a) => h('div', { class: `alert ${a.severity}`, 'data-testid': 'cc-alert', 'data-kind': a.kind, 'data-severity': a.severity }, h('span', { class: 'sev' }, SEV_TR[a.severity]), h('div', { style: 'min-width:0' }, h('div', { style: 'font-weight:600' }, a.title), h('div', { class: 'mut', 'data-testid': 'cc-alert-meta' }, [ALERT_KINDS[a.kind]?.label ?? a.kind, a.detail, a.since ? `· ${formatStamp(a.since)}` : null].filter(Boolean).join(' — '))), PASSPORT_ENTITY[a.entityType] && a.entityId ? h('a', { href: passportHref(PASSPORT_ENTITY[a.entityType], a.entityId), 'data-testid': 'cc-alert-passport', style: 'margin-left:auto;color:#67e8f9;font-size:12px;white-space:nowrap' }, 'Pasaport →') : null, SRC[a.entityType] ? h('a', { href: SRC[a.entityType][0], 'data-testid': 'cc-alert-link', style: 'margin-left:8px;color:var(--cyan);font-size:12px;white-space:nowrap' }, `${SRC[a.entityType][1]} →`) : null);
     let body;
     if (!snap) {
         body = h('div', { 'data-testid': 'cc-load-error', class: 'panel' }, `Yüklenemedi: ${loadError}`);
@@ -168,12 +199,16 @@ export async function renderCommandCenterScreen(container, api, opts = {}) {
         const oeeVal = percentLabel(oee ? oee.oee : null);
         const oeeKnown = !!oee && oee.oee !== null && oee.oee !== undefined;
         const perfEl = h('section', { class: 'panel', 'data-testid': 'cc-performance' }, h('h2', {}, ic('bolt', 16), 'Performans göstergeleri · bugün'), h('div', { class: 'perf', 'data-testid': 'cc-oee' }, h('div', { class: 'gauge', 'data-testid': 'cc-oee-card', 'data-key': 'oee' }, h('div', { class: `g ${oeeKnown ? 'ok' : 'unk'}` }, h('div', { class: 'num' }, oeeVal)), h('div', { class: 'lbl' }, 'OEE')), h('div', {}, h('div', { class: 'sub' }, ...[['availability', 'Kullanılabilirlik'], ['performance', 'Performans'], ['quality', 'Kalite']].map(([k, label]) => h('div', { 'data-testid': 'cc-oee-card', 'data-key': k }, h('div', { class: 'num' }, percentLabel(oee ? oee[k] : null)), h('div', { class: 'lbl' }, label)))), h('div', { class: 'flow' }, ...FLOW_KEYS.map((k) => counter(k, '', COUNTER_LABEL[k]))))));
-        body = h('div', { style: 'display:flex;flex-direction:column;gap:14px' }, heroEl, h('div', { class: 'cols' }, h('section', { class: 'panel', 'data-testid': 'cc-health' }, h('h2', {}, ic('PRODUCTION', 16), 'Canlı üretim sağlığı'), pulseEl, stale.length
+        const flowEl = h('section', { class: 'panel', 'data-testid': 'cc-flow' }, h('h2', {}, ic('bolt', 16), 'Canlı üretim akışı'), h('div', { class: 'fsteps' }, ...FLOW_STEPS.map(([k, label], i) => {
+            const tone = flowTone(k, c[k], fresh);
+            return h('div', { class: `fstep ${tone}`, 'data-testid': 'cc-flow-step', 'data-key': k, 'data-tone': tone }, h('div', { class: 'n' }, c[k] === undefined ? 'BİLİNMİYOR' : String(c[k])), h('div', { class: 'lbl' }, label), i < FLOW_STEPS.length - 1 ? h('span', { class: 'arr', 'aria-hidden': 'true' }, '›') : null);
+        })), h('div', { class: 'legend', 'data-testid': 'cc-legend', style: 'margin-top:8px' }, ...['red', 'amber', 'green', 'blue', 'gray'].map((t) => h('span', {}, h('i', { class: `sw tn-${t}` }), TONE_TR[t]))));
+        body = h('div', { style: 'display:flex;flex-direction:column;gap:14px' }, heroEl, flowEl, h('div', { class: 'cols' }, h('section', { class: 'panel', 'data-testid': 'cc-health' }, h('h2', {}, ic('PRODUCTION', 16), 'Canlı üretim sağlığı'), pulseEl, stale.length
             ? h('div', { class: 'mut', style: 'margin-top:8px', 'data-testid': 'cc-coverage-note' }, stale.map((d) => `${PULSE_DOMAIN_TR[d]}: ${COVERAGE_REASON_TR[s.coverage?.[d]?.reason ?? 'NO_RECORDS'] ?? ''}`).join(' · '), '. Veri yokken ışık yeşil yanmaz.')
             : null, fleetEl, h('div', { class: 'stats' }, counter('workOrdersRunning', 'stat', 'Çalışan iş emri'), counter('workOrdersWaiting', 'stat', 'Bekleyen iş emri'), counter('machinesEligible', 'stat', 'Üretime uygun'), counter('machinesDown', 'stat', 'Arızalı'), counter('machinesMaintenance', 'stat', 'Bakımda')), liveEl), h('div', { style: 'display:flex;flex-direction:column;gap:14px;min-width:0' }, actionEl, perfEl)));
     }
     const age = snap ? ageLabel(snap.generatedAt) : { text: '', old: false };
-    const screen = h('div', { class: 'cc', 'data-testid': 'cc-root' }, h('style', {}, CSS), h('div', { class: 'top' }, h('div', {}, h('h1', {}, 'Komuta Merkezi · PULSE'), h('div', { class: `live${age.old ? ' old' : ''}`, 'data-testid': 'cc-generated' }, snap ? h('i', {}) : null, snap ? `Veri anı: ${snap.generatedAt.slice(0, 19).replace('T', ' ')} · ${age.text}${age.old ? ' — veri güncel olmayabilir' : ''} · canlı KMI verisi` : '')), h('button', { type: 'button', 'data-testid': 'cc-refresh', onClick: refresh }, 'Yenile')), body);
+    const screen = h('div', { class: 'cc', 'data-testid': 'cc-root' }, h('style', {}, CSS), h('div', { class: 'top' }, h('div', {}, h('h1', {}, 'Komuta Merkezi · PULSE'), h('div', { class: `live${age.old ? ' old' : ''}`, 'data-testid': 'cc-generated' }, snap ? h('i', {}) : null, snap ? `Veri anı: ${formatStamp(snap.generatedAt)} · ${age.text}${age.old ? ' — veri güncel olmayabilir' : ''} · canlı KMI verisi` : '')), h('button', { type: 'button', 'data-testid': 'cc-refresh', onClick: refresh }, 'Yenile')), body);
     mount(container, screen);
     if (opts.refreshMs && opts.refreshMs > 0)
         timers.set(container, setTimeout(refresh, opts.refreshMs));

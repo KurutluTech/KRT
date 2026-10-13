@@ -9,6 +9,8 @@ import { FRESHNESS_TR } from '../../../../packages/domain/src/live.js';
 import { machineState, HEADLINE_TR, AVAILABILITY_TR, PHYSICAL_TR, MACHINE_CLASS_TR, MACHINE_CLASS_UNKNOWN_TR } from '../../../../packages/domain/src/machineState.js';
 import { machineIcon } from '../machineIcons.js';
 import { percentLabel } from '../../../../packages/domain/src/oee.js';
+import { sumPeriods, distinctActiveWorkOrders, rankMachines, deadlineRisk, scrapShare, meanOee } from '../../../../packages/domain/src/liveKpi.js';
+import { passportHref } from '../passport/registry.js';
 import { initials } from '../ds.js';
 import { errorText as sharedErrorText } from '../errorText.js';
 const CSS = `
@@ -48,12 +50,25 @@ const CSS = `
 .live button{background:#1d4ed8;color:#fff;border:0;border-radius:8px;padding:7px 12px;font-weight:600;cursor:pointer}
 .live input[type=text]{background:#0b1220;color:var(--txt);border:1px solid var(--line2);border-radius:8px;padding:7px}
 .live code{overflow-wrap:anywhere}
+.live .k8{display:grid;grid-template-columns:repeat(auto-fit,minmax(118px,1fr));gap:8px}
+.live .k8 .kpi b{font-size:26px;overflow-wrap:anywhere}.live .k8 .kpi.unk b{font-size:13px}.live .k8 .kpi{min-width:0}.live .k8 .kpi small{display:block;font-size:10px;color:var(--mut);margin-top:2px}
+.live .k8 .kpi.hot{border-color:#7f1d1d}.live .k8 .kpi.hot b{color:#fca5a5}.live .k8 .kpi.warn{border-color:#78350f}.live .k8 .kpi.warn b{color:#fcd34d}.live .k8 .kpi.ok b{color:#86efac}
+.live .pgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(280px,100%),1fr));gap:10px}
+.live .pgrid .panel{font-size:12px}.live .pgrid ol,.live .pgrid ul{margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:4px}
+.live .pgrid li{display:flex;gap:8px;justify-content:space-between;align-items:baseline;border-top:1px solid var(--line);padding-top:4px}.live .pgrid li:first-child{border-top:0;padding-top:0}
+.live .tone-red{color:#fca5a5}.live .tone-amber{color:#fcd34d}.live .tone-green{color:#86efac}.live .tone-blue{color:#93c5fd}.live .tone-gray{color:var(--mut)}
+.live .pp{font-size:11px;color:#67e8f9;text-decoration:none;font-weight:700}
+.live .meter{height:8px;border-radius:99px;background:var(--line);overflow:hidden;margin:4px 0}.live .meter i{display:block;height:100%;background:linear-gradient(90deg,#22d3ee,#6366f1)}
 `;
 const NUM = new Intl.NumberFormat('tr-TR');
 const fmt = (iso) => (iso ? new Intl.DateTimeFormat('tr-TR', { timeZone: 'Europe/Istanbul', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }).format(new Date(iso)) : 'BİLİNMİYOR');
 const ORDER_TR = { LATE: 'GECİKMİŞ', DUE_SOON: 'YAKLAŞIYOR', ON_TRACK: 'ZAMANINDA' };
 const errText = (e) => sharedErrorText(e);
+const renderSeq = new WeakMap();
 export async function renderLiveScreen(container, api, state) {
+    // A newer render of the same container (auto-refresh vs. a button press) supersedes this one: the older result must never overwrite the newer screen.
+    const seq = (renderSeq.get(container) ?? 0) + 1;
+    renderSeq.set(container, seq);
     const profile = state.mode === 'KIOSK' ? 'PUBLIC' : state.profile ?? 'OFFICE';
     let board = null;
     let loadError = null;
@@ -80,6 +95,17 @@ export async function renderLiveScreen(container, api, state) {
         }
         catch { /* names/classes are optional: codes only */ }
     }
+    let per = null;
+    if (state.mode === 'APP' && profile === 'OFFICE' && api.periods) {
+        try {
+            per = await api.periods(board?.generatedAt ?? new Date().toISOString());
+        }
+        catch {
+            per = null; /* BİLİNMİYOR on the KPIs, never 0 */
+        }
+    }
+    if (renderSeq.get(container) !== seq)
+        return;
     const b0 = board; // tiles are only built when the board loaded
     let details = null;
     if (state.mode === 'APP' && profile === 'OFFICE' && api.workDetail) {
@@ -103,7 +129,7 @@ export async function renderLiveScreen(container, api, state) {
         const mi = info.get(m.code);
         const cls = mi?.machineClass ?? null;
         const clsTr = cls && cls in MACHINE_CLASS_TR ? MACHINE_CLASS_TR[cls] : MACHINE_CLASS_UNKNOWN_TR;
-        return h('div', { class: 'm', 'data-testid': 'live-machine', 'data-code': m.code, 'data-status': m.status, 'data-headline': ms.headline, 'data-class': cls ?? 'UNKNOWN' }, h('div', { class: 'mh' }, h('span', { class: 'ico' }, machineIcon(cls, 38)), h('div', { style: 'min-width:0' }, h('div', { class: m.code.length > 5 ? 'code long' : 'code' }, m.code), mi ? h('div', { class: 'small', 'data-testid': 'live-name' }, mi.name) : null), h('span', { class: 'st', 'data-testid': 'live-status', title: AVAILABILITY_TR[ms.availability] }, HEADLINE_TR[ms.headline])), h('div', { class: 'small', 'data-testid': 'live-class' }, clsTr), ms.conflict ? h('div', { class: 'conflict', 'data-testid': 'live-conflict' }, `Kayıt: ${AVAILABILITY_TR[ms.availability]} — ama aktif iş emri var`) : null, h('div', { class: 'small', 'data-testid': 'live-since' }, `Durum kaydı: ${fmt(m.since)}`), ...m.active.map((a) => {
+        return h('div', { class: 'm', 'data-testid': 'live-machine', 'data-code': m.code, 'data-status': m.status, 'data-headline': ms.headline, 'data-class': cls ?? 'UNKNOWN' }, h('div', { class: 'mh' }, h('span', { class: 'ico' }, machineIcon(cls, 38)), h('div', { style: 'min-width:0' }, h('div', { class: m.code.length > 5 ? 'code long' : 'code' }, m.code), mi ? h('div', { class: 'small', 'data-testid': 'live-name' }, mi.name) : null), h('span', { class: 'st', 'data-testid': 'live-status', title: AVAILABILITY_TR[ms.availability] }, HEADLINE_TR[ms.headline])), h('div', { class: 'small' }, h('span', { 'data-testid': 'live-class' }, clsTr), mi?.id && state.mode === 'APP' ? [' · ', h('a', { class: 'pp', href: passportHref('MACHINE', mi.id), 'data-testid': 'live-passport' }, 'Pasaport →')] : null), ms.conflict ? h('div', { class: 'conflict', 'data-testid': 'live-conflict' }, `Kayıt: ${AVAILABILITY_TR[ms.availability]} — ama aktif iş emri var`) : null, h('div', { class: 'small', 'data-testid': 'live-since' }, `Durum kaydı: ${fmt(m.since)}`), ...m.active.map((a) => {
             const d = detailFor(m.code, a.productCode);
             const opName = a.operator !== undefined ? a.operator : d?.operatorName ?? null;
             const named = a.operator !== undefined || d !== null;
@@ -136,6 +162,46 @@ export async function renderLiveScreen(container, api, state) {
         const k = (v, label, cls = '', tid) => h('div', { class: `kpi ${cls}`, ...(tid ? { 'data-testid': tid } : {}) }, h('b', {}, String(v)), h('span', {}, label));
         return h('div', { class: 'kpis', 'data-testid': 'live-totals' }, k(bd.machines.length, 'kayıtlı ekipman'), k(n((x) => x.headline === 'ACTIVE_WORK_ORDER'), 'aktif iş emri olan makine'), k(n((x) => x.headline === 'READY_IDLE'), 'hazır · boşta'), k(n((x) => x.availability === 'DOWN'), 'arıza', n((x) => x.availability === 'DOWN') ? 'bad' : ''), k(n((x) => x.availability === 'MAINTENANCE' || x.availability === 'HOLD'), 'bakım / bekletme'), k(bd.totals.openHolds, 'kalite bekletmesi', bd.totals.openHolds ? 'bad' : ''), k('BİLİNMİYOR', 'fiziksel çalışma (CNC bağlantısı yok)', 'unk', 'live-physical'));
     };
+    const tonePct = (v) => (v === null ? 'VERİ YOK' : `${(v * 100).toFixed(1).replace('.', ',')} %`);
+    const kpi8 = (bd) => {
+        const t = per ? sumPeriods(per.rows, bd.generatedAt) : null;
+        const lb = per?.truncated ? '≥ ' : '';
+        const unk = (key, label, why) => h('div', { class: 'kpi unk', 'data-testid': 'live-kpi', 'data-key': key, 'data-known': 'false' }, h('b', {}, 'BİLİNMİYOR'), h('span', {}, label), h('small', {}, why));
+        const val = (key, label, v, sub, cls = '') => h('div', { class: `kpi ${cls}`, 'data-testid': 'live-kpi', 'data-key': key, 'data-known': 'true' }, h('b', {}, `${key.startsWith('prod') ? lb : ''}${NUM.format(v)}`), h('span', {}, label), sub ? h('small', {}, sub) : null);
+        const periodNote = (x) => (x.declarations ? `${NUM.format(x.declarations)} beyan` : 'beyan kaydı yok');
+        const why = state.mode === 'KIOSK' || profile === 'PUBLIC' ? 'ekran görünümünde gösterilmez' : 'kaynak okunamadı';
+        const risk = deadlineRisk(bd.orders);
+        const running = bd.machines.filter((m) => machineState({ status: m.status, active: m.active }).headline === 'ACTIVE_WORK_ORDER').length;
+        return h('div', { class: 'k8', 'data-testid': 'live-kpis' }, t ? val('prod-today', 'Bugün Üretim', t.today.good, periodNote(t.today)) : unk('prod-today', 'Bugün Üretim', why), t ? val('prod-week', 'Bu Hafta', t.week.good, periodNote(t.week)) : unk('prod-week', 'Bu Hafta', why), t ? val('prod-month', 'Bu Ay', t.month.good, periodNote(t.month)) : unk('prod-month', 'Bu Ay', why), t ? val('scrap-today', 'Hurda (Bugün)', t.today.scrap, periodNote(t.today), t.today.scrap > 0 ? 'warn' : '') : unk('scrap-today', 'Hurda (Bugün)', why), val('active-wo', 'Aktif İş Emri', distinctActiveWorkOrders(bd.machines), 'makinede çalışan'), per && per.assigned !== null ? val('assigned', 'Atanmış', per.assigned, 'makineye atanmış, başlamadı') : unk('assigned', 'Atanmış', why), val('running-machines', 'Çalışan Makine', running, `${bd.machines.length} kayıtlı makineden`, running ? 'ok' : ''), val('deadline-risk', 'Termin Riski', risk, risk ? 'geciken / yaklaşan sipariş' : 'riskli satır yok', risk ? 'hot' : 'ok'));
+    };
+    const opsPanels = (bd) => {
+        const st = (m) => machineState({ status: m.status, active: m.active });
+        const nameOf = (c) => info.get(c)?.name ?? c;
+        const li = (tone, left, right) => h('li', {}, h('span', { class: `tone-${tone}` }, left), h('span', {}, right));
+        const panel = (key, title, ...kids) => h('section', { class: 'panel', 'data-testid': 'live-panel', 'data-key': key }, h('h2', {}, title), ...kids);
+        const empty = (t) => h('div', { class: 'small' }, t);
+        const down = bd.machines.filter((m) => st(m).availability === 'DOWN');
+        const maint = bd.machines.filter((m) => st(m).availability === 'MAINTENANCE' || st(m).availability === 'HOLD');
+        const late = bd.orders.filter((o) => o.state === 'LATE'), soon = bd.orders.filter((o) => o.state === 'DUE_SOON');
+        // critical flow: only what the records say is wrong right now, in severity order (red = late/urgent, amber = risk)
+        const crit = [
+            ...down.map((m) => li('red', `${m.code} · ARIZA`, m.since ? `${elapsed(m.since, bd.generatedAt)}` : 'süre BİLİNMİYOR')),
+            ...late.slice(0, 5).map((o) => li('red', `${o.productCode ?? '—'} · GECİKMİŞ`, o.dueDate)),
+            ...bd.machines.filter((m) => m.openHolds > 0).map((m) => li('amber', `${m.code} · kalite bekletmesi`, `${m.openHolds}`)),
+            ...maint.map((m) => li('amber', `${m.code} · ${AVAILABILITY_TR[st(m).availability]}`, m.since ? elapsed(m.since, bd.generatedAt) : 'süre BİLİNMİYOR')),
+            ...soon.slice(0, 5).map((o) => li('amber', `${o.productCode ?? '—'} · termin yaklaşıyor`, o.dueDate)),
+        ];
+        const ranked = rankMachines(bd.machines).filter((m) => m.shiftGood + m.shiftScrap > 0).slice(0, 8);
+        const target = details ? details.reduce((a, d) => ({ plan: a.plan + d.qtyPlanned, got: a.got + d.qtyProduced }), { plan: 0, got: 0 }) : null;
+        const operators = details ? [...new Map(details.filter((d) => d.operatorName).map((d) => [d.operatorName, d])).values()] : null;
+        const todayScrap = per ? sumPeriods(per.rows, bd.generatedAt).today : null;
+        const rate = todayScrap ? scrapShare(todayScrap.good, todayScrap.scrap) : null;
+        const oee = meanOee(bd.machines);
+        const shipRisk = bd.orders.filter((o) => (o.state === 'LATE' || o.state === 'DUE_SOON') && o.shipped < o.qty);
+        return h('div', { class: 'pgrid', 'data-testid': 'live-panels' }, panel('critical', 'Kritik akış', crit.length ? h('ul', {}, ...crit) : empty('Kayıtlara göre şu an kritik durum yok.')), panel('ranking', 'Makine sıralaması (vardiya sağlam)', ranked.length ? h('ol', {}, ...ranked.map((m) => li('blue', `${m.code}${info.get(m.code) ? ` · ${nameOf(m.code)}` : ''}`, `${NUM.format(m.shiftGood)} / fire ${NUM.format(m.shiftScrap)}`))) : empty('Bu vardiyada üretim kaydı yok.')), panel('shift', 'Vardiya ve personel', h('div', {}, bd.shift ? `Vardiya ${bd.shift}` : 'Üretim vardiyası dışında'), operators === null ? empty('Operatör ayrıntısı: BİLİNMİYOR (kaynak okunamadı / ekran görünümü).') : operators.length ? h('ul', {}, ...operators.slice(0, 8).map((d) => li('green', d.operatorName, d.machineCode ?? '—'))) : empty('Şu an makinede çalışan operatör kaydı yok.')), panel('target', 'Hedef / gerçekleşen (çalışan işler)', target === null ? empty('BİLİNMİYOR (kaynak okunamadı / ekran görünümü).') : target.plan > 0
+            ? h('div', {}, h('div', {}, `${NUM.format(target.got)} / ${NUM.format(target.plan)} adet`), h('div', { class: 'meter' }, h('i', { style: `width:${Math.min(100, Math.round((target.got / target.plan) * 100))}%` })), h('div', { class: 'small' }, `%${Math.min(999, Math.round((target.got / target.plan) * 100))} · yalnız şu an çalışan iş emirleri`))
+            : empty('Çalışan iş emri planı yok.')), panel('downtime', 'Duruş ve kayıplar', down.length + maint.length ? h('ul', {}, ...[...down, ...maint].map((m) => li(st(m).availability === 'DOWN' ? 'red' : 'amber', m.code, m.since ? `${AVAILABILITY_TR[st(m).availability]} · ${elapsed(m.since, bd.generatedAt)}` : `${AVAILABILITY_TR[st(m).availability]} · süre BİLİNMİYOR`))) : empty('Kayıtlı duruş yok. (Telemetri bağlı olmadığından kayıtsız duruş görünmez.)')), panel('quality', 'Kalite', h('div', {}, `${bd.totals.openHolds} açık bekletme`), todayScrap === null ? empty('Bugünkü hurda oranı: BİLİNMİYOR.') : h('div', {}, rate === null ? 'Bugünkü hurda oranı: beyan yok' : `Bugünkü hurda oranı: ${tonePct(rate)}`)), panel('oee', 'OEE', oee.value === null ? empty('VERİ YOK — OEE için yeterli kayıt olan makine yok (100 gösterilmez).') : h('div', {}, h('div', { style: 'font-size:22px;font-weight:800' }, tonePct(oee.value)), h('div', { class: 'small' }, `${oee.counted}/${oee.of} makinenin bugünkü OEE değerinin ortalaması`))), panel('shipping', 'Sevkiyat riski', shipRisk.length ? h('ul', {}, ...shipRisk.slice(0, 6).map((o) => li(o.state === 'LATE' ? 'red' : 'amber', `${o.productCode ?? '—'} · ${ORDER_TR[o.state] ?? o.state}`, `${NUM.format(o.shipped)}/${NUM.format(o.qty)} sevk · ${o.dueDate}`))) : empty('Sevki bekleyen riskli sipariş satırı yok.')));
+    };
     const GROUPS = [['ALL', 'Tümü', null], ['ACTIVE', 'Aktif iş emri', ['ACTIVE_WORK_ORDER', 'FIRST_PIECE']], ['READY', 'Hazır · boşta', ['READY_IDLE']], ['DOWN', 'Arıza', ['DOWN']], ['MAINT', 'Bakım / bekletme', ['MAINTENANCE', 'HOLD']]];
     const tabsRow = (bd) => {
         const st = states(bd);
@@ -152,7 +218,7 @@ export async function renderLiveScreen(container, api, state) {
         return row;
     };
     const b = board;
-    mount(container, h('div', { class: `live${state.mode === 'KIOSK' ? ' kiosk' : ''}`, 'data-testid': 'live', 'data-profile': profile }, h('style', {}, CSS), h('div', { class: 'bar' }, h('h1', { style: 'margin:6px 0', 'data-testid': 'live-heading' }, b?.display ? `KMI LIVE — ${b.display}` : 'KMI LIVE'), b ? h('span', { class: 'chip', 'data-testid': 'live-shift' }, b.shift ? `Vardiya ${b.shift}` : 'Üretim vardiyası dışında') : null, state.mode === 'APP' ? h('button', { type: 'button', 'data-testid': 'live-profile-toggle', onClick: () => go({ profile: profile === 'OFFICE' ? 'PUBLIC' : 'OFFICE' }) }, profile === 'OFFICE' ? 'Ekran görünümü (atölye)' : 'Ofis görünümü') : null), loadError ? h('div', { 'data-testid': 'live-error', style: 'padding:10px;border-radius:8px;background:#7f1d1d;color:#fecaca' }, loadError === 'DISPLAY_TOKEN_INVALID' ? 'Ekran anahtarı geçersiz veya iptal edilmiş.' : `Yüklenemedi: ${loadError}`) : null, state.error ? h('div', { 'data-testid': 'live-action-error', style: 'padding:8px;border-radius:8px;background:#7f1d1d;color:#fecaca' }, state.error) : null, state.message ? h('div', { 'data-testid': 'live-message', style: 'padding:8px;border-radius:8px;background:#14532d;color:#bbf7d0' }, state.message) : null, state.newToken ? h('div', { 'data-testid': 'live-new-link', style: 'padding:8px;border-radius:8px;background:#422006;color:#fde68a;font-size:12px;overflow-wrap:anywhere' }, 'Bu bağlantı yalnız şimdi gösterilir, saklanmaz: ', h('code', {}, state.newToken)) : null, b ? h('div', { 'data-testid': 'live-honesty', style: 'padding:8px 12px;border-radius:10px;background:#2a1c05;border:1px solid #78350f;color:#fde68a;font-size:12px' }, `Telemetri bağlı değil: ${b.sourceNote} · ${PHYSICAL_TR} · ${FRESHNESS_TR[b.productionFreshness]} · Son üretim kaydı: ${fmt(b.lastProductionEventAt)} · Güncellendi: ${fmt(b.generatedAt)}`) : null, b ? kpiStrip(b) : null, b ? h('section', { class: 'panel' }, h('h2', {}, 'Makine durumu'), tabsRow(b), h('div', { class: 'grid', 'data-testid': 'live-grid' }, ...b.machines.map(machineTile))) : null, b ? h('section', { class: 'panel' }, h('h2', {}, 'Sipariş ilerlemesi (en yakın termin)'), b.orders.length ? h('div', { style: 'overflow-x:auto' }, h('table', { 'data-testid': 'live-orders' }, h('tbody', {}, ...b.orders.map((o) => h('tr', { 'data-testid': 'live-order', 'data-state': o.state }, h('td', {}, o.productCode ?? '—'), o.customerPo !== undefined ? h('td', {}, o.customerPo ?? '—') : null, h('td', {}, o.dueDate), h('td', {}, `${NUM.format(o.produced)}/${NUM.format(o.qty)} üretim · ${NUM.format(o.shipped)} sevk`), h('td', { style: 'font-weight:800' }, ORDER_TR[o.state] ?? o.state))))))
+    mount(container, h('div', { class: `live${state.mode === 'KIOSK' ? ' kiosk' : ''}`, 'data-testid': 'live', 'data-profile': profile }, h('style', {}, CSS), h('div', { class: 'bar' }, h('h1', { style: 'margin:6px 0', 'data-testid': 'live-heading' }, b?.display ? `KURUTLU LIVE — ${b.display}` : 'KURUTLU LIVE — Fabrika Performansı · Canlı Operasyon'), b ? h('span', { class: 'chip', 'data-testid': 'live-shift' }, b.shift ? `Vardiya ${b.shift}` : 'Üretim vardiyası dışında') : null, state.mode === 'APP' ? h('button', { type: 'button', 'data-testid': 'live-profile-toggle', onClick: () => go({ profile: profile === 'OFFICE' ? 'PUBLIC' : 'OFFICE' }) }, profile === 'OFFICE' ? 'Ekran görünümü (atölye)' : 'Ofis görünümü') : null), loadError ? h('div', { 'data-testid': 'live-error', style: 'padding:10px;border-radius:8px;background:#7f1d1d;color:#fecaca' }, loadError === 'DISPLAY_TOKEN_INVALID' ? 'Ekran anahtarı geçersiz veya iptal edilmiş.' : `Yüklenemedi: ${loadError}`) : null, state.error ? h('div', { 'data-testid': 'live-action-error', style: 'padding:8px;border-radius:8px;background:#7f1d1d;color:#fecaca' }, state.error) : null, state.message ? h('div', { 'data-testid': 'live-message', style: 'padding:8px;border-radius:8px;background:#14532d;color:#bbf7d0' }, state.message) : null, state.newToken ? h('div', { 'data-testid': 'live-new-link', style: 'padding:8px;border-radius:8px;background:#422006;color:#fde68a;font-size:12px;overflow-wrap:anywhere' }, 'Bu bağlantı yalnız şimdi gösterilir, saklanmaz: ', h('code', {}, state.newToken)) : null, b ? h('div', { 'data-testid': 'live-honesty', style: 'padding:8px 12px;border-radius:10px;background:#2a1c05;border:1px solid #78350f;color:#fde68a;font-size:12px' }, `Telemetri bağlı değil: ${b.sourceNote} · ${PHYSICAL_TR} · ${FRESHNESS_TR[b.productionFreshness]} · Son üretim kaydı: ${fmt(b.lastProductionEventAt)} · Güncellendi: ${fmt(b.generatedAt)}`) : null, b ? kpi8(b) : null, b ? opsPanels(b) : null, b ? kpiStrip(b) : null, b ? h('section', { class: 'panel' }, h('h2', {}, 'Makine durumu'), tabsRow(b), h('div', { class: 'grid', 'data-testid': 'live-grid' }, ...b.machines.map(machineTile))) : null, b ? h('section', { class: 'panel' }, h('h2', {}, 'Sipariş ilerlemesi (en yakın termin)'), b.orders.length ? h('div', { style: 'overflow-x:auto' }, h('table', { 'data-testid': 'live-orders' }, h('tbody', {}, ...b.orders.map((o) => h('tr', { 'data-testid': 'live-order', 'data-state': o.state }, h('td', {}, o.productCode ?? '—'), o.customerPo !== undefined ? h('td', {}, o.customerPo ?? '—') : null, h('td', {}, o.dueDate), h('td', {}, `${NUM.format(o.produced)}/${NUM.format(o.qty)} üretim · ${NUM.format(o.shipped)} sevk`), h('td', { style: 'font-weight:800' }, ORDER_TR[o.state] ?? o.state))))))
         : h('div', { class: 'small' }, 'Açık sipariş satırı yok.')) : null, b ? h('section', { class: 'panel' }, h('h2', {}, 'Vardiya karşılaştırması (dün / bugün)'), b.shiftCompare.length ? h('table', { 'data-testid': 'live-compare' }, h('tbody', {}, ...b.shiftCompare.map((x) => h('tr', {}, h('td', {}, x.day), h('td', {}, x.shift === 'OUT_OF_SHIFT' ? 'vardiya dışı' : x.shift), h('td', {}, `${NUM.format(x.good)} sağlam`), h('td', {}, `${NUM.format(x.scrap)} fire`)))))
         : h('div', { class: 'small', 'data-testid': 'live-compare-empty' }, 'Dün ve bugün üretim kaydı yok (VERİ YOK — "sıfır üretim" anlamına gelmez).')) : null, displays ? displaysPanel(displays) : null));
     const sel = GROUPS.find((g) => g[0] === state.group);
@@ -164,7 +230,10 @@ export async function renderLiveScreen(container, api, state) {
     const tick = () => {
         if (!container.isConnected || !container.querySelector('[data-testid="live"]'))
             return;
-        const busy = !!container.querySelector('[data-testid="live-displays"][open]') || (container.contains(document.activeElement) && document.activeElement instanceof HTMLInputElement);
+        if (renderSeq.get(container) !== seq)
+            return; // a newer render owns the timer now
+        // the show-once display link must stay on screen until the person acts (it is never stored)
+        const busy = !!container.querySelector('[data-testid="live-new-link"]') || !!container.querySelector('[data-testid="live-displays"][open]') || (container.contains(document.activeElement) && document.activeElement instanceof HTMLInputElement);
         if (busy) {
             setTimeout(tick, ms);
             return;

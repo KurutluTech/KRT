@@ -1,9 +1,11 @@
 export const NO_ACCESS = { linked: false, roles: [], actions: [], economics: false, owner: false };
 export const OPEN_RULES = {
     '/ekonomi': { economics: true },
+    '/maliyet': { economics: true },
     // D-007: the APPLICATION screen is separate from economic data. Seeing it grants nothing (the server decides); only ADMIN is offered it.
     '/ekonomi-basvuru': { roles: ['ADMIN'] },
     '/alacaklar': { any: ['ACCOUNTING_MUTATION'], economics: true },
+    '/yonetim': { any: ['MANAGEMENT_RELEASE', 'COMMERCIAL_RELEASE', 'PURCHASING_APPROVE', 'TASK_MANAGE'], roles: ['ADMIN', 'MANAGEMENT'] },
     '/onay-kuyrugu': { any: ['COMMERCIAL_RELEASE', 'MANAGEMENT_RELEASE', 'ACCOUNTING_MUTATION', 'SHIPMENT_MANAGE'] },
     '/muhasebe': { any: ['ACCOUNTING_MUTATION'], economics: true },
     '/tedarikci-fatura': { any: ['PURCHASE_ORDER_MANAGE', 'ACCOUNTING_MUTATION'], economics: true },
@@ -17,10 +19,13 @@ export const OPEN_RULES = {
     // visible and the screen itself says "Kurulum bekleniyor". The server (puantaj_month_facts) remains the only authority.
     '/puantaj': { any: ['PUANTAJ_MANAGE'], roles: ['ADMIN', 'MANAGEMENT'] },
     // /zirvedekiler: open to every signed-in user; the screen picks the MANAGEMENT or EMPLOYEE view, and the server (RPC authorization) decides what each may read.
+    // audit history: management only in the UI. NOTE the server's audit_log read policy is broader (see docs/TEMPORAL_MIGRATION_DRAFT.md) — hiding here is not the security boundary.
+    '/gecmis': { roles: ['ADMIN', 'MANAGEMENT'] },
     '/personel-aktarim': { any: ['PERSONNEL_MANAGE'] },
     '/yetkinlik-aktarim': { any: ['COMPETENCY_APPROVE'] },
     '/giris-cikis': { any: ['GECKO_ATTENDANCE_VIEW', 'GECKO_SYNC_RUN', 'GECKO_VIEW_GRANT', 'GECKO_MAPPING_VERIFY'] },
     '/cihazlar': { any: ['DEVICE_MANAGE'] },
+    '/tahsis': { any: ['QUALITY_REJECT', 'OPERATION_QC_RECORD', 'FIRST_PIECE_APPROVE', 'QUALITY_HOLD_RELEASE'] },
     '/kalite': { any: ['FIRST_PIECE_APPROVE', 'QUALITY_HOLD_RELEASE', 'QUALITY_REJECT', 'OPERATION_QC_RECORD', 'FINAL_PRODUCTION_RELEASE'] },
     '/sevkiyat': { any: ['SHIPMENT_MANAGE', 'COMMERCIAL_RELEASE', 'MANAGEMENT_RELEASE'] },
     '/depo': { any: ['WAREHOUSE_RECORD'] },

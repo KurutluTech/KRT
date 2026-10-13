@@ -76,6 +76,11 @@ export class KmiNextClient {
     apiKey;
     schema;
     fetchImpl;
+    /** Called after a successful silent token refresh (the session object is also updated in place). */
+    onSessionRefreshed = null;
+    /** Called once when the session can no longer be renewed (no refresh token, or the server refused it). */
+    onSessionExpired = null;
+    refreshing = new Map();
     constructor(config) {
         this.url = config.url.replace(/\/$/, '');
         this.apiKey = config.apiKey;
@@ -137,15 +142,89 @@ export class KmiNextClient {
             }
         },
     };
+    /** Harmless reachability probe (no data read/written): true only when the auth service answers 2xx within the timeout. */
+    async health(timeoutMs = 6000) {
+        const ctl = typeof AbortController !== 'undefined' ? new AbortController() : null;
+        const timer = ctl ? setTimeout(() => ctl.abort(), timeoutMs) : null;
+        try {
+            const res = await this.fetchImpl(`${this.url}/auth/v1/health`, { method: 'GET', headers: { apikey: this.apiKey }, ...(ctl ? { signal: ctl.signal } : {}) });
+            return res.ok;
+        }
+        catch {
+            return false;
+        }
+        finally {
+            if (timer)
+                clearTimeout(timer);
+        }
+    }
     authHeaders(session) {
         return {
             apikey: this.apiKey,
             authorization: `Bearer ${session ? session.accessToken : this.apiKey}`,
         };
     }
+    /**
+     * Expired-JWT handling. PostgREST answers 401 when the access token is expired/invalid; the request was NOT executed, so it is safe to
+     * retry once after a silent refresh. Refresh tokens rotate (single use), so concurrent 401s share ONE refresh (single flight). If the
+     * refresh fails the session is over: onSessionExpired fires once and AuthError('SESSION_EXPIRED') is thrown — never a retry loop.
+     */
+    async refreshSession(session) {
+        const rt = session.refreshToken;
+        if (!rt)
+            return 'rejected';
+        const inflight = this.refreshing.get(rt);
+        if (inflight)
+            return inflight;
+        const run = (async () => {
+            try {
+                const res = await this.fetchImpl(`${this.url}/auth/v1/token?grant_type=refresh_token`, {
+                    method: 'POST', headers: { apikey: this.apiKey, 'content-type': 'application/json' }, body: JSON.stringify({ refresh_token: rt }),
+                });
+                const body = (await parseJsonSafe(res));
+                // Only an explicit refusal ends the session. A server hiccup (5xx/408/429) says nothing about the refresh token: keep the session.
+                if (res.status >= 500 || res.status === 408 || res.status === 429)
+                    return 'transient';
+                if (!res.ok || !body || typeof body['access_token'] !== 'string')
+                    return 'rejected';
+                session.accessToken = body['access_token'];
+                session.refreshToken = typeof body['refresh_token'] === 'string' ? body['refresh_token'] : rt;
+                this.onSessionRefreshed?.(session);
+                return 'ok';
+            }
+            catch {
+                return 'transient';
+            } // network error / aborted by navigation: the refresh token may still be valid — never log the user out for that
+            finally {
+                setTimeout(() => this.refreshing.delete(rt), 0);
+            }
+        })();
+        this.refreshing.set(rt, run);
+        return run;
+    }
+    async authed(send, session) {
+        const startToken = session ? session.accessToken : ''; // the token THIS request was sent with
+        const res = await send();
+        if (res.status !== 401 || !session)
+            return res;
+        // another call may already have refreshed while this one was in flight: just retry with the new token
+        const ok = session.accessToken !== startToken ? 'ok' : await this.refreshSession(session);
+        if (ok === 'transient')
+            throw new AuthError('REFRESH_UNAVAILABLE', 503); // session kept; the caller may retry
+        if (ok === 'rejected') {
+            this.onSessionExpired?.();
+            throw new AuthError('SESSION_EXPIRED', 401);
+        }
+        const again = await send();
+        if (again.status === 401) {
+            this.onSessionExpired?.();
+            throw new AuthError('SESSION_EXPIRED', 401);
+        }
+        return again;
+    }
     /** Calls a kmi_next.* RPC (the ONLY way this client ever mutates data). */
     async rpc(fnName, args, session) {
-        const res = await this.fetchImpl(`${this.url}/rest/v1/rpc/${fnName}`, {
+        const res = await this.authed(() => this.fetchImpl(`${this.url}/rest/v1/rpc/${fnName}`, {
             method: 'POST',
             headers: {
                 ...this.authHeaders(session),
@@ -153,7 +232,7 @@ export class KmiNextClient {
                 'content-profile': this.schema,
             },
             body: JSON.stringify(args),
-        });
+        }), session);
         const body = await parseJsonSafe(res);
         if (!res.ok) {
             const err = body;
@@ -171,13 +250,13 @@ export class KmiNextClient {
             params.set('limit', String(options.limit));
         for (const [key, value] of Object.entries(options.filters ?? {}))
             params.set(key, value);
-        const res = await this.fetchImpl(`${this.url}/rest/v1/${table}?${params.toString()}`, {
+        const res = await this.authed(() => this.fetchImpl(`${this.url}/rest/v1/${table}?${params.toString()}`, {
             method: 'GET',
             headers: {
                 ...this.authHeaders(session),
                 'accept-profile': this.schema,
             },
-        });
+        }), session);
         const body = await parseJsonSafe(res);
         if (!res.ok) {
             const err = body;

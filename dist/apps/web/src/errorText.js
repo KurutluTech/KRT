@@ -37,6 +37,11 @@ export const ACTION_TR = {
     PURCHASE_ORDER_MANAGE: 'satınalma siparişi',
     MASTER_DATA_IMPORT: 'ana veri içe aktarma',
     TASK_MANAGE: 'görev atama / onaylama',
+    MANAGEMENT_VIEW: 'yönetim zekâsı verilerini görme',
+    STRATEGY_MANAGE: 'strateji ve hedef yönetimi',
+    RISK_MANAGE: 'risk kaydı yönetimi',
+    MEETING_MANAGE: 'toplantı ve karar kaydı',
+    ACCESS_DENY_MANAGE: 'kişi bazlı yetki engelleme (DENY)',
     WAREHOUSE_RECORD: 'depo / stok kaydı',
     MATERIAL_ISSUE: 'malzeme çıkışı',
     SHIPMENT_MANAGE: 'sevkiyat',
@@ -48,6 +53,12 @@ export const ACTION_TR = {
 // cross-cutting business refusals introduced with the release hardening (screen-specific texts stay in the screens)
 const BUSINESS_TR = [
     [/^APPROVER_NOT_LINKED$/, 'Onay verebilmek için giriş hesabınız bir personel kaydına bağlı olmalı. Yöneticinize başvurun.'],
+    [/^ALREADY_DECIDED/, 'Bu kayıt için karar zaten verilmiş (başka biri onaylamış veya reddetmiş olabilir). Liste yenilendi; çift onay yapılmaz.'],
+    [/^MANAGEMENT_RELEASE_MISSING$/, 'Ticari onay verilemez: önce yönetim serbest bırakması gerekir.'],
+    [/^MANAGEMENT_RELEASE_ALREADY_GIVEN$/, 'Yönetim serbest bırakması bu talep için zaten verilmiş.'],
+    [/^SELF_APPROVAL_FORBIDDEN$/, 'Kendi tamamladığınız görevi kendiniz onaylayamazsınız.'],
+    [/^(?:REASON_REQUIRED|NOTE_REQUIRED)$/, 'Gerekçe zorunludur (en az 5 karakter).'],
+    [/^ILLEGAL_TRANSITION|^ILLEGAL_TASK_TRANSITION|^APPROVAL_REQUIRES_SUBMITTED_STATUS/, 'Kaydın durumu bu işleme uygun değil (başka biri değiştirmiş olabilir). Liste yenilendi.'],
     [/^SHIPPING_STATUS_IS_DERIVED$/, 'Sevkiyat durumu elle değiştirilmez; sevk edilen partilerden otomatik belirlenir.'],
     [/^OVER_SHIPMENT/, 'Sipariş miktarından fazla sevk edilemez.'],
     [/Invalid schema|PGRST106|schema must be one of/i, 'Sunucu ayarı eksik: veri şeması (kmi_next) Supabase API ayarında açık değil. Sistem yöneticisine bildirin; bu bir kullanıcı hatası değildir.'],
@@ -56,6 +67,8 @@ export const SETUP_PENDING_TR = 'Kurulum bekleniyor: bu bölümün veritabanı k
 export function humanError(raw) {
     if (/Could not find the function|PGRST202|PGRST205|schema cache|unknown rpc/i.test(raw))
         return SETUP_PENDING_TR;
+    if (/^REFRESH_UNAVAILABLE$/.test(raw.trim()))
+        return 'Oturum yenilenemedi (bağlantı sorunu). Oturumunuz açık kalır — birkaç saniye sonra tekrar deneyin. [REFRESH_UNAVAILABLE]';
     const b = BUSINESS_TR.find(([re]) => re.test(raw.trim()));
     if (b)
         return `${b[1]} [${raw.trim()}]`;

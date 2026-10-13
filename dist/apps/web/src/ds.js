@@ -5,10 +5,17 @@ export const DS_CSS = `.kd{display:flex;flex-direction:column;gap:14px;color:#e2
 .kd h1{font-size:20px;margin:0;color:#fff}.kd h2{font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:#94a3b8;margin:0 0 8px}
 .kd .head{display:flex;gap:10px;align-items:center;flex-wrap:wrap}.kd .grow{flex:1;min-width:140px}
 .kd .panel{background:linear-gradient(180deg,#111c2e,#0f172a);border:1px solid #1e293b;border-radius:14px;padding:14px;min-width:0}
-.kd .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:8px}.kd .kpi{border:1px solid #1e293b;border-radius:12px;padding:10px;background:rgba(2,6,23,.45)}
+.kd .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,170px),1fr));gap:8px}.kd .kpi{min-width:0;overflow-wrap:anywhere;border:1px solid #1e293b;border-radius:12px;padding:10px;background:rgba(2,6,23,.45)}
 .kd .kpi .n{font-size:24px;font-weight:800;color:#fff}.kd .kpi .l{font-size:11px;color:#94a3b8}
 .kd .pill{display:inline-block;font-size:11px;font-weight:800;padding:2px 9px;border-radius:999px;background:#1e293b;color:#e6edf7;white-space:nowrap}
 .kd .pill.ok{background:#14532d;color:#bbf7d0}.kd .pill.warn{background:#78350f;color:#fde68a}.kd .pill.bad{background:#7f1d1d;color:#fecaca}.kd .pill.info{background:#1e3a8a;color:#dbeafe}.kd .pill.gold{background:#5b4510;color:#f5d98a}
+.kd .pill.unknown{background:#334155;color:#e2e8f0;border:1px dashed #94a3b8}.kd .pill.ai{background:#4c1d95;color:#ede9fe}
+/* colour is never the only signal: every semantic kind also carries a glyph (CSS-only, so the readable text is unchanged) */
+.kd .pill.ok::before{content:'✓ '}.kd .pill.warn::before{content:'! '}.kd .pill.bad::before{content:'✕ '}.kd .pill.info::before{content:'i '}.kd .pill.unknown::before{content:'? '}.kd .pill.ai::before{content:'◇ '}
+.kd .state{display:flex;gap:10px;align-items:flex-start;padding:12px 14px;border-radius:12px;border:1px solid #1e293b;background:rgba(2,6,23,.45);font-size:13px;color:#cbd5e1}
+.kd .state b{display:block;color:#fff;margin-bottom:2px}.kd .state.loading{border-style:dashed}.kd .state.error{border-color:#b91c1c;background:rgba(127,29,29,.25)}
+.kd .state.unknown{border-style:dashed;border-color:#94a3b8}.kd .state.ai{border-color:#7c3aed;background:rgba(76,29,149,.2)}
+.kd .stamp{font-size:11px;color:#94a3b8}
 .kd .item{border-top:1px solid #1e293b;padding:10px 0;display:flex;gap:10px;align-items:center;flex-wrap:wrap}.kd .item:first-of-type{border-top:0}
 .kd .mut{color:#94a3b8;font-size:12px}.kd .empty{color:#94a3b8;font-size:13px}
 .kd .avatar{width:36px;height:36px;border-radius:50%;background:#1e293b;border:1px solid #334155;display:flex;align-items:center;justify-content:center;font-weight:800;color:#67e8f9;flex:none}
@@ -26,3 +33,5 @@ export const DEPT_TR = { URETIM: 'Üretim', OFIS: 'Ofis', KALITE: 'Kalite', CAM:
 export const TIER_TR = { BASE: 'Temel', TIER_8: 'Gelişmiş (8+ yetkinlik)', TIER_10: 'Usta (10+ yetkinlik)' };
 /** Calm placeholder for a section whose database part is not installed yet. Never an error, never a blank page. */
 export const setupPending = (title, detail = 'Bu bölümün veritabanı kurulumu henüz yapılmadı. Mevcut kayıtlarınız etkilenmedi; kurulum tamamlanınca bu ekran otomatik açılır.') => h('div', { class: 'panel', 'data-testid': 'setup-pending', style: 'border-left:4px solid #d97706' }, h('h2', {}, 'Kurulum bekleniyor'), h('div', { style: 'font-size:16px;font-weight:700;color:#fff' }, title), h('div', { class: 'mut', style: 'margin-top:6px' }, detail));
+export const stateBox = (kind, title, detail, testid) => h('div', { class: `state ${kind}`, role: kind === 'error' ? 'alert' : 'status', ...(testid ? { 'data-testid': testid } : {}) }, h('div', {}, h('b', {}, title), detail ? h('span', {}, detail) : null));
+export const provenance = (source, asOf, unit) => h('div', { class: 'stamp', 'data-testid': 'provenance' }, `Kaynak: ${source}`, unit ? ` · Birim: ${unit}` : '', ` · ${asOf ? `Veri anı: ${asOf}` : 'Veri anı: BİLİNMİYOR'}`);

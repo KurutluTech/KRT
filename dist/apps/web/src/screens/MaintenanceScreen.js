@@ -5,6 +5,8 @@
 import { h, Fragment, mount } from '../../../../packages/ui/src/h.js';
 import { errorText as sharedErrorText } from '../errorText.js';
 import { DS_CSS, kpi } from '../ds.js';
+import { formatStamp } from '../../../../packages/domain/src/temporal.js';
+import { passportHref } from '../passport/registry.js';
 function errorText(err) {
     return sharedErrorText(err);
 }
@@ -174,7 +176,15 @@ export async function renderMaintenanceScreen(container, deps, banner) {
                                     h("span", { class: "mut" },
                                         "Toplam duru\u015F: ",
                                         h("span", { "data-testid": "machine-down-minutes" }, String(m.totalDownMinutes)),
-                                        " dk"))),
+                                        " dk")),
+                                h("div", { style: "display:flex;gap:10px;flex-wrap:wrap;margin-top:6px;align-items:center;font-size:12px", class: "mut" },
+                                    h("span", { "data-testid": "machine-open-tickets", "data-count": String(tickets.filter((t) => t.machineId === m.id && t.status !== 'CLOSED').length) },
+                                        "A\u00E7\u0131k bak\u0131m kayd\u0131: ",
+                                        String(tickets.filter((t) => t.machineId === m.id && t.status !== 'CLOSED').length)),
+                                    m.downSince ? h("span", { "data-testid": "machine-down-since" },
+                                        "Duru\u015F ba\u015Flang\u0131c\u0131: ",
+                                        formatStamp(m.downSince)) : null,
+                                    h("a", { href: passportHref('MACHINE', m.id), "data-testid": "machine-passport", style: "color:#67e8f9;font-weight:700;text-decoration:none" }, "Pasaport \u2192"))),
                             h("div", { class: "acts" },
                                 reasonInputFor(m.id),
                                 m.status === 'UP' || m.status === 'HOLD' ? mkBtn('danger', 'set-down-btn', m.id, 'ARIZA / DURUŞ Bildir', () => handleSetDown(m.id)) : null,
@@ -197,6 +207,8 @@ export async function renderMaintenanceScreen(container, deps, banner) {
                             h("span", { class: `pill ${sv[1]}`, "data-testid": "ticket-severity", "data-code": t.severity }, sv[0]),
                             h("span", { class: `pill ${ts[1]}`, "data-testid": "ticket-status", "data-code": t.status }, ts[0]),
                             h("span", { class: "mut grow", "data-testid": "ticket-reason" }, t.reason),
+                            h("span", { class: "mut", "data-testid": "ticket-created", style: "font-size:12px" }, formatStamp(t.createdAt)),
+                            h("a", { href: passportHref('MAINTENANCE_TICKET', t.id), "data-testid": "ticket-passport", style: "color:#67e8f9;font-weight:700;text-decoration:none;font-size:12px" }, "Pasaport \u2192"),
                             h("div", { class: "acts", style: "display:flex;gap:8px;flex-wrap:wrap" }, ticketActions(t))));
                     })))))));
     mount(container, screen);

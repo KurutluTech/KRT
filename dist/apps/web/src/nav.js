@@ -39,28 +39,45 @@ export const NAV_GROUPS = [
     { title: null, items: [
             { path: '/', label: 'Ana Sayfa', icon: 'home' },
             { path: '/komuta', label: 'Komuta Merkezi', icon: 'grid' },
+            { path: '/yonetim', label: 'Yönetim Zekâsı', icon: 'chart' },
             { path: '/canli', label: 'KMI LIVE', icon: 'factory' },
+            { path: '/operator', label: 'Benim İşlerim', icon: 'user' },
+        ] },
+    { title: 'MÜŞTERİ & SİPARİŞ', items: [
+            { path: '/siparisler', label: 'Siparişler', icon: 'truck' },
+            { path: '/katalog', label: 'Katalog', icon: 'book' },
         ] },
     { title: 'ÜRETİM', items: [
-            { path: '/operator', label: 'Benim İşlerim', icon: 'user' },
             { path: '/terminal', label: 'Makine Terminali', icon: 'chip' },
             { path: '/gorevler', label: 'Görev Zemini', icon: 'tasks' },
             { path: '/is-emirleri', label: 'İş Emirleri', icon: 'factory' },
-            { path: '/siparisler', label: 'Siparişler', icon: 'truck' },
-            { path: '/planlama', label: 'Üretim Planlama', icon: 'layers' },
             { path: '/tara', label: 'QR / Barkod', icon: 'scan' },
         ] },
-    { title: 'YARDIMCI', items: [
+    { title: 'ÜRETİM PLANLAMA', items: [
+            { path: '/planlama', label: 'Üretim Planlama', icon: 'layers' },
+        ] },
+    { title: 'CAM & MÜHENDİSLİK', items: [
             { path: '/muhendislik', label: 'CAM / Programlama', icon: 'gear' },
             { path: '/rota', label: 'Rota / Operasyon', icon: 'link' },
+        ] },
+    { title: 'TAKIM ODASI', items: [
             { path: '/takimhane', label: 'Takım Odası', icon: 'wrench' },
+        ] },
+    { title: 'KALİTE & METROLOJİ', items: [
             { path: '/kalite', label: 'Kalite / Metroloji', icon: 'shield' },
+            { path: '/tahsis', label: 'TAHSİS (ölçü düzeltme)', icon: 'tasks' },
+        ] },
+    { title: 'BAKIM', items: [
             { path: '/bakim', label: 'Bakım', icon: 'wrench' },
+        ] },
+    { title: 'DEPO & STOK', items: [
             { path: '/depo', label: 'Depo / Stok', icon: 'box' },
+        ] },
+    { title: 'SATINALMA', items: [
             { path: '/satinalma', label: 'Satınalma / Mal Kabul', icon: 'cart' },
             { path: '/talepler', label: 'Satınalma Talepleri', icon: 'box' },
-            { path: '/alacaklar', label: 'Muhasebe', icon: 'calc' },
-            { path: '/onay-kuyrugu', label: 'Muhasebe Kuyruğu', icon: 'tasks' },
+        ] },
+    { title: 'LOJİSTİK & SEVKİYAT', items: [
             { path: '/sevkiyat', label: 'Sevkiyat / Lojistik', icon: 'truck' },
         ] },
     { title: 'İNSAN KAYNAKLARI', items: [
@@ -72,22 +89,27 @@ export const NAV_GROUPS = [
             { path: '/giris-cikislarim', label: 'Giriş-çıkışlarım', icon: 'clock' },
             { path: '/rozetlerim', label: 'Rozetler / Yetenekler', icon: 'badge' },
             { path: '/akademi', label: 'KMI Academy', icon: 'cap' },
+            { path: '/personel-aktarim', label: 'Personel Aktarımı', icon: 'upload' },
+            { path: '/yetkinlik-aktarim', label: 'Yetkinlik Aktarımı', icon: 'upload' },
         ] },
-    { title: 'DİJİTAL', items: [
-            { path: '/dokumanlar', label: 'Dokümanlar', icon: 'file' },
+    { title: 'DİJİTAL ZEKÂ', items: [
             { path: '/pasaport', label: 'Dijital Pasaport', icon: 'layers' },
+            { path: '/dokumanlar', label: 'Dokümanlar', icon: 'file' },
             { path: '/raporlar', label: 'Raporlama', icon: 'chart' },
+            { path: '/gecmis', label: 'Olay Geçmişi', icon: 'clock' },
             { path: '/oee', label: 'OEE / KPI', icon: 'chart' },
             { path: '/zeka', label: 'KMI Zekâ', icon: 'bolt' },
         ] },
-    { title: 'YÖNETİM & SİSTEM', items: [
-            { path: '/katalog', label: 'Katalog', icon: 'book' },
+    { title: 'FİNANS & MALİYET ZEKÂSI', items: [
+            { path: '/alacaklar', label: 'Muhasebe', icon: 'calc' },
+            { path: '/onay-kuyrugu', label: 'Muhasebe Kuyruğu', icon: 'tasks' },
+            { path: '/maliyet', label: 'Maliyet Zekâsı', icon: 'chart' },
             { path: '/ekonomi', label: 'Ekonomi & Kararlar', icon: 'lock' },
             { path: '/ekonomi-basvuru', label: 'Ekonomik Sahiplik Başvurusu', icon: 'shield' },
-            { path: '/ana-veri-aktarim', label: 'Ana Veri Aktarımı', icon: 'upload' },
-            { path: '/personel-aktarim', label: 'Personel Aktarımı', icon: 'upload' },
-            { path: '/yetkinlik-aktarim', label: 'Yetkinlik Aktarımı', icon: 'upload' },
+        ] },
+    { title: 'BT & SİSTEM YÖNETİMİ', items: [
             { path: '/cihazlar', label: 'Cihaz Entegrasyonları', icon: 'chip' },
+            { path: '/ana-veri-aktarim', label: 'Ana Veri Aktarımı', icon: 'upload' },
         ] },
 ];
 export const NAV_ITEM_BY_PATH = Object.fromEntries(NAV_GROUPS.flatMap((g) => g.items).map((i) => [i.path, i]));

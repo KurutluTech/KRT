@@ -15,7 +15,7 @@ export function createWorkOrderHubApi(client, session) {
             return wos.map((w) => {
                 const i = it.get(w.orderItemId);
                 const p = i ? pr.get(i.productId) : undefined;
-                return { ...w, productCode: p?.code ?? '?', productName: p?.name ?? '?', customerPo: (i && od.get(i.orderId)?.customerPo) || '?', dueDate: i?.dueDate ?? null };
+                return { ...w, productCode: p?.code ?? '?', productName: p?.name ?? '?', customerPo: (i && od.get(i.orderId)?.customerPo) || `İE ${w.id.slice(0, 8)}`, dueDate: i?.dueDate ?? null };
             });
         },
         async readiness(id) {

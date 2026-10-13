@@ -31,6 +31,21 @@ import { renderAcademyScreen } from './screens/AcademyScreen.js';
 import { createAcademyApi } from './academyApi.js';
 import { renderPassportScreen } from './screens/PassportScreen.js';
 import { renderEconomicsScreen } from './screens/EconomicsScreen.js';
+import { renderTahsisScreen } from './screens/TahsisScreen.js';
+import { createTahsisApi } from './tahsisApi.js';
+import { renderManagementScreen } from './screens/ManagementScreen.js';
+import { createManagementApi } from './managementApi.js';
+import { renderHomeTab } from './screens/management/HomeTab.js';
+import { renderOperationsTab } from './screens/management/OperationsTab.js';
+import { renderFinanceTab } from './screens/management/FinanceTab.js';
+import { renderStrategyTab } from './screens/management/StrategyTab.js';
+import { renderPeopleTab } from './screens/management/PeopleTab.js';
+import { renderRiskTab } from './screens/management/RiskTab.js';
+import { renderIntelligenceTab } from './screens/management/IntelligenceTab.js';
+import { renderMeetingsTab } from './screens/management/MeetingsTab.js';
+import { createApprovalsInboxApi } from './approvalsInboxApi.js';
+import { renderCostIntelligenceScreen } from './screens/CostIntelligenceScreen.js';
+import { createCostOpsApi } from './costOpsApi.js';
 import { renderOwnerApplicationScreen } from './screens/OwnerApplicationScreen.js';
 import { renderMyAttendanceScreen } from './screens/MyAttendanceScreen.js';
 import { renderCompetencyImportScreen } from './screens/CompetencyImportScreen.js';
@@ -56,6 +71,9 @@ import { createDocumentsApi } from './documentsApi.js';
 import { DOCUMENT_ENTITY_TYPES } from '../../../packages/domain/src/documents.js';
 import { renderMaintenanceScreen } from './screens/MaintenanceScreen.js';
 import { createMaintenanceApi } from './maintenanceApi.js';
+import { renderObjectPassportScreen } from './screens/ObjectPassportScreen.js';
+import { createObjectPassportApi } from './objectPassportApi.js';
+import { isKind } from './passport/registry.js';
 import { renderOrdersScreen } from './screens/OrdersScreen.js';
 import { createOrdersApi } from './ordersApi.js';
 import { renderPurchasingScreen } from './screens/PurchasingScreen.js';
@@ -97,6 +115,13 @@ import { createMaterialApi } from './materialApi.js';
 import { renderToolReadinessScreen } from './screens/ToolReadinessScreen.js';
 import { createToolReadinessApi } from './toolReadinessApi.js';
 import { THEME_CSS } from './theme.js';
+import { renderHistorySearchScreen } from './screens/HistorySearchScreen.js';
+import { createHistoryApi } from './historyApi.js';
+import { createHeader, pickShortcuts } from './header.js';
+import { renderCockpit } from './homeCockpit.js';
+import { loadExtras } from './homeData.js';
+import { loadFactoryData, renderFactoryPanels } from './homeFactory.js';
+import { homeCardsFor } from '../../../packages/domain/src/homeLayout.js';
 import { NAV_ITEM_BY_PATH, iconSvg, visibleNav } from './nav.js';
 const SESSION_KEY = 'kmi-next.session';
 function loadSession() {
@@ -120,12 +145,50 @@ function saveSession(s) {
     }
 }
 const istanbulToday = () => new Date().toLocaleDateString('sv-SE', { timeZone: 'Europe/Istanbul' });
+/** Yönetim Zekâsı: nine tabs on one context. Each tab loads its own sources; the server (authorize_critical_action / RLS / can_view_economics) stays the only authority. */
+function managementDeps(c, s, a) {
+    const approvals = createApprovalsInboxApi(c, s, { includeTasks: a.actions.includes('TASK_MANAGE') });
+    const ctx = () => ({ api: createManagementApi(c, s), approvals, command: createCommandCenterApi(c, s), oee: createOeeApi(c, s), economics: createEconomicsApi(c, s), held: new Set(a.actions), hasEconomics: a.economics, today: istanbulToday(), nowMs: Date.now(), access: a });
+    return {
+        approvals: { api: approvals, held: a.actions, ctx },
+        leadTabs: [{ id: 'home', label: 'Özet', render: (p) => renderHomeTab(p, ctx()) }],
+        extraTabs: [
+            { id: 'operasyon', label: 'Operasyon', render: (p) => renderOperationsTab(p, ctx()) }, { id: 'finans', label: 'Finans', render: (p) => renderFinanceTab(p, ctx()) },
+            { id: 'strateji', label: 'Strateji', render: (p) => renderStrategyTab(p, ctx()) }, { id: 'insan', label: 'İnsan', render: (p) => renderPeopleTab(p, ctx()) },
+            { id: 'risk', label: 'Risk', render: (p) => renderRiskTab(p, ctx()) }, { id: 'zeka', label: 'KMI Zekâ', render: (p) => renderIntelligenceTab(p, ctx()) }, { id: 'toplanti', label: 'Toplantılar', render: (p) => renderMeetingsTab(p, ctx()) }
+        ],
+    };
+}
 const addDays = (iso, n) => {
     const d = new Date(`${iso}T00:00:00Z`);
     d.setUTCDate(d.getUTCDate() + n);
     return d.toISOString().slice(0, 10);
 };
+// Sensitive export: the audit row is written by the API (export_audit) BEFORE this runs; this only hands the text to the browser.
+function downloadText(name, text) {
+    const url = URL.createObjectURL(new Blob([text], { type: 'text/csv;charset=utf-8' }));
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = name;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
 export const ROUTES = [
+    {
+        path: '/nesne', label: 'Nesne pasaportu', group: 'Saha', inMenu: false, needs: ['t', 'id'],
+        // ?t=<MACHINE|WORK_ORDER|…>&id=<uuid>&tab=<tab> — one canonical object, one digital passport
+        render: (el, c, s, q, access) => {
+            const t = q.get('t');
+            if (!isKind(t)) {
+                mount(el, h('div', { 'data-testid': 'pp-badkind', style: 'padding:16px' }, 'Bilinmeyen nesne türü.'));
+                return;
+            }
+            return renderObjectPassportScreen(el, createObjectPassportApi(c, s, access), { kind: t, id: q.get('id'), tab: q.get('tab') ?? undefined }, { access });
+        },
+    },
+    { path: '/gecmis', label: 'Olay geçmişi (zaman araması)', group: 'Yönetim', inMenu: true, render: (el, c, s, _q, a) => renderHistorySearchScreen(el, createHistoryApi(c, s), { access: a, nowIso: new Date().toISOString() }) },
     { path: '/ara', label: 'Arama', group: 'Saha', inMenu: false, render: (el, c, s, q) => renderSearchScreen(el, createSearchApi(c, s), q.get('q') ?? '') },
     {
         path: '/gorevler', label: 'Görev Zemini — işlerim', group: 'Saha', inMenu: true,
@@ -189,6 +252,9 @@ export const ROUTES = [
     { path: '/canli', label: 'KMI LIVE — fabrika ekranı', group: 'Yönetim', inMenu: true, render: (el, c, s) => renderLiveScreen(el, createLiveApi(c, s), { mode: 'APP' }) },
     { path: '/onay-kuyrugu', label: 'Muhasebe Kuyruğu (ticari onay)', group: 'Yönetim', inMenu: true, render: (el, c, s) => renderAccountingQueueScreen(el, createAccountingQueueApi(c, s)) },
     { path: '/alacaklar', label: 'Alacaklar & Vade', group: 'Yönetim', inMenu: true, render: (el, c, s) => renderReceivablesScreen(el, createReceivablesApi(c, s), { today: istanbulToday() }) },
+    { path: '/tahsis', label: 'TAHSİS (ölçü düzeltme)', group: 'Saha', inMenu: true, render: (el, c, s) => renderTahsisScreen(el, createTahsisApi(c, s)) },
+    { path: '/yonetim', label: 'Yönetim Zekâsı (onaylar ve üst yönetim)', group: 'Yönetim', inMenu: true, render: (el, c, s, q, a) => renderManagementScreen(el, managementDeps(c, s, a), { tab: q.get('sekme') }) },
+    { path: '/maliyet', label: 'Maliyet Zekâsı (yalnız ekonomik erişim)', group: 'Yönetim', inMenu: true, render: (el, c, s, q, a) => renderCostIntelligenceScreen(el, q.get('sekme') ?? 'live', { api: createCostOpsApi(c, s), access: a, today: istanbulToday(), nowMs: Date.now(), openTab: (t) => { location.hash = `#/maliyet?sekme=${t}`; }, download: downloadText }) },
     { path: '/ekonomi', label: 'Ekonomi & Kararlar (yalnız sahip)', group: 'Yönetim', inMenu: true, render: (el, c, s) => renderEconomicsScreen(el, createEconomicsApi(c, s), { from: addDays(istanbulToday(), -89), to: istanbulToday(), today: istanbulToday() }) },
     { path: '/ekonomi-basvuru', label: 'Ekonomik sahiplik başvurusu', group: 'Yönetim', inMenu: true, render: (el, c, s) => renderOwnerApplicationScreen(el, createEconomicsApi(c, s)) },
     { path: '/giris-cikis', label: 'Giriş-Çıkış (GEÇKO)', group: 'Yönetim', inMenu: true, render: (el, c, s) => renderGeckoScreen(el, createGeckoApi(c, s)) },
@@ -250,6 +316,25 @@ export async function startApp(root, opts = {}) {
     }
     const client = opts.client ?? createKmiNextClient({ url: cfg.supabaseUrl, apiKey: cfg.anonKey });
     let session = loadSession();
+    // Silent JWT refresh keeps the stored session current; an unrenewable session ends cleanly (once) instead of looping on 401s.
+    client.onSessionRefreshed = (s) => saveSession(s);
+    let expiredHandled = false;
+    let loginNotice; // survives the re-render the interrupted screen may still trigger
+    client.onSessionExpired = () => {
+        if (expiredHandled || !session)
+            return;
+        expiredHandled = true;
+        try {
+            headerDispose?.();
+        }
+        catch { /* header not built yet */ }
+        session = null;
+        accessCache = null;
+        saveSession(null);
+        location.hash = '#/';
+        loginNotice = 'Oturum süresi doldu — lütfen yeniden giriş yapın.';
+        renderLogin(loginNotice);
+    };
     let accessCache = null;
     // What this user may open (server mirror: my_access). A failure never opens anything extra: only unrestricted screens remain.
     const getAccess = async () => {
@@ -288,6 +373,8 @@ export async function startApp(root, opts = {}) {
                     session = await client.auth.signInWithPassword(email.value.trim(), pass.value);
                 }
                 accessCache = null;
+                expiredHandled = false;
+                loginNotice = undefined;
                 saveSession(session);
                 location.hash = '#/';
                 await route();
@@ -296,12 +383,22 @@ export async function startApp(root, opts = {}) {
                 renderLogin(err instanceof Error ? `Giriş başarısız: ${err.message}` : 'Giriş başarısız', mode);
             }
         };
+        const dbText = h('span', {}, 'Veritabanı bağlantısı kontrol ediliyor…');
+        const dbBox = h('div', { class: 'kmi-login-db', 'data-testid': 'login-db', 'data-state': 'checking', role: 'status' }, h('i', {}), dbText);
         const tab = (m, label, tid) => h('button', { type: 'button', class: `kmi-login-tab${mode === m ? ' on' : ''}`, 'data-testid': tid, 'aria-pressed': String(mode === m), onClick: () => renderLogin(undefined, m) }, label);
-        mount(root, h('div', {}, h('style', {}, SHELL_CSS), offlineBar(), h('div', { class: 'kmi-login', 'data-testid': 'login-screen', 'data-mode': mode }, h('div', { class: 'kmi-login-k', 'aria-hidden': 'true' }, h('img', { src: './assets/kurutlu-k-symbol-white.png', alt: '' })), h('form', { class: 'kmi-login-card', 'data-testid': 'login-form', onSubmit: (e) => void submit(e) }, h('div', { class: 'brand' }, h('img', { src: './assets/kurutlu-k-symbol-white.png', alt: 'Kurutlu' }), h('h1', {}, BRAND), h('p', { class: 'sub' }, BRAND_SUB), h('div', { class: 'rule' })), operatorLoginEnabled ? h('div', { class: 'kmi-login-tabs' }, tab('EMAIL', 'E-posta', 'login-tab-email'), tab('OPERATOR', 'Operatör girişi', 'login-tab-operator')) : null, message ? h('div', { class: 'kmi-login-err', 'data-testid': 'login-error', role: 'alert' }, message) : null, ...(mode === 'OPERATOR'
+        mount(root, h('div', {}, h('style', {}, SHELL_CSS), offlineBar(), h('div', { class: 'kmi-login', 'data-testid': 'login-screen', 'data-mode': mode }, h('div', { class: 'kmi-login-k', 'aria-hidden': 'true' }, h('div', { class: 'kspin' }, h('img', { src: './assets/kurutlu-k-symbol-white.png', alt: '' }), h('span', { class: 'glare' }))), h('form', { class: 'kmi-login-card', 'data-testid': 'login-form', onSubmit: (e) => void submit(e) }, h('div', { class: 'brand' }, h('img', { src: './assets/kurutlu-k-symbol-white.png', alt: 'Kurutlu' }), h('h1', {}, BRAND), h('p', { class: 'sub' }, BRAND_SUB), h('div', { class: 'rule' })), operatorLoginEnabled ? h('div', { class: 'kmi-login-tabs' }, tab('EMAIL', 'E-posta', 'login-tab-email'), tab('OPERATOR', 'Operatör girişi', 'login-tab-operator')) : null, message ? h('div', { class: 'kmi-login-err', 'data-testid': 'login-error', role: 'alert' }, message) : null, ...(mode === 'OPERATOR'
             ? [h('label', { for: 'kmi-login-sicil' }, 'Sicil numarası'), sicil, h('label', { for: 'kmi-login-badge' }, 'Rozet / QR'), badge, h('label', { for: 'kmi-login-pin' }, 'Kişisel PIN'), pin,
                 h('p', { class: 'kmi-login-hint' }, 'Rozet tek başına giriş yaptırmaz; PIN gerekir. Paylaşılan tablette işiniz bitince Çıkış yapın.')]
-            : [h('label', { for: 'kmi-login-email' }, 'E-posta'), email, h('label', { for: 'kmi-login-password' }, 'Şifre'), pass]), h('button', { type: 'submit', 'data-testid': 'login-submit' }, 'Giriş')))));
+            : [h('label', { for: 'kmi-login-email' }, 'E-posta'), email, h('label', { for: 'kmi-login-password' }, 'Şifre'), pass]), h('button', { type: 'submit', 'data-testid': 'login-submit' }, 'Giriş'), dbBox))));
+        // Green ONLY after a real reachability answer from the auth service; never assumed.
+        void client.health().then((ok) => {
+            if (!dbBox.isConnected)
+                return;
+            dbBox.setAttribute('data-state', ok ? 'ok' : 'fail');
+            dbText.textContent = ok ? 'Veritabanı bağlantısı doğrulandı' : 'Veritabanına ulaşılamıyor — bağlantınızı kontrol edin';
+        });
     };
+    let headerDispose;
     const route = async () => {
         {
             // KMI LIVE kiosk: no login, display token only, PUBLIC board only (server decides)
@@ -313,7 +410,7 @@ export async function startApp(root, opts = {}) {
             }
         }
         if (!session)
-            return renderLogin();
+            return renderLogin(loginNotice);
         const { path, query } = parseHash(location.hash);
         const content = h('div', { 'data-testid': 'app-content' });
         const logout = async () => {
@@ -324,6 +421,7 @@ export async function startApp(root, opts = {}) {
             catch {
                 /* token may already be expired — local sign-out still happens */
             }
+            headerDispose?.();
             session = null;
             accessCache = null;
             saveSession(null);
@@ -349,26 +447,68 @@ export async function startApp(root, opts = {}) {
         const sideEl = h('aside', { class: `kmi-side${collapsed0 ? ' collapsed' : ''}`, 'data-testid': 'app-sidebar', 'aria-label': 'Ana gezinme' }, h('div', { class: 'kmi-side-head' }, h('a', { class: 'b', href: '#/', 'data-testid': 'app-side-home', title: BRAND }, h('img', { src: './assets/kurutlu-k-symbol-white.png', alt: 'Kurutlu' }), h('span', { class: 't' }, h('i', {}, 'KURUTLU'), h('b', {}, 'Performance Center'))), h('button', { type: 'button', class: 'kmi-side-collapse', 'data-testid': 'app-side-collapse', 'aria-label': collapsed0 ? 'Menüyü genişlet' : 'Menüyü daralt', title: collapsed0 ? 'Genişlet' : 'Daralt',
             onClick: () => { const now = !sideEl.classList.contains('collapsed'); sideEl.classList.toggle('collapsed', now); writeCollapsed(now); document.documentElement.style.setProperty('--kmi-side-w', now ? '64px' : '260px'); collBtn.setAttribute('aria-label', now ? 'Menüyü genişlet' : 'Menüyü daralt'); collBtn.replaceChildren(icon(now ? 'chevrons-right' : 'chevrons-left', 16)); } }, icon(collapsed0 ? 'chevrons-right' : 'chevrons-left', 16))), navHost);
         const collBtn = sideEl.querySelector('[data-testid="app-side-collapse"]');
-        mount(root, h('div', { class: 'kmi-has-bottom' }, h('style', {}, SHELL_CSS), offlineBar(), h('a', { class: 'kmi-skip', href: '#kmi-main', onClick: (e) => { e.preventDefault(); document.getElementById('kmi-main')?.focus(); } }, 'İçeriğe geç'), sideEl, drawerBack, h('div', { class: 'kmi-main' }, h('header', { class: 'kmi-top' }, h('a', { class: 'brand', href: '#/', 'data-testid': 'app-home', title: BRAND }, h('img', { src: './assets/kurutlu-k-symbol-white.png', alt: '' }), h('span', {}, 'KMI', h('small', {}, 'PERFORMANCE CENTER'))), h('form', { 'data-testid': 'app-search-form', role: 'search', onSubmit: (e) => { e.preventDefault(); const v = e.target.querySelector('input').value.trim(); if (v)
-                location.hash = `#/ara?q=${encodeURIComponent(v)}`; } }, h('input', { type: 'search', 'data-testid': 'app-search', 'aria-label': 'Ara', placeholder: 'Ara…', value: path === '/ara' ? (query.get('q') ?? '') : '' })), h('span', { class: 'user', 'data-testid': 'app-user' }, session.user.email ?? session.user.label ?? ''), menuBtn, h('button', { type: 'button', class: 'btn', 'data-testid': 'app-logout', onClick: () => void logout() }, icon('logout', 16), h('span', { class: 'nl' }, 'Çıkış'))), h('main', { class: 'kmi-content', id: 'kmi-main', tabindex: '-1' }, content)), bottomHost));
+        headerDispose?.();
+        const header = createHeader({ brandTitle: BRAND, initialName: session.user.label ?? session.user.email ?? '', searchValue: path === '/ara' ? (query.get('q') ?? '') : '', menuBtn, onLogout: () => void logout() });
+        headerDispose = header.dispose;
+        mount(root, h('div', { class: 'kmi-has-bottom' }, h('style', {}, SHELL_CSS), offlineBar(), h('a', { class: 'kmi-skip', href: '#kmi-main', onClick: (e) => { e.preventDefault(); document.getElementById('kmi-main')?.focus(); } }, 'İçeriğe geç'), sideEl, drawerBack, h('div', { class: 'kmi-main' }, header.el, h('main', { class: 'kmi-content', id: 'kmi-main', tabindex: '-1' }, content)), bottomHost));
         const { value: access, failed: accessFailed } = await getAccess();
+        {
+            const live = canOpen('/canli', access), pulse = canOpen('/komuta', access);
+            header.setChips(live, pulse);
+            // real person, from the personnel record linked to this login (RLS decides); nothing invented when unlinked
+            const uid = session.user.id;
+            const fallbackName = session.user.label ?? session.user.email ?? '';
+            header.setIdentity({ name: fallbackName, roles: access.roles });
+            void client.select('personnel', { columns: 'name,department', filters: { auth_user_id: `eq.${uid}` }, limit: 1 }, session)
+                .then((rows) => { if (rows[0]?.name)
+                header.setIdentity({ name: rows[0].name, department: rows[0].department, roles: access.roles }); })
+                .catch(() => { });
+        }
         // navigation: only what this user may open (same rule as the home screen and the direct-URL guard); the server decides for real
         const navGroups = visibleNav((p) => canOpen(p, access) && ROUTES.some((x) => x.path === p && x.inMenu));
         const navLink = (it, testid, onNav) => {
             const a = h('a', { href: `#${it.path}`, 'data-testid': testid, 'data-path': it.path, title: it.label, ...(it.path === path ? { 'aria-current': 'page' } : {}), ...(onNav ? { onClick: onNav } : {}) }, icon(it.icon), h('span', { class: 'nl' }, it.label));
             return a;
         };
+        // Department workspaces are collapsible; the open/closed choice is remembered per browser. The group holding the current screen is always open.
+        const NAV_CLOSED_KEY = 'kmi-nav-closed';
+        const readClosed = () => { try {
+            const v = JSON.parse(localStorage.getItem(NAV_CLOSED_KEY) ?? '[]');
+            return Array.isArray(v) ? v.filter((x) => typeof x === 'string') : [];
+        }
+        catch {
+            return [];
+        } };
+        const writeClosed = (v) => { try {
+            localStorage.setItem(NAV_CLOSED_KEY, JSON.stringify(v));
+        }
+        catch { /* private mode: not remembered */ } };
         const fillNav = (host, itemTestId, onNav) => {
-            host.replaceChildren(...navGroups.flatMap((g, gi) => [
-                ...(gi > 0 ? [h('hr', {})] : []),
-                ...(g.title ? [h('div', { class: 'lbl' }, g.title)] : []),
-                ...g.items.map((it) => navLink(it, itemTestId, onNav)),
-            ]));
+            const closed = readClosed();
+            host.replaceChildren(...navGroups.flatMap((g, gi) => {
+                const links = g.items.map((it) => navLink(it, itemTestId, onNav));
+                if (!g.title)
+                    return [...(gi > 0 ? [h('hr', {})] : []), ...links];
+                const hasCurrent = g.items.some((i) => i.path === path);
+                const isClosed = !hasCurrent && closed.includes(g.title);
+                const body = h('div', { class: 'grp-body', ...(isClosed ? { hidden: true } : {}) }, ...links);
+                const head = h('button', { type: 'button', class: 'lbl grp-head', 'data-testid': 'app-nav-group', 'aria-expanded': String(!isClosed), onClick: () => {
+                        const nowClosed = !body.hidden ? true : false;
+                        body.hidden = nowClosed;
+                        head.setAttribute('aria-expanded', String(!nowClosed));
+                        const cur = readClosed().filter((t) => t !== g.title);
+                        if (nowClosed)
+                            cur.push(g.title);
+                        writeClosed(cur);
+                    } }, g.title);
+                return [h('div', { class: 'grp', 'data-group': g.title }, head, body)];
+            }));
         };
         fillNav(navHost, 'app-nav-item');
         fillNav(drawerNavHost, 'app-drawer-item', closeDrawer);
         const quick = ['/', ...featuredPaths(access, navGroups.flatMap((g) => g.items.map((i) => i.path))).filter((p) => p !== '/')].slice(0, 4);
         bottomHost.replaceChildren(...quick.map((p) => navLink(NAV_ITEM_BY_PATH[p], 'app-bottom-item')), h('button', { type: 'button', 'data-testid': 'app-bottom-menu', 'aria-label': 'Tüm menü', onClick: openDrawer }, icon('menu'), 'Menü'));
+        header.setShortcuts(pickShortcuts([...quick, ...navGroups.flatMap((g) => g.items.map((i) => i.path))].map((p) => ({ path: p, label: NAV_ITEM_BY_PATH[p]?.label ?? p })), (p) => canOpen(p, access) && !!NAV_ITEM_BY_PATH[p]));
         const r = ROUTES.find((x) => x.path === path);
         if (!r) {
             const landing = landingPath(access);
@@ -387,21 +527,30 @@ export async function startApp(root, opts = {}) {
                 const n = NAV_ITEM_BY_PATH[x.path];
                 return h('a', { href: `#${x.path}`, class: 'kmi-link', 'data-testid': 'app-menu-item', 'data-path': x.path }, icon(n?.icon ?? 'grid', 16), n?.label ?? x.label);
             })))))));
-            // "Bugün": real counters from the canonical command_center snapshot only — nothing is shown when it is unavailable (no placeholders, no invented numbers)
+            // KOKPİT (KMI-HOME-001): role-adaptive cards from the canonical command_center snapshot (+ commercial_approvals counts for accounting).
             void (async () => {
+                const host = content.querySelector('[data-testid="app-today"]');
+                if (!host)
+                    return;
+                let snapshot = null;
+                let failed = false;
                 try {
-                    const snap = await createCommandCenterApi(client, session).snapshot();
-                    const host = content.querySelector('[data-testid="app-today"]');
-                    if (!host)
-                        return;
-                    const c = snap.counters;
-                    const crit = snap.alerts.filter((a) => a.severity === 'CRITICAL').length;
-                    const action = (c.orderItemsOverdue ?? 0) + (c.qualityHoldsOpen ?? 0) + (c.ncrsOpen ?? 0) + (c.incomingQcWaiting ?? 0) + (c.purchaseRequestsWaiting ?? 0);
-                    const stat = (n, label, tone, href) => h('a', { href, class: `kmi-stat ${tone}`, 'data-testid': 'app-today-stat' }, h('b', {}, String(n)), h('span', {}, label));
-                    host.replaceChildren(h('div', { class: 'kmi-section' }, 'BUGÜN'), h('div', { class: 'stats' }, stat(crit, 'kritik uyarı', crit > 0 ? 'bad' : '', '#/komuta'), stat(action, 'aksiyon bekleyen iş', action > 0 ? 'warn' : '', '#/komuta'), stat(c.workOrdersRunning ?? 0, 'çalışan iş emri', '', '#/is-emirleri'), stat(c.workOrdersWaiting ?? 0, 'bekleyen iş emri', '', '#/is-emirleri')), h('div', { class: 'kmi-mut' }, `Veri anı: ${snap.generatedAt.slice(0, 16).replace('T', ' ')}`));
-                    host.hidden = false;
+                    snapshot = await createCommandCenterApi(client, session).snapshot();
                 }
-                catch { /* snapshot unavailable for this user: show nothing */ }
+                catch {
+                    failed = true;
+                }
+                const homeAccess = { roles: access.roles, economics: access.economics, owner: access.owner, actions: access.actions };
+                const needed = homeCardsFor(homeAccess).filter((c) => c.source.kind === 'extra').map((c) => c.source.key);
+                const extras = await loadExtras(client, session, needed, new Date().toISOString());
+                renderCockpit(host, { snapshot, extras, access: homeAccess, nowMs: Date.now(), failed });
+                // management only: factory map + machine×shift matrix + KMI Zekâ summary (separate reads; one failing panel never blanks the others)
+                if (access.roles.includes('ADMIN') || access.roles.includes('MANAGEMENT')) {
+                    const fp = h('div', { class: 'fp-root', 'data-testid': 'factory-panels' });
+                    host.append(fp);
+                    void loadFactoryData(client, session).then((d) => { if (fp.isConnected)
+                        renderFactoryPanels(fp, d); });
+                }
             })();
             return;
         }
