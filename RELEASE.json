@@ -1,8 +1,8 @@
 {
   "product": "KMI NEXT",
-  "commit": "9034d6126f47cd70020202d8020f51da4f005eec",
+  "commit": "856ebedccee39926c407345860009ac330e283bf",
   "builtFrom": "clean git tree",
-  "fileCount": 215,
+  "fileCount": 219,
   "migrationsInRepo": 73,
   "lastMigration": "0073_kmi_next_puantaj_month.sql",
   "note": "Release candidate. Publishing to https://flow.kurutlu.com is a manual owner action; this file is not a publication permit.",
@@ -64,8 +64,8 @@
     },
     {
       "path": "dist/apps/web/src/access.js",
-      "bytes": 4890,
-      "sha256": "8fe3709930751f5f92df3a3dbd5aa1b4f22f312f45658b220b0747e46c2125a6"
+      "bytes": 5030,
+      "sha256": "ae2655a480ff08ef8f90c7cc28ed4af1f125a0a1ff4c77a32720362c4ec1c58d"
     },
     {
       "path": "dist/apps/web/src/accountingApi.js",
@@ -79,8 +79,8 @@
     },
     {
       "path": "dist/apps/web/src/app.js",
-      "bytes": 52605,
-      "sha256": "e274a15b63edf836df4bde2620e8d301f59b63734e12a7bce904d915587158ec"
+      "bytes": 61639,
+      "sha256": "247ee746e466834490d33a56a07e4fa6544fd93baf98c09181335e6d0ddc502a"
     },
     {
       "path": "dist/apps/web/src/approvalsInboxApi.js",
@@ -154,8 +154,8 @@
     },
     {
       "path": "dist/apps/web/src/header.js",
-      "bytes": 6021,
-      "sha256": "df398095b3cf282d864e2469a59dcc4964dbf5861201e3e8aadca8d97d3a1273"
+      "bytes": 6026,
+      "sha256": "b1873f992ab4bb92c589592af11a2fb599581e50278046391cdb5ed7e84c5d0e"
     },
     {
       "path": "dist/apps/web/src/historyApi.js",
@@ -164,13 +164,18 @@
     },
     {
       "path": "dist/apps/web/src/homeCockpit.js",
-      "bytes": 4438,
-      "sha256": "2e701ba51abe1c8e0422466c292017541913f26812d90be346e0cfa276f169b5"
+      "bytes": 5814,
+      "sha256": "59341672b63bc609a6d2a7f48184fc00060e2d9ad226e403b7509e5cad3ec1d6"
     },
     {
       "path": "dist/apps/web/src/homeData.js",
       "bytes": 4334,
       "sha256": "3de5db04f52417d5e0e9e086047f394c39f3f58084eb469b93c741c07b6d178a"
+    },
+    {
+      "path": "dist/apps/web/src/idleGuard.js",
+      "bytes": 6266,
+      "sha256": "c1a81aa6f853ee3d4dfff4af4341e4d3bcb3b4dfd6d6f63a58ba0f2e49a0d6ca"
     },
     {
       "path": "dist/apps/web/src/intelligenceApi.js",
@@ -214,8 +219,8 @@
     },
     {
       "path": "dist/apps/web/src/nav.js",
-      "bytes": 10289,
-      "sha256": "a8b2c8a19a91a16249ff0fbd2b4f2f2c4ec57b4ede91f248ffc15cddbb5f587c"
+      "bytes": 11912,
+      "sha256": "83f9028a9097f2c8f8c72b57738102e094687a1f1149fb3b57ef4998bdfba382"
     },
     {
       "path": "dist/apps/web/src/objectPassportApi.js",
@@ -384,8 +389,13 @@
     },
     {
       "path": "dist/apps/web/src/screens/DepartmentCockpit.js",
-      "bytes": 8586,
-      "sha256": "6b7ee5e909c5f825e91163e40cc960183b60916eedd0fd03b882c8517113943c"
+      "bytes": 8845,
+      "sha256": "9f7bce2454e499740e53b2844b858007f452fae87f9af204c6576d60314e7d14"
+    },
+    {
+      "path": "dist/apps/web/src/screens/DepartmentHomeScreen.js",
+      "bytes": 10095,
+      "sha256": "184c07580761da869b4abebd5f341d0951b883e5cf7b0f02a5faf11953e6a281"
     },
     {
       "path": "dist/apps/web/src/screens/DepartmentScreen.js",
@@ -439,8 +449,8 @@
     },
     {
       "path": "dist/apps/web/src/screens/MaintenanceScreen.js",
-      "bytes": 15098,
-      "sha256": "91e4eeea2651b18997859cfe68ee312937347b8e785320fd3c069b6373a11bad"
+      "bytes": 14760,
+      "sha256": "bfd0f47b4d4cf0d967a039c5d91b3c5e4960cd69f49426daa0378940c4b43f2d"
     },
     {
       "path": "dist/apps/web/src/screens/ManagementScreen.js",
@@ -534,8 +544,8 @@
     },
     {
       "path": "dist/apps/web/src/screens/PurchasingScreen.js",
-      "bytes": 6516,
-      "sha256": "1484226f3f79cd93fccec9806778776c1a581d33bb85930c770860c26cc520cb"
+      "bytes": 6742,
+      "sha256": "f8792a70b4f048a02d2621960350358c9ea9876599b7ce5c33be08311d383548"
     },
     {
       "path": "dist/apps/web/src/screens/ReceivablesScreen.js",
@@ -599,8 +609,8 @@
     },
     {
       "path": "dist/apps/web/src/screens/ToolroomScreen.js",
-      "bytes": 6716,
-      "sha256": "63b5f1c6bf8f5ed17ddfe44c9bf27bf246f073e5dd883e5d0863a9893f72f93e"
+      "bytes": 6524,
+      "sha256": "3f0ec7a9bdd12f1d96d504c07c3ccf4df8f0027055e0510b0adf086b884ee4fe"
     },
     {
       "path": "dist/apps/web/src/screens/WorkOrderHubScreen.js",
@@ -709,8 +719,8 @@
     },
     {
       "path": "dist/apps/web/src/theme.js",
-      "bytes": 27122,
-      "sha256": "cc2edfebf3dfa11a86f06894e48df5c15b312d05206ab90379eea1082995ef4e"
+      "bytes": 31613,
+      "sha256": "38e1c16cabcda9b98a34eca8cc21334b53cd3098576ca470b134f57a0bc5c920"
     },
     {
       "path": "dist/apps/web/src/toolReadinessApi.js",
@@ -828,6 +838,11 @@
       "sha256": "a83acb2dc7dcfaf3b7a9c83a087c86fcd0da9ca516f4e19416b108cea5bce7df"
     },
     {
+      "path": "dist/packages/domain/src/departmentHome.js",
+      "bytes": 15641,
+      "sha256": "e5162098b75ec9b98ba57a492150ad910ae09079938d9b01a4e1ac3c8cb5eaea"
+    },
+    {
       "path": "dist/packages/domain/src/devices.js",
       "bytes": 1488,
       "sha256": "5a32658bf9e11616c530c6c11d084ebab13f5e1bc9773e9ac0ca92f5ddeab20b"
@@ -858,9 +873,14 @@
       "sha256": "db4218203696017a15c1712fb437beb28504ce720d4e3f6314bff13483b868da"
     },
     {
+      "path": "dist/packages/domain/src/idleSession.js",
+      "bytes": 3097,
+      "sha256": "4b9eb64a9cd0e2d2f179d28726977e0ecda6a792459aae62b20ac7a7e7959642"
+    },
+    {
       "path": "dist/packages/domain/src/index.js",
-      "bytes": 1625,
-      "sha256": "af8af3d5a325d982d963229a812bafc63575d921ec0a33a846276555b15b5a00"
+      "bytes": 1690,
+      "sha256": "904a30d72df64952086e150054ae8e8a7b207b619d2d6321a418d12e061c71a7"
     },
     {
       "path": "dist/packages/domain/src/intelligence.js",
