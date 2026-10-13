@@ -1,8 +1,8 @@
 {
   "product": "KMI NEXT",
-  "commit": "cecd7decd935b23b0cc26c38e131130a6ba5a6ad",
+  "commit": "8d7db49f14d1ce8b69aa18d2a6830a76a68dc2e7",
   "builtFrom": "clean git tree",
-  "fileCount": 168,
+  "fileCount": 210,
   "migrationsInRepo": 73,
   "lastMigration": "0073_kmi_next_puantaj_month.sql",
   "note": "Release candidate. Publishing to https://flow.kurutlu.com is a manual owner action; this file is not a publication permit.",
@@ -64,8 +64,8 @@
     },
     {
       "path": "dist/apps/web/src/access.js",
-      "bytes": 4363,
-      "sha256": "0286ced47a1e5352b350f66a236ced877afd436824d6c2b744b276914f9af552"
+      "bytes": 4890,
+      "sha256": "8fe3709930751f5f92df3a3dbd5aa1b4f22f312f45658b220b0747e46c2125a6"
     },
     {
       "path": "dist/apps/web/src/accountingApi.js",
@@ -79,8 +79,13 @@
     },
     {
       "path": "dist/apps/web/src/app.js",
-      "bytes": 38569,
-      "sha256": "7c159e961b7dc37fc20bfda4477cf513e1c186a4ce0e79aa97e9fdd3c54dfe58"
+      "bytes": 47417,
+      "sha256": "877af8b1d60e14542fb585b0a3004c2271ba905ccbdc41a7feeb992215377174"
+    },
+    {
+      "path": "dist/apps/web/src/approvalsInboxApi.js",
+      "bytes": 9815,
+      "sha256": "952334d223ab9f24d82730b3b2cdf9262c7d1d3c5c1df232d2cea06e031f8bc2"
     },
     {
       "path": "dist/apps/web/src/badgesApi.js",
@@ -103,6 +108,11 @@
       "sha256": "41120d68986f22d5fecaa3f32344874af84a77493828df9df987727b27c1099a"
     },
     {
+      "path": "dist/apps/web/src/costOpsApi.js",
+      "bytes": 3503,
+      "sha256": "fa3ab663f33ed93befe640cb9703b1eb8201d8b74c54ed97e4d0a6f8d8b74934"
+    },
+    {
       "path": "dist/apps/web/src/departmentApi.js",
       "bytes": 275,
       "sha256": "97f2b53360ef0984bad3e9d05d077053a6cf0a189659ce200be8de20bfdc0c1c"
@@ -119,8 +129,8 @@
     },
     {
       "path": "dist/apps/web/src/ds.js",
-      "bytes": 4559,
-      "sha256": "c7e7fc7e6d7b2669e0933c88e75628e1d853a9f6fcd3ea3b091c05800e22b285"
+      "bytes": 6072,
+      "sha256": "a65f3d7d81de189fd6260024d1a3118fe682ee4f910662d8a7d4cb6955b18509"
     },
     {
       "path": "dist/apps/web/src/economicsApi.js",
@@ -134,13 +144,38 @@
     },
     {
       "path": "dist/apps/web/src/errorText.js",
-      "bytes": 4931,
-      "sha256": "98d8ad46653c6fef8fe984de74c75af9243477cbefb2cb6452147d3320b92d98"
+      "bytes": 6144,
+      "sha256": "9a778e9460c92a31081ef76d417e3387a21d82f88e4d36f15c86b8406303a09b"
     },
     {
       "path": "dist/apps/web/src/geckoApi.js",
       "bytes": 1488,
       "sha256": "0a2d583938125b188fe49bd8d09d54bfde21633d0275b5c1abf9bd275900d11f"
+    },
+    {
+      "path": "dist/apps/web/src/header.js",
+      "bytes": 6021,
+      "sha256": "df398095b3cf282d864e2469a59dcc4964dbf5861201e3e8aadca8d97d3a1273"
+    },
+    {
+      "path": "dist/apps/web/src/historyApi.js",
+      "bytes": 1448,
+      "sha256": "66a5d140ca3b55351461360ceb15df62cf2710a105117d1c109fabca7c53fc80"
+    },
+    {
+      "path": "dist/apps/web/src/homeCockpit.js",
+      "bytes": 5227,
+      "sha256": "758efc425303db272aa961f7cb79b0ad85140fbd348d01d1235efcfbf3740924"
+    },
+    {
+      "path": "dist/apps/web/src/homeData.js",
+      "bytes": 4334,
+      "sha256": "3de5db04f52417d5e0e9e086047f394c39f3f58084eb469b93c741c07b6d178a"
+    },
+    {
+      "path": "dist/apps/web/src/homeFactory.js",
+      "bytes": 8399,
+      "sha256": "7c368dbc6de9087e1464456e761ede03eef3247d836a69ad20ae253d475e2fb3"
     },
     {
       "path": "dist/apps/web/src/intelligenceApi.js",
@@ -154,8 +189,8 @@
     },
     {
       "path": "dist/apps/web/src/liveApi.js",
-      "bytes": 1039,
-      "sha256": "2ea8dfb4dbf149f1bf9c93ca1de3e4eb49a5d6ccbf0b5d1b3f2cf90e8a2fa77e"
+      "bytes": 2100,
+      "sha256": "588c33aaa81e9419b59aa7d0c232b669cd49c715e263b42fe8ca5acd16429e18"
     },
     {
       "path": "dist/apps/web/src/machineIcons.js",
@@ -166,6 +201,11 @@
       "path": "dist/apps/web/src/maintenanceApi.js",
       "bytes": 2183,
       "sha256": "e0c635b514670fb02b35bb5b6c731242eb885da123b0871c4eb7d23744a0ef81"
+    },
+    {
+      "path": "dist/apps/web/src/managementApi.js",
+      "bytes": 4658,
+      "sha256": "a95be63ef2f52d8001e97d55200ee9213117b533ae97d69e24ee6cb7a1128040"
     },
     {
       "path": "dist/apps/web/src/masterImportApi.js",
@@ -179,8 +219,13 @@
     },
     {
       "path": "dist/apps/web/src/nav.js",
-      "bytes": 7544,
-      "sha256": "6e54fb51c8517b0019f863b86537c3554925edd4235bf7b968ce401fd003d8cc"
+      "bytes": 8374,
+      "sha256": "e04fd30625959617c919bf59f876ecde9bc4231c916aa9d783d5eacd7a243dfd"
+    },
+    {
+      "path": "dist/apps/web/src/objectPassportApi.js",
+      "bytes": 50417,
+      "sha256": "b8d4d5f0435e6c8cd7b576a4e990e79a17d8716d0d95754752e5a1fd94b01798"
     },
     {
       "path": "dist/apps/web/src/oeeApi.js",
@@ -196,6 +241,16 @@
       "path": "dist/apps/web/src/ordersApi.js",
       "bytes": 1496,
       "sha256": "db89a73708594221d1028b71a93cf93a0f915e67c40ec6b0852b7c677f331b6c"
+    },
+    {
+      "path": "dist/apps/web/src/passport/model.js",
+      "bytes": 162,
+      "sha256": "a85eb368434ca0fc886e8ba840d132e5ac9986ca140a33ea9f99fa05b61909cc"
+    },
+    {
+      "path": "dist/apps/web/src/passport/registry.js",
+      "bytes": 5560,
+      "sha256": "7d6afa774c41761811ce70e417b90c51b94266d163e05f7a0aef5ba27d29a974"
     },
     {
       "path": "dist/apps/web/src/passportApi.js",
@@ -283,6 +338,11 @@
       "sha256": "e4f444468cdef03d94334834ec29efe685af0efd8e6c232f852791f0ed176041"
     },
     {
+      "path": "dist/apps/web/src/screens/ApprovalsTab.js",
+      "bytes": 10993,
+      "sha256": "b255b384dda6340ecf352ad39b82630100f7699b84b7ca514a233ad742cc0ff5"
+    },
+    {
       "path": "dist/apps/web/src/screens/BadgesScreen.js",
       "bytes": 9001,
       "sha256": "a8a0af2619bcec23f7283f03ee460eb580b65c712101611c0d60923637212f61"
@@ -294,8 +354,8 @@
     },
     {
       "path": "dist/apps/web/src/screens/CommandCenterScreen.js",
-      "bytes": 21368,
-      "sha256": "4db49ea655931c0c5e27714633ea5c9f7acc0d91d2b70337778a38a95ffecb5b"
+      "bytes": 24857,
+      "sha256": "2ed16dbb21ddaedfb3caff74c8ec383036dd063aa66517c21a746dad94e1af91"
     },
     {
       "path": "dist/apps/web/src/screens/CommercialApprovalScreen.js",
@@ -306,6 +366,16 @@
       "path": "dist/apps/web/src/screens/CompetencyImportScreen.js",
       "bytes": 7050,
       "sha256": "c655bbdb2c9b5770c1e62d5120c0537ac14cbf02092d64a2099c8dd2b623ce74"
+    },
+    {
+      "path": "dist/apps/web/src/screens/CostIntelligenceScreen.js",
+      "bytes": 21479,
+      "sha256": "1897fa2efec3330246f81531d45f6515806b45e7d7d07d069065c825555a59db"
+    },
+    {
+      "path": "dist/apps/web/src/screens/CostOpsPanels.js",
+      "bytes": 27910,
+      "sha256": "61d7e5818ea1db6707ff0c537e128302650bc05aed2c89d8e90eed9468be51fa"
     },
     {
       "path": "dist/apps/web/src/screens/DepartmentScreen.js",
@@ -338,6 +408,11 @@
       "sha256": "3225dbf8e87ce7edc39f3217e259d7cf0bbb35636ecc415161b3d859caa6aedb"
     },
     {
+      "path": "dist/apps/web/src/screens/HistorySearchScreen.js",
+      "bytes": 6975,
+      "sha256": "e6a52fd123565ca066d1c6d7b9bfc6fd99341a3dd510e0a9cc5f71e185406d90"
+    },
+    {
       "path": "dist/apps/web/src/screens/IntelligenceScreen.js",
       "bytes": 9391,
       "sha256": "1bb6ece7aa1c845b6fa7bf5f1e8c3f9dc731b5ea8a0623bc42b70b55a8c8b18b"
@@ -349,13 +424,18 @@
     },
     {
       "path": "dist/apps/web/src/screens/LiveScreen.js",
-      "bytes": 20539,
-      "sha256": "259a0827ddea6102079db6ebb1bcdedd38af02a9c8856fca33f8caae6464a6ed"
+      "bytes": 30721,
+      "sha256": "5f3ca1b694ee0e0e5e7b21469ff9c5be2b05194c85139c0e67edeccc5db13636"
     },
     {
       "path": "dist/apps/web/src/screens/MaintenanceScreen.js",
-      "bytes": 13600,
-      "sha256": "0a86ca076a51bc73aaac384837ad55d53cdf45e50342ac77fed5139bf030ab2d"
+      "bytes": 15098,
+      "sha256": "91e4eeea2651b18997859cfe68ee312937347b8e785320fd3c069b6373a11bad"
+    },
+    {
+      "path": "dist/apps/web/src/screens/ManagementScreen.js",
+      "bytes": 1432,
+      "sha256": "5770881460a2d2fc010ca28315c392991a286745a5dca290a606e32004658889"
     },
     {
       "path": "dist/apps/web/src/screens/MasterImportScreen.js",
@@ -371,6 +451,11 @@
       "path": "dist/apps/web/src/screens/MyAttendanceScreen.js",
       "bytes": 2766,
       "sha256": "c3d21d70cf56f92b2608b15b90ed5ad48e48fec467f8795c04d7b8d99b3aa429"
+    },
+    {
+      "path": "dist/apps/web/src/screens/ObjectPassportScreen.js",
+      "bytes": 21212,
+      "sha256": "e5fb2fc145d9e0fb33d3e1a70e6807b87b6686ec9d3e5267075ca40fdfb61377"
     },
     {
       "path": "dist/apps/web/src/screens/OeeScreen.js",
@@ -444,8 +529,8 @@
     },
     {
       "path": "dist/apps/web/src/screens/ReportsScreen.js",
-      "bytes": 16461,
-      "sha256": "d383974d8af9a8fbccb64cf5a6c6e7bd577d496420bcbfa95f93d025ba80350d"
+      "bytes": 16640,
+      "sha256": "8f77e2220aa24007191519abe7dc899fa5adce95646e54adaec5e1704c66f3ba"
     },
     {
       "path": "dist/apps/web/src/screens/RoutingScreen.js",
@@ -459,8 +544,8 @@
     },
     {
       "path": "dist/apps/web/src/screens/SearchScreen.js",
-      "bytes": 2343,
-      "sha256": "7897f5b4fe3be3d6d238ba643e497bd0db6c3f5f573e461989daec46714eb2fc"
+      "bytes": 2894,
+      "sha256": "0f8620afede78ff3a1fbad387cbacaada17983d572cd1484dfe18f557977fa5a"
     },
     {
       "path": "dist/apps/web/src/screens/ShipmentScreen.js",
@@ -476,6 +561,11 @@
       "path": "dist/apps/web/src/screens/SupplierInvoiceScreen.js",
       "bytes": 6386,
       "sha256": "ab6252da27788ff6e13f33464c2f9a1bb041c54c9693119b3172233d6d7c6ca0"
+    },
+    {
+      "path": "dist/apps/web/src/screens/TahsisScreen.js",
+      "bytes": 10017,
+      "sha256": "34b6752ba1393f2233b68d0ee0fa0e083e391926c95e217018726e0bb67982b5"
     },
     {
       "path": "dist/apps/web/src/screens/TaskFloorScreen.js",
@@ -499,8 +589,8 @@
     },
     {
       "path": "dist/apps/web/src/screens/WorkOrderHubScreen.js",
-      "bytes": 12695,
-      "sha256": "8de785024b1208b2666a18373e2f93f1155a817c62b629921fd2af3748c32908"
+      "bytes": 12933,
+      "sha256": "e195a3f2ac3eafabdf24167a89035b3c458304849a39873b972ccef951cfd8ec"
     },
     {
       "path": "dist/apps/web/src/screens/WorkOrdersScreen.js",
@@ -511,6 +601,56 @@
       "path": "dist/apps/web/src/screens/ZirvedekilerScreen.js",
       "bytes": 10577,
       "sha256": "573e94bcd1bac0b7611ce8eafd3d0546b9c701f180d35607a8f5f1963597cb1a"
+    },
+    {
+      "path": "dist/apps/web/src/screens/costCalcs.js",
+      "bytes": 19386,
+      "sha256": "ae97ca59d98bf2e59ef8ebc562a9f44b4c0ca0baac707ca387c26b9c6f03f7dd"
+    },
+    {
+      "path": "dist/apps/web/src/screens/management/FinanceTab.js",
+      "bytes": 7274,
+      "sha256": "f3be3272e170965a479b1a7bd668dcf491699de116660a4f1320c6788a5cd335"
+    },
+    {
+      "path": "dist/apps/web/src/screens/management/HomeTab.js",
+      "bytes": 8122,
+      "sha256": "8d3c4bf5362aea0c70e74f8603bbda3454e230f0e4b2460853107fe1819f4887"
+    },
+    {
+      "path": "dist/apps/web/src/screens/management/IntelligenceTab.js",
+      "bytes": 7728,
+      "sha256": "82c2b57f00b76dad2391f41dc4d5791e7b3fca41419502898835a498970b4e8f"
+    },
+    {
+      "path": "dist/apps/web/src/screens/management/MeetingsTab.js",
+      "bytes": 7894,
+      "sha256": "bd64bbf8969ee1b1cab7f817e79145d451b129899eb71d0f3b22a820926f15f6"
+    },
+    {
+      "path": "dist/apps/web/src/screens/management/OperationsTab.js",
+      "bytes": 8421,
+      "sha256": "61e8bc7307076c1179e2457957830550901a86463c55ea93ece604dbb55ad309"
+    },
+    {
+      "path": "dist/apps/web/src/screens/management/PeopleTab.js",
+      "bytes": 5415,
+      "sha256": "ba5789a13d8b0f565272c776b59f1764bf0e4df98ad0be88e3b9325a67cb8842"
+    },
+    {
+      "path": "dist/apps/web/src/screens/management/RiskTab.js",
+      "bytes": 9477,
+      "sha256": "7ccee0842c1f37f59cdf86501303d9639c1122ecff6b191ae21031f18e69e738"
+    },
+    {
+      "path": "dist/apps/web/src/screens/management/StrategyTab.js",
+      "bytes": 15080,
+      "sha256": "68ffc02f10540bf508af46f86f195f9a0c481909c23f5454275ee0a5eb891faa"
+    },
+    {
+      "path": "dist/apps/web/src/screens/management/kit.js",
+      "bytes": 6242,
+      "sha256": "18a209739e0281d379fc2d9b4912a9b4bb7323f9b8c27d77ae8424e9d031ea6d"
     },
     {
       "path": "dist/apps/web/src/screens/readinessPanel.js",
@@ -538,6 +678,11 @@
       "sha256": "7a4537858f8e9a5945a66d05ba2bc4add7eca63c0de304312da755969f733023"
     },
     {
+      "path": "dist/apps/web/src/tahsisApi.js",
+      "bytes": 2663,
+      "sha256": "3869b8eafddc72d007f56011d5c3fc52f633c762b8b6c99510c1f0979183ec0b"
+    },
+    {
       "path": "dist/apps/web/src/taskFloorApi.js",
       "bytes": 1141,
       "sha256": "958a4f2387da3e6f302aec94bd3fdea523dd9a9c53f6d084bbdb358104d11c41"
@@ -549,8 +694,8 @@
     },
     {
       "path": "dist/apps/web/src/theme.js",
-      "bytes": 18249,
-      "sha256": "76445f2166efdb1114683d1f92938e934b10fd921285306a5ede137c9624808b"
+      "bytes": 26683,
+      "sha256": "9ef250d6a95a192c8b5fa3895d38641c9591b4f8cc7c7bda251541c173b2a927"
     },
     {
       "path": "dist/apps/web/src/toolReadinessApi.js",
@@ -564,8 +709,8 @@
     },
     {
       "path": "dist/apps/web/src/workOrderHubApi.js",
-      "bytes": 4344,
-      "sha256": "31f9b174a1ca057d36698c6cf564b5b6cf95bdf2cf55808e52c5c59ca5396b89"
+      "bytes": 4366,
+      "sha256": "5caed2ab6e17563911bfc0fd1033b455a577a10c3bcb8e22bcf8d6179676d90f"
     },
     {
       "path": "dist/apps/web/src/workOrdersApi.js",
@@ -574,8 +719,8 @@
     },
     {
       "path": "dist/packages/data-client/src/client.js",
-      "bytes": 8663,
-      "sha256": "652b0f73e356b5984e9d30a4315784e880a66daa39c42530de106dc68c0cf77b"
+      "bytes": 12712,
+      "sha256": "784a6c51ba73aa1bd8f9d324370e7e025307f078c21be32af29eb98d8d328642"
     },
     {
       "path": "dist/packages/data-client/src/index.js",
@@ -586,6 +731,11 @@
       "path": "dist/packages/domain/src/accounting.js",
       "bytes": 1796,
       "sha256": "abbd5a7fd68a968ae5288953d228b9624672b0451c6e5f62008ef7b5215789a4"
+    },
+    {
+      "path": "dist/packages/domain/src/approvalsInbox.js",
+      "bytes": 11418,
+      "sha256": "9fdfa17789405e95c2cc077b6bc4115f87c5a73577bb23b4c9319eb5fac38950"
     },
     {
       "path": "dist/packages/domain/src/asBuilt.js",
@@ -599,8 +749,8 @@
     },
     {
       "path": "dist/packages/domain/src/authorization.js",
-      "bytes": 5260,
-      "sha256": "568eef471ab827599c756384716b24258a674b00816ab79da30d06436db8c273"
+      "bytes": 5566,
+      "sha256": "b41de75417c57114b252c1e35265a350eb5d6bcfb4c0a1f060619b1440056537"
     },
     {
       "path": "dist/packages/domain/src/badges.js",
@@ -633,9 +783,29 @@
       "sha256": "b998a8586a10baa8b2de5d5d8555ec91e811e4172b5cfdb926d5aced29153354"
     },
     {
+      "path": "dist/packages/domain/src/costImport.js",
+      "bytes": 8190,
+      "sha256": "39fe99ba0d683de3141b76d80f74b16feeac70a4b7ce60abe8f785b95cd1205b"
+    },
+    {
+      "path": "dist/packages/domain/src/costIntelligence.js",
+      "bytes": 12795,
+      "sha256": "b44193244d10562c01b508f1b9f679b49a5a3f7a02c1045f0e6c053b8553fa62"
+    },
+    {
+      "path": "dist/packages/domain/src/costIntelligenceExt.js",
+      "bytes": 29587,
+      "sha256": "0c13fe3e1769379d92b33862a54d884c91afac753698514f489fdde1ae99a730"
+    },
+    {
       "path": "dist/packages/domain/src/costModel.js",
       "bytes": 8196,
       "sha256": "a84f2f073648521bf3d86803ca0683914fc728efa17b82a176c25a0819942a44"
+    },
+    {
+      "path": "dist/packages/domain/src/costOps.js",
+      "bytes": 3824,
+      "sha256": "7a2cdf6ba70174252491833525bb08904475368a4b34e81f103dfa038c4f88f1"
     },
     {
       "path": "dist/packages/domain/src/devices.js",
@@ -653,14 +823,24 @@
       "sha256": "e0f796391adae90d8b1492963f5eef28e841d669e8b4f02742f04d0e6d572257"
     },
     {
+      "path": "dist/packages/domain/src/factoryMap.js",
+      "bytes": 3098,
+      "sha256": "4996c6437e931ab509286c3650792899185b364c6d50869364cecf06dfce5964"
+    },
+    {
       "path": "dist/packages/domain/src/gecko.js",
       "bytes": 10349,
       "sha256": "fbf290ca72b65977796169e0b8363722e4144098343a94954a4cbba4337d359d"
     },
     {
+      "path": "dist/packages/domain/src/homeLayout.js",
+      "bytes": 14992,
+      "sha256": "db4218203696017a15c1712fb437beb28504ce720d4e3f6314bff13483b868da"
+    },
+    {
       "path": "dist/packages/domain/src/index.js",
-      "bytes": 1239,
-      "sha256": "855fa5d47d595d6132fce4ce55885b8f1b4d6190410d2da5cad31980c0df1cff"
+      "bytes": 1551,
+      "sha256": "6e1b6fc7e9906cb69a3581e5683a66bb4ab5964c8af0c89928c98782624eaecf"
     },
     {
       "path": "dist/packages/domain/src/intelligence.js",
@@ -678,6 +858,11 @@
       "sha256": "08161dd520a4d8b6182f6db055d72279493938cca6aaa87d013cf7180f48009d"
     },
     {
+      "path": "dist/packages/domain/src/liveKpi.js",
+      "bytes": 2311,
+      "sha256": "6e072f1155bcd08c8f7b8c05add845b4b3d7e83d369738721d2e25bbc8099359"
+    },
+    {
       "path": "dist/packages/domain/src/machineState.js",
       "bytes": 1636,
       "sha256": "8af96319bb9b20cb8d12b4f3b0b12e5df75897d869d89d3c0732958903a82e22"
@@ -686,6 +871,16 @@
       "path": "dist/packages/domain/src/maintenance.js",
       "bytes": 10534,
       "sha256": "aa7f3da933ba4c32546fb1b4f33b950105768a8ac3d9b841b1070e283fd5c608"
+    },
+    {
+      "path": "dist/packages/domain/src/managementIntel.js",
+      "bytes": 9179,
+      "sha256": "2371e37140ea21763163c5b76d33a5c9b7b34a1be41ca21e73d6b024b276593c"
+    },
+    {
+      "path": "dist/packages/domain/src/managementKpiCatalog.js",
+      "bytes": 12485,
+      "sha256": "c6fedd13439434753af6983a5f7133e75659aac1f8a8c65e3cfd34199965bfec"
     },
     {
       "path": "dist/packages/domain/src/oee.js",
@@ -706,6 +901,11 @@
       "path": "dist/packages/domain/src/passport.js",
       "bytes": 4575,
       "sha256": "ecf750abd8df8823db5847bf7688f605bd70d1091025119abc3b7890a86b014c"
+    },
+    {
+      "path": "dist/packages/domain/src/peopleCapacity.js",
+      "bytes": 2157,
+      "sha256": "7ec1620fe767cea13000ba06912b718bb990c2bc1259132f6a8ae6951a068f62"
     },
     {
       "path": "dist/packages/domain/src/personnel.js",
@@ -788,6 +988,11 @@
       "sha256": "267f2ecf4e30db36cc9f6c14b9c029a76ab677c68e1317335294287283f00678"
     },
     {
+      "path": "dist/packages/domain/src/temporal.js",
+      "bytes": 13368,
+      "sha256": "61b5a7a3c9c9e7335ff93af0daa940bd8e3b8b0eeeebde8bdbd830b8386fc963"
+    },
+    {
       "path": "dist/packages/domain/src/toolroom.js",
       "bytes": 6569,
       "sha256": "c100503e5293a58c3053039e67a1eb109bb0f08ae78d5d5841bb851c053ec3e1"
@@ -796,6 +1001,11 @@
       "path": "dist/packages/domain/src/workOrder.js",
       "bytes": 3631,
       "sha256": "a34e431f9ce629914a42a5b9e94894d76202a9196dcf9c1a3c4b44d492ffa9a9"
+    },
+    {
+      "path": "dist/packages/domain/src/xlsxRead.js",
+      "bytes": 7102,
+      "sha256": "ce8566c89d355215453c08dfdf53db14974809e23bdf3dd8f7ede2ac3b71bb79"
     },
     {
       "path": "dist/packages/ui/src/badge.js",
@@ -844,47 +1054,8 @@
     },
     {
       "path": "sw.js",
-      "bytes": 1694,
-      "sha256": "538dab8e158045807462d6a9595f76efa14cdf8cd281c80688542c6f6e4feb62"
+      "bytes": 1938,
+      "sha256": "1c200c5f0b618c2feeaebdaf65834ff7b390c9b7424ae030debcc17cdb0f6c36"
     }
-  ],
-  "verification": {
-    "regression": {
-      "headCommit": "cecd7decd935b23b0cc26c38e131130a6ba5a6ad",
-      "testFiles": 125,
-      "filesWithSummaryLine": 121,
-      "passed": 1044,
-      "failed": 0,
-      "runnerExit": 0,
-      "classification": {
-        "PASS": "all",
-        "FLAKY": 0,
-        "FAIL": 0,
-        "BLOCKED": 0
-      },
-      "note": "full run on this exact HEAD; DB e2e ran against local replica, never production"
-    },
-    "acceptanceMatrix": {
-      "routes": 40,
-      "WORKING": 31,
-      "PARTIAL": 7,
-      "BLOCKED": 1,
-      "DEFERRED": 1,
-      "ERROR": 0,
-      "basis": "WORKING = screen-specific function test (mock backend or local replica); no live-data verification",
-      "doc": "docs/ACCEPTANCE_MATRIX.md"
-    },
-    "knownBlockers": [
-      "Migration 0071-0073 and operator-login not deployed: Puantaj shows Kurulum bekleniyor; operator PIN/badge section blocked",
-      "Duplicate PENDING commercial approval request is NOT prevented by the server (needs unique partial index migration, owner approval); UI only warns",
-      "General ranking has no safe server view (BLOCKED)"
-    ],
-    "replaces": {
-      "liveCommit": "f42c9f0f292b273b56382491430604c85de8af5b",
-      "liveFileCount": 157
-    },
-    "changedFiles": 26,
-    "addedFiles": 11,
-    "configJsIncluded": false
-  }
+  ]
 }

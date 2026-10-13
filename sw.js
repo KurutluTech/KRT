@@ -18,6 +18,8 @@ self.addEventListener('fetch', (event) => {
   const req = event.request;
   const url = new URL(req.url);
   if (req.method !== 'GET' || url.origin !== self.location.origin) return; // network only
+  // Release 005: even when the API is served from the SAME origin (reverse proxy / local test shim) business data must never be cached or served stale offline.
+  if (/\/(rest|auth|functions|storage|realtime)\/v1\//.test(url.pathname)) return;
   // network first (fresh code when online), cache fallback (shell works offline)
   event.respondWith(
     fetch(req)
