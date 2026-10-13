@@ -74,30 +74,32 @@ export async function renderPurchasingScreen(container, deps, banner) {
             loadError)) : (h(Fragment, null,
             h("div", { class: "panel" },
                 h("h2", null, "Sat\u0131nalma sipari\u015Fleri"),
-                h("table", { "data-testid": "purchase-orders-table" },
-                    h("tbody", { "data-testid": "purchase-orders-tbody" }, orders.map((po) => (h("tr", { "data-testid": "po-row", "data-po-id": po.id },
-                        h("td", null,
-                            h("span", { class: `pill ${(PO_TR[po.status] ?? ['', ''])[1]}`, "data-testid": "po-status", "data-code": po.status }, (PO_TR[po.status] ?? [po.status])[0])),
-                        h("td", null,
-                            po.status === 'DRAFT'
-                                ? h('button', { type: 'button', class: 'primary', 'data-testid': 'submit-po-btn', 'data-po-id': po.id, onClick: () => handleSubmit(po.id) }, 'Onaya Gönder')
-                                : null,
-                            po.status === 'SUBMITTED'
-                                ? h('button', { type: 'button', class: 'okb', 'data-testid': 'approve-po-btn', 'data-po-id': po.id, onClick: () => handleApprove(po.id) }, 'Onayla')
-                                : null,
-                            po.status === 'APPROVED'
-                                ? h('button', { type: 'button', class: 'primary', 'data-testid': 'send-po-btn', 'data-po-id': po.id, onClick: () => handleSend(po.id) }, 'Tedarikçiye Gönder')
-                                : null)))))),
+                h("div", { style: "overflow-x:auto;max-width:100%" },
+                    h("table", { "data-testid": "purchase-orders-table" },
+                        h("tbody", { "data-testid": "purchase-orders-tbody" }, orders.map((po) => (h("tr", { "data-testid": "po-row", "data-po-id": po.id },
+                            h("td", null,
+                                h("span", { class: `pill ${(PO_TR[po.status] ?? ['', ''])[1]}`, "data-testid": "po-status", "data-code": po.status }, (PO_TR[po.status] ?? [po.status])[0])),
+                            h("td", null,
+                                po.status === 'DRAFT'
+                                    ? h('button', { type: 'button', class: 'primary', 'data-testid': 'submit-po-btn', 'data-po-id': po.id, onClick: () => handleSubmit(po.id) }, 'Onaya Gönder')
+                                    : null,
+                                po.status === 'SUBMITTED'
+                                    ? h('button', { type: 'button', class: 'okb', 'data-testid': 'approve-po-btn', 'data-po-id': po.id, onClick: () => handleApprove(po.id) }, 'Onayla')
+                                    : null,
+                                po.status === 'APPROVED'
+                                    ? h('button', { type: 'button', class: 'primary', 'data-testid': 'send-po-btn', 'data-po-id': po.id, onClick: () => handleSend(po.id) }, 'Tedarikçiye Gönder')
+                                    : null))))))),
                 orders.length === 0 ? h("div", { class: "empty", "data-testid": "po-empty" }, "Hen\u00FCz sat\u0131nalma sipari\u015Fi yok.") : null),
             h("div", { class: "panel" },
                 h("h2", null, "Sipari\u015F kalemleri / mal kabul"),
-                h("table", { "data-testid": "po-lines-table" },
-                    h("tbody", { "data-testid": "po-lines-tbody" }, lines.map((line) => (h("tr", { "data-testid": "po-line-row", "data-line-id": line.id },
-                        h("td", { "data-testid": "line-material" }, line.materialCode),
-                        h("td", { "data-testid": "line-qty-ordered" }, String(line.qtyOrdered)),
-                        h("td", { "data-testid": "line-qty-received" }, String(line.qtyReceived)),
-                        h("td", null, receiveInputFor(line.id)),
-                        h("td", null, h('button', { type: 'button', class: 'okb', 'data-testid': 'receive-btn', 'data-line-id': line.id, onClick: () => handleReceive(line.id) }, 'Mal Kabul Et'))))))),
+                h("div", { style: "overflow-x:auto;max-width:100%" },
+                    h("table", { "data-testid": "po-lines-table" },
+                        h("tbody", { "data-testid": "po-lines-tbody" }, lines.map((line) => (h("tr", { "data-testid": "po-line-row", "data-line-id": line.id },
+                            h("td", { "data-testid": "line-material" }, line.materialCode),
+                            h("td", { "data-testid": "line-qty-ordered" }, String(line.qtyOrdered)),
+                            h("td", { "data-testid": "line-qty-received" }, String(line.qtyReceived)),
+                            h("td", null, receiveInputFor(line.id)),
+                            h("td", null, h('button', { type: 'button', class: 'okb', 'data-testid': 'receive-btn', 'data-line-id': line.id, onClick: () => handleReceive(line.id) }, 'Mal Kabul Et')))))))),
                 lines.length === 0 ? h("div", { class: "empty", "data-testid": "po-lines-empty" }, "Mal kabul edilecek kalem yok.") : null)))));
     mount(container, screen);
 }

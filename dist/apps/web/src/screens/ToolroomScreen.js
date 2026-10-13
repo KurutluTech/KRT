@@ -4,7 +4,7 @@
 import { h, Fragment, mount } from '../../../../packages/ui/src/h.js';
 import { computeToolWearPercent } from '../../../../packages/domain/src/toolroom.js';
 import { errorText as sharedErrorText } from '../errorText.js';
-import { DS_CSS, kpi } from '../ds.js';
+import { DS_CSS } from '../ds.js';
 function errorText(err) {
     return sharedErrorText(err);
 }
@@ -71,10 +71,6 @@ export async function renderToolroomScreen(container, deps, banner) {
         loadError ? (h("div", { class: "banner error", "data-testid": "toolroom-load-error" },
             "Y\u00FCklenemedi: ",
             loadError)) : (h(Fragment, null,
-            h("div", { class: "kpis" },
-                kpi('DOLAPTA', String(cab)),
-                kpi('MAKİNEDE', String(mnt)),
-                kpi('AŞINMA ≥ %80', String(worn))),
             h("div", { class: "panel", "data-testid": "tools-table" },
                 h("h2", null, "Tak\u0131m envanteri"),
                 h("div", { "data-testid": "tools-tbody" },

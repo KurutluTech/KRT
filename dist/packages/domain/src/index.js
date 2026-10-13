@@ -52,3 +52,5 @@ export * from './managementIntel';
 export * from './peopleCapacity';
 export * from './performanceCenter';
 export * from './departmentCockpit';
+export * from './departmentHome';
+export * from './idleSession';
