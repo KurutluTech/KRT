@@ -66,7 +66,7 @@ export function createHeader(o) {
         el,
         setChips(live, pulse) {
             const host = el.querySelector('[data-testid="app-header-chips"]');
-            host.replaceChildren(...(live ? [h('a', { class: 'chip live', href: '#/canli', 'data-testid': 'app-live-link' }, h('i', {}), 'KMI LIVE')] : []), ...(pulse ? [h('a', { class: 'chip pulse', href: '#/komuta', 'data-testid': 'app-pulse-link' }, 'PULSE')] : []));
+            host.replaceChildren(...(live ? [h('a', { class: 'chip live', href: '#/canli', 'data-testid': 'app-live-link' }, h('i', {}), 'KMI LIVE')] : []), ...(pulse ? [h('a', { class: 'chip pulse', href: '#/komuta', 'data-testid': 'app-pulse-link' }, 'Performans')] : []));
         },
         setIdentity(id) {
             const name = id.name || o.initialName;

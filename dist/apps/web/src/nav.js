@@ -31,56 +31,62 @@ export const ICON_PATHS = {
     'chevrons-left': 'M12 6l-6 6 6 6M19 6l-6 6 6 6',
     'chevrons-right': 'M5 6l6 6-6 6M12 6l6 6-6 6',
     logout: 'M10 4H5v16h5M15 8l4 4-4 4M19 12H9',
+    // CNC / shop-floor glyphs: spindle with end mill, machine with door + spindle, gauge, order clipboard
+    spindle: 'M9 3h6v4H9zM10.5 7v3h3V7M12 10v8.5M10.2 12.5l3.6 1.2M10.2 15.5l3.6 1.2M12 21l-1.2-2.5h2.4z',
+    gauge: 'M4.5 17a8.5 8.5 0 1 1 15 0M12 17l4-5M6.5 17h1.5M16 17h1.5M12 8.5V10M4 20.5h16',
+    clipboard: 'M8 4h8v3H8zM6 5.5h2M16 5.5h2M6 5.5V21h12V5.5M9 11h6M9 15h6',
+    cnc: 'M3.5 20.5V6.5h17v14zM3.5 10h17M7 13.5h6v4.5H7zM16 13.5v4.5M12 3v3.5M10.2 3h3.6',
 };
 /** THE navigation tree: 15 workspaces, 44 routes. The sidebar, the drawer, the home page and the role tests are all built from this one list
  *  (there is no second menu). Whether a user sees an entry is decided by access.ts (canOpen); the server decides for real. */
 export const NAV_TREE = [
-    { id: 'pc', title: 'PERFORMANCE CENTER', icon: 'grid', items: [
+    { id: 'pc', short: 'Performans', title: 'PERFORMANCE CENTER', icon: 'grid', items: [
             { path: '/', label: 'Ana Sayfa', icon: 'home' },
-            { path: '/komuta', label: 'Komuta · PULSE', icon: 'grid' },
+            { path: '/komuta', label: 'Performance Center', icon: 'grid' },
             { path: '/canli', label: 'KMI LIVE', icon: 'factory' },
             { path: '/oee', label: 'Eğilim · OEE', icon: 'chart' },
             { path: '/yonetim', label: 'Kararlar (Yönetim Zekâsı)', icon: 'chart' },
+            { path: '/onaylar', label: 'Onaylar', icon: 'shield' },
         ] },
-    { id: 'order', title: 'MÜŞTERİ & SİPARİŞ', icon: 'truck', items: [
+    { id: 'order', short: 'Sipariş', title: 'MÜŞTERİ & SİPARİŞ', icon: 'clipboard', items: [
             { path: '/siparisler', label: 'Siparişler', icon: 'truck' },
             { path: '/katalog', label: 'Katalog', icon: 'book' },
         ] },
-    { id: 'prod', title: 'ÜRETİM', icon: 'factory', items: [
+    { id: 'prod', short: 'Üretim', title: 'ÜRETİM', icon: 'cnc', items: [
             { path: '/operator', label: 'Benim İşlerim', icon: 'user' },
             { path: '/gorevler', label: 'Görev Zemini', icon: 'tasks' },
             { path: '/is-emirleri', label: 'İş Emirleri', icon: 'factory' },
             { path: '/terminal', label: 'Makine Terminali', icon: 'chip' },
             { path: '/tara', label: 'QR / Barkod', icon: 'scan' },
         ] },
-    { id: 'plan', title: 'ÜRETİM PLANLAMA', icon: 'layers', items: [
+    { id: 'plan', short: 'Planlama', title: 'ÜRETİM PLANLAMA', icon: 'layers', items: [
             { path: '/planlama', label: 'Üretim Planlama', icon: 'layers' },
         ] },
-    { id: 'cam', title: 'CAM & MÜHENDİSLİK', icon: 'gear', items: [
+    { id: 'cam', short: 'CAM', title: 'CAM & MÜHENDİSLİK', icon: 'gear', items: [
             { path: '/muhendislik', label: 'CAM / Programlama', icon: 'gear' },
             { path: '/rota', label: 'Rota / Operasyon', icon: 'link' },
         ] },
-    { id: 'tool', title: 'TAKIMHANE', icon: 'wrench', items: [
+    { id: 'tool', short: 'Takımhane', title: 'TAKIMHANE', icon: 'spindle', items: [
             { path: '/takimhane', label: 'Takım Odası', icon: 'wrench' },
         ] },
-    { id: 'qc', title: 'KALİTE & METROLOJİ', icon: 'shield', items: [
+    { id: 'qc', short: 'Kalite', title: 'KALİTE & METROLOJİ', icon: 'shield', items: [
             { path: '/kalite', label: 'Kalite / Metroloji', icon: 'shield' },
             { path: '/tahsis', label: 'TAHSİS (ölçü düzeltme)', icon: 'tasks' },
         ] },
-    { id: 'maint', title: 'BAKIM', icon: 'wrench', items: [
+    { id: 'maint', short: 'Bakım', title: 'BAKIM', icon: 'gauge', items: [
             { path: '/bakim', label: 'Bakım', icon: 'wrench' },
         ] },
-    { id: 'wh', title: 'DEPO & STOK', icon: 'box', items: [
+    { id: 'wh', short: 'Depo', title: 'DEPO & STOK', icon: 'box', items: [
             { path: '/depo', label: 'Depo / Stok', icon: 'box' },
         ] },
-    { id: 'buy', title: 'SATINALMA', icon: 'cart', items: [
+    { id: 'buy', short: 'Satınalma', title: 'SATINALMA', icon: 'cart', items: [
             { path: '/satinalma', label: 'Satınalma / Mal Kabul', icon: 'cart' },
             { path: '/talepler', label: 'Satınalma Talepleri', icon: 'box' },
         ] },
-    { id: 'ship', title: 'LOJİSTİK & SEVKİYAT', icon: 'truck', items: [
+    { id: 'ship', short: 'Sevkiyat', title: 'LOJİSTİK & SEVKİYAT', icon: 'truck', items: [
             { path: '/sevkiyat', label: 'Sevkiyat / Lojistik', icon: 'truck' },
         ] },
-    { id: 'hr', title: 'İNSAN KAYNAKLARI', icon: 'users', items: [
+    { id: 'hr', short: 'İK', title: 'İNSAN KAYNAKLARI', icon: 'users', items: [
             { path: '/personel', label: 'Personel / İK', icon: 'users' },
             { path: '/puantaj', label: 'Puantaj & Prim Havuzu', icon: 'calc' },
             { path: '/zirvedekiler', label: 'Zirvedekiler', icon: 'badge' },
@@ -90,19 +96,19 @@ export const NAV_TREE = [
             { path: '/giris-cikislarim', label: 'Giriş-çıkışlarım', icon: 'clock', personal: true },
             { path: '/rozetlerim', label: 'Rozetler / Yetenekler', icon: 'badge', personal: true },
         ] },
-    { id: 'intel', title: 'DİJİTAL ZEKÂ', icon: 'bolt', items: [
+    { id: 'intel', short: 'Zekâ', title: 'DİJİTAL ZEKÂ', icon: 'bolt', items: [
             { path: '/zeka', label: 'KMI Zekâ', icon: 'bolt' },
             { path: '/raporlar', label: 'Raporlama', icon: 'chart' },
             { path: '/dokumanlar', label: 'Dokümanlar', icon: 'file' },
             { path: '/gecmis', label: 'Olay Geçmişi', icon: 'clock' },
         ] },
-    { id: 'fin', title: 'FİNANS & MALİYET ZEKÂSI', icon: 'calc', items: [
+    { id: 'fin', short: 'Finans', title: 'FİNANS & MALİYET ZEKÂSI', icon: 'calc', items: [
             { path: '/alacaklar', label: 'Muhasebe', icon: 'calc' },
             { path: '/onay-kuyrugu', label: 'Muhasebe Kuyruğu', icon: 'tasks' },
             { path: '/maliyet', label: 'Maliyet Zekâsı', icon: 'chart' },
             { path: '/ekonomi', label: 'Ekonomi & Kararlar', icon: 'lock' },
         ] },
-    { id: 'it', title: 'BT & SİSTEM YÖNETİMİ', icon: 'chip', items: [
+    { id: 'it', short: 'BT', title: 'BT & SİSTEM YÖNETİMİ', icon: 'chip', items: [
             { path: '/cihazlar', label: 'Cihaz Entegrasyonları', icon: 'chip' },
             { path: '/ana-veri-aktarim', label: 'Ana Veri Aktarımı', icon: 'upload' },
             { path: '/personel-aktarim', label: 'Personel Aktarımı', icon: 'upload' },
@@ -121,17 +127,19 @@ export function isOperatorOnly(roles) { return roles.length > 0 && roles.every((
 export function simpleNav(tree, preferred) {
     const byPath = new Map(tree.flatMap((g) => g.items).map((i) => [i.path, i]));
     const items = preferred.map((p) => byPath.get(p)).filter((i) => !!i);
-    return items.length ? [{ id: 'mine', title: 'BENİM İŞLERİM', icon: 'user', items }] : tree;
+    return items.length ? [{ id: 'mine', short: 'Benim', title: 'BENİM İŞLERİM', icon: 'user', items }] : tree;
 }
 /** Remembered "where I was": the last workspace and favourite screens (per browser; never a permission). */
 export const NAV_STATE_KEY = 'kmi-nav-state-v1';
+export const RECENT_MAX = 6;
 export function readNavState(storage) {
     try {
         const v = JSON.parse(storage?.getItem(NAV_STATE_KEY) ?? 'null');
-        return { last: typeof v?.last === 'string' ? v.last : null, favorites: Array.isArray(v?.favorites) ? v.favorites.filter((x) => typeof x === 'string' && x in NAV_ITEM_BY_PATH).slice(0, 8) : [] };
+        const clean = (a, n) => Array.isArray(a) ? a.filter((x) => typeof x === 'string' && x in NAV_ITEM_BY_PATH).slice(0, n) : [];
+        return { last: typeof v?.last === 'string' ? v.last : null, favorites: clean(v?.favorites, 8), recent: clean(v?.recent, RECENT_MAX) };
     }
     catch {
-        return { last: null, favorites: [] };
+        return { last: null, favorites: [], recent: [] };
     }
 }
 export function nextNavState(prev, ev) {
@@ -139,7 +147,18 @@ export function nextNavState(prev, ev) {
         ? (prev.favorites.includes(ev.toggleFavorite) ? prev.favorites.filter((f) => f !== ev.toggleFavorite) : [...prev.favorites, ev.toggleFavorite].slice(-8))
         : prev.favorites;
     const ws = ev.visit ? WORKSPACE_OF_PATH[ev.visit] : undefined;
-    return { last: ws && ws !== 'pc' ? ws : prev.last, favorites };
+    // "recently used": the home page is not a destination worth remembering; a screen moves to the front, duplicates collapse
+    const recent = ev.visit && ev.visit !== '/' && ev.visit in NAV_ITEM_BY_PATH ? [ev.visit, ...prev.recent.filter((r) => r !== ev.visit)].slice(0, RECENT_MAX) : prev.recent;
+    return { last: ws && ws !== 'pc' ? ws : prev.last, favorites, recent };
+}
+/** Breadcrumb for a screen: workspace › page (the home page has none). */
+export function breadcrumbOf(path) {
+    const ws = WORKSPACE_OF_PATH[path];
+    const item = NAV_ITEM_BY_PATH[path];
+    if (!ws || !item || path === '/')
+        return null;
+    const g = NAV_TREE.find((x) => x.id === ws);
+    return { workspace: g.title, workspaceId: g.id, page: item.label };
 }
 /** Inline SVG markup for an icon (static, trusted strings only). */
 export function iconSvg(name, size = 20) {

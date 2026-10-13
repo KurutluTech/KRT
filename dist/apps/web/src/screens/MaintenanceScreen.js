@@ -4,7 +4,7 @@
 // (kmi_next.machine_eligibility / domain machineEligibility), never decided on the screen.
 import { h, Fragment, mount } from '../../../../packages/ui/src/h.js';
 import { errorText as sharedErrorText } from '../errorText.js';
-import { DS_CSS, kpi } from '../ds.js';
+import { DS_CSS } from '../ds.js';
 import { formatStamp } from '../../../../packages/domain/src/temporal.js';
 import { passportHref } from '../passport/registry.js';
 function errorText(err) {
@@ -150,12 +150,6 @@ export async function renderMaintenanceScreen(container, deps, banner) {
         loadError ? (h("div", { class: "banner error", "data-testid": "maintenance-load-error" },
             "Y\u00FCklenemedi: ",
             loadError)) : (h(Fragment, null,
-            h("div", { class: "kpis" },
-                kpi('ÜRETİMDE / HAZIR', String(n('UP'))),
-                kpi('BEKLEMEDE', String(n('HOLD'))),
-                kpi('ARIZA / DURUŞ', String(n('DOWN'))),
-                kpi('BAKIMDA', String(n('MAINTENANCE'))),
-                kpi('AÇIK BAKIM KAYDI', String(openTickets))),
             h("div", { class: "panel", "data-testid": "machines-table" },
                 h("h2", null, "Makineler"),
                 h("div", { "data-testid": "machines-tbody" },

@@ -31,12 +31,16 @@ const attempt = async (f) => { if (!f)
 catch {
     return null;
 } };
-export async function loadCockpit(id, src, nowIso) {
+/** Reads every source the department needs ONCE (a failed read stays null → UNKNOWN, never 0); cockpit and department home share the result. */
+export async function loadCockpitInput(id, src, nowIso) {
     const keys = NEEDS[id];
     const vals = await Promise.all(keys.map((k) => attempt(src[k])));
     const input = { nowIso, snapshot: null };
     keys.forEach((k, i) => { input[k] = vals[i]; });
-    return buildCockpit(id, input);
+    return input;
+}
+export async function loadCockpit(id, src, nowIso) {
+    return buildCockpit(id, await loadCockpitInput(id, src, nowIso));
 }
 const CSS = `
 .kc{--hair:#1a2a46;--tx:#e9eef7;--mu:#8da0bd;--gold:#c9a24a;--ok:#5fd0a0;--risk:#e8b04a;--crit:#f0645a;--live:#5cc8e6;--unk:#7d8ba3;color:var(--tx);font-family:system-ui,-apple-system,"Segoe UI",sans-serif;font-size:13.5px;margin:0 0 18px;border:1px solid var(--hair);border-radius:14px;background:linear-gradient(180deg,#0f1a30,#0b1425);position:relative}

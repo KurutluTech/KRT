@@ -20,6 +20,7 @@ import { renderOperatorHomeScreen } from './screens/OperatorHomeScreen.js';
 import { createOperatorHomeApi } from './operatorHomeApi.js';
 import { createTerminalApi } from './terminalApi.js';
 import { withCockpit, liveCockpitSources } from './screens/DepartmentCockpit.js';
+import { renderDepartmentHome } from './screens/DepartmentHomeScreen.js';
 import { COCKPIT_OF_PATH } from '../../../packages/domain/src/departmentCockpit.js';
 import { renderPerformanceCenter } from './screens/PerformanceCenterScreen.js';
 import { createPerformanceCenterSources } from './performanceCenterApi.js';
@@ -126,8 +127,13 @@ import { createHeader, pickShortcuts } from './header.js';
 import { renderCockpit } from './homeCockpit.js';
 import { loadExtras } from './homeData.js';
 import { homeCardsFor } from '../../../packages/domain/src/homeLayout.js';
-import { NAV_ITEM_BY_PATH, NAV_STATE_KEY, iconSvg, isOperatorOnly, nextNavState, readNavState, simpleNav, visibleNav } from './nav.js';
+import { startIdleGuard } from './idleGuard.js';
+import { idleGuardApplies, resolveDeviceMode } from '../../../packages/domain/src/idleSession.js';
+import { NAV_TREE, NAV_ITEM_BY_PATH, WORKSPACE_OF_PATH, breadcrumbOf, NAV_STATE_KEY, iconSvg, isOperatorOnly, nextNavState, readNavState, simpleNav, visibleNav } from './nav.js';
+const NAV_TREE_FIRST = Object.fromEntries(NAV_TREE.map((g) => [g.id, g.items.find((i) => i.path !== '/')?.path ?? g.items[0].path]));
 const SESSION_KEY = 'kmi-next.session';
+const OPERATOR_FLAG_KEY = 'kmi-next.operatorSession'; // set only by a Sicil No + PIN sign-in: that session is a shared-terminal session (60 s inactivity rule)
+const DEVICE_MODE_KEY = 'kmiDeviceMode';
 function loadSession() {
     try {
         const raw = sessionStorage.getItem(SESSION_KEY);
@@ -141,8 +147,10 @@ function saveSession(s) {
     try {
         if (s)
             sessionStorage.setItem(SESSION_KEY, JSON.stringify(s));
-        else
+        else {
             sessionStorage.removeItem(SESSION_KEY);
+            sessionStorage.removeItem(OPERATOR_FLAG_KEY);
+        }
     }
     catch {
         /* private mode: session lives only in memory for this page */
@@ -251,7 +259,7 @@ export const ROUTES = [
     { path: '/sevkiyat', label: 'Sevkiyat / Lojistik', group: 'Saha', inMenu: true, render: (el, c, s) => renderDepartmentScreen(el, createDepartmentApi(c, s, createWorkOrderHubApi(c, s)), 'SEVKIYAT') },
     { path: '/depo', label: 'Depo / Stok / Malzeme', group: 'Satınalma / Depo', inMenu: true, render: (el, c, s) => renderDepartmentScreen(el, createDepartmentApi(c, s, createWorkOrderHubApi(c, s)), 'DEPO') },
     { path: '/takimhane', label: 'Takımhane', group: 'Saha', inMenu: true, render: (el, c, s) => renderToolroomScreen(el, { api: createToolroomApi(c, s) }) },
-    { path: '/komuta', label: 'Performance Center · Komuta · PULSE', group: 'Yönetim', inMenu: true, render: (el, c, s, q) => renderPerformanceCenter(el, createPerformanceCenterSources(c, s), { today: istanbulToday(), dept: q.get('birim'), refreshMs: 60_000 }) },
+    { path: '/komuta', label: 'Performance Center', group: 'Yönetim', inMenu: true, render: (el, c, s, q) => renderPerformanceCenter(el, createPerformanceCenterSources(c, s), { today: istanbulToday(), dept: q.get('birim'), refreshMs: 60_000 }) },
     { path: '/rota', label: 'Rota / Operasyonlar', group: 'Yönetim', inMenu: true, render: (el, c, s) => renderRoutingScreen(el, createRoutingApi(c, s)) },
     { path: '/planlama', label: 'Üretim Planlama', group: 'Yönetim', inMenu: true, render: (el, c, s) => renderPlanningScreen(el, createPlanningApi(c, s), { today: istanbulToday(), days: 5 }) },
     { path: '/oee', label: 'OEE / KPI', group: 'Yönetim', inMenu: true, render: (el, c, s) => renderOeeScreen(el, createOeeApi(c, s), { from: addDays(istanbulToday(), -6), to: istanbulToday(), group: 'MACHINE' }) },
@@ -262,6 +270,20 @@ export const ROUTES = [
     { path: '/onay-kuyrugu', label: 'Muhasebe Kuyruğu (ticari onay)', group: 'Yönetim', inMenu: true, render: (el, c, s) => renderAccountingQueueScreen(el, createAccountingQueueApi(c, s)) },
     { path: '/alacaklar', label: 'Alacaklar & Vade', group: 'Yönetim', inMenu: true, render: (el, c, s) => renderReceivablesScreen(el, createReceivablesApi(c, s), { today: istanbulToday() }) },
     { path: '/tahsis', label: 'TAHSİS (ölçü düzeltme)', group: 'Saha', inMenu: true, render: (el, c, s) => renderTahsisScreen(el, createTahsisApi(c, s)) },
+    { path: '/departman', label: 'Departman Ana Ekranı', group: 'Diğer', inMenu: false, needs: ['d'], render: (el, c, s, q, a) => {
+            const g = NAV_TREE.find((x) => x.id === q.get('d'));
+            if (!g) {
+                mount(el, h('div', { class: 'shell-menu', 'data-testid': 'dept-unknown' }, 'Böyle bir departman yok.'));
+                return;
+            }
+            const items = g.items.filter((i) => i.path !== '/' && canOpen(i.path, a) && ROUTES.some((x) => x.path === i.path && x.inMenu));
+            if (!items.length) {
+                mount(el, h('div', { class: 'shell-menu kmi-closed', 'data-testid': 'app-closed' }, 'Bu departman rolünüze açık değil.'));
+                return;
+            }
+            return renderDepartmentHome(el, { icon, view: ['ozet', 'kayit', 'analitik'].find((v) => v === q.get('v')), group: g, items, src: liveCockpitSources(c, s), nowIso: new Date().toISOString() });
+        } },
+    { path: '/onaylar', label: 'Onaylar (Yönetim)', group: 'Yönetim', inMenu: true, render: (el, c, s, q, a) => renderManagementScreen(el, managementDeps(c, s, a), { tab: 'onaylar' }) },
     { path: '/yonetim', label: 'Yönetim Zekâsı (onaylar ve üst yönetim)', group: 'Yönetim', inMenu: true, render: (el, c, s, q, a) => renderManagementScreen(el, managementDeps(c, s, a), { tab: q.get('sekme') }) },
     { path: '/maliyet', label: 'Maliyet Zekâsı (yalnız ekonomik erişim)', group: 'Yönetim', inMenu: true, render: (el, c, s, q, a) => renderCostIntelligenceScreen(el, q.get('sekme') ?? 'live', { api: createCostOpsApi(c, s), access: a, today: istanbulToday(), nowMs: Date.now(), openTab: (t) => { location.hash = `#/maliyet?sekme=${t}`; }, download: downloadText }) },
     { path: '/ekonomi', label: 'Ekonomi & Kararlar (yalnız sahip)', group: 'Yönetim', inMenu: true, render: (el, c, s) => renderEconomicsScreen(el, createEconomicsApi(c, s), { from: addDays(istanbulToday(), -89), to: istanbulToday(), today: istanbulToday() }) },
@@ -334,6 +356,68 @@ export async function startApp(root, opts = {}) {
     }
     const client = opts.client ?? createKmiNextClient({ url: cfg.supabaseUrl, apiKey: cfg.anonKey });
     let session = loadSession();
+    // DEVICE CONTEXT for the 60 s inactivity sign-out: deployment config.js `deviceMode`, or a one-time setup link (?cihaz=kiosk|tablet|masaustu) remembered on this device. Never inferred from screen width.
+    const storedLocal = (() => { try {
+        return localStorage.getItem(DEVICE_MODE_KEY);
+    }
+    catch {
+        return null;
+    } })();
+    const device = resolveDeviceMode({ config: window.KMI_NEXT_CONFIG?.deviceMode, urlParam: new URLSearchParams(location.search).get('cihaz'), stored: storedLocal });
+    if (device.persist) {
+        try {
+            localStorage.setItem(DEVICE_MODE_KEY, device.persist);
+        }
+        catch { /* storage blocked: applies to this page load only */ }
+    }
+    const isOperatorSession = () => { try {
+        return sessionStorage.getItem(OPERATOR_FLAG_KEY) === '1';
+    }
+    catch {
+        return false;
+    } };
+    let idleGuard = null;
+    const withTimeout = (p, ms) => Promise.race([p, new Promise((r) => setTimeout(() => r(undefined), ms))]);
+    /** Ends THIS tab's session after inactivity (or because another tab of the device signed out). Local state is cleared first; audit + server sign-out are best-effort and time-boxed. */
+    const endSessionIdle = async (reason) => {
+        const ending = session;
+        try {
+            headerDispose?.();
+        }
+        catch { /* header not built yet */ }
+        session = null;
+        accessCache = null;
+        saveSession(null);
+        loginNotice = undefined;
+        expiredHandled = true;
+        if (ending) {
+            try {
+                await withTimeout(client.rpc('log_session_event', { p_kind: reason === 'IDLE' ? 'IDLE_SIGNOUT' : 'REMOTE_SIGNOUT', p_reason: reason }, ending), 2500);
+            }
+            catch { /* audit function not deployed / unreachable: the screen is closed anyway */ }
+            try {
+                await withTimeout(client.auth.signOut(ending), 3000);
+            }
+            catch { /* token may already be expired */ }
+        }
+        idleGuard = null;
+        location.replace(`${location.pathname}${location.search}#/`);
+        renderLogin(reason === 'IDLE' ? 'Hareketsizlik nedeniyle oturum kapatıldı. Kaydedilmemiş bir işlem varsa tamamlanmadı — yeniden giriş yapın.' : 'Bu cihazda oturum kapatıldı — yeniden giriş yapın.');
+    };
+    const ensureIdleGuard = () => {
+        if (idleGuard && !idleGuard.expired())
+            return;
+        if (!idleGuardApplies(device.mode, isOperatorSession()))
+            return;
+        idleGuard = startIdleGuard({ doc: document, win: window, storage: (() => { try {
+                return localStorage;
+            }
+            catch {
+                return null;
+            } })(), hasSession: () => session !== null && loadSession() !== null, onExpire: endSessionIdle });
+    };
+    const stopIdleGuard = (announce) => { if (announce)
+        idleGuard?.announce(); idleGuard?.dispose(); idleGuard = null; };
     // Silent JWT refresh keeps the stored session current; an unrenewable session ends cleanly (once) instead of looping on 401s.
     client.onSessionRefreshed = (s) => saveSession(s);
     let expiredHandled = false;
@@ -342,6 +426,7 @@ export async function startApp(root, opts = {}) {
         if (expiredHandled || !session)
             return;
         expiredHandled = true;
+        stopIdleGuard(false);
         try {
             headerDispose?.();
         }
@@ -407,6 +492,11 @@ export async function startApp(root, opts = {}) {
                 expiredHandled = false;
                 loginNotice = undefined;
                 saveSession(session);
+                try {
+                    if (mode === 'OPERATOR')
+                        sessionStorage.setItem(OPERATOR_FLAG_KEY, '1');
+                }
+                catch { /* private mode */ }
                 location.hash = '#/';
                 await route();
             }
@@ -421,7 +511,7 @@ export async function startApp(root, opts = {}) {
             ? [h('label', { for: 'kmi-login-sicil' }, 'Sicil numarası'), sicil, h('label', { for: 'kmi-login-pin' }, 'Kişisel PIN (6 rakam)'), pin,
                 h('details', { class: 'kmi-login-badge-opt' }, h('summary', {}, 'Rozet / QR ile giriş (isteğe bağlı)'), h('label', { for: 'kmi-login-badge' }, 'Rozet / QR'), badge),
                 h('p', { class: 'kmi-login-hint' }, 'Rozet tek başına giriş yaptırmaz; PIN gerekir. Paylaşılan tablette işiniz bitince Çıkış yapın.')]
-            : [h('label', { for: 'kmi-login-email' }, 'E-posta'), email, h('label', { for: 'kmi-login-password' }, 'Şifre'), pass]), h('button', { type: 'submit', 'data-testid': 'login-submit' }, 'Giriş'), dbBox))));
+            : [h('label', { for: 'kmi-login-email' }, 'E-posta'), email, h('label', { for: 'kmi-login-password' }, 'Şifre'), pass]), h('button', { type: 'submit', 'data-testid': 'login-submit' }, 'Giriş'), idleGuardApplies(device.mode, mode === 'OPERATOR') ? h('p', { class: 'kmi-login-hint', 'data-testid': 'login-idle-note' }, `${device.mode === 'DESKTOP' ? 'Operatör oturumu' : device.mode === 'KIOSK' ? 'Kiosk modu' : 'Tablet modu'}: 60 saniye hareketsizlikte oturum otomatik kapanır.`) : null, dbBox))));
         // Green ONLY after a real reachability answer from the auth service; never assumed.
         void client.health().then((ok) => {
             if (!dbBox.isConnected)
@@ -443,9 +533,11 @@ export async function startApp(root, opts = {}) {
         }
         if (!session)
             return renderLogin(loginNotice);
+        ensureIdleGuard();
         const { path, query } = parseHash(location.hash);
         const content = h('div', { 'data-testid': 'app-content' });
         const logout = async () => {
+            stopIdleGuard(true);
             try {
                 if (session)
                     await client.auth.signOut(session);
@@ -460,10 +552,23 @@ export async function startApp(root, opts = {}) {
             location.hash = '#/';
             renderLogin('Çıkış yapıldı.');
         };
+        const crumbEl = (p) => {
+            if (p === '/departman') {
+                const g = NAV_TREE.find((x) => x.id === new URLSearchParams(location.hash.split('?')[1] ?? '').get('d'));
+                if (!g)
+                    return null;
+                return h('nav', { class: 'kmi-crumb', 'aria-label': 'Konum', 'data-testid': 'app-breadcrumb' }, h('a', { href: '#/' }, 'Ana Sayfa'), h('span', { 'aria-hidden': 'true' }, '›'), h('b', { 'aria-current': 'page' }, g.title));
+            }
+            const bc = breadcrumbOf(p);
+            if (!bc)
+                return null;
+            const first = NAV_TREE_FIRST[bc.workspaceId];
+            return h('nav', { class: 'kmi-crumb', 'aria-label': 'Konum', 'data-testid': 'app-breadcrumb' }, h('a', { href: '#/' }, 'Ana Sayfa'), h('span', { 'aria-hidden': 'true' }, '›'), first ? h('a', { href: `#${first}`, 'data-testid': 'app-crumb-ws' }, bc.workspace) : h('span', {}, bc.workspace), h('span', { 'aria-hidden': 'true' }, '›'), h('b', { 'aria-current': 'page' }, bc.page));
+        };
         const collapsed0 = readCollapsed();
-        document.documentElement.style.setProperty('--kmi-side-w', collapsed0 ? '64px' : '260px');
-        const navHost = h('nav', { class: 'kmi-nav', 'data-testid': 'app-nav', 'aria-label': 'Modüller' });
-        const drawerNavHost = h('nav', { class: 'kmi-nav', 'data-testid': 'app-drawer-nav', 'aria-label': 'Modüller (menü)' });
+        document.documentElement.style.setProperty('--kmi-side-w', collapsed0 ? '92px' : '328px');
+        const navHost = h('div', { class: 'kmi-nav2', 'data-testid': 'app-nav' });
+        const drawerNavHost = h('div', { class: 'kmi-nav2 kmi-dw', 'data-testid': 'app-drawer-nav' });
         const bottomHost = h('nav', { class: 'kmi-bottom', 'data-testid': 'app-bottom-nav', 'aria-label': 'Hızlı gezinme' });
         const drawerBack = h('div', { class: 'kmi-drawer-back', 'data-testid': 'app-drawer' });
         const closeDrawer = () => { drawerBack.classList.remove('open'); menuBtn.setAttribute('aria-expanded', 'false'); };
@@ -477,12 +582,12 @@ export async function startApp(root, opts = {}) {
         } });
         drawerBack.append(h('aside', { class: 'kmi-drawer', id: 'kmi-drawer', role: 'dialog', 'aria-modal': 'true', 'aria-label': 'KMI menü' }, h('div', { class: 'kmi-side-head' }, h('a', { class: 'b', href: '#/', onClick: closeDrawer }, h('img', { src: './assets/kurutlu-k-symbol-white.png', alt: '' }), h('span', { class: 't' }, h('i', {}, 'KURUTLU'), h('b', {}, 'Performance Center'))), h('button', { type: 'button', class: 'kmi-side-collapse', 'aria-label': 'Menüyü kapat', onClick: closeDrawer }, '✕')), drawerNavHost));
         const sideEl = h('aside', { class: `kmi-side${collapsed0 ? ' collapsed' : ''}`, 'data-testid': 'app-sidebar', 'aria-label': 'Ana gezinme' }, h('div', { class: 'kmi-side-head' }, h('a', { class: 'b', href: '#/', 'data-testid': 'app-side-home', title: BRAND }, h('img', { src: './assets/kurutlu-k-symbol-white.png', alt: 'Kurutlu' }), h('span', { class: 't' }, h('i', {}, 'KURUTLU'), h('b', {}, 'Performance Center'))), h('button', { type: 'button', class: 'kmi-side-collapse', 'data-testid': 'app-side-collapse', 'aria-label': collapsed0 ? 'Menüyü genişlet' : 'Menüyü daralt', title: collapsed0 ? 'Genişlet' : 'Daralt',
-            onClick: () => { const now = !sideEl.classList.contains('collapsed'); sideEl.classList.toggle('collapsed', now); writeCollapsed(now); document.documentElement.style.setProperty('--kmi-side-w', now ? '64px' : '260px'); collBtn.setAttribute('aria-label', now ? 'Menüyü genişlet' : 'Menüyü daralt'); collBtn.replaceChildren(icon(now ? 'chevrons-right' : 'chevrons-left', 16)); } }, icon(collapsed0 ? 'chevrons-right' : 'chevrons-left', 16))), navHost);
+            onClick: () => { const now = !sideEl.classList.contains('collapsed'); sideEl.classList.toggle('collapsed', now); writeCollapsed(now); document.documentElement.style.setProperty('--kmi-side-w', now ? '92px' : '328px'); collBtn.setAttribute('aria-label', now ? 'Menüyü genişlet' : 'Menüyü daralt'); collBtn.replaceChildren(icon(now ? 'chevrons-right' : 'chevrons-left', 16)); } }, icon(collapsed0 ? 'chevrons-right' : 'chevrons-left', 16))), navHost);
         const collBtn = sideEl.querySelector('[data-testid="app-side-collapse"]');
         headerDispose?.();
         const header = createHeader({ brandTitle: BRAND, initialName: session.user.label ?? session.user.email ?? '', searchValue: path === '/ara' ? (query.get('q') ?? '') : '', menuBtn, onLogout: () => void logout() });
         headerDispose = header.dispose;
-        mount(root, h('div', { class: 'kmi-has-bottom' }, h('style', {}, SHELL_CSS), offlineBar(), h('a', { class: 'kmi-skip', href: '#kmi-main', onClick: (e) => { e.preventDefault(); document.getElementById('kmi-main')?.focus(); } }, 'İçeriğe geç'), sideEl, drawerBack, h('div', { class: 'kmi-main' }, header.el, h('main', { class: 'kmi-content', id: 'kmi-main', tabindex: '-1' }, content)), bottomHost));
+        mount(root, h('div', { class: 'kmi-has-bottom' }, h('style', {}, SHELL_CSS), offlineBar(), h('a', { class: 'kmi-skip', href: '#kmi-main', onClick: (e) => { e.preventDefault(); document.getElementById('kmi-main')?.focus(); } }, 'İçeriğe geç'), sideEl, drawerBack, h('div', { class: 'kmi-main' }, header.el, h('main', { class: 'kmi-content', id: 'kmi-main', tabindex: '-1' }, crumbEl(path), content)), bottomHost));
         const { value: access, failed: accessFailed } = await getAccess();
         {
             const live = canOpen('/canli', access), pulse = canOpen('/komuta', access);
@@ -512,66 +617,79 @@ export async function startApp(root, opts = {}) {
         navState = nextNavState(navState, { visit: path });
         saveNavState();
         const operatorSimple = isOperatorOnly(access.roles);
-        const favItems = navState.favorites.map((p) => NAV_ITEM_BY_PATH[p]).filter((i) => !!i && treeAll.some((g) => g.items.some((x) => x.path === i.path)));
-        const favGroup = favItems.length ? [{ id: 'fav', title: 'FAVORİLERİM', icon: 'badge', items: favItems }] : [];
         const navGroups = operatorSimple
             ? (() => {
                 const simple = simpleNav(treeAll, featuredPaths(access, treeAll.flatMap((g) => g.items.map((i) => i.path))));
                 const shown = new Set(simple.flatMap((g) => g.items.map((i) => i.path)));
                 return [...simple, ...treeAll.map((g) => ({ ...g, items: g.items.filter((i) => !shown.has(i.path)) })).filter((g) => g.items.length > 0)];
             })()
-            : [...favGroup, ...treeAll];
+            : treeAll;
         const navAllPaths = treeAll.flatMap((g) => g.items.map((i) => i.path));
         const navLink = (it, testid, onNav) => {
             const a = h('a', { href: `#${it.path}`, 'data-testid': testid, 'data-path': it.path, title: it.label, ...(it.path === path ? { 'aria-current': 'page' } : {}), ...(onNav ? { onClick: onNav } : {}) }, icon(it.icon), h('span', { class: 'nl' }, it.label));
             return a;
         };
-        // Department workspaces are collapsible; the open/closed choice is remembered per browser. The group holding the current screen is always open.
-        const NAV_CLOSED_KEY = 'kmi-nav-closed';
-        const readClosed = () => { try {
-            const v = JSON.parse(localStorage.getItem(NAV_CLOSED_KEY) ?? '[]');
-            return Array.isArray(v) ? v.filter((x) => typeof x === 'string') : [];
-        }
-        catch {
-            return [];
-        } };
-        const writeClosed = (v) => { try {
-            localStorage.setItem(NAV_CLOSED_KEY, JSON.stringify(v));
-        }
-        catch { /* private mode: not remembered */ } };
-        const fillNav = (host, itemTestId, onNav) => {
-            const closed = readClosed();
-            host.replaceChildren(...navGroups.flatMap((g, gi) => {
-                const links = g.items.map((it) => {
-                    const a = navLink(it, itemTestId, onNav);
-                    if (it.path === '/' || itemTestId !== 'app-nav-item')
-                        return a;
-                    const fav = navState.favorites.includes(it.path);
-                    const star = h('button', { type: 'button', class: 'nfav', 'data-testid': 'app-nav-fav', 'data-path': it.path, 'aria-pressed': String(fav), 'aria-label': fav ? `${it.label} favorilerden çıkar` : `${it.label} favorilere ekle`,
-                        onClick: () => { navState = nextNavState(navState, { toggleFavorite: it.path }); saveNavState(); void route(); } }, fav ? '★' : '☆');
-                    return h('div', { class: 'nrow' }, a, star);
-                });
-                const hasCurrent = g.items.some((i) => i.path === path);
-                // operator-simple: the short own-work list is open, the rest of the factory tree starts closed (still reachable)
-                const defaultClosed = operatorSimple && gi > 0 && !closed.includes(`open:${g.id}`);
-                const isClosed = !hasCurrent && (closed.includes(g.title) || defaultClosed);
-                const body = h('div', { class: 'grp-body', ...(isClosed ? { hidden: true } : {}) }, ...links);
-                const head = h('button', { type: 'button', class: 'lbl grp-head', 'data-testid': 'app-nav-group', 'data-ws': g.id, 'aria-expanded': String(!isClosed), onClick: () => {
-                        const nowClosed = !body.hidden ? true : false;
-                        body.hidden = nowClosed;
-                        head.setAttribute('aria-expanded', String(!nowClosed));
-                        const cur = readClosed().filter((t) => t !== g.title && t !== `open:${g.id}`);
-                        if (nowClosed)
-                            cur.push(g.title);
-                        else if (operatorSimple)
-                            cur.push(`open:${g.id}`);
-                        writeClosed(cur);
-                    } }, g.title);
-                return [h('div', { class: 'grp', 'data-group': g.title, 'data-ws': g.id }, head, body)];
-            }));
+        // ---- TWO-LEVEL NAVIGATION (owner directive, Release 007): a compact rail of the 15 workspaces + a panel with the pages of the SELECTED workspace only.
+        // Never 15 open groups. Favourites and recently used screens are virtual workspaces; tasks / approvals sit at the rail foot. Phones/tablets get a drawer that switches department.
+        const visibleItem = (p) => treeAll.some((g) => g.items.some((x) => x.path === p));
+        const favVirt = () => { const items = navState.favorites.map((p) => NAV_ITEM_BY_PATH[p]).filter((i) => !!i && visibleItem(i.path)); return items.length ? { id: 'fav', short: 'Favori', title: 'FAVORİLERİM', icon: 'badge', items } : null; };
+        const recentVirt = () => { const items = navState.recent.filter((p) => p !== path).map((p) => NAV_ITEM_BY_PATH[p]).filter((i) => !!i && visibleItem(i.path)); return items.length ? { id: 'recent', short: 'Son', title: 'SON KULLANILAN', icon: 'clock', items } : null; };
+        const wsList = navGroups.filter((g) => g.id !== 'fav');
+        const initialWs = () => {
+            const own = path === '/departman' ? new URLSearchParams(location.hash.split('?')[1] ?? '').get('d') ?? undefined : WORKSPACE_OF_PATH[path];
+            if (operatorSimple && wsList[0]?.id === 'mine' && wsList[0].items.some((i) => i.path === path))
+                return 'mine';
+            if (own && wsList.some((g) => g.id === own))
+                return own;
+            if (path === '/' && navState.last && wsList.some((g) => g.id === navState.last))
+                return navState.last;
+            return wsList[0]?.id ?? 'pc';
         };
-        fillNav(navHost, 'app-nav-item');
-        fillNav(drawerNavHost, 'app-drawer-item', closeDrawer);
+        let selectedWs = initialWs();
+        const findWs = (id) => id === 'fav' ? favVirt() ?? undefined : id === 'recent' ? recentVirt() ?? undefined : wsList.find((g) => g.id === id);
+        const quickLinks = ['/gorevler', '/onaylar'].filter((p) => visibleItem(p));
+        const pickWs = (id, redraw, afterNav) => {
+            const g = findWs(id);
+            if (!g)
+                return;
+            selectedWs = id;
+            if (g.items.length === 1 && id !== 'fav' && id !== 'recent' && id !== 'mine' && g.items[0].path !== '/') {
+                location.hash = `#/departman?d=${id}`;
+                afterNav?.();
+                return;
+            }
+            redraw();
+        };
+        const wsIcon = (g) => icon(g.icon, 22);
+        const fillSide = (host) => {
+            const draw = () => {
+                const sel = findWs(selectedWs) ?? wsList[0];
+                const railBtn = (g, tid) => h('button', { type: 'button', class: 'ri', 'data-testid': tid, 'data-ws': g.id, 'aria-pressed': String(g.id === selectedWs), 'aria-label': g.title, title: g.title, onClick: () => pickWs(g.id, draw) }, wsIcon(g), h('span', { class: 'rl' }, g.short));
+                const railLink = (p, tid) => { const it = NAV_ITEM_BY_PATH[p]; return h('a', { class: 'ri', href: `#${it.path}`, 'data-testid': tid, 'data-path': it.path, title: it.label, ...(it.path === path ? { 'aria-current': 'page' } : {}) }, icon(it.icon, 20), h('span', { class: 'rl' }, p === '/' ? 'Ana Sayfa' : it.label.split(' ')[0] ?? it.label)); };
+                const fav = favVirt(), rec = recentVirt();
+                const rail = h('nav', { class: 'kmi-rail', 'aria-label': 'Çalışma alanları', 'data-testid': 'app-rail' }, railLink('/', 'app-rail-home'), ...(fav ? [railBtn(fav, 'app-nav-special')] : []), ...(rec ? [railBtn(rec, 'app-nav-special')] : []), h('hr', {}), ...wsList.map((g) => railBtn(g, 'app-nav-group')), ...(quickLinks.length ? [h('hr', {}), ...quickLinks.map((p) => railLink(p, 'app-rail-link'))] : []));
+                const panel = h('div', { class: 'kmi-panel', 'data-testid': 'app-nav-panel', 'data-ws': sel?.id ?? '' }, h('div', { class: 'ph', 'data-testid': 'app-nav-panel-title' }, sel && sel.id !== 'fav' && sel.id !== 'recent' && sel.id !== 'mine' && sel.id !== 'pc' && sel.items.some((x) => x.path !== '/') ? h('a', { href: `#/departman?d=${sel.id}`, class: 'ph-link', 'data-testid': 'app-dept-home-link', title: 'Departman ana ekranı' }, sel.title, ' ›') : (sel?.title ?? '')), ...(sel?.items ?? []).map((it) => {
+                    const a = navLink(it, 'app-nav-item');
+                    const on = navState.favorites.includes(it.path);
+                    const star = h('button', { type: 'button', class: 'nfav', 'data-testid': 'app-nav-fav', 'data-path': it.path, 'aria-pressed': String(on), 'aria-label': on ? `${it.label} favorilerden çıkar` : `${it.label} favorilere ekle`, title: on ? 'Favoriden çıkar' : 'Favorilere ekle',
+                        onClick: () => { navState = nextNavState(navState, { toggleFavorite: it.path }); saveNavState(); draw(); } }, on ? '★' : '☆');
+                    return h('div', { class: 'nrow' }, a, star);
+                }));
+                host.replaceChildren(rail, panel);
+            };
+            draw();
+        };
+        const fillDrawer = (host) => {
+            const draw = () => {
+                const sel = findWs(selectedWs) ?? wsList[0];
+                const fav = favVirt(), rec = recentVirt();
+                const chip = (g) => h('button', { type: 'button', class: 'dws', 'data-testid': 'app-drawer-ws', 'data-ws': g.id, 'aria-pressed': String(g.id === selectedWs), onClick: () => pickWs(g.id, draw, closeDrawer) }, wsIcon(g), h('span', {}, g.short));
+                host.replaceChildren(h('div', { class: 'dh', 'data-testid': 'app-drawer-title' }, sel?.title ?? ''), h('div', { class: 'dpages' }, ...(sel?.items ?? []).map((it) => navLink(it, 'app-drawer-item', closeDrawer))), h('div', { class: 'dh' }, 'DEPARTMAN DEĞİŞTİR'), h('div', { class: 'dgrid' }, ...[...(fav ? [fav] : []), ...(rec ? [rec] : []), ...wsList].map(chip)), h('div', { class: 'dquick' }, navLink(NAV_ITEM_BY_PATH['/'], 'app-drawer-quick', closeDrawer), ...quickLinks.map((p) => navLink(NAV_ITEM_BY_PATH[p], 'app-drawer-quick', closeDrawer))));
+            };
+            draw();
+        };
+        fillSide(navHost);
+        fillDrawer(drawerNavHost);
         const quick = ['/', ...featuredPaths(access, navAllPaths).filter((p) => p !== '/')].slice(0, 4);
         bottomHost.replaceChildren(...quick.map((p) => navLink(NAV_ITEM_BY_PATH[p], 'app-bottom-item')), h('button', { type: 'button', 'data-testid': 'app-bottom-menu', 'aria-label': 'Tüm menü', onClick: openDrawer }, icon('menu'), 'Menü'));
         header.setShortcuts(pickShortcuts([...quick, ...navAllPaths].map((p) => ({ path: p, label: NAV_ITEM_BY_PATH[p]?.label ?? p })), (p) => canOpen(p, access) && !!NAV_ITEM_BY_PATH[p]));

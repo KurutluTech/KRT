@@ -5,6 +5,7 @@ export const OPEN_RULES = {
     // D-007: the APPLICATION screen is separate from economic data. Seeing it grants nothing (the server decides); only ADMIN is offered it.
     '/ekonomi-basvuru': { roles: ['ADMIN'] },
     '/alacaklar': { any: ['ACCOUNTING_MUTATION'], economics: true },
+    '/onaylar': { any: ['MANAGEMENT_RELEASE', 'COMMERCIAL_RELEASE', 'PURCHASING_APPROVE', 'TASK_MANAGE'], roles: ['ADMIN', 'MANAGEMENT'] },
     '/yonetim': { any: ['MANAGEMENT_RELEASE', 'COMMERCIAL_RELEASE', 'PURCHASING_APPROVE', 'TASK_MANAGE'], roles: ['ADMIN', 'MANAGEMENT'] },
     '/onay-kuyrugu': { any: ['COMMERCIAL_RELEASE', 'MANAGEMENT_RELEASE', 'ACCOUNTING_MUTATION', 'SHIPMENT_MANAGE'] },
     '/muhasebe': { any: ['ACCOUNTING_MUTATION'], economics: true },
