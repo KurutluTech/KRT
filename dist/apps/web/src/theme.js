@@ -77,6 +77,7 @@ a{color:var(--kmi-cyan2)}
 .kmi-nav .grp-head:hover{color:#94a3b8}
 .kmi-side.collapsed .grp-body{display:block!important}
 .kmi-nav hr{border:0;border-top:1px solid rgba(30,41,59,.7);margin:6px 0}
+.kmi-nav .nrow{display:flex;align-items:center;gap:2px}.kmi-nav .nrow a{flex:1;min-width:0}.kmi-nav .nfav{flex:none;width:32px;min-height:40px;border:0;background:none;color:#64748b;cursor:pointer;font-size:15px;border-radius:8px;opacity:.55}.kmi-nav .nrow:hover .nfav,.kmi-nav .nfav[aria-pressed=true],.kmi-nav .nfav:focus-visible{opacity:1}.kmi-nav .nfav[aria-pressed=true]{color:var(--kmi-gold2)}.kmi-side.collapsed .nfav{display:none}
 .kmi-nav a{display:flex;align-items:center;gap:10px;min-height:40px;padding:6px 10px;border-radius:10px;color:#e2e8f0;text-decoration:none;font-size:13px;font-weight:600;border-left:3px solid transparent}
 .kmi-nav a .ic{color:var(--kmi-cyan)}
 .kmi-nav a:hover{background:#1e293b}

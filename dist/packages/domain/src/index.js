@@ -50,3 +50,5 @@ export * from './xlsxRead';
 export * from './approvalsInbox';
 export * from './managementIntel';
 export * from './peopleCapacity';
+export * from './performanceCenter';
+export * from './departmentCockpit';
