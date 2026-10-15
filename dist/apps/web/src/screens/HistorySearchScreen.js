@@ -5,6 +5,7 @@ import { TIME_PRESETS, resolveRange, filterEvents, formatStamp, actionTr, lateRe
 import { DS_CSS, pill } from '../ds.js';
 import { errorText } from '../errorText.js';
 import { KINDS, passportHref, canOpenPassport } from '../passport/registry.js';
+import { parseHistoryQuery } from '../../../../packages/domain/src/universalSearch.js';
 const KIND_OF_TYPE = {};
 for (const k of Object.values(KINDS))
     for (const t of k.auditTypes)
@@ -12,6 +13,10 @@ for (const k of Object.values(KINDS))
 const LATE_WINDOW_DAYS = 14;
 const TYPE_TR = { PRODUCT: 'Ürün', PRODUCT_REVISION: 'Ürün revizyonu', CAM_PROGRAM: 'CAM programı' };
 const ENTITY_OPTIONS = Object.keys(KIND_OF_TYPE).sort();
+/** 005.07: `#/gecmis?p=&e=&q=` → initial state (pure rules in the domain module; unknown values are ignored). */
+export function historyStateFromQuery(q) {
+    return parseHistoryQuery(q, TIME_PRESETS.map((x) => x.code), ENTITY_OPTIONS);
+}
 export async function renderHistorySearchScreen(container, api, opts) {
     const st = { preset: 'TODAY', basis: 'RECORDED', ...opts.state };
     const host = h('div', { 'data-testid': 'hs-results' });

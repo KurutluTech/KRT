@@ -1,3 +1,6 @@
+// Universal object passport adapter (KMI-RECOVERY-004). Reads ONLY canonical tables / existing RPCs through RLS; writes ONLY through existing canonical RPCs.
+// It creates no table, no cache, no second audit: the timeline is kmi_next.audit_log + the existing per-object event tables.
+import { machineState } from '../../../packages/domain/src/machineState.js';
 import { auditToEvent, formatStamp } from '../../../packages/domain/src/temporal.js';
 import { errorText, isSetupPending } from './errorText.js';
 import { KINDS, canOpenPassport } from './passport/registry.js';
@@ -67,7 +70,7 @@ export function createObjectPassportApi(client, session, access, myUserId = sess
                     sel('maintenance_tickets', 'id', { machine_id: `eq.${id}`, status: 'in.(OPEN,IN_PROGRESS,TEST_PENDING)' }),
                 ]);
                 const [st, tone] = MACHINE_STATUS_TR[m.status] ?? [m.status, ''];
-                return { kind, id, title: `${m.code} · ${m.name}`, subtitle: m.category ?? 'Kategori belirtilmemiş', status: pill(st, tone), createdAt: m.createdAt, links: [],
+                return { kind, id, title: `${m.code} · ${m.name}`, subtitle: m.category ?? 'Kategori belirtilmemiş', status: pill(st, tone), createdAt: m.createdAt, links: [], machineHeadline: machineState({ status: m.status, active: wos.map((w) => ({ runStatus: w.status })) }).headline,
                     kpis: [{ label: 'Aktif iş emri', value: String(wos.length) }, { label: 'Açık bakım/arıza', value: String(tickets.length) }, { label: 'Toplam duruş', value: m.totalDownMinutes === null ? 'BİLİNMİYOR' : `${num(m.totalDownMinutes)} dk` },
                         { label: m.status === 'DOWN' ? 'DOWN başlangıcı' : 'Fiziksel durum', value: m.status === 'DOWN' ? ts(m.downSince) : 'BİLİNMİYOR (CNC bağlantısı yok)' }] };
             }

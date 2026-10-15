@@ -22,7 +22,10 @@ export function startIdleGuard(o) {
     let last = now(), lastWrite = 0, done = false;
     swrite(LAST_INTERACTION_KEY, last);
     const effectiveLast = () => Math.max(last, sread(LAST_INTERACTION_KEY));
-    const startedAt = now();
+    // A sign-out announced by another tab is recognised by the stored marker CHANGING from what this tab saw when it started — never by comparing
+    // timestamps from two tabs' clocks (clock offsets/steps between tabs, or the same millisecond, must not hide a sign-out).
+    const baseline = sread(IDLE_LOGOUT_KEY);
+    const stampLogout = () => swrite(IDLE_LOGOUT_KEY, Math.max(now(), sread(IDLE_LOGOUT_KEY) + 1));
     let banner = null, countdown = null;
     const showBanner = (secs) => {
         if (!banner) {
@@ -56,7 +59,7 @@ export function startIdleGuard(o) {
         hideBanner();
         cover();
         if (reason === 'IDLE') {
-            swrite(IDLE_LOGOUT_KEY, now());
+            stampLogout();
             try {
                 bc?.postMessage('logout');
             }
@@ -75,8 +78,7 @@ export function startIdleGuard(o) {
             void expire('GONE');
             return;
         }
-        const logoutAt = sread(IDLE_LOGOUT_KEY);
-        if (logoutAt > startedAt) {
+        if (sread(IDLE_LOGOUT_KEY) !== baseline) {
             void expire('REMOTE');
             return;
         }
@@ -135,7 +137,7 @@ export function startIdleGuard(o) {
         }
         catch { /* already closed */ }
     }
-    const announce = () => { swrite(IDLE_LOGOUT_KEY, now()); try {
+    const announce = () => { stampLogout(); try {
         bc?.postMessage('logout');
     }
     catch { /* channel closed */ } };

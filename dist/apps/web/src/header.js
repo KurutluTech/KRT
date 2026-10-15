@@ -61,7 +61,7 @@ export function createHeader(o) {
     const search = h('input', { type: 'search', 'data-testid': 'app-search', 'aria-label': 'Ara', placeholder: 'Ara…  (Ctrl/⌘ K)', value: o.searchValue });
     const form = h('form', { 'data-testid': 'app-search-form', role: 'search', onSubmit: (e) => { e.preventDefault(); const v = search.value.trim(); if (v)
             location.hash = `#/ara?q=${encodeURIComponent(v)}`; } }, search);
-    const el = h('header', { class: 'kmi-top' }, h('a', { class: 'brand', href: '#/', 'data-testid': 'app-home', title: o.brandTitle }, h('img', { src: './assets/kurutlu-k-symbol-white.png', alt: '' }), h('span', {}, 'KURUTLU', h('small', {}, 'PERFORMANCE CENTER'))), h('span', { class: 'kmi-chips', 'data-testid': 'app-header-chips' }), form, shiftChip, clock, o.menuBtn, wrap, h('button', { type: 'button', class: 'btn', 'data-testid': 'app-logout', 'aria-label': 'Çıkış', onClick: o.onLogout }, 'Çıkış'));
+    const el = h('header', { class: 'kmi-top' }, h('a', { class: 'brand', href: '#/', 'data-testid': 'app-home', title: o.brandTitle }, h('img', { src: './assets/kurutlu-k-symbol-white.png', alt: '' }), h('span', { class: 'bt', 'data-testid': 'app-brand-full' }, h('b', {}, 'KURUTLU MANUFACTURING INTELLIGENCE'), h('small', {}, 'Paperless Factory · Performance Center')), h('span', { class: 'bs', 'data-testid': 'app-brand-short' }, 'KMI')), h('span', { class: 'kmi-chips', 'data-testid': 'app-header-chips' }), form, shiftChip, clock, o.menuBtn, wrap, h('button', { type: 'button', class: 'btn', 'data-testid': 'app-logout', 'aria-label': 'Çıkış', onClick: o.onLogout }, 'Çıkış'));
     return {
         el,
         setChips(live, pulse) {

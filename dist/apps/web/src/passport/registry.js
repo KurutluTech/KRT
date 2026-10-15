@@ -58,5 +58,5 @@ export function canOpenPassport(kind, a, ownPersonnel = false) {
 export const canonicalHref = (legacyKind, id, tab = TRACE_TAB.key) => passportHref(LEGACY_TO_CANONICAL[legacyKind], id, tab);
 export const passportHref = (kind, id, tab) => `#/nesne?t=${kind}&id=${encodeURIComponent(id)}${tab ? `&tab=${tab}` : ''}`;
 /** Map a universal-search / board record type to a passport kind (types without a passport stay on their own screen). */
-export const SEARCH_TYPE_TO_KIND = { MACHINE: 'MACHINE', WORK_ORDER: 'WORK_ORDER', PRODUCT: 'PRODUCT', CUSTOMER: 'CUSTOMER', ORDER: 'ORDER', SHIPMENT: 'SHIPMENT', SUPPLIER: 'SUPPLIER', QUALITY_NCR: 'QUALITY_NCR', TASK: 'TASK' };
+export const SEARCH_TYPE_TO_KIND = { MACHINE: 'MACHINE', WORK_ORDER: 'WORK_ORDER', PRODUCT: 'PRODUCT', CUSTOMER: 'CUSTOMER', ORDER: 'ORDER', SHIPMENT: 'SHIPMENT', SUPPLIER: 'SUPPLIER', QUALITY_NCR: 'QUALITY_NCR', TASK: 'TASK', MAINTENANCE_TICKET: 'MAINTENANCE_TICKET', STOCK_LOT: 'STOCK_LOT', TOOL: 'TOOL' };
 export { canOpen };

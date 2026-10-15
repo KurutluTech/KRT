@@ -35,9 +35,13 @@ export const ICON_PATHS = {
     spindle: 'M9 3h6v4H9zM10.5 7v3h3V7M12 10v8.5M10.2 12.5l3.6 1.2M10.2 15.5l3.6 1.2M12 21l-1.2-2.5h2.4z',
     gauge: 'M4.5 17a8.5 8.5 0 1 1 15 0M12 17l4-5M6.5 17h1.5M16 17h1.5M12 8.5V10M4 20.5h16',
     clipboard: 'M8 4h8v3H8zM6 5.5h2M16 5.5h2M6 5.5V21h12V5.5M9 11h6M9 15h6',
+    play: 'M7 4.5v15l12-7.5z',
+    stop: 'M5.5 5.5h13v13h-13z',
+    check: 'M4.5 12.5l5 5 10-11',
+    plus: 'M12 4.5v15M4.5 12h15',
     cnc: 'M3.5 20.5V6.5h17v14zM3.5 10h17M7 13.5h6v4.5H7zM16 13.5v4.5M12 3v3.5M10.2 3h3.6',
 };
-/** THE navigation tree: 15 workspaces, 44 routes. The sidebar, the drawer, the home page and the role tests are all built from this one list
+/** THE navigation tree: 15 workspaces, 47 routes. The sidebar, the drawer, the home page and the role tests are all built from this one list
  *  (there is no second menu). Whether a user sees an entry is decided by access.ts (canOpen); the server decides for real. */
 export const NAV_TREE = [
     { id: 'pc', short: 'Performans', title: 'PERFORMANCE CENTER', icon: 'grid', items: [
@@ -46,15 +50,17 @@ export const NAV_TREE = [
             { path: '/canli', label: 'KMI LIVE', icon: 'factory' },
             { path: '/oee', label: 'Eğilim · OEE', icon: 'chart' },
             { path: '/yonetim', label: 'Kararlar (Yönetim Zekâsı)', icon: 'chart' },
-            { path: '/onaylar', label: 'Onaylar', icon: 'shield' },
+            { path: '/onaylar', label: 'Onaylarım', icon: 'shield' },
+            { path: '/bildirimler', label: 'Bildirimler', icon: 'bolt' },
         ] },
     { id: 'order', short: 'Sipariş', title: 'MÜŞTERİ & SİPARİŞ', icon: 'clipboard', items: [
             { path: '/siparisler', label: 'Siparişler', icon: 'truck' },
             { path: '/katalog', label: 'Katalog', icon: 'book' },
         ] },
     { id: 'prod', short: 'Üretim', title: 'ÜRETİM', icon: 'cnc', items: [
+            { path: '/uretim', label: 'Üretim Masası', icon: 'cnc' },
             { path: '/operator', label: 'Benim İşlerim', icon: 'user' },
-            { path: '/gorevler', label: 'Görev Zemini', icon: 'tasks' },
+            { path: '/gorevler', label: 'Görevlerim', icon: 'tasks' },
             { path: '/is-emirleri', label: 'İş Emirleri', icon: 'factory' },
             { path: '/terminal', label: 'Makine Terminali', icon: 'chip' },
             { path: '/tara', label: 'QR / Barkod', icon: 'scan' },
@@ -122,6 +128,43 @@ export const WORKSPACE_OF_PATH = Object.fromEntries(NAV_TREE.flatMap((g) => g.it
 export function visibleNav(can) {
     return NAV_TREE.map((g) => ({ ...g, items: g.items.filter((i) => i.path === '/' || can(i.path)) })).filter((g) => g.items.length > 0);
 }
+export const GATE_ME_PATHS = ['/', '/bildirimler', '/operator', '/gorevler', '/onaylar', '/giris-cikislarim', '/rozetlerim'];
+export const GATES = [
+    { id: 'me', title: 'BENİM KMI', short: 'Benim', icon: 'user', workspaces: [], personalPaths: [...GATE_ME_PATHS] },
+    { id: 'perf', title: 'PERFORMANCE CENTER', short: 'Performans', icon: 'grid', workspaces: ['pc'] },
+    { id: 'flow', title: 'SİPARİŞTEN SEVKİYATA', short: 'Sipariş', icon: 'truck', workspaces: ['order', 'ship'] },
+    { id: 'dept', title: 'DEPARTMANLAR', short: 'Departman', icon: 'factory', workspaces: ['prod', 'plan', 'cam', 'tool', 'qc', 'maint', 'wh', 'buy', 'fin', 'hr'] },
+    { id: 'mgmt', title: 'YÖNETİM VE KURUMSAL ZEKÂ', short: 'Yönetim', icon: 'bolt', workspaces: ['intel', 'fin'] },
+    { id: 'tools', title: 'ARAÇLAR VE SİSTEM', short: 'Sistem', icon: 'chip', workspaces: ['it'] },
+];
+/** Gates reduced to what `visible` (already access-filtered workspaces) allows; empty gates vanish. `Ana Sayfa` is in "Benim", not in the Performance gate. */
+export function visibleGates(visible, extraMe = []) {
+    const wsById = new Map(visible.map((g) => [g.id, g]));
+    const byPath = new Map(visible.flatMap((g) => g.items).map((i) => [i.path, i]));
+    return GATES.map((g) => {
+        if (g.personalPaths) {
+            const items = [...g.personalPaths.map((p) => byPath.get(p)).filter((i) => !!i), ...extraMe];
+            return { id: g.id, title: g.title, short: g.short, icon: g.icon, sections: items.length ? [{ id: 'me', short: 'Benim', title: 'BENİM İŞLERİM', icon: 'user', items }] : [] };
+        }
+        const sections = g.workspaces.map((w) => wsById.get(w)).filter((w) => !!w)
+            .map((w) => (g.id === 'perf' ? { ...w, items: w.items.filter((i) => i.path !== '/' && i.path !== '/onaylar' && i.path !== '/bildirimler') } : w)).filter((w) => w.items.length > 0);
+        return { id: g.id, title: g.title, short: g.short, icon: g.icon, sections };
+    }).filter((g) => g.sections.length > 0);
+}
+/** Which gate a screen belongs to for highlighting: personal paths → Benim; Maliyet/Ekonomi → Yönetim; otherwise the first gate holding its workspace. */
+export function gateOfPath(path) {
+    if (path === '/maliyet' || path === '/ekonomi')
+        return 'mgmt';
+    if (GATE_ME_PATHS.includes(path))
+        return 'me';
+    const ws = WORKSPACE_OF_PATH[path];
+    return gateOfWorkspace(ws);
+}
+export function gateOfWorkspace(ws) {
+    if (!ws)
+        return 'me';
+    return GATES.find((g) => g.workspaces.includes(ws))?.id ?? 'me';
+}
 /** Operator-simple menu: a user whose only role is OPERATOR sees one short list (their own work), not the factory tree. */
 export function isOperatorOnly(roles) { return roles.length > 0 && roles.every((r) => r === 'OPERATOR'); }
 export function simpleNav(tree, preferred) {
@@ -152,6 +195,10 @@ export function nextNavState(prev, ev) {
     return { last: ws && ws !== 'pc' ? ws : prev.last, favorites, recent };
 }
 /** Breadcrumb for a screen: workspace › page (the home page has none). */
+/** Display form of a department title: Turkish title case, short acronyms (CAM, İK) and '&' kept. The data titles stay as registered (tests/lookups); only what the user reads is softened. */
+export function trTitle(t) {
+    return t.split(' ').map((w) => (w.length <= 3 || !/[A-ZÇĞİÖŞÜ]/.test(w) ? w : w.charAt(0) + w.slice(1).toLocaleLowerCase('tr-TR'))).join(' ');
+}
 export function breadcrumbOf(path) {
     const ws = WORKSPACE_OF_PATH[path];
     const item = NAV_ITEM_BY_PATH[path];

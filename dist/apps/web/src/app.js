@@ -17,10 +17,17 @@ import { renderZirvedekilerScreen } from './screens/ZirvedekilerScreen.js';
 import { renderEngineeringScreen } from './screens/EngineeringScreen.js';
 import { createEngineeringApi } from './engineeringApi.js';
 import { renderOperatorHomeScreen } from './screens/OperatorHomeScreen.js';
+import { renderNoticesScreen } from './screens/NoticesScreen.js';
 import { createOperatorHomeApi } from './operatorHomeApi.js';
 import { createTerminalApi } from './terminalApi.js';
 import { withCockpit, liveCockpitSources } from './screens/DepartmentCockpit.js';
+import { FUNCTION_STATE_TR, resolveFunctions } from '../../../packages/domain/src/departmentFunctions.js';
 import { renderDepartmentHome } from './screens/DepartmentHomeScreen.js';
+import { renderQualityDesk } from './screens/QualityDeskScreen.js';
+import { renderDemandPanel } from './screens/DemandPanel.js';
+import { renderProductionDesk } from './screens/ProductionDeskScreen.js';
+import { createProductionDeskApi } from './productionDeskApi.js';
+import { createQualityDeskApi } from './qualityDeskApi.js';
 import { COCKPIT_OF_PATH } from '../../../packages/domain/src/departmentCockpit.js';
 import { renderPerformanceCenter } from './screens/PerformanceCenterScreen.js';
 import { createPerformanceCenterSources } from './performanceCenterApi.js';
@@ -96,6 +103,8 @@ import { createSearchApi } from './searchApi.js';
 import { renderSearchScreen } from './screens/SearchScreen.js';
 import { createTaskFloorApi } from './taskFloorApi.js';
 import { renderTaskFloorScreen } from './screens/TaskFloorScreen.js';
+import { renderApprovalsScreen } from './screens/ApprovalsScreen.js';
+import { countGates, sourcesFor } from '../../../packages/domain/src/approvalWorkspace.js';
 import { renderWorkOrderHubScreen } from './screens/WorkOrderHubScreen.js';
 import { createWorkOrderHubApi } from './workOrderHubApi.js';
 import { createWorkOrdersApi } from './workOrdersApi.js';
@@ -121,15 +130,23 @@ import { createMaterialApi } from './materialApi.js';
 import { renderToolReadinessScreen } from './screens/ToolReadinessScreen.js';
 import { createToolReadinessApi } from './toolReadinessApi.js';
 import { THEME_CSS } from './theme.js';
-import { renderHistorySearchScreen } from './screens/HistorySearchScreen.js';
+import { renderHistorySearchScreen, historyStateFromQuery } from './screens/HistorySearchScreen.js';
 import { createHistoryApi } from './historyApi.js';
 import { createHeader, pickShortcuts } from './header.js';
 import { renderCockpit } from './homeCockpit.js';
+import { OBJECT_CARD_CSS } from './objectCard.js';
+import { renderHomeShow, showsFleet, HOME_SHOW_CSS } from './homeShow.js';
+import { createHomeLoader } from './homeLoader.js';
+import { createHomePrefsApi } from './homePrefsApi.js';
+import { applyOrder, moveSection, orderStorageKey } from '../../../packages/domain/src/smartHome.js';
+import { SPINDLE_CSS } from './spindle.js';
+import { MACHINE_CARD_CSS } from './machineCard.js';
 import { loadExtras } from './homeData.js';
 import { homeCardsFor } from '../../../packages/domain/src/homeLayout.js';
 import { startIdleGuard } from './idleGuard.js';
-import { idleGuardApplies, resolveDeviceMode } from '../../../packages/domain/src/idleSession.js';
-import { NAV_TREE, NAV_ITEM_BY_PATH, WORKSPACE_OF_PATH, breadcrumbOf, NAV_STATE_KEY, iconSvg, isOperatorOnly, nextNavState, readNavState, simpleNav, visibleNav } from './nav.js';
+import { createUxTelemetry, errorClassOf, routeKey } from '../../../packages/domain/src/uxTelemetry.js';
+import { IDLE_LIMIT_MS, deviceProfile, idleGuardApplies, resolveDeviceMode } from '../../../packages/domain/src/idleSession.js';
+import { NAV_TREE, NAV_ITEM_BY_PATH, breadcrumbOf, trTitle, NAV_STATE_KEY, iconSvg, isOperatorOnly, nextNavState, readNavState, simpleNav, visibleNav, visibleGates, gateOfPath, gateOfWorkspace } from './nav.js';
 const NAV_TREE_FIRST = Object.fromEntries(NAV_TREE.map((g) => [g.id, g.items.find((i) => i.path !== '/')?.path ?? g.items[0].path]));
 const SESSION_KEY = 'kmi-next.session';
 const OPERATOR_FLAG_KEY = 'kmi-next.operatorSession'; // set only by a Sicil No + PIN sign-in: that session is a shared-terminal session (60 s inactivity rule)
@@ -202,12 +219,12 @@ export const ROUTES = [
             return renderObjectPassportScreen(el, createObjectPassportApi(c, s, access), { kind: t, id: q.get('id'), tab: q.get('tab') ?? undefined }, { access, trace });
         },
     },
-    { path: '/gecmis', label: 'Olay geçmişi (zaman araması)', group: 'Yönetim', inMenu: true, render: (el, c, s, _q, a) => renderHistorySearchScreen(el, createHistoryApi(c, s), { access: a, nowIso: new Date().toISOString() }) },
-    { path: '/ara', label: 'Arama', group: 'Saha', inMenu: false, render: (el, c, s, q) => renderSearchScreen(el, createSearchApi(c, s), q.get('q') ?? '') },
+    { path: '/gecmis', label: 'Olay geçmişi (zaman araması)', group: 'Yönetim', inMenu: true, render: (el, c, s, q, a) => renderHistorySearchScreen(el, createHistoryApi(c, s), { access: a, nowIso: new Date().toISOString(), state: historyStateFromQuery(q) }) },
+    { path: '/ara', label: 'Arama', group: 'Saha', inMenu: false, render: (el, c, s, q, a) => renderSearchScreen(el, createSearchApi(c, s), q.get('q') ?? '', { access: a, filters: { types: (q.get('f') ?? '').split(',').filter(Boolean), from: q.get('from'), to: q.get('to'), status: q.get('s') } }) },
     {
-        path: '/gorevler', label: 'Görev Zemini — işlerim', group: 'Saha', inMenu: true,
+        path: '/gorevler', label: 'Görevlerim', group: 'Saha', inMenu: true,
         // ?kaynak=WORK_ORDER&id=<uuid> pre-links a new task to an existing record
-        render: (el, c, s, q) => renderTaskFloorScreen(el, createTaskFloorApi(c, s), q.get('kaynak') && q.get('id') ? { prefill: { sourceType: q.get('kaynak'), sourceId: q.get('id') } } : {}),
+        render: (el, c, s, q) => renderTaskFloorScreen(el, createTaskFloorApi(c, s), { ...(q.get('kaynak') && q.get('id') ? { prefill: { sourceType: q.get('kaynak'), sourceId: q.get('id') } } : {}), ...(q.get('t') ? { focus: q.get('t'), ...(q.get('via') === 'qr' ? { viaQr: true } : {}) } : {}) }),
     },
     {
         path: '/operator', label: 'Benim İşlerim (operatör)', group: 'Saha', inMenu: true,
@@ -215,14 +232,14 @@ export const ROUTES = [
             openTerminal: (machineId) => { rememberMachine(machineId); location.hash = '#/terminal'; }, goTasks: () => { location.hash = '#/gorevler'; }
         }),
     },
-    { path: '/terminal', label: 'Makine Terminali', group: 'Saha', inMenu: true, render: (el, c, s) => renderTerminalScreen(el, createTerminalApi(c, s), { machineId: rememberedMachine() }) },
+    { path: '/terminal', label: 'Makine Terminali', group: 'Saha', inMenu: true, render: (el, c, s) => renderTerminalScreen(el, createTerminalApi(c, s), { machineId: rememberedMachine() }, { icon: (n, z) => icon(n, z) }) },
     {
         path: '/is-emirleri', label: 'İş Emirleri (üretim · kalite · stok · sevkiyat)', group: 'Saha', inMenu: true,
         render: (el, c, s, q) => renderWorkOrderHubScreen(el, { hub: createWorkOrderHubApi(c, s), workOrders: createWorkOrdersApi(c, s), production: createProductionApi(c, s),
             stock: createStockApi(c, s), shipment: createShipmentApi(c, s), commercial: createCommercialApprovalApi(c, s) }, { wo: q.get('wo'), lot: q.get('lot') }),
     },
     { path: '/muhasebe', label: 'Muhasebe / Fatura (kalem)', group: 'Yönetim', inMenu: false, needs: ['kalem'], render: (el, c, s, q) => renderAccountingScreen(el, q.get('kalem') ?? '', createAccountingApi(c, s)) },
-    { path: '/tara', label: 'QR / Barkod Okut', group: 'Saha', inMenu: true, render: (el, c, s) => renderScanScreen(el, createScanApi(c, s)) },
+    { path: '/tara', label: 'QR / Barkod Okut', group: 'Saha', inMenu: true, render: (el, c, s, q, a) => renderScanScreen(el, createScanApi(c, s), undefined, { code: q.get('kod'), access: a }) },
     {
         path: '/dokumanlar', label: 'Dokümanlar', group: 'Saha', inMenu: true,
         // ?tip=<WORK_ORDER|STOCK_LOT|PRODUCT_REVISION|…>&id=<uuid> opens a record's documents (links from the passport)
@@ -255,13 +272,19 @@ export const ROUTES = [
     { path: '/giris-cikislarim', label: 'Giriş-çıkışlarım', group: 'Saha', inMenu: true, render: (el, c, s) => renderMyAttendanceScreen(el, createGeckoApi(c, s), { today: istanbulToday() }) },
     { path: '/rozetlerim', label: 'Rozetlerim', group: 'Saha', inMenu: true, render: (el, c, s, q) => renderBadgesScreen(el, createBadgesApi(c, s), { personnelId: q.get('kisi') }) },
     { path: '/bakim', label: 'Bakım / Makine Sağlığı', group: 'Saha', inMenu: true, render: (el, c, s) => renderMaintenanceScreen(el, { api: createMaintenanceApi(c, s) }) },
-    { path: '/kalite', label: 'Kalite Kontrol / Metroloji', group: 'Saha', inMenu: true, render: (el, c, s) => renderDepartmentScreen(el, createDepartmentApi(c, s, createWorkOrderHubApi(c, s)), 'KALITE') },
+    { path: '/kalite', label: 'Kalite Masası (karar kuyruğu)', group: 'Saha', inMenu: true, render: (el, c, s, q, a) => renderQualityDesk(el, createQualityDeskApi(c, s), { can: (x) => a.actions.includes(x), initialKind: q.get('k') }) },
     { path: '/sevkiyat', label: 'Sevkiyat / Lojistik', group: 'Saha', inMenu: true, render: (el, c, s) => renderDepartmentScreen(el, createDepartmentApi(c, s, createWorkOrderHubApi(c, s)), 'SEVKIYAT') },
     { path: '/depo', label: 'Depo / Stok / Malzeme', group: 'Satınalma / Depo', inMenu: true, render: (el, c, s) => renderDepartmentScreen(el, createDepartmentApi(c, s, createWorkOrderHubApi(c, s)), 'DEPO') },
     { path: '/takimhane', label: 'Takımhane', group: 'Saha', inMenu: true, render: (el, c, s) => renderToolroomScreen(el, { api: createToolroomApi(c, s) }) },
     { path: '/komuta', label: 'Performance Center', group: 'Yönetim', inMenu: true, render: (el, c, s, q) => renderPerformanceCenter(el, createPerformanceCenterSources(c, s), { today: istanbulToday(), dept: q.get('birim'), refreshMs: 60_000 }) },
     { path: '/rota', label: 'Rota / Operasyonlar', group: 'Yönetim', inMenu: true, render: (el, c, s) => renderRoutingScreen(el, createRoutingApi(c, s)) },
-    { path: '/planlama', label: 'Üretim Planlama', group: 'Yönetim', inMenu: true, render: (el, c, s) => renderPlanningScreen(el, createPlanningApi(c, s), { today: istanbulToday(), days: 5 }) },
+    { path: '/planlama', label: 'Üretim Planlama', group: 'Yönetim', inMenu: true, render: async (el, c, s) => {
+            const top = h('div', { 'data-testid': 'plan-demand-host' });
+            const rest = h('div', {});
+            mount(el, h('div', {}, top, rest));
+            void renderDemandPanel(top, createOrdersApi(c, s), createWorkOrderHubApi(c, s), istanbulToday(), () => { window.dispatchEvent(new HashChangeEvent('hashchange')); });
+            await renderPlanningScreen(rest, createPlanningApi(c, s), { today: istanbulToday(), days: 5 });
+        } },
     { path: '/oee', label: 'OEE / KPI', group: 'Yönetim', inMenu: true, render: (el, c, s) => renderOeeScreen(el, createOeeApi(c, s), { from: addDays(istanbulToday(), -6), to: istanbulToday(), group: 'MACHINE' }) },
     { path: '/raporlar', label: 'Raporlar', group: 'Yönetim', inMenu: true, render: (el, c, s) => renderReportsScreen(el, createReportsApi(c, s)) },
     { path: '/cihazlar', label: 'Cihaz entegrasyonları (kanıt bekliyor)', group: 'Diğer', inMenu: true, render: (el, c, s) => renderDevicesScreen(el, createDevicesApi(c, s)) },
@@ -270,6 +293,7 @@ export const ROUTES = [
     { path: '/onay-kuyrugu', label: 'Muhasebe Kuyruğu (ticari onay)', group: 'Yönetim', inMenu: true, render: (el, c, s) => renderAccountingQueueScreen(el, createAccountingQueueApi(c, s)) },
     { path: '/alacaklar', label: 'Alacaklar & Vade', group: 'Yönetim', inMenu: true, render: (el, c, s) => renderReceivablesScreen(el, createReceivablesApi(c, s), { today: istanbulToday() }) },
     { path: '/tahsis', label: 'TAHSİS (ölçü düzeltme)', group: 'Saha', inMenu: true, render: (el, c, s) => renderTahsisScreen(el, createTahsisApi(c, s)) },
+    { path: '/uretim', label: 'Üretim Masası (makine parkı ve işler)', group: 'Saha', inMenu: true, render: (el, c, s) => renderProductionDesk(el, createProductionDeskApi(c, s)) },
     { path: '/departman', label: 'Departman Ana Ekranı', group: 'Diğer', inMenu: false, needs: ['d'], render: (el, c, s, q, a) => {
             const g = NAV_TREE.find((x) => x.id === q.get('d'));
             if (!g) {
@@ -281,9 +305,26 @@ export const ROUTES = [
                 mount(el, h('div', { class: 'shell-menu kmi-closed', 'data-testid': 'app-closed' }, 'Bu departman rolünüze açık değil.'));
                 return;
             }
-            return renderDepartmentHome(el, { icon, view: ['ozet', 'kayit', 'analitik'].find((v) => v === q.get('v')), group: g, items, src: liveCockpitSources(c, s), nowIso: new Date().toISOString() });
+            return renderDepartmentHome(el, { canOpen: (p) => canOpen(p, a), icon, view: ['ozet', 'kayit', 'analitik'].find((v) => v === q.get('v')), group: g, items, src: liveCockpitSources(c, s), nowIso: new Date().toISOString(), showSystemStatus: a.roles.includes('MANAGEMENT') });
         } },
-    { path: '/onaylar', label: 'Onaylar (Yönetim)', group: 'Yönetim', inMenu: true, render: (el, c, s, q, a) => renderManagementScreen(el, managementDeps(c, s, a), { tab: 'onaylar' }) },
+    { path: '/bildirimler', label: 'Bildirimler', group: 'Yönetim', inMenu: true, render: (el, c, s, _q, a) => renderNoticesScreen(el, { icon: (n, z) => icon(n, z), sources: {
+                alerts: async () => (await createCommandCenterApi(c, s).snapshot()).alerts,
+                approvals: async () => (canOpen('/onaylar', a) ? (await createApprovalsInboxApi(c, s, { includeTasks: sourcesFor(new Set(a.actions)).tasks, sources: sourcesFor(new Set(a.actions)), light: true }).load()).items : []), // not an approver: not applicable (never an error banner)
+                tasks: async () => (await createTaskFloorApi(c, s).floor('MINE')).manual
+            } }) },
+    { path: '/onaylar', label: 'Onaylarım', group: 'Yönetim', inMenu: true, render: (el, c, s, q, a) => {
+            // KMI-004: one decision list over the canonical sources. Only the sources the person may decide on are read; quality gates (first piece / HOLD) are listed but decided at their own screen.
+            const held = a.actions;
+            const src = sourcesFor(new Set(held));
+            const tf = createTaskFloorApi(c, s);
+            const hasGate = held.includes('FIRST_PIECE_APPROVE') || held.includes('QUALITY_HOLD_RELEASE');
+            const view = ['PENDING', 'CRITICAL', 'OVERDUE', 'DONE'].find((v) => v === q.get('v'));
+            return renderApprovalsScreen(el, {
+                api: createApprovalsInboxApi(c, s, { includeTasks: src.tasks, sources: { commercial: src.commercial, requests: src.requests, orders: src.orders } }), held,
+                ...(hasGate ? { gates: async () => (await tf.floor('MINE')).derived.map((d) => ({ sourceType: d.sourceType, sourceId: d.sourceId, title: d.title, status: d.status, due: d.due ?? null, route: d.route ?? null })) } : {}),
+                ...(src.tasks ? { taskDetail: { history: (id) => tf.history(id), evidence: (id) => tf.evidence(id), content: (v) => tf.evidenceContent(v) } } : {}),
+            }, { ...(q.get('k') ? { focus: q.get('k') } : {}), ...(view ? { view } : {}) });
+        } },
     { path: '/yonetim', label: 'Yönetim Zekâsı (onaylar ve üst yönetim)', group: 'Yönetim', inMenu: true, render: (el, c, s, q, a) => renderManagementScreen(el, managementDeps(c, s, a), { tab: q.get('sekme') }) },
     { path: '/maliyet', label: 'Maliyet Zekâsı (yalnız ekonomik erişim)', group: 'Yönetim', inMenu: true, render: (el, c, s, q, a) => renderCostIntelligenceScreen(el, q.get('sekme') ?? 'live', { api: createCostOpsApi(c, s), access: a, today: istanbulToday(), nowMs: Date.now(), openTab: (t) => { location.hash = `#/maliyet?sekme=${t}`; }, download: downloadText }) },
     { path: '/ekonomi', label: 'Ekonomi & Kararlar (yalnız sahip)', group: 'Yönetim', inMenu: true, render: (el, c, s) => renderEconomicsScreen(el, createEconomicsApi(c, s), { from: addDays(istanbulToday(), -89), to: istanbulToday(), today: istanbulToday() }) },
@@ -320,8 +361,8 @@ export const ROUTES = [
 // packages/domain/src/departmentCockpit.ts). A record deep link (?wo= / ?lot=) opens the record without the band.
 for (const r of ROUTES) {
     const cockpit = COCKPIT_OF_PATH[r.path];
-    if (!cockpit)
-        continue;
+    if (!cockpit || r.path === '/kalite')
+        continue; // the Quality Desk carries its own counts (no second KPI band above it)
     const inner = r.render;
     r.render = (el, c, s, q, a) => (q.get('wo') || q.get('lot') ? inner(el, c, s, q, a) : withCockpit(el, cockpit, liveCockpitSources(c, s), new Date().toISOString(), (host) => inner(host, c, s, q, a)));
 }
@@ -330,20 +371,30 @@ export function parseHash(hash) {
     const [path, qs] = raw.split('?');
     return { path: path || '/', query: new URLSearchParams(qs ?? '') };
 }
-const SHELL_CSS = THEME_CSS + `
+/** Weak devices (≤2 cores or ≤2 GB) get the still K — no animation, same picture. */
+const lowPowerDevice = () => { try {
+    const n = navigator;
+    return (n.hardwareConcurrency ?? 8) <= 2 || (n.deviceMemory ?? 8) <= 2;
+}
+catch {
+    return false;
+} };
+const SHELL_CSS = THEME_CSS + SPINDLE_CSS + MACHINE_CARD_CSS + OBJECT_CARD_CSS + HOME_SHOW_CSS + `
 .shell-menu{padding:16px;max-width:820px;margin:0 auto}
 .shell-menu a{color:#67e8f9;font-weight:700}
 .offline{background:rgba(245,158,11,.16);color:#fcd34d;padding:8px 16px;font-weight:700;position:sticky;top:0;z-index:50}
 `;
 const BRAND = 'KURUTLU MANUFACTURING INTELLIGENCE';
-const BRAND_SUB = 'Performance Center · Paperless Machining';
+const BRAND_SUB = 'Paperless Factory · Performance Center';
 const icon = (name, size = 20) => { const el = document.createElement('span'); el.className = 'ic'; el.innerHTML = iconSvg(name, size); return el; };
+// default = collapsed icon rail (more room for the work area); the owner's explicit choice ('0' = expanded) is remembered
 const readCollapsed = () => { try {
-    return localStorage.getItem('kmiSidebarCollapsed') === '1';
+    return localStorage.getItem('kmiSidebarCollapsed') !== '0';
 }
 catch {
-    return false;
+    return true;
 } };
+let sidePeek = false; // flyout state survives a shell rebuild (e.g. after starring a page)
 const writeCollapsed = (v) => { try {
     localStorage.setItem('kmiSidebarCollapsed', v ? '1' : '0');
 }
@@ -355,6 +406,14 @@ export async function startApp(root, opts = {}) {
         return;
     }
     const client = opts.client ?? createKmiNextClient({ url: cfg.supabaseUrl, apiKey: cfg.anonKey });
+    // KMI-001 §001.7: anonymous technical usability measurements (route key, latency bucket, error class, device class) — no identity, nothing leaves the browser (no sink configured).
+    const ux = createUxTelemetry();
+    // privacy: an unknown/typed route is never echoed into telemetry (it could hold a name); only routes from the route table are keyed
+    const knownHash = () => { const k = routeKey(location.hash); return k === '/' || ROUTES.some((x) => x.path === k || k.startsWith(`${x.path}/`)) ? location.hash : '#/?'; };
+    client.onRequestFailed = ({ status }) => ux.record({ kind: 'ACTION_FAILED', route: knownHash(), errorClass: errorClassOf(status) });
+    window.KMI_UX = { snapshot: () => ux.snapshot() };
+    document.addEventListener('pointerdown', (e) => { if (!e.isTrusted)
+        return; const t0 = performance.now(); requestAnimationFrame(() => requestAnimationFrame(() => ux.record({ kind: 'INTERACTION_LATENCY', route: knownHash(), ms: performance.now() - t0 }))); }, { passive: true });
     let session = loadSession();
     // DEVICE CONTEXT for the 60 s inactivity sign-out: deployment config.js `deviceMode`, or a one-time setup link (?cihaz=kiosk|tablet|masaustu) remembered on this device. Never inferred from screen width.
     const storedLocal = (() => { try {
@@ -377,6 +436,9 @@ export async function startApp(root, opts = {}) {
         return false;
     } };
     let idleGuard = null;
+    let deviceReported = false;
+    let deviceApply = null; // set by the shell render; ONE resize listener for the whole page (not one per render)
+    window.addEventListener('resize', () => deviceApply?.(), { passive: true });
     const withTimeout = (p, ms) => Promise.race([p, new Promise((r) => setTimeout(() => r(undefined), ms))]);
     /** Ends THIS tab's session after inactivity (or because another tab of the device signed out). Local state is cleared first; audit + server sign-out are best-effort and time-boxed. */
     const endSessionIdle = async (reason) => {
@@ -497,8 +559,11 @@ export async function startApp(root, opts = {}) {
                         sessionStorage.setItem(OPERATOR_FLAG_KEY, '1');
                 }
                 catch { /* private mode */ }
+                // setting a different hash already fires `hashchange` → route(); calling route() as well rendered the first screen twice (and read every source twice)
+                const hashWillChange = location.hash !== '#/';
                 location.hash = '#/';
-                await route();
+                if (!hashWillChange)
+                    await route();
             }
             catch (err) {
                 renderLogin(err instanceof Error ? `Giriş başarısız: ${err.message}` : 'Giriş başarısız', mode);
@@ -507,7 +572,7 @@ export async function startApp(root, opts = {}) {
         const dbText = h('span', {}, 'Veritabanı bağlantısı kontrol ediliyor…');
         const dbBox = h('div', { class: 'kmi-login-db', 'data-testid': 'login-db', 'data-state': 'checking', role: 'status' }, h('i', {}), dbText);
         const tab = (m, label, tid) => h('button', { type: 'button', class: `kmi-login-tab${mode === m ? ' on' : ''}`, 'data-testid': tid, 'aria-pressed': String(mode === m), onClick: () => { rememberMode(m); renderLogin(undefined, m); } }, label);
-        mount(root, h('div', {}, h('style', {}, SHELL_CSS), offlineBar(), h('div', { class: 'kmi-login', 'data-testid': 'login-screen', 'data-mode': mode }, h('div', { class: 'kmi-login-k', 'aria-hidden': 'true' }, h('div', { class: 'kspin' }, h('img', { src: './assets/kurutlu-k-symbol-white.png', alt: '' }), h('span', { class: 'glare' }))), h('form', { class: 'kmi-login-card', 'data-testid': 'login-form', onSubmit: (e) => void submit(e) }, h('div', { class: 'brand' }, h('img', { src: './assets/kurutlu-k-symbol-white.png', alt: 'Kurutlu' }), h('h1', {}, BRAND), h('p', { class: 'sub' }, BRAND_SUB), h('div', { class: 'rule' })), operatorLoginEnabled ? h('div', { class: 'kmi-login-tabs' }, tab('EMAIL', 'Yetkili girişi', 'login-tab-email'), tab('OPERATOR', 'Operatör: Sicil No + PIN', 'login-tab-operator')) : null, message ? h('div', { class: 'kmi-login-err', 'data-testid': 'login-error', role: 'alert' }, message) : null, ...(mode === 'OPERATOR'
+        mount(root, h('div', {}, h('style', {}, SHELL_CSS), offlineBar(), h('div', { class: 'kmi-login', 'data-testid': 'login-screen', 'data-mode': mode, ...(lowPowerDevice() ? { 'data-lowpower': '' } : {}) }, h('div', { class: 'kmi-login-k', 'aria-hidden': 'true', 'data-testid': 'login-k' }, h('div', { class: 'kbody' }), h('div', { class: 'ksheen' }), h('span', { class: 'kstar' })), h('form', { class: 'kmi-login-card', 'data-testid': 'login-form', onSubmit: (e) => void submit(e) }, h('div', { class: 'brand' }, h('img', { src: './assets/kurutlu-k-symbol-white.png', alt: 'Kurutlu' }), h('h1', {}, BRAND), h('p', { class: 'sub' }, BRAND_SUB), h('div', { class: 'rule' })), operatorLoginEnabled ? h('div', { class: 'kmi-login-tabs' }, tab('EMAIL', 'Yetkili girişi', 'login-tab-email'), tab('OPERATOR', 'Operatör: Sicil No + PIN', 'login-tab-operator')) : null, message ? h('div', { class: 'kmi-login-err', 'data-testid': 'login-error', role: 'alert' }, message) : null, ...(mode === 'OPERATOR'
             ? [h('label', { for: 'kmi-login-sicil' }, 'Sicil numarası'), sicil, h('label', { for: 'kmi-login-pin' }, 'Kişisel PIN (6 rakam)'), pin,
                 h('details', { class: 'kmi-login-badge-opt' }, h('summary', {}, 'Rozet / QR ile giriş (isteğe bağlı)'), h('label', { for: 'kmi-login-badge' }, 'Rozet / QR'), badge),
                 h('p', { class: 'kmi-login-hint' }, 'Rozet tek başına giriş yaptırmaz; PIN gerekir. Paylaşılan tablette işiniz bitince Çıkış yapın.')]
@@ -522,6 +587,7 @@ export async function startApp(root, opts = {}) {
     };
     let headerDispose;
     const route = async () => {
+        const routeStart = performance.now();
         {
             // KMI LIVE kiosk: no login, display token only, PUBLIC board only (server decides)
             const { path, query } = parseHash(location.hash);
@@ -557,16 +623,16 @@ export async function startApp(root, opts = {}) {
                 const g = NAV_TREE.find((x) => x.id === new URLSearchParams(location.hash.split('?')[1] ?? '').get('d'));
                 if (!g)
                     return null;
-                return h('nav', { class: 'kmi-crumb', 'aria-label': 'Konum', 'data-testid': 'app-breadcrumb' }, h('a', { href: '#/' }, 'Ana Sayfa'), h('span', { 'aria-hidden': 'true' }, '›'), h('b', { 'aria-current': 'page' }, g.title));
+                return h('nav', { class: 'kmi-crumb', 'aria-label': 'Konum', 'data-testid': 'app-breadcrumb' }, h('a', { href: '#/' }, 'Ana Sayfa'), h('span', { 'aria-hidden': 'true' }, '›'), h('b', { 'aria-current': 'page' }, trTitle(g.title)));
             }
             const bc = breadcrumbOf(p);
             if (!bc)
                 return null;
             const first = NAV_TREE_FIRST[bc.workspaceId];
-            return h('nav', { class: 'kmi-crumb', 'aria-label': 'Konum', 'data-testid': 'app-breadcrumb' }, h('a', { href: '#/' }, 'Ana Sayfa'), h('span', { 'aria-hidden': 'true' }, '›'), first ? h('a', { href: `#${first}`, 'data-testid': 'app-crumb-ws' }, bc.workspace) : h('span', {}, bc.workspace), h('span', { 'aria-hidden': 'true' }, '›'), h('b', { 'aria-current': 'page' }, bc.page));
+            return h('nav', { class: 'kmi-crumb', 'aria-label': 'Konum', 'data-testid': 'app-breadcrumb' }, h('a', { href: '#/' }, 'Ana Sayfa'), h('span', { 'aria-hidden': 'true' }, '›'), ...(bc.workspace.toLowerCase() === bc.page.toLowerCase() ? [] : [first ? h('a', { href: `#${first}`, 'data-testid': 'app-crumb-ws' }, trTitle(bc.workspace)) : h('span', {}, trTitle(bc.workspace)), h('span', { 'aria-hidden': 'true' }, '›')]), h('b', { 'aria-current': 'page' }, bc.page));
         };
         const collapsed0 = readCollapsed();
-        document.documentElement.style.setProperty('--kmi-side-w', collapsed0 ? '92px' : '328px');
+        document.documentElement.style.setProperty('--kmi-side-w', collapsed0 ? '84px' : '300px');
         const navHost = h('div', { class: 'kmi-nav2', 'data-testid': 'app-nav' });
         const drawerNavHost = h('div', { class: 'kmi-nav2 kmi-dw', 'data-testid': 'app-drawer-nav' });
         const bottomHost = h('nav', { class: 'kmi-bottom', 'data-testid': 'app-bottom-nav', 'aria-label': 'Hızlı gezinme' });
@@ -581,14 +647,45 @@ export async function startApp(root, opts = {}) {
             menuBtn.focus();
         } });
         drawerBack.append(h('aside', { class: 'kmi-drawer', id: 'kmi-drawer', role: 'dialog', 'aria-modal': 'true', 'aria-label': 'KMI menü' }, h('div', { class: 'kmi-side-head' }, h('a', { class: 'b', href: '#/', onClick: closeDrawer }, h('img', { src: './assets/kurutlu-k-symbol-white.png', alt: '' }), h('span', { class: 't' }, h('i', {}, 'KURUTLU'), h('b', {}, 'Performance Center'))), h('button', { type: 'button', class: 'kmi-side-collapse', 'aria-label': 'Menüyü kapat', onClick: closeDrawer }, '✕')), drawerNavHost));
-        const sideEl = h('aside', { class: `kmi-side${collapsed0 ? ' collapsed' : ''}`, 'data-testid': 'app-sidebar', 'aria-label': 'Ana gezinme' }, h('div', { class: 'kmi-side-head' }, h('a', { class: 'b', href: '#/', 'data-testid': 'app-side-home', title: BRAND }, h('img', { src: './assets/kurutlu-k-symbol-white.png', alt: 'Kurutlu' }), h('span', { class: 't' }, h('i', {}, 'KURUTLU'), h('b', {}, 'Performance Center'))), h('button', { type: 'button', class: 'kmi-side-collapse', 'data-testid': 'app-side-collapse', 'aria-label': collapsed0 ? 'Menüyü genişlet' : 'Menüyü daralt', title: collapsed0 ? 'Genişlet' : 'Daralt',
-            onClick: () => { const now = !sideEl.classList.contains('collapsed'); sideEl.classList.toggle('collapsed', now); writeCollapsed(now); document.documentElement.style.setProperty('--kmi-side-w', now ? '92px' : '328px'); collBtn.setAttribute('aria-label', now ? 'Menüyü genişlet' : 'Menüyü daralt'); collBtn.replaceChildren(icon(now ? 'chevrons-right' : 'chevrons-left', 16)); } }, icon(collapsed0 ? 'chevrons-right' : 'chevrons-left', 16))), navHost);
+        const sideEl = h('aside', { class: `kmi-side${collapsed0 ? ' collapsed' : ''}${collapsed0 && sidePeek ? ' peek' : ''}`, 'data-testid': 'app-sidebar', 'aria-label': 'Ana gezinme' }, h('div', { class: 'kmi-side-head' }, h('a', { class: 'b', href: '#/', 'data-testid': 'app-side-home', title: BRAND }, h('img', { src: './assets/kurutlu-k-symbol-white.png', alt: 'Kurutlu' }), h('span', { class: 't' }, h('i', {}, 'KURUTLU'), h('b', {}, 'Performance Center'))), h('button', { type: 'button', class: 'kmi-side-collapse', 'data-testid': 'app-side-collapse', 'aria-label': collapsed0 ? 'Menüyü genişlet' : 'Menüyü daralt', title: collapsed0 ? 'Genişlet' : 'Daralt',
+            onClick: () => { const now = !sideEl.classList.contains('collapsed'); sideEl.classList.toggle('collapsed', now); writeCollapsed(now); document.documentElement.style.setProperty('--kmi-side-w', now ? '84px' : '300px'); collBtn.setAttribute('aria-label', now ? 'Menüyü genişlet' : 'Menüyü daralt'); collBtn.replaceChildren(icon(now ? 'chevrons-right' : 'chevrons-left', 16)); } }, icon(collapsed0 ? 'chevrons-right' : 'chevrons-left', 16))), navHost);
         const collBtn = sideEl.querySelector('[data-testid="app-side-collapse"]');
+        // collapsed rail: a gate click opens the page list as a flyout (peek); it closes on outside click, Escape or after choosing a page
+        const closePeek = () => { sidePeek = false; sideEl.classList.remove('peek'); };
+        document.addEventListener('click', (e) => { const t = e.target; if (!sideEl.classList.contains('peek'))
+            return; if (!e.composedPath().includes(sideEl) || t?.closest('.kmi-panel a'))
+            closePeek(); });
+        document.addEventListener('keydown', (e) => { if (e.key === 'Escape')
+            closePeek(); });
         headerDispose?.();
         const header = createHeader({ brandTitle: BRAND, initialName: session.user.label ?? session.user.email ?? '', searchValue: path === '/ara' ? (query.get('q') ?? '') : '', menuBtn, onLogout: () => void logout() });
         headerDispose = header.dispose;
-        mount(root, h('div', { class: 'kmi-has-bottom' }, h('style', {}, SHELL_CSS), offlineBar(), h('a', { class: 'kmi-skip', href: '#kmi-main', onClick: (e) => { e.preventDefault(); document.getElementById('kmi-main')?.focus(); } }, 'İçeriğe geç'), sideEl, drawerBack, h('div', { class: 'kmi-main' }, header.el, h('main', { class: 'kmi-content', id: 'kmi-main', tabindex: '-1' }, crumbEl(path), content)), bottomHost));
+        // KMI-001 §001.3: device experience — policy (config/setup link/operator session) is separate from the physical form factor; tablets/kiosks/operator terminals show who is signed in + a big safe sign-out.
+        const applyDevice = () => {
+            const p = deviceProfile(device.mode, window.innerWidth, isOperatorSession());
+            const ds = document.documentElement.dataset;
+            ds['kmiDevice'] = p.mode.toLowerCase();
+            ds['kmiForm'] = p.form;
+            ds['kmiTouch'] = p.touchFirst ? '1' : '0';
+            document.documentElement.style.setProperty('--kmi-target', `${p.minTargetPx}px`);
+            deviceStrip.hidden = !p.showIdentityStrip;
+            if (!deviceReported) {
+                deviceReported = true;
+                ux.record({ kind: 'DEVICE_CLASS', route: '#/', device: { mode: p.mode, form: p.form } });
+            }
+            stripLabel.textContent = p.mode === 'KIOSK' ? 'KIOSK' : p.mode === 'TABLET' ? 'TABLET' : 'OPERATÖR TERMİNALİ';
+            stripNote.textContent = p.idleSignOut ? `${IDLE_LIMIT_MS / 1000} sn hareketsizlikte oturum otomatik kapanır` : 'Otomatik çıkış bu cihazda kapalı';
+        };
+        const stripLabel = h('b', { class: 'dv-mode', 'data-testid': 'device-mode' }, '');
+        const stripName = h('span', { class: 'dv-name', 'data-testid': 'device-identity' }, session.user.label ?? session.user.email ?? '');
+        const stripNote = h('span', { class: 'dv-note', 'data-testid': 'device-idle-note' }, '');
+        const deviceStrip = h('div', { class: 'kmi-device', 'data-testid': 'device-strip', role: 'status', hidden: true }, stripLabel, h('span', { class: 'dv-who' }, icon('user', 18), stripName), stripNote, h('button', { type: 'button', class: 'dv-out', 'data-testid': 'device-logout', onClick: () => void logout() }, icon('logout', 20), 'ÇIKIŞ YAP'));
+        deviceApply = applyDevice;
+        applyDevice();
+        mount(root, h('div', { class: 'kmi-has-bottom' }, h('style', {}, SHELL_CSS), offlineBar(), h('a', { class: 'kmi-skip', href: '#kmi-main', onClick: (e) => { e.preventDefault(); document.getElementById('kmi-main')?.focus(); } }, 'İçeriğe geç'), sideEl, drawerBack, h('div', { class: 'kmi-main' }, deviceStrip, header.el, h('main', { class: 'kmi-content', id: 'kmi-main', tabindex: '-1' }, crumbEl(path), content)), bottomHost));
         const { value: access, failed: accessFailed } = await getAccess();
+        if (!session)
+            return; // signed out (manual, idle or another tab) while the access lookup was in flight: nothing more to draw
         {
             const live = canOpen('/canli', access), pulse = canOpen('/komuta', access);
             header.setChips(live, pulse);
@@ -597,21 +694,24 @@ export async function startApp(root, opts = {}) {
             const fallbackName = session.user.label ?? session.user.email ?? '';
             header.setIdentity({ name: fallbackName, roles: access.roles });
             void client.select('personnel', { columns: 'name,department', filters: { auth_user_id: `eq.${uid}` }, limit: 1 }, session)
-                .then((rows) => { if (rows[0]?.name)
-                header.setIdentity({ name: rows[0].name, department: rows[0].department, roles: access.roles }); })
+                .then((rows) => { if (rows[0]?.name) {
+                header.setIdentity({ name: rows[0].name, department: rows[0].department, roles: access.roles });
+                stripName.textContent = rows[0].name;
+            } })
                 .catch(() => { });
         }
         // navigation: only what this user may open (same rule as the home screen and the direct-URL guard); the server decides for real
         const treeAll = visibleNav((p) => canOpen(p, access) && ROUTES.some((x) => x.path === p && x.inMenu));
         // remembered state (per browser, never a permission): last workspace + favourites
+        const navKey = `${NAV_STATE_KEY}:${session.user.id}`; // per user: a shared tablet/kiosk never shows the previous person's recent screens
         let navState = readNavState((() => { try {
-            return localStorage;
+            return { getItem: (_k) => localStorage.getItem(navKey) };
         }
         catch {
             return null;
         } })());
         const saveNavState = () => { try {
-            localStorage.setItem(NAV_STATE_KEY, JSON.stringify(navState));
+            localStorage.setItem(navKey, JSON.stringify(navState));
         }
         catch { /* private mode */ } };
         navState = nextNavState(navState, { visit: path });
@@ -629,62 +729,98 @@ export async function startApp(root, opts = {}) {
             const a = h('a', { href: `#${it.path}`, 'data-testid': testid, 'data-path': it.path, title: it.label, ...(it.path === path ? { 'aria-current': 'page' } : {}), ...(onNav ? { onClick: onNav } : {}) }, icon(it.icon), h('span', { class: 'nl' }, it.label));
             return a;
         };
-        // ---- TWO-LEVEL NAVIGATION (owner directive, Release 007): a compact rail of the 15 workspaces + a panel with the pages of the SELECTED workspace only.
-        // Never 15 open groups. Favourites and recently used screens are virtual workspaces; tasks / approvals sit at the rail foot. Phones/tablets get a drawer that switches department.
+        // ---- TWO-LEVEL NAVIGATION (KMI-001 §001.1): SIX gates in the rail (Benim KMI · Performance Center · Siparişten Sevkiyata · Departmanlar · Yönetim ve Kurumsal Zekâ · Araçlar ve Sistem);
+        // the panel of the SELECTED gate lists its workspaces (department → its own screens, each header links to the department home). The 15 workspaces / routes / permissions are unchanged
+        // (gates only group them); a screen may sit under two gates but is one route. Favourites and recently used screens are sections of "Benim KMI".
         const visibleItem = (p) => treeAll.some((g) => g.items.some((x) => x.path === p));
         const favVirt = () => { const items = navState.favorites.map((p) => NAV_ITEM_BY_PATH[p]).filter((i) => !!i && visibleItem(i.path)); return items.length ? { id: 'fav', short: 'Favori', title: 'FAVORİLERİM', icon: 'badge', items } : null; };
         const recentVirt = () => { const items = navState.recent.filter((p) => p !== path).map((p) => NAV_ITEM_BY_PATH[p]).filter((i) => !!i && visibleItem(i.path)); return items.length ? { id: 'recent', short: 'Son', title: 'SON KULLANILAN', icon: 'clock', items } : null; };
-        const wsList = navGroups.filter((g) => g.id !== 'fav');
-        const initialWs = () => {
-            const own = path === '/departman' ? new URLSearchParams(location.hash.split('?')[1] ?? '').get('d') ?? undefined : WORKSPACE_OF_PATH[path];
-            if (operatorSimple && wsList[0]?.id === 'mine' && wsList[0].items.some((i) => i.path === path))
-                return 'mine';
-            if (own && wsList.some((g) => g.id === own))
-                return own;
-            if (path === '/' && navState.last && wsList.some((g) => g.id === navState.last))
-                return navState.last;
-            return wsList[0]?.id ?? 'pc';
-        };
-        let selectedWs = initialWs();
-        const findWs = (id) => id === 'fav' ? favVirt() ?? undefined : id === 'recent' ? recentVirt() ?? undefined : wsList.find((g) => g.id === id);
-        const quickLinks = ['/gorevler', '/onaylar'].filter((p) => visibleItem(p));
-        const pickWs = (id, redraw, afterNav) => {
-            const g = findWs(id);
-            if (!g)
-                return;
-            selectedWs = id;
-            if (g.items.length === 1 && id !== 'fav' && id !== 'recent' && id !== 'mine' && g.items[0].path !== '/') {
-                location.hash = `#/departman?d=${id}`;
-                afterNav?.();
-                return;
+        const gatesNow = () => {
+            const gs = visibleGates(treeAll);
+            if (operatorSimple && navGroups[0]?.id === 'mine') {
+                const mine = navGroups[0];
+                const me = gs.find((g) => g.id === 'me');
+                const rest = (me?.sections ?? []).map((sct) => ({ ...sct, title: 'DİĞER', items: sct.items.filter((i) => !mine.items.some((m) => m.path === i.path)) })).filter((sct) => sct.items.length > 0);
+                const meGate = { id: 'me', title: 'BENİM KMI', short: 'Benim', icon: 'user', sections: [mine, ...rest] };
+                return me ? gs.map((g) => (g.id === 'me' ? meGate : g)) : [meGate, ...gs];
             }
-            redraw();
+            const fav = favVirt(), rec = recentVirt();
+            const me = gs.find((g) => g.id === 'me');
+            if (me || fav || rec) {
+                const meGate = { id: 'me', title: 'BENİM KMI', short: 'Benim', icon: 'user', sections: [...(me?.sections ?? []), ...(fav ? [fav] : []), ...(rec ? [rec] : [])] };
+                return me ? gs.map((g) => (g.id === 'me' ? meGate : g)) : [meGate, ...gs];
+            }
+            return gs;
         };
-        const wsIcon = (g) => icon(g.icon, 22);
+        const initialGate = () => {
+            const gs = gatesNow();
+            const deptId = path === '/departman' ? new URLSearchParams(location.hash.split('?')[1] ?? '').get('d') ?? undefined : undefined;
+            const want = operatorSimple && gs[0]?.sections[0]?.id === 'mine' && gs[0].sections[0].items.some((i) => i.path === path) ? 'me' : deptId ? gateOfWorkspace(deptId) : gateOfPath(path);
+            if (path === '/' && navState.last) {
+                const g = gateOfWorkspace(navState.last);
+                if (gs.some((x) => x.id === g))
+                    return g;
+            }
+            if (gs.some((g) => g.id === want))
+                return want;
+            return gs.find((g) => g.sections.some((sct) => sct.items.some((i) => i.path === path)))?.id ?? gs[0]?.id ?? 'me';
+        };
+        let selectedGate = initialGate();
+        const pickGate = (id, redraw) => { selectedGate = id; redraw(); };
+        const gateIcon = (g) => icon(g.icon, 22);
+        const deptHomeId = (sct) => (sct.id === 'me' || sct.id === 'mine' || sct.id === 'fav' || sct.id === 'recent' || sct.id === 'pc' || !sct.items.some((x) => x.path !== '/') ? null : sct.id);
         const fillSide = (host) => {
             const draw = () => {
-                const sel = findWs(selectedWs) ?? wsList[0];
-                const railBtn = (g, tid) => h('button', { type: 'button', class: 'ri', 'data-testid': tid, 'data-ws': g.id, 'aria-pressed': String(g.id === selectedWs), 'aria-label': g.title, title: g.title, onClick: () => pickWs(g.id, draw) }, wsIcon(g), h('span', { class: 'rl' }, g.short));
-                const railLink = (p, tid) => { const it = NAV_ITEM_BY_PATH[p]; return h('a', { class: 'ri', href: `#${it.path}`, 'data-testid': tid, 'data-path': it.path, title: it.label, ...(it.path === path ? { 'aria-current': 'page' } : {}) }, icon(it.icon, 20), h('span', { class: 'rl' }, p === '/' ? 'Ana Sayfa' : it.label.split(' ')[0] ?? it.label)); };
-                const fav = favVirt(), rec = recentVirt();
-                const rail = h('nav', { class: 'kmi-rail', 'aria-label': 'Çalışma alanları', 'data-testid': 'app-rail' }, railLink('/', 'app-rail-home'), ...(fav ? [railBtn(fav, 'app-nav-special')] : []), ...(rec ? [railBtn(rec, 'app-nav-special')] : []), h('hr', {}), ...wsList.map((g) => railBtn(g, 'app-nav-group')), ...(quickLinks.length ? [h('hr', {}), ...quickLinks.map((p) => railLink(p, 'app-rail-link'))] : []));
-                const panel = h('div', { class: 'kmi-panel', 'data-testid': 'app-nav-panel', 'data-ws': sel?.id ?? '' }, h('div', { class: 'ph', 'data-testid': 'app-nav-panel-title' }, sel && sel.id !== 'fav' && sel.id !== 'recent' && sel.id !== 'mine' && sel.id !== 'pc' && sel.items.some((x) => x.path !== '/') ? h('a', { href: `#/departman?d=${sel.id}`, class: 'ph-link', 'data-testid': 'app-dept-home-link', title: 'Departman ana ekranı' }, sel.title, ' ›') : (sel?.title ?? '')), ...(sel?.items ?? []).map((it) => {
-                    const a = navLink(it, 'app-nav-item');
-                    const on = navState.favorites.includes(it.path);
-                    const star = h('button', { type: 'button', class: 'nfav', 'data-testid': 'app-nav-fav', 'data-path': it.path, 'aria-pressed': String(on), 'aria-label': on ? `${it.label} favorilerden çıkar` : `${it.label} favorilere ekle`, title: on ? 'Favoriden çıkar' : 'Favorilere ekle',
-                        onClick: () => { navState = nextNavState(navState, { toggleFavorite: it.path }); saveNavState(); draw(); } }, on ? '★' : '☆');
-                    return h('div', { class: 'nrow' }, a, star);
-                }));
+                const gs = gatesNow();
+                const sel = gs.find((g) => g.id === selectedGate) ?? gs[0];
+                const railBtn = (g) => h('button', { type: 'button', class: 'ri', 'data-testid': 'app-nav-group', 'data-ws': g.id, 'data-gate': g.id, 'aria-pressed': String(g.id === sel?.id), 'aria-label': g.title, title: g.title, onClick: () => { pickGate(g.id, draw); const sd = host.closest('.kmi-side'); if (sd?.classList.contains('collapsed'))
+                        sd.classList.add('peek'); sidePeek = true; } }, gateIcon(g), h('span', { class: 'rl' }, g.short));
+                const rail = h('nav', { class: 'kmi-rail', 'aria-label': 'Ana kapılar', 'data-testid': 'app-rail' }, ...gs.map(railBtn));
+                const secs = sel?.sections ?? [];
+                const activeSec = secs.find((sct) => sct.items.some((i) => i.path === path)) ?? (path === '/departman' ? secs.find((sct) => sct.id === new URLSearchParams(location.hash.split('?')[1] ?? '').get('d')) : undefined);
+                const isOpen = (sct) => secs.length <= 2 || sct === activeSec || openSecs.has(`${sel?.id}:${sct.id}`);
+                const sectionEl = (sct) => {
+                    const dh = deptHomeId(sct);
+                    const open = isOpen(sct);
+                    const fl = open && sct === activeSec && dh ? resolveFunctions(sct.id, (pp) => canOpen(pp, access)) : null;
+                    const covered = new Set((fl ?? []).filter((f) => f.link && f.path && f.path !== '/departman').map((f) => f.path)); // one implementation, one menu entry: a page the function list already links is not repeated
+                    const rows = sct.items.filter((it) => !covered.has(it.path)).map((it) => {
+                        const a = navLink(it, 'app-nav-item');
+                        const on = navState.favorites.includes(it.path);
+                        const star = h('button', { type: 'button', class: 'nfav', 'data-testid': 'app-nav-fav', 'data-path': it.path, 'aria-pressed': String(on), 'aria-label': on ? `${it.label} favorilerden çıkar` : `${it.label} favorilere ekle`, title: on ? 'Favoriden çıkar' : 'Favorilere ekle',
+                            onClick: () => { navState = nextNavState(navState, { toggleFavorite: it.path }); saveNavState(); draw(); } }, on ? '★' : '☆');
+                        return h('div', { class: 'nrow' }, a, star);
+                    });
+                    const head = dh ? h('a', { href: `#/departman?d=${dh}`, class: 'ph-link', 'data-testid': 'app-dept-home-link', 'data-dept': dh }, icon(sct.icon, 18), sct.title) : h('span', {}, sct.title);
+                    const toggle = secs.length > 2 ? h('button', { type: 'button', class: 'nfav nexp', 'data-testid': 'app-nav-expand', 'aria-expanded': String(open), 'aria-label': `${sct.title} sayfaları`, title: open ? 'Daralt' : 'Sayfaları göster',
+                        onClick: () => { const k = `${sel?.id}:${sct.id}`; if (openSecs.has(k))
+                            openSecs.delete(k);
+                        else
+                            openSecs.add(k); draw(); } }, open ? '▴' : '▾') : null;
+                    // KMI-001 §001.1 rich second level: the department's functions with their honest state (only the section the user is in, to keep the panel short)
+                    const fnList = fl ? h('div', { class: 'nfn', 'data-testid': 'app-nav-functions' }, h('div', { class: 'nfh' }, 'İŞLEVLER'), ...fl.map((f) => {
+                        const dot = h('i', { class: `fd fd-${f.state.toLowerCase()}`, title: FUNCTION_STATE_TR[f.state], 'aria-hidden': 'true' });
+                        const tx = h('span', {}, f.label, h('small', {}, f.pkg ? `${FUNCTION_STATE_TR[f.state]} · ${f.pkg}` : FUNCTION_STATE_TR[f.state]));
+                        return f.link ? h('a', { href: f.link, class: 'nfi', 'data-testid': 'app-nav-function', 'data-state': f.state }, dot, tx) : h('div', { class: 'nfi off', 'data-testid': 'app-nav-function', 'data-state': f.state, title: f.note ?? '' }, dot, tx);
+                    })) : null;
+                    return h('section', { class: 'nsec', 'data-testid': 'app-nav-section', 'data-ws': sct.id, 'data-open': String(open) }, h('div', { class: 'nsh' }, head, toggle), ...(open ? rows : []), fnList);
+                };
+                const panel = h('div', { class: 'kmi-panel', 'data-testid': 'app-nav-panel', 'data-ws': sel?.id ?? '', 'data-gate': sel?.id ?? '' }, h('div', { class: 'ph', 'data-testid': 'app-nav-panel-title' }, sel?.title ?? ''), ...secs.map(sectionEl));
                 host.replaceChildren(rail, panel);
             };
             draw();
         };
+        const openSecs = new Set();
         const fillDrawer = (host) => {
             const draw = () => {
-                const sel = findWs(selectedWs) ?? wsList[0];
-                const fav = favVirt(), rec = recentVirt();
-                const chip = (g) => h('button', { type: 'button', class: 'dws', 'data-testid': 'app-drawer-ws', 'data-ws': g.id, 'aria-pressed': String(g.id === selectedWs), onClick: () => pickWs(g.id, draw, closeDrawer) }, wsIcon(g), h('span', {}, g.short));
-                host.replaceChildren(h('div', { class: 'dh', 'data-testid': 'app-drawer-title' }, sel?.title ?? ''), h('div', { class: 'dpages' }, ...(sel?.items ?? []).map((it) => navLink(it, 'app-drawer-item', closeDrawer))), h('div', { class: 'dh' }, 'DEPARTMAN DEĞİŞTİR'), h('div', { class: 'dgrid' }, ...[...(fav ? [fav] : []), ...(rec ? [rec] : []), ...wsList].map(chip)), h('div', { class: 'dquick' }, navLink(NAV_ITEM_BY_PATH['/'], 'app-drawer-quick', closeDrawer), ...quickLinks.map((p) => navLink(NAV_ITEM_BY_PATH[p], 'app-drawer-quick', closeDrawer))));
+                const gs = gatesNow();
+                const sel = gs.find((g) => g.id === selectedGate) ?? gs[0];
+                const chip = (g) => h('button', { type: 'button', class: 'dws', 'data-testid': 'app-drawer-ws', 'data-ws': g.id, 'data-gate': g.id, 'aria-pressed': String(g.id === sel?.id), onClick: () => pickGate(g.id, draw) }, gateIcon(g), h('span', {}, g.short));
+                host.replaceChildren(h('div', { class: 'dh', 'data-testid': 'app-drawer-title' }, sel?.title ?? ''), h('div', { class: 'dpages' }, ...(sel?.sections ?? []).flatMap((sct) => {
+                    const dh = deptHomeId(sct);
+                    return [(sel?.sections.length ?? 0) > 1 ? h('div', { class: 'dsub' }, dh ? h('a', { href: `#/departman?d=${dh}`, onClick: closeDrawer }, sct.title) : sct.title) : null,
+                        ...sct.items.map((it) => navLink(it, 'app-drawer-item', closeDrawer))].filter((x) => !!x);
+                })), h('div', { class: 'dh' }, 'KAPI DEĞİŞTİR'), h('div', { class: 'dgrid' }, ...gs.map(chip)));
             };
             draw();
         };
@@ -695,43 +831,106 @@ export async function startApp(root, opts = {}) {
         header.setShortcuts(pickShortcuts([...quick, ...navAllPaths].map((p) => ({ path: p, label: NAV_ITEM_BY_PATH[p]?.label ?? p })), (p) => canOpen(p, access) && !!NAV_ITEM_BY_PATH[p]));
         const r = ROUTES.find((x) => x.path === path);
         if (!r) {
+            if (path !== '/')
+                ux.record({ kind: 'BROKEN_ROUTE', route: '#/?' }); // the typed path is never recorded
             const landing = landingPath(access);
             if (landing) {
                 location.hash = `#${landing}`;
                 return;
             }
             const open = ROUTES.filter((x) => x.inMenu && canOpen(x.path, access));
-            const featured = featuredPaths(access, open.map((x) => x.path)).map((p) => open.find((x) => x.path === p));
-            const tile = (x, testid, cls = '') => {
-                const n = NAV_ITEM_BY_PATH[x.path];
-                return h('a', { href: `#${x.path}`, class: `kmi-tile${cls}`, 'data-testid': testid, 'data-path': x.path }, icon(n?.icon ?? 'grid', 22), h('span', {}, n?.label ?? x.label, (() => { const rest = n && x.label.startsWith(n.label) ? x.label.slice(n.label.length).replace(/^[\s·—()-]+|[\s)]+$/g, '') : (n && n.label !== x.label ? x.label : ''); return rest ? h('small', {}, rest) : null; })()));
-            };
             const homeGroups = treeAll.map((g) => ({ title: g.title, items: g.items.map((i) => open.find((x) => x.path === i.path)).filter((x) => !!x) })).filter((g) => g.items.length > 0);
-            mount(content, h('div', { class: 'shell-menu kmi-home', style: 'max-width:1200px', 'data-testid': 'app-menu' }, accessFailed ? h('div', { class: 'kmi-banner warn', 'data-testid': 'app-access-failed' }, 'Yetki bilgisi alınamadı; yalnız herkese açık ekranlar gösteriliyor. Sayfayı yenileyin.') : null, h('section', { class: 'kmi-hero' }, h('img', { src: './assets/kurutlu-k-symbol-white.png', alt: '' }), h('div', {}, h('h1', {}, BRAND), h('p', {}, BRAND_SUB), access.roles.length ? h('div', { class: 'chips', 'data-testid': 'app-roles' }, h('span', { class: 'kmi-chip' }, `Rolünüz: ${access.roles.join(', ')}`), access.economics ? h('span', { class: 'kmi-chip' }, 'ekonomi yetkisi') : null) : null)), h('section', { class: 'kmi-pulse', 'data-testid': 'app-today', hidden: true }), featured.length ? h('div', { 'data-testid': 'app-featured' }, h('div', { class: 'kmi-section gold' }, 'SİZİN İÇİN'), h('div', { class: 'tiles' }, ...featured.slice(0, 6).map((x) => tile(x, 'app-featured-item', ' featured')))) : null, h('details', { 'data-testid': 'app-all', class: 'kmi-home' }, h('summary', {}, 'Tüm departmanlar ve ekranlar'), ...homeGroups.map((g) => h('div', { class: 'kmi-dept' }, h('div', { class: 'kmi-section' }, g.title), h('div', { class: 'kmi-links' }, ...g.items.map((x) => {
+            mount(content, h('div', { class: 'shell-menu kmi-home', style: 'max-width:1200px', 'data-testid': 'app-menu' }, accessFailed ? h('div', { class: 'kmi-banner warn', 'data-testid': 'app-access-failed' }, 'Yetki bilgisi alınamadı; yalnız herkese açık ekranlar gösteriliyor. Sayfayı yenileyin.') : null, h('section', { class: 'kmi-pulse', 'data-testid': 'app-today', hidden: true }), h('details', { 'data-testid': 'app-all', class: 'kmi-home' }, h('summary', {}, 'Tüm departmanlar ve ekranlar'), ...homeGroups.map((g) => h('div', { class: 'kmi-dept' }, h('div', { class: 'kmi-section' }, trTitle(g.title)), h('div', { class: 'kmi-links' }, ...g.items.map((x) => {
                 const n = NAV_ITEM_BY_PATH[x.path];
                 return h('a', { href: `#${x.path}`, class: 'kmi-link', 'data-testid': 'app-menu-item', 'data-path': x.path }, icon(n?.icon ?? 'grid', 16), n?.label ?? x.label);
             })))))));
-            // KOKPİT (KMI-HOME-001): role-adaptive cards from the canonical command_center snapshot (+ commercial_approvals counts for accounting).
-            void (async () => {
+            // AKILLI ANA SAYFA (KMI-002): every source is requested once, in parallel, and settles on its own; the heavy KPI catalogue loads only when opened.
+            {
                 const host = content.querySelector('[data-testid="app-today"]');
                 if (!host)
                     return;
-                let snapshot = null;
-                let failed = false;
+                const homeAccess = { roles: access.roles, economics: access.economics, owner: access.owner, actions: access.actions };
+                const uid = session?.user.id ?? 'anon';
+                const liveApi = createLiveApi(client, session);
+                const fleet = showsFleet(homeAccess);
+                let savedOrder = null;
                 try {
-                    snapshot = await createCommandCenterApi(client, session).snapshot();
+                    savedOrder = JSON.parse(localStorage.getItem(orderStorageKey(uid)) ?? 'null');
                 }
                 catch {
-                    failed = true;
+                    savedOrder = null;
                 }
-                const homeAccess = { roles: access.roles, economics: access.economics, owner: access.owner, actions: access.actions };
-                const needed = homeCardsFor(homeAccess).filter((c) => c.source.kind === 'extra').map((c) => c.source.key);
-                const extras = await loadExtras(client, session, needed, new Date().toISOString());
-                renderCockpit(host, { snapshot, extras, access: homeAccess, nowMs: Date.now(), failed });
+                const prefs = createHomePrefsApi(client, session, { enabled: window.KMI_NEXT_CONFIG?.features?.homePrefs === true });
+                const decideSrc = sourcesFor(new Set(access.actions));
+                const hasDecideSrc = decideSrc.commercial || decideSrc.requests || decideSrc.orders || decideSrc.tasks; // a person is only ever loaded the decisions he may take
+                const decideApi = canOpen('/onaylar', access) && hasDecideSrc ? createApprovalsInboxApi(client, session, { includeTasks: decideSrc.tasks, sources: decideSrc }) : null;
+                const showHost = h('div', { id: 'home-show-host', 'data-testid': 'home-show' });
+                const catHost = h('div', { 'data-testid': 'cockpit-catalog-host' });
+                const hasCatalog = homeCardsFor(homeAccess).length > 0;
+                const catalog = hasCatalog ? h('details', { class: 'hs-catalog cp-block', 'data-testid': 'home-catalog' }, h('summary', {}, 'Ayrıntılı gösterge kataloğu'), catHost) : null;
+                host.replaceChildren(showHost, ...(catalog ? [catalog] : []));
+                host.hidden = false;
+                let last = null;
+                let catLoaded = false;
+                const present = () => ['fleet', 'perf', 'wos', 'flow', 'quick'].filter((x) => fleet || (x !== 'fleet' && x !== 'wos'));
+                const draw = () => {
+                    if (!last)
+                        return;
+                    const nowMs = Date.now();
+                    const recent = navState.recent;
+                    const order = applyOrder(present(), savedOrder);
+                    renderHomeShow(showHost, { snapshot: last.snapshot, board: last.board, info: new Map(last.info.map((m) => [m.code, m])), approvalsInQueue: last.approvalsPending, approvalsPending: last.approvalsPending === null ? null : last.approvalsPending + countGates((last.tasks?.derived ?? []).map((d) => ({ sourceType: d.sourceType, sourceId: d.sourceId, title: d.title, status: d.status, due: d.due ?? null, route: d.route ?? null })), new Set(access.actions)), access: homeAccess, nowMs, canOpen: (p) => canOpen(p, access),
+                        userName: session?.user.label ?? session?.user.email ?? null, failed: last.sources.snapshot.state === 'FAILED' || last.sources.snapshot.state === 'TIMEOUT',
+                        tasks: last.tasks, sources: last.sources, recent, quickDefaults: featuredPaths(access, navAllPaths), order, decideApi, customOrder: Array.isArray(savedOrder),
+                        onMove: (id, dir) => { savedOrder = moveSection(order, id, dir); try {
+                            localStorage.setItem(orderStorageKey(uid), JSON.stringify(savedOrder));
+                        }
+                        catch { /* private mode: order lives for this view only */ } void prefs.set(savedOrder).catch(() => { }); draw(); },
+                        onResetOrder: () => { savedOrder = null; try {
+                            localStorage.removeItem(orderStorageKey(uid));
+                        }
+                        catch { /* private mode */ } void prefs.set([]).catch(() => { }); draw(); },
+                        onRefresh: () => loader.refresh() });
+                };
+                const loader = createHomeLoader({
+                    snapshot: () => createCommandCenterApi(client, session).snapshot(),
+                    board: fleet ? () => liveApi.board('OFFICE') : null, info: fleet && liveApi.machineInfo ? () => liveApi.machineInfo() : null,
+                    tasks: () => createTaskFloorApi(client, session).floor('MINE'),
+                    approvals: canOpen('/onaylar', access) ? async () => {
+                        const hs = new Set(access.actions);
+                        const sr = sourcesFor(hs);
+                        if (!hasDecideSrc)
+                            return 0; // quality-only person: no source to read; his gates are counted from the task list already loaded
+                        return (await createApprovalsInboxApi(client, session, { includeTasks: sr.tasks, sources: sr, light: true }).load()).items.length;
+                    } : null,
+                    onUpdate: (d) => { last = d; draw(); }, isMounted: () => showHost.isConnected
+                });
+                loader.start();
+                // the user's server-side order (follows them to other devices) is read once, in parallel, and only replaces the device copy when it is a real order
+                void prefs.get().then((o) => { if (o && o.length && showHost.isConnected) {
+                    savedOrder = o;
+                    try {
+                        localStorage.setItem(orderStorageKey(uid), JSON.stringify(o));
+                    }
+                    catch { /* private mode */ }
+                    draw();
+                } }).catch(() => { });
+                // the 30-odd KPI catalogue (≈20 table reads) is NOT part of the first screen: it loads once, when the user opens it
+                catalog?.addEventListener('toggle', () => {
+                    if (!catalog.open || catLoaded)
+                        return;
+                    catLoaded = true;
+                    catHost.replaceChildren(h('div', { class: 'hs-skel', role: 'status' }, 'Göstergeler yükleniyor…'));
+                    void (async () => {
+                        const needed = homeCardsFor(homeAccess).filter((c) => c.source.kind === 'extra').map((c) => c.source.key);
+                        const extras = await loadExtras(client, session, needed, new Date().toISOString());
+                        renderCockpit(catHost, { snapshot: last?.snapshot ?? null, extras, access: homeAccess, nowMs: Date.now(), failed: !last?.snapshot });
+                    })();
+                });
                 // Factory state (machine park, shifts, OEE, risks, departments) lives ONLY in the Performance Center — Home links to it instead of repeating it.
                 if (canOpen('/komuta', access))
                     host.append(h('a', { href: '#/komuta', class: 'kmi-link', 'data-testid': 'home-pc-link', style: 'display:inline-block;margin-top:14px' }, 'Fabrikanın tamamı: Performance Center →'));
-            })();
+            }
             return;
         }
         if (!canOpen(r.path, access)) {
@@ -745,9 +944,11 @@ export async function startApp(root, opts = {}) {
         }
         try {
             await r.render(content, client, session, query, access);
+            ux.record({ kind: 'PAGE_LOAD', route: knownHash(), ms: performance.now() - routeStart });
         }
         catch (err) {
-            mount(content, h('div', { class: 'shell-menu', 'data-testid': 'app-route-error' }, `Ekran açılamadı: ${err instanceof Error ? err.message : String(err)}`));
+            ux.record({ kind: 'NAV_ERROR', route: knownHash() });
+            mount(content, h('div', { class: 'shell-menu', 'data-testid': 'app-route-error', 'data-detail': err instanceof Error ? err.message : String(err) }, h('p', {}, 'Bu ekran şu an açılamadı. Bağlantıyı kontrol edip yeniden deneyin; sürerse sistem yöneticisine bildirin.'), h('a', { href: location.hash || '#/', 'data-testid': 'app-route-retry', onClick: (e) => { e.preventDefault(); void route(); } }, 'Yeniden dene'))); // raw technical text never reaches the user (kept in data-detail for support)
         }
     };
     window.addEventListener('hashchange', () => void route());

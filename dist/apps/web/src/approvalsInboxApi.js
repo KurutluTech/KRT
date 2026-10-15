@@ -6,7 +6,7 @@ const inList = (ids) => `in.(${ids.join(',')})`;
 export async function loadTasks(client, session) {
     try {
         const rows = await client.rpc('task_approval_inbox', {}, session);
-        return rows.map((r) => ({ id: r.id, title: r.title, status: r.status, completedAt: r.completedAt, dueAt: r.dueAt, ownerLabel: r.ownerLabel, completedByMe: !!r.completedByMe }));
+        return rows.map((r) => ({ id: r.id, title: r.title, status: r.status, completedAt: r.completedAt, dueAt: r.dueAt, ownerLabel: r.ownerLabel, completedByMe: !!r.completedByMe, completionNote: r.completionNote ?? null, completedByLabel: r.completedByLabel ?? null }));
     }
     catch (e) {
         if (!isSetupPending(e) && !/Could not find the function|schema cache/i.test(msg(e)))
@@ -17,6 +17,7 @@ export async function loadTasks(client, session) {
 }
 const msg = (e) => (e instanceof Error ? e.message : String(e));
 export function createApprovalsInboxApi(client, session, opts = {}) {
+    const on = { commercial: opts.sources?.commercial ?? true, requests: opts.sources?.requests ?? true, orders: opts.sources?.orders ?? true, hist: !opts.light };
     const now = opts.now ?? (() => Date.now());
     const includeTasks = opts.includeTasks ?? true;
     return {
@@ -30,19 +31,26 @@ export function createApprovalsInboxApi(client, session, opts = {}) {
                 return [];
             } };
             const sinceIso = new Date(now() - HISTORY_DAYS * 86_400_000).toISOString();
-            const [commercial, purchaseRequests, purchaseOrders, tasks, decidedC, decidedR, approvedPO] = await Promise.all([
-                safe('COMMERCIAL_DECISION', client.select('commercial_approvals', { columns: 'id,stock_lot_id,status,requested_by,requested_at,management_released_at', filters: { status: 'eq.PENDING' }, order: 'requested_at.asc', limit: 500 }, session)),
-                safe('PURCHASE_REQUEST', client.select('purchase_requests', { columns: 'id,material_code,qty,needed_by,reason,status,requested_by,requested_at,source_work_order_id', filters: { status: 'eq.SUBMITTED' }, order: 'requested_at.asc', limit: 500 }, session)),
-                safe('PURCHASE_ORDER', client.select('purchase_orders', { columns: 'id,supplier_id,status,created_by,created_at,updated_at', filters: { status: 'eq.SUBMITTED' }, order: 'created_at.asc', limit: 500 }, session)),
+            const [commercial, purchaseRequests, purchaseOrders, tasks, decidedC, decidedR, approvedPO, rejectedPO] = await Promise.all([
+                on.commercial ? safe('COMMERCIAL_DECISION', client.select('commercial_approvals', { columns: 'id,stock_lot_id,status,requested_by,requested_at,management_released_at', filters: { status: 'eq.PENDING' }, order: 'requested_at.asc', limit: 500 }, session)) : Promise.resolve([]),
+                on.requests ? safe('PURCHASE_REQUEST', client.select('purchase_requests', { columns: 'id,material_code,qty,needed_by,reason,status,requested_by,requested_at,source_work_order_id', filters: { status: 'eq.SUBMITTED' }, order: 'requested_at.asc', limit: 500 }, session)) : Promise.resolve([]),
+                on.orders ? safe('PURCHASE_ORDER', client.select('purchase_orders', { columns: 'id,supplier_id,status,created_by,created_at,updated_at', filters: { status: 'eq.SUBMITTED' }, order: 'created_at.asc', limit: 500 }, session)) : Promise.resolve([]),
                 safe('TASK_COMPLETION', includeTasks ? loadTasks(client, session) : Promise.resolve([])),
-                safe('HISTORY', client.select('commercial_approvals', { columns: 'id,stock_lot_id,status,decided_at,decided_by,decision_reason', filters: { status: 'in.(APPROVED,REJECTED)', decided_at: `gte.${sinceIso}` }, order: 'decided_at.desc', limit: 100 }, session)),
-                safe('HISTORY', client.select('purchase_requests', { columns: 'id,material_code,qty,status,decided_at,decided_by,decision_reason,source_work_order_id', filters: { status: 'in.(APPROVED,REJECTED)', decided_at: `gte.${sinceIso}` }, order: 'decided_at.desc', limit: 100 }, session)),
-                safe('HISTORY', client.select('purchase_orders', { columns: 'id,supplier_id,status,updated_at', filters: { status: 'eq.APPROVED', updated_at: `gte.${sinceIso}` }, order: 'updated_at.desc', limit: 100 }, session)),
+                on.hist && on.commercial ? safe('HISTORY', client.select('commercial_approvals', { columns: 'id,stock_lot_id,status,decided_at,decided_by,decision_reason', filters: { status: 'in.(APPROVED,REJECTED)', decided_at: `gte.${sinceIso}` }, order: 'decided_at.desc', limit: 100 }, session)) : Promise.resolve([]),
+                on.hist && on.requests ? safe('HISTORY', client.select('purchase_requests', { columns: 'id,material_code,qty,status,decided_at,decided_by,decision_reason,source_work_order_id', filters: { status: 'in.(APPROVED,REJECTED)', decided_at: `gte.${sinceIso}` }, order: 'decided_at.desc', limit: 100 }, session)) : Promise.resolve([]),
+                on.hist && on.orders ? safe('HISTORY', client.select('purchase_orders', { columns: 'id,supplier_id,status,updated_at', filters: { status: 'eq.APPROVED', updated_at: `gte.${sinceIso}` }, order: 'updated_at.desc', limit: 100 }, session)) : Promise.resolve([]),
+                // rejected orders (draft 0092 columns). Not installed yet = no rejected-order history, NOT an error banner (the approve history above is unaffected).
+                on.hist && on.orders ? client.select('purchase_orders', { columns: 'id,supplier_id,status,updated_at,rejection_reason,rejected_by,rejected_at', filters: { status: 'eq.CANCELLED', rejection_reason: 'not.is.null', rejected_at: `gte.${sinceIso}` }, order: 'rejected_at.desc', limit: 100 }, session).catch(() => []) : Promise.resolve([]),
             ]);
             // Every canonical source failed (typically: connection lost / server unreachable). That is NOT "nothing pending": fail the load so the screen shows one clear error with a retry.
-            const coreKinds = includeTasks ? ['COMMERCIAL_DECISION', 'PURCHASE_REQUEST', 'PURCHASE_ORDER', 'TASK_COMPLETION'] : ['COMMERCIAL_DECISION', 'PURCHASE_REQUEST', 'PURCHASE_ORDER'];
-            if (coreKinds.every((k) => errors[k] !== undefined))
+            const coreKinds = [...(on.commercial ? ['COMMERCIAL_DECISION'] : []), ...(on.requests ? ['PURCHASE_REQUEST'] : []), ...(on.orders ? ['PURCHASE_ORDER'] : []), ...(includeTasks ? ['TASK_COMPLETION'] : [])];
+            if (coreKinds.length && coreKinds.every((k) => errors[k] !== undefined))
                 throw new Error(errors[coreKinds[0]]);
+            if (opts.light) { // count only (Home): same sources, same buildInbox rule, no label / link hops, no history
+                const none = () => null;
+                return { items: buildInbox({ commercial, purchaseRequests, purchaseOrders, tasks, lotLabel: none, supplierLabel: none, userLabel: none, relatedLinks: () => [] }, now()), history: [], historyDays: HISTORY_DAYS, sourceErrors: errors, asOf: new Date(now()).toISOString() };
+            }
+            const decidedPO = [...approvedPO, ...rejectedPO];
             const lotIds = [...new Set([...commercial.map((c) => c.stockLotId), ...decidedC.map((c) => c.stockLotId)])];
             const lotLabels = new Map();
             const lotWo = new Map();
@@ -76,7 +84,7 @@ export function createApprovalsInboxApi(client, session, opts = {}) {
                     errors.LINKS = msg(e);
                 }
             }
-            const supplierIds = [...new Set([...purchaseOrders.map((o) => o.supplierId), ...approvedPO.map((o) => o.supplierId)])];
+            const supplierIds = [...new Set([...purchaseOrders.map((o) => o.supplierId), ...decidedPO.map((o) => o.supplierId)])];
             const supplierNames = new Map();
             if (supplierIds.length) {
                 try {
@@ -88,7 +96,7 @@ export function createApprovalsInboxApi(client, session, opts = {}) {
                 }
             }
             const userNames = new Map();
-            const uids = [...new Set([...commercial.map((c) => c.requestedBy), ...purchaseRequests.map((r) => r.requestedBy), ...purchaseOrders.map((o) => o.createdBy), ...decidedC.map((c) => c.decidedBy), ...decidedR.map((r) => r.decidedBy)].filter((x) => !!x))];
+            const uids = [...new Set([...commercial.map((c) => c.requestedBy), ...purchaseRequests.map((r) => r.requestedBy), ...purchaseOrders.map((o) => o.createdBy), ...decidedC.map((c) => c.decidedBy), ...decidedR.map((r) => r.decidedBy), ...rejectedPO.map((o) => o.rejectedBy)].filter((x) => !!x))];
             if (uids.length) {
                 try {
                     for (const x of await client.select('personnel', { columns: 'auth_user_id,name', filters: { auth_user_id: inList(uids) }, limit: 500 }, session))
@@ -101,7 +109,7 @@ export function createApprovalsInboxApi(client, session, opts = {}) {
             }
             // source record + related work order / order passports (hash links only; the target screen applies its own permission gate)
             const lotOfApproval = new Map([...commercial.map((c) => [c.id, c.stockLotId]), ...decidedC.map((c) => [c.id, c.stockLotId])]);
-            const poSupplier = new Map([...purchaseOrders.map((o) => [o.id, o.supplierId]), ...approvedPO.map((o) => [o.id, o.supplierId])]);
+            const poSupplier = new Map([...purchaseOrders.map((o) => [o.id, o.supplierId]), ...decidedPO.map((o) => [o.id, o.supplierId])]);
             const reqWo = new Map([...purchaseRequests, ...decidedR].map((r) => [r.id, r.sourceWorkOrderId ?? null]));
             const pp = (kind, id) => `#/nesne?t=${kind}&id=${encodeURIComponent(id)}`;
             const chain = (woId) => { const out = []; if (woId) {
@@ -126,7 +134,7 @@ export function createApprovalsInboxApi(client, session, opts = {}) {
             const common = { lotLabel: (id) => lotLabels.get(id) ?? null, supplierLabel: (id) => supplierNames.get(id) ?? null, userLabel: (id) => userNames.get(id) ?? null, relatedLinks };
             return {
                 items: buildInbox({ commercial, purchaseRequests, purchaseOrders, tasks, ...common }, now()),
-                history: buildHistory({ commercial: decidedC, purchaseRequests: decidedR, purchaseOrders: approvedPO, ...common }),
+                history: buildHistory({ commercial: decidedC, purchaseRequests: decidedR, purchaseOrders: decidedPO, ...common }),
                 historyDays: HISTORY_DAYS, sourceErrors: errors, asOf: new Date(now()).toISOString(),
             };
         },
