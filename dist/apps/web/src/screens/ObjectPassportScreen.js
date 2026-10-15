@@ -6,7 +6,8 @@ import { DS_CSS, pill } from '../ds.js';
 import { errorText } from '../errorText.js';
 import { isLink, isPill } from '../passport/model.js';
 import { KINDS, canOpenPassport, isKind, passportHref } from '../passport/registry.js';
-const CSS = DS_CSS + `
+import { passportHeader, PASSPORT_HEADER_CSS } from '../passport/passportHeader.js';
+const CSS = DS_CSS + PASSPORT_HEADER_CSS + `
 .kd .pp-head{display:flex;flex-direction:column;gap:10px}
 .kd .pp-kind{font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:#67e8f9;font-weight:800}
 .kd .pp-title{font-size:22px;font-weight:900;color:#fff;overflow-wrap:anywhere}
@@ -70,7 +71,7 @@ export async function renderObjectPassportScreen(container, api, state, ctx) {
         return;
     }
     const tabKey = def.tabs.some((t) => t.key === state.tab) ? state.tab : def.tabs[0].key;
-    const head = h('div', { class: 'panel pp-head', 'data-testid': 'pp-card' }, h('div', { class: 'pp-kind' }, `${def.tr} · dijital pasaport`), h('div', { class: 'pp-title', 'data-testid': 'pp-title' }, cardData.title), h('div', { class: 'pp-sub' }, cardData.subtitle), cardData.status ? h('div', {}, pill(cardData.status.pill, cardData.status.tone, 'pp-status')) : null, h('div', { class: 'pp-kpis' }, ...cardData.kpis.map((k) => h('div', { class: 'pp-kpi', 'data-testid': 'pp-kpi' }, h('b', {}, k.value), h('span', {}, k.label)))), cardData.links.length ? h('div', { class: 'pp-links' }, ...cardData.links.map((l) => h('a', { class: 'pp-chip', href: passportHref(l.kind, l.id), 'data-testid': 'pp-chip', 'data-kind': l.kind }, `${KINDS[l.kind].tr}: ${l.label}`))) : null, h('div', { class: 'mut' }, `Kayıt: ${formatStamp(cardData.createdAt)} · Zamanlar Türkiye saatiyle, sunucu kayıt zamanıdır (KMI iç denetim mührü; hukuken nitelikli elektronik zaman damgası değildir).`));
+    const head = passportHeader(cardData, { onTab: (t) => go({ tab: t }), activeTab: tabKey, firstTab: def.tabs[0].key });
     const tabs = h('div', { class: 'tabs', role: 'tablist' }, ...def.tabs.map((t) => h('button', { type: 'button', role: 'tab', class: t.key === tabKey ? 'on' : '', 'aria-selected': String(t.key === tabKey), 'data-testid': `pp-tab-${t.key}`, onClick: () => go({ tab: t.key }) }, t.label)));
     const body = h('div', { 'data-testid': 'pp-body', style: 'display:flex;flex-direction:column;gap:12px' });
     const actions = actionsPanel();

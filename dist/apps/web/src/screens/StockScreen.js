@@ -3,9 +3,12 @@
 import { h, Fragment, mount } from '../../../../packages/ui/src/h.js';
 import { canCreateStockLot, canTransitionStockState } from '../../../../packages/domain/src/stock.js';
 import { errorText as sharedErrorText } from '../errorText.js';
+import { normalizeReason, reasonError } from '../../../../packages/domain/src/approvalsInbox.js';
 function errorText(err) {
     return sharedErrorText(err);
 }
+/** SCRAP is a negative quality disposition: a written reason is mandatory (server: draft 0092). Pending panel per container; closing it changes nothing. */
+const pendingScrap = new WeakMap();
 const NEXT_STATES = ['WIP', 'FG', 'AVAILABLE', 'RESERVED', 'STAGED', 'SHIPPED', 'HOLD', 'SCRAP'];
 export async function renderStockScreen(container, workOrderId, deps, banner) {
     let wo = null;
@@ -32,16 +35,33 @@ export async function renderStockScreen(container, workOrderId, deps, banner) {
             await renderStockScreen(container, workOrderId, deps, { kind: 'error', text: errorText(err) });
         }
     }
-    async function handleTransition(lotId, toState) {
+    async function handleTransition(lotId, toState, reason = 'KMI NEXT UI: state change') {
+        if (toState === 'SCRAP' && reason === 'KMI NEXT UI: state change') {
+            pendingScrap.set(container, lotId);
+            await renderStockScreen(container, workOrderId, deps, banner);
+            return;
+        }
         try {
-            await deps.api.transition(lotId, toState, 'KMI NEXT UI: state change');
+            pendingScrap.delete(container);
+            await deps.api.transition(lotId, toState, reason);
             await renderStockScreen(container, workOrderId, deps, { kind: 'info', text: `Lot durumu güncellendi: ${toState}` });
         }
         catch (err) {
             await renderStockScreen(container, workOrderId, deps, { kind: 'error', text: errorText(err) });
         }
     }
+    const scrapLotId = pendingScrap.get(container) ?? null;
+    const scrapReason = h('textarea', { 'data-testid': 'scrap-reason', rows: '3', placeholder: 'Hurdaya ayırma gerekçesi (zorunlu, en az 5 karakter)', 'aria-label': 'Hurda gerekçesi' });
+    const scrapConfirm = h('button', { type: 'button', 'data-testid': 'scrap-confirm', disabled: true, onClick: () => { const lot = scrapLotId; if (lot && !reasonError(scrapReason.value))
+            void handleTransition(lot, 'SCRAP', normalizeReason(scrapReason.value)); } }, '✕ Hurdaya ayır — kaydet');
+    scrapReason.addEventListener('input', () => { scrapConfirm.disabled = reasonError(scrapReason.value) !== null; });
+    const scrapPanel = scrapLotId ? (h("div", { role: "dialog", "aria-label": "Hurda gerek\u00E7esi", "data-testid": "scrap-panel" },
+        h("p", null, "Bu lot HURDA olarak i\u015Faretlenecek. Gerek\u00E7e yaz\u0131lmadan hi\u00E7bir \u015Fey de\u011Fi\u015Fmez."),
+        scrapReason,
+        h("button", { type: "button", "data-testid": "scrap-cancel", onClick: () => { pendingScrap.delete(container); void renderStockScreen(container, workOrderId, deps, banner); } }, "\u2190 Vazge\u00E7 (hi\u00E7bir \u015Fey de\u011Fi\u015Fmez)"),
+        scrapConfirm)) : null;
     const screen = (h("div", { class: "stock-screen" },
+        scrapPanel,
         h("h1", { "data-testid": "stock-heading" },
             "Stok (\u0130\u015F Emri: ",
             workOrderId,

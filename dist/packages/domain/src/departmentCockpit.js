@@ -1,4 +1,6 @@
 import { NEEDS_DATA } from './performanceCenter.js';
+import { QKIND_TR } from './qualityDesk.js';
+import { waitLabel } from './approvalsInbox.js';
 const WEAR_LIMIT = 0.8;
 const OPEN_WO = (s) => s !== 'COMPLETED' && s !== 'CANCELLED';
 const k = (key, label, value, reason, tone, href = null) => value === null ? { key, label, value: null, reason: `${reason} — ${NEEDS_DATA}`, tone: 'gray', href } : { key, label, value, reason: null, tone: tone(value), href };
@@ -52,6 +54,21 @@ export function buildCockpit(id, i) {
                 risks: [], crossLinks: [{ label: 'Rota / Operasyon', href: '#/rota', why: 'rotayı iş emrine uygula' }, { label: 'Planlama', href: '#/planlama', why: 'hazır olmayan işler' }, { label: 'OEE', href: '#/oee', why: 'çevrim süresi OEE\'yi etkiler' }] };
         }
         case 'QUALITY': {
+            if (i.qdesk !== undefined) {
+                const d = i.qdesk, n = (kd) => (d ? d.counts[kd] : null);
+                const dk = (kd) => `#/kalite?k=${kd}`;
+                const PRIORITY = { HOLD: 'KRİTİK', NCR: 'YÜKSEK', FIRST_PIECE: 'YÜKSEK', INCOMING: 'ORTA', QC: 'ORTA', FINAL: 'ORTA' };
+                return { id, title: 'Kalite & Metroloji', owner: 'Kalite (ilk parça / hold / NCR yetkileri)', actions: ['İlk parça onayı', 'Hold bırak', 'NCR / ret'],
+                    kpis: [k('holds', 'Açık HOLD', n('HOLD'), 'kalite kayıtları okunamadı', hot('red'), dk('HOLD')), k('ncr', 'Açık NCR', n('NCR'), 'kalite kayıtları okunamadı', hot('amber'), dk('NCR')),
+                        k('fp', 'İlk parça bekleyen', n('FIRST_PIECE'), 'operasyon kayıtları okunamadı', hot('amber'), dk('FIRST_PIECE')), k('incoming', 'Giriş kalite bekleyen', n('INCOMING'), 'mal kabul kayıtları okunamadı', hot('amber'), dk('INCOMING')),
+                        k('scrap', 'Fireli açık iş emri', cnt(wo, (w) => OPEN_WO(w.status) && w.qtyScrap > 0), 'iş emri listesi okunamadı', hot('amber'), '#/is-emirleri')],
+                    queueTitle: 'Karar bekleyenler', queue: d ? d.items.slice(0, 6).map((x) => ({ label: x.title, detail: x.detail, href: x.workOrderId ? wolink(x.workOrderId) : dk(x.kind), tone: (x.tone === 'blue' ? 'blue' : x.tone),
+                        priority: PRIORITY[x.kind], age: x.ageHours === null ? null : waitLabel(x.ageHours), owner: x.owner ?? null, decision: QKIND_TR[x.kind] })) : null, queueReason: d ? null : 'kalite kayıtları okunamadı',
+                    workflow: [{ step: 'İlk parça bekliyor', count: n('FIRST_PIECE') }, { step: 'Hold', count: n('HOLD') }, { step: 'NCR', count: n('NCR') }, { step: 'Giriş kalite', count: n('INCOMING') }],
+                    risks: (s?.alerts ?? []).filter((a) => a.domain === 'QUALITY').map((a) => ({ text: a.title, href: null })),
+                    quick: [{ label: 'İlk parça kararı', href: dk('FIRST_PIECE'), why: 'ilk parça onayı / ret — sunucu yetkiyi denetler', path: '/kalite' }, { label: 'HOLD / NCR', href: dk('HOLD'), why: 'HOLD bırak, NCR aç/ilerlet', path: '/kalite' }, { label: 'Ölçüm (TAHSİS)', href: '#/tahsis', why: 'ölçü düzeltme kaydı', path: '/tahsis' }],
+                    crossLinks: [{ label: 'Depo', href: '#/depo', why: 'HOLD lotlar' }, { label: 'Sevkiyat', href: '#/sevkiyat', why: 'sevk öncesi kalite kapısı' }] };
+            }
             return { id, title: 'Kalite & Metroloji kokpiti', owner: 'Kalite (ilk parça / hold / NCR yetkileri)', actions: ['İlk parça onayı', 'Hold bırak', 'NCR / ret'],
                 kpis: [k('holds', 'Açık HOLD', c(s, 'qualityHoldsOpen'), 'komuta anlık görüntüsü yok', hot('red'), '#/kalite'), k('ncr', 'Açık NCR', c(s, 'ncrsOpen'), 'komuta anlık görüntüsü yok', hot('amber'), '#/kalite'),
                     k('fp', 'İlk parça onayı bekleyen', cnt(wo, (w) => w.status === 'FIRST_PIECE_PENDING'), 'iş emri listesi okunamadı', hot('amber'), '#/kalite'), k('incoming', 'Giriş kalite bekleyen', c(s, 'incomingQcWaiting'), 'komuta anlık görüntüsü yok', hot('amber'), '#/satinalma'),

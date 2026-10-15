@@ -44,3 +44,10 @@ export function idleState(lastActivityMs, nowMs, limitMs = IDLE_LIMIT_MS, warnMs
 export const idleSecondsLeft = (lastActivityMs, nowMs, limitMs = IDLE_LIMIT_MS) => Math.max(0, Math.ceil((limitMs - (nowMs - lastActivityMs)) / 1000));
 /** Only a trusted, user-originated event resets the timer. Synthetic events (scripts), timers, network callbacks and animations never do. */
 export const countsAsInteraction = (e) => e.isTrusted === true && ['pointerdown', 'mousedown', 'touchstart', 'keydown', 'wheel', 'scroll', 'click'].includes(e.type);
+export const formFactorOf = (widthPx) => (widthPx < 640 ? 'phone' : widthPx < 1024 ? 'tablet' : 'desktop');
+export function deviceProfile(mode, widthPx, operatorSession) {
+    const form = formFactorOf(widthPx);
+    const shared = mode === 'KIOSK' || operatorSession;
+    const touchFirst = mode !== 'DESKTOP' || form !== 'desktop' || operatorSession;
+    return { mode, form, idleSignOut: idleGuardApplies(mode, operatorSession), sharedDevice: shared, showIdentityStrip: shared || mode === 'TABLET', touchFirst, minTargetPx: mode === 'KIOSK' || operatorSession ? 64 : touchFirst ? 48 : 40 };
+}

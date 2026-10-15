@@ -18,7 +18,7 @@ export const KIND_RPC = {
     COMMERCIAL_MGMT_RELEASE: { APPROVE: 'grant_management_release', REJECT: 'decide_commercial_approval' },
     COMMERCIAL_DECISION: { APPROVE: 'decide_commercial_approval', REJECT: 'decide_commercial_approval' },
     PURCHASE_REQUEST: { APPROVE: 'decide_purchase_request', REJECT: 'decide_purchase_request' },
-    PURCHASE_ORDER: { APPROVE: 'approve_purchase_order', REJECT: 'transition_purchase_order_status' },
+    PURCHASE_ORDER: { APPROVE: 'approve_purchase_order', REJECT: 'reject_purchase_order' }, // reject = the decision door of draft 0092 (reason required on the server); the generic cancel is closed for SUBMITTED orders
     TASK_COMPLETION: { APPROVE: 'approve_task', REJECT: 'reopen_task' },
 };
 export const REJECT_LABEL = {
@@ -73,12 +73,14 @@ export function buildInbox(src, nowMs) {
         if (c.status !== 'PENDING')
             continue;
         const lot = src.lotLabel?.(c.stockLotId) ?? `Stok lotu ${shortId(c.stockLotId)}`;
-        out.push(build(c.managementReleasedAt ? 'COMMERCIAL_DECISION' : 'COMMERCIAL_MGMT_RELEASE', c.id, lot, c.requestedBy ?? null, null, c.requestedAt, null, false, `#/onay-kuyrugu`, nowMs, src.userLabel, src.relatedLinks?.('COMMERCIAL_DECISION', c.id) ?? []));
+        out.push({ ...build(c.managementReleasedAt ? 'COMMERCIAL_DECISION' : 'COMMERCIAL_MGMT_RELEASE', c.id, lot, c.requestedBy ?? null, null, c.requestedAt, null, false, `#/onay-kuyrugu`, nowMs, src.userLabel, src.relatedLinks?.('COMMERCIAL_DECISION', c.id) ?? []),
+            facts: [{ label: 'Parti', value: lot }, { label: 'Adım', value: c.managementReleasedAt ? '2/2 · ticari karar (muhasebe)' : '1/2 · yönetim serbest bırakma' }, ...(c.managementReleasedAt ? [{ label: 'Yönetim serbest bıraktı', value: c.managementReleasedAt }] : [])] });
     }
     for (const r of src.purchaseRequests) {
         if (r.status !== 'SUBMITTED')
             continue;
-        out.push(build('PURCHASE_REQUEST', r.id, `${r.materialCode} × ${r.qty} · ${r.reason}`, r.requestedBy ?? null, null, r.requestedAt, r.neededBy, false, `#/talepler`, nowMs, src.userLabel, src.relatedLinks?.('PURCHASE_REQUEST', r.id) ?? []));
+        out.push({ ...build('PURCHASE_REQUEST', r.id, `${r.materialCode} × ${r.qty} · ${r.reason}`, r.requestedBy ?? null, null, r.requestedAt, r.neededBy, false, `#/talepler`, nowMs, src.userLabel, src.relatedLinks?.('PURCHASE_REQUEST', r.id) ?? []),
+            facts: [{ label: 'Malzeme', value: r.materialCode }, { label: 'Miktar', value: String(r.qty) }, { label: 'Gerekçe (talep eden)', value: r.reason }, ...(r.neededBy ? [{ label: 'İstenen tarih', value: r.neededBy }] : [])] });
     }
     for (const o of src.purchaseOrders) {
         if (o.status !== 'SUBMITTED')
@@ -88,7 +90,8 @@ export function buildInbox(src, nowMs) {
     for (const t of src.tasks) {
         if (t.status !== 'COMPLETED')
             continue;
-        out.push(build('TASK_COMPLETION', t.id, t.title, null, t.ownerLabel, t.completedAt, t.dueAt ? t.dueAt.slice(0, 10) : null, t.completedByMe, `#/gorevler`, nowMs, src.userLabel));
+        out.push({ ...build('TASK_COMPLETION', t.id, t.title, null, t.ownerLabel, t.completedAt, t.dueAt ? t.dueAt.slice(0, 10) : null, t.completedByMe, `#/gorevler`, nowMs, src.userLabel),
+            facts: [...(t.completedByLabel ? [{ label: 'Tamamlayan', value: t.completedByLabel }] : []), ...(t.completionNote ? [{ label: 'Tamamlama notu', value: t.completionNote }] : [])] });
     }
     return out.sort((a, b) => PRIORITY_RANK[a.priority] - PRIORITY_RANK[b.priority] || (b.waitingHours ?? -1) - (a.waitingHours ?? -1) || a.key.localeCompare(b.key));
 }
@@ -106,18 +109,20 @@ export function actionState(item, decision, held) {
     return { visible: true, enabled: true, why: null };
 }
 export const MIN_REASON = 5;
+/** the reason as the server sees it (draft 0092 require_reject_reason): trimmed incl. NBSP / zero-width characters. Blank-looking text is NOT a reason. */
+export const normalizeReason = (reason) => reason.replace(/^[\s\u00a0\u200b\u2060\ufeff]+|[\s\u00a0\u200b\u2060\ufeff]+$/g, '');
 export function reasonError(reason) {
-    return reason.trim().length >= MIN_REASON ? null : `Gerekçe en az ${MIN_REASON} karakter olmalı`;
+    return normalizeReason(reason).length >= MIN_REASON ? null : `Gerekçe en az ${MIN_REASON} karakter olmalı`;
 }
 /** Exact RPC call (name + params) for a decision — one place so UI and tests cannot drift. */
 export function rpcCall(item, decision, reason) {
     const fn = KIND_RPC[item.kind][decision];
-    const r = reason.trim();
+    const r = normalizeReason(reason);
     switch (item.kind) {
         case 'COMMERCIAL_MGMT_RELEASE': return decision === 'APPROVE' ? { fn, params: { p_approval_id: item.recordId, p_reason: r } } : { fn, params: { p_approval_id: item.recordId, p_decision: 'REJECTED', p_reason: r } };
         case 'COMMERCIAL_DECISION': return { fn, params: { p_approval_id: item.recordId, p_decision: decision === 'APPROVE' ? 'APPROVED' : 'REJECTED', p_reason: r } };
         case 'PURCHASE_REQUEST': return { fn, params: { p_request_id: item.recordId, p_decision: decision === 'APPROVE' ? 'APPROVED' : 'REJECTED', p_reason: r } };
-        case 'PURCHASE_ORDER': return decision === 'APPROVE' ? { fn, params: { p_purchase_order_id: item.recordId } } : { fn, params: { p_purchase_order_id: item.recordId, p_to_status: 'CANCELLED' } };
+        case 'PURCHASE_ORDER': return decision === 'APPROVE' ? { fn, params: { p_purchase_order_id: item.recordId } } : { fn, params: { p_purchase_order_id: item.recordId, p_reason: r } };
         case 'TASK_COMPLETION': return decision === 'APPROVE' ? { fn, params: { p_task_id: item.recordId, p_note: r } } : { fn, params: { p_task_id: item.recordId, p_reason: r } };
     }
 }
@@ -146,6 +151,10 @@ export function buildHistory(src) {
         out.push({ key: `PURCHASE_REQUEST:${r.id}`, kind: 'PURCHASE_REQUEST', record: `${r.materialCode} × ${r.qty}`, outcome: r.status, decidedAt: r.decidedAt, decidedBy: who(r.decidedBy), reason: r.decisionReason, reasonNote: null, related: src.relatedLinks?.('PURCHASE_REQUEST', r.id) ?? [] });
     }
     for (const o of src.purchaseOrders) {
+        if (o.status === 'CANCELLED' && o.rejectionReason) {
+            out.push({ key: `PURCHASE_ORDER:${o.id}`, kind: 'PURCHASE_ORDER', record: `Sipariş ${shortId(o.id)} · ${src.supplierLabel?.(o.supplierId) ?? `tedarikçi ${shortId(o.supplierId)}`}`, outcome: 'REJECTED', decidedAt: o.rejectedAt ?? o.updatedAt, decidedBy: who(o.rejectedBy ?? null), reason: o.rejectionReason, reasonNote: null, related: src.relatedLinks?.('PURCHASE_ORDER', o.id) ?? [] });
+            continue;
+        }
         if (o.status !== 'APPROVED')
             continue;
         out.push({ key: `PURCHASE_ORDER:${o.id}`, kind: 'PURCHASE_ORDER', record: `Sipariş ${shortId(o.id)} · ${src.supplierLabel?.(o.supplierId) ?? `tedarikçi ${shortId(o.supplierId)}`}`, outcome: 'APPROVED', decidedAt: o.updatedAt, decidedBy: null, reason: null, reasonNote: 'Sipariş tablosunda karar veren/gerekçe sütunu yok; ayrıntı denetim kaydında. Zaman = son güncelleme.', related: src.relatedLinks?.('PURCHASE_ORDER', o.id) ?? [] });

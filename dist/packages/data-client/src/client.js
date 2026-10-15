@@ -78,6 +78,8 @@ export class KmiNextClient {
     fetchImpl;
     /** Called after a successful silent token refresh (the session object is also updated in place). */
     onSessionRefreshed = null;
+    /** Technical-usability hook (KMI-001 §001.7): called with the HTTP status (0 = network) when an RPC fails. Carries no payload, no message, no identity. */
+    onRequestFailed = null;
     /** Called once when the session can no longer be renewed (no refresh token, or the server refused it). */
     onSessionExpired = null;
     refreshing = new Map();
@@ -224,17 +226,31 @@ export class KmiNextClient {
     }
     /** Calls a kmi_next.* RPC (the ONLY way this client ever mutates data). */
     async rpc(fnName, args, session) {
-        const res = await this.authed(() => this.fetchImpl(`${this.url}/rest/v1/rpc/${fnName}`, {
-            method: 'POST',
-            headers: {
-                ...this.authHeaders(session),
-                'content-type': 'application/json',
-                'content-profile': this.schema,
-            },
-            body: JSON.stringify(args),
-        }), session);
+        let res;
+        try {
+            res = await this.authed(() => this.fetchImpl(`${this.url}/rest/v1/rpc/${fnName}`, {
+                method: 'POST',
+                headers: {
+                    ...this.authHeaders(session),
+                    'content-type': 'application/json',
+                    'content-profile': this.schema,
+                },
+                body: JSON.stringify(args),
+            }), session);
+        }
+        catch (e) {
+            try {
+                this.onRequestFailed?.({ status: e instanceof AuthError ? 401 : 0 });
+            }
+            catch { /* telemetry never breaks a call */ }
+            throw e;
+        }
         const body = await parseJsonSafe(res);
         if (!res.ok) {
+            try {
+                this.onRequestFailed?.({ status: res.status });
+            }
+            catch { /* telemetry never breaks a call */ }
             const err = body;
             throw new PostgrestError(String(err?.['message'] ?? res.statusText), res.status, err?.['code'], err?.['details'], err?.['hint']);
         }

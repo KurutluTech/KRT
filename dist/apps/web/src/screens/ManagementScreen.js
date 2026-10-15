@@ -13,6 +13,6 @@ export async function renderManagementScreen(container, deps, opts = {}) {
             onClick: () => { current = t; void draw(); } }, t.label)));
         await current.render(body);
     };
-    mount(container, h('div', { class: 'kd', 'data-testid': 'mg-root' }, h('style', {}, DS_CSS), h('h1', {}, 'Yönetim Zekâsı'), bar, body));
+    mount(container, h('div', { class: 'kd', 'data-testid': 'mg-root' }, h('style', {}, DS_CSS), h('h1', {}, opts.only ? current.label : 'Yönetim Zekâsı'), opts.only ? null : bar, body));
     await draw();
 }

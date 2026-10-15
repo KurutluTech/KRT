@@ -17,6 +17,12 @@ export function createTerminalApi(client, session) {
         async resume(machineId, reason) {
             await client.rpc('resume_machine_from_hold', { p_machine_id: machineId, p_reason: reason }, session);
         },
+        async toolChange(machineId, workOrderId, toolCode, rid) {
+            await client.rpc('report_operator_tool_event', { p_machine_id: machineId, p_work_order_id: workOrderId, p_kind: 'CHANGE', p_tool_code: toolCode, p_note: null, p_client_request_id: rid }, session);
+        },
+        async declareTashih(workOrderId, qty, reasonText, rid) {
+            await client.rpc('open_tahsis_ncr', { p_work_order_id: workOrderId, p_qty: qty, p_reason: reasonText, p_detection_source: 'OPERATOR_SELF_DECLARED', p_client_request_id: rid }, session);
+        },
         async reportFault(machineId, reason) {
             await client.rpc('report_machine_fault', { p_machine_id: machineId, p_reason: reason, p_severity: 'MEDIUM' }, session);
         },
