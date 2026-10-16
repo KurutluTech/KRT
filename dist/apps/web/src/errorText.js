@@ -32,6 +32,8 @@ export const ACTION_TR = {
     LIVE_DISPLAY_MANAGE: 'fabrika ekranı yönetimi',
     DEVICE_MANAGE: 'cihaz kaydı',
     PERSONNEL_MANAGE: 'personel kaydı',
+    CUSTOMER_MANAGE: 'müşteri kaydı',
+    CUSTOMER_CONTACT_VIEW: 'müşteri kişileri',
     ORDER_CREATE: 'sipariş açma',
     WORK_ORDER_CREATE: 'iş emri açma',
     PURCHASE_ORDER_MANAGE: 'satınalma siparişi',

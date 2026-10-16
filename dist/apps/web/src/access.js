@@ -16,6 +16,7 @@ export const OPEN_RULES = {
     '/muhendislik': { any: ['BOM_RELEASE'] },
     '/katalog': { any: ['ORDER_CREATE', 'PURCHASE_ORDER_MANAGE', 'MASTER_DATA_IMPORT'] },
     '/siparisler': { any: ['ORDER_CREATE', 'ORDER_CONFIRM', 'WORK_ORDER_CREATE', 'COMMERCIAL_RELEASE', 'MANAGEMENT_RELEASE'] },
+    '/musteriler': { any: ['CUSTOMER_MANAGE', 'CUSTOMER_CONTACT_VIEW'] },
     '/personel': { any: ['PERSONNEL_MANAGE'] },
     '/personel-yetki': { any: ['PERSONNEL_LOGIN_LINK', 'WORK_ORDER_ASSIGN_MACHINE', 'WORK_ORDER_MULTI_MACHINE_ASSIGN'] },
     // PUANTAJ_MANAGE is defined by migration 0073; until it is installed no one holds it, so ADMIN/MANAGEMENT (the roles 0073 grants it to) keep the entry

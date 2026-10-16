@@ -41,7 +41,7 @@ export const ICON_PATHS = {
     plus: 'M12 4.5v15M4.5 12h15',
     cnc: 'M3.5 20.5V6.5h17v14zM3.5 10h17M7 13.5h6v4.5H7zM16 13.5v4.5M12 3v3.5M10.2 3h3.6',
 };
-/** THE navigation tree: 15 workspaces, 47 routes. The sidebar, the drawer, the home page and the role tests are all built from this one list
+/** THE navigation tree: 15 workspaces, 48 routes. The sidebar, the drawer, the home page and the role tests are all built from this one list
  *  (there is no second menu). Whether a user sees an entry is decided by access.ts (canOpen); the server decides for real. */
 export const NAV_TREE = [
     { id: 'pc', short: 'Performans', title: 'PERFORMANCE CENTER', icon: 'grid', items: [
@@ -54,6 +54,7 @@ export const NAV_TREE = [
             { path: '/bildirimler', label: 'Bildirimler', icon: 'bolt' },
         ] },
     { id: 'order', short: 'Sipariş', title: 'MÜŞTERİ & SİPARİŞ', icon: 'clipboard', items: [
+            { path: '/musteriler', label: 'Müşteriler', icon: 'users' },
             { path: '/siparisler', label: 'Siparişler', icon: 'truck' },
             { path: '/katalog', label: 'Katalog', icon: 'book' },
         ] },
@@ -199,11 +200,24 @@ export function nextNavState(prev, ev) {
 export function trTitle(t) {
     return t.split(' ').map((w) => (w.length <= 3 || !/[A-ZÇĞİÖŞÜ]/.test(w) ? w : w.charAt(0) + w.slice(1).toLocaleLowerCase('tr-TR'))).join(' ');
 }
+/** Detail / helper routes that are not menu entries still get a location line, so no screen is without a "where am I". ws = '' means directly under Ana Sayfa. */
+export const DETAIL_CRUMBS = {
+    '/ara': { ws: '', page: 'Arama' }, '/nesne': { ws: '', page: 'Nesne pasaportu' },
+    '/muhasebe': { ws: 'fin', page: 'Muhasebe / Fatura (kalem)' }, '/tedarikci-fatura': { ws: 'buy', page: 'Tedarikçi Faturası' },
+    '/etiket': { ws: 'wh', page: 'Etiket' }, '/malzeme': { ws: 'wh', page: 'Hammadde / BOM' }, '/takim-hazirlik': { ws: 'tool', page: 'Takım Hazırlığı' },
+};
 export function breadcrumbOf(path) {
+    if (path === '/')
+        return null;
     const ws = WORKSPACE_OF_PATH[path];
     const item = NAV_ITEM_BY_PATH[path];
-    if (!ws || !item || path === '/')
-        return null;
+    if (!ws || !item) {
+        const d = DETAIL_CRUMBS[path];
+        if (!d)
+            return null;
+        const g = d.ws ? NAV_TREE.find((x) => x.id === d.ws) : undefined;
+        return { workspace: g?.title ?? '', workspaceId: g?.id ?? '', page: d.page };
+    }
     const g = NAV_TREE.find((x) => x.id === ws);
     return { workspace: g.title, workspaceId: g.id, page: item.label };
 }

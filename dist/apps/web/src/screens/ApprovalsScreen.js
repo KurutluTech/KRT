@@ -38,7 +38,7 @@ const AO_CSS = DS_CSS + `
 .kd button.ao-chip{min-height:38px;border-radius:999px;border:1px solid #334155;background:#0f172a;color:#cbd5e1;padding:0 12px;font-weight:700;font-size:13px;cursor:pointer;white-space:nowrap}
 .kd button.ao-chip[aria-pressed="true"]{border-color:#22d3ee;background:rgba(34,211,238,.14);color:#fff}.kd button.ao-chip .c{margin-left:6px;font-weight:800;opacity:.85}
 .kd .ao-bar input[type=search],.kd .ao-bar select{min-height:40px;font-size:16px;border-radius:10px;border:1px solid #334155;background:#0f172a;color:#fff;padding:0 10px}.kd .ao-bar input[type=search]{flex:1 1 220px;min-width:0}
-.kd .ao-split{display:grid;grid-template-columns:minmax(340px,5fr) minmax(0,7fr);gap:12px;align-items:start}
+.kd .ao-empty-state{max-width:640px;padding:18px 4px}.kd .ao-empty-title{margin:0 0 6px;font-size:16px;font-weight:700;color:#e2e8f0}.kd .ao-empty-state p{margin:0 0 8px}.kd .ao-split{display:grid;grid-template-columns:minmax(340px,5fr) minmax(0,7fr);gap:12px;align-items:start}
 .kd .ao-listcol{display:flex;flex-direction:column;gap:6px;max-height:max(300px,calc(100vh - var(--ao-top,330px) - 16px));min-height:300px;overflow-y:auto;padding-right:4px;overscroll-behavior:contain}
 .kd .ao-detailcol{position:sticky;top:66px;max-height:max(300px,calc(100vh - var(--ao-top,330px) - 16px));overflow-y:auto;border:1px solid #1e293b;border-radius:14px;background:#0f172a;padding:14px 16px;min-width:0;overscroll-behavior:contain}
 .kd .ao-row{border:1px solid #1e293b;border-left:5px solid #475569;border-radius:12px;margin:0;background:linear-gradient(180deg,#111c2e,#0f172a);color:#e2e8f0;flex:0 0 auto;display:flex}
@@ -378,7 +378,7 @@ export async function renderApprovalsScreen(container, deps, state = {}) {
     function paintDetail() {
         const r = ui.sel ? rows.find((x) => x.id === ui.sel) ?? null : null;
         if (!r) {
-            detailHost.replaceChildren(E('div', { class: 'ao-empty-detail', 'data-testid': 'ao-detail-empty' }, 'Soldan bir karar seçin.'));
+            detailHost.replaceChildren(...(rows.length ? [E('div', { class: 'ao-empty-detail', 'data-testid': 'ao-detail-empty' }, 'Ayrıntı için listeden bir karar seçin.')] : []));
             return;
         }
         loadTaskDetail(r);
@@ -479,7 +479,7 @@ export async function renderApprovalsScreen(container, deps, state = {}) {
             : E('div', { class: 'ao-bar' }, search, viewBar, E('details', { class: 'ao-filter', 'data-testid': 'ao-filter-menu', ...(active ? { open: true } : {}) }, E('summary', {}, active ? `Filtre (${active})` : 'Filtre'), E('div', { class: 'fb' }, deptSel, kindSel, ownerSel, daysSel, mineBtn)));
         const countLine = E('div', { 'data-testid': 'ao-count', style: 'font-size:13px;color:#94a3b8' }, `${sum.mine} karar sizde · ${sum.pending} bekleyen${sum.longestHours === null ? '' : ` · en uzun bekleme ${waitLabel(sum.longestHours)}`}`);
         const detailMode = !wide && ui.mobileDetail;
-        const body = detailMode ? [detailHost] : wide ? [E('div', { class: 'ao-split' }, E('div', { style: 'min-width:0;display:grid;gap:6px' }, countLine, listHost), detailHost)] : [countLine, listHost];
+        const body = detailMode ? [detailHost] : wide && rows.length === 0 ? [E('div', { 'data-testid': 'ao-empty-state', class: 'ao-empty-state' }, E('p', { class: 'ao-empty-title' }, 'Şu an sizden bekleyen karar yok.'), E('p', { class: 'mut' }, 'Size atanan onay veya red kararı oluştuğunda burada listelenir. Geçmiş kararlar için «Tamamlanan» görünümüne bakabilirsiniz.'), listHost)] : wide ? [E('div', { class: 'ao-split' }, E('div', { style: 'min-width:0;display:grid;gap:6px' }, countLine, listHost), detailHost)] : [rows.length === 0 ? '' : countLine, listHost];
         mount(container, E('div', { class: `kd ao-screen${detailMode ? ' ao-detail-mode' : ''}` }, E('style', {}, AO_CSS), ...head(), ...(detailMode ? [] : [E('div', { 'data-testid': 'ao-summary', class: 'ao-tiles' }, ...tiles), bar]), ...body));
         ui.shown = Math.max(ui.shown, PAGE);
         paintList();

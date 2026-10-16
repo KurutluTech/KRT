@@ -34,7 +34,7 @@ export const pill = (text, kind = '', testid) => h('span', { class: `pill ${kind
 export const kpi = (label, value, testid) => h('div', { class: 'kpi', ...(testid ? { 'data-testid': testid } : {}) }, h('div', { class: 'n' }, value), h('div', { class: 'l' }, label));
 export const initials = (name) => name.split(/\s+/).filter(Boolean).slice(0, 2).map((p) => p[0].toLocaleUpperCase('tr-TR')).join('');
 export const ROLE_TR = { ADMIN: 'Yönetici', MANAGEMENT: 'Yönetim', OPERATOR: 'Operatör', QUALITY: 'Kalite', MAINTENANCE: 'Bakım', PURCHASING: 'Satınalma', ACCOUNTING: 'Muhasebe', SHIPPING: 'Sevkiyat', CAM: 'CAM' };
-export const DEPT_TR = { URETIM: 'Üretim', OFIS: 'Ofis', KALITE: 'Kalite', CAM: 'CAM / Programlama', BAKIM: 'Bakım', TESVIYE: 'Tesviye', ASCI: 'Mutfak' };
+export const DEPT_TR = { URETIM: 'Üretim', OFIS: 'Ofis', KALITE: 'Kalite', CAM: 'CAM / Programlama', BAKIM: 'Bakım', TESVIYE: 'Tesviye', ASCI: 'Mutfak', UNASSIGNED: 'Departman atanmadı' };
 export const TIER_TR = { BASE: 'Temel', TIER_8: 'Gelişmiş (8+ yetkinlik)', TIER_10: 'Usta (10+ yetkinlik)' };
 /** Calm placeholder for a section whose database part is not installed yet. Never an error, never a blank page. */
 export const setupPending = (title, detail = 'Bu bölümün veritabanı kurulumu henüz yapılmadı. Mevcut kayıtlarınız etkilenmedi; kurulum tamamlanınca bu ekran otomatik açılır.') => h('div', { class: 'panel', 'data-testid': 'setup-pending', style: 'border-left:4px solid #d97706' }, h('h2', {}, 'Kurulum bekleniyor'), h('div', { style: 'font-size:16px;font-weight:700;color:#fff' }, title), h('div', { class: 'mut', style: 'margin-top:6px' }, detail));

@@ -288,8 +288,22 @@ export function createObjectPassportApi(client, session, access, myUserId = sess
                     { title: 'Eğitimler', table: tbl(['Modül', 'Durum', 'Kayıt'], en.map((e) => [e.moduleId.slice(0, 8), e.status, ts(e.enrolledAt)]), 'Eğitim kaydı yok.') }];
             });
             case 'PERSONNEL:rozetler': return guard(async () => {
-                const b = await sel('badge_awards', 'family_code,tier,awarded_at', { personnel_id: `eq.${id}` }, 'awarded_at.desc', 200);
-                return [{ title: 'Rozet kazanım kayıtları', table: tbl(['Aile', 'Seviye', 'Kazanım'], b.map((x) => [x.familyCode, String(x.tier), ts(x.awardedAt)]), 'Rozet kaydı yok veya görme yetkiniz yok.'), note: 'Rozet kaydı kanonik badge_awards tablosundandır; kişi yalnız kendisini, yetkili kullanıcı başkalarını görür (sunucu kuralı).' }];
+                const TN = { 1: 'BRONZ', 2: 'GÜMÜŞ', 3: 'ALTIN', 4: 'PLATİN', 5: 'USTA' };
+                const [b, fam, sk, cat] = await Promise.all([
+                    sel('badge_awards', 'family_code,tier,awarded_at', { personnel_id: `eq.${id}` }, 'awarded_at.desc', 200),
+                    sel('badge_families', 'code,name_tr', {}, 'sort.asc', 50),
+                    sel('personnel_skills', 'skill_code,level,valid_until', { personnel_id: `eq.${id}` }, 'skill_code.asc', 200),
+                    sel('skill_catalog', 'code,category', {}, 'code.asc', 300),
+                ]);
+                const famName = (c) => fam.find((f) => f.code === c)?.nameTr ?? c;
+                const today = new Date().toISOString().slice(0, 10);
+                const machine = sk.filter((x) => cat.find((c) => c.code === x.skillCode)?.category === 'MACHINE' && x.level >= 2 && (!x.validUntil || x.validUntil >= today));
+                return [
+                    { title: 'Son kazanım', kv: [['Son rozet', b[0] ? `${famName(b[0].familyCode)} — ${TN[b[0].tier] ?? b[0].tier} (${ts(b[0].awardedAt)})` : 'Henüz rozet yok'], ['Kazanılan toplam', String(b.length)]] },
+                    { title: 'Rozet kazanım kayıtları', table: tbl(['Rozet', 'Seviye', 'Kazanım'], b.map((x) => [famName(x.familyCode), TN[x.tier] ?? String(x.tier), ts(x.awardedAt)]), 'Rozet kaydı yok veya görme yetkiniz yok.') },
+                    { title: 'Doğrulanmış makine yetkinlikleri', table: tbl(['Yetkinlik', 'Seviye', 'Geçerlilik'], machine.map((x) => [x.skillCode, String(x.level), x.validUntil ?? 'süresiz']), 'Doğrulanmış (seviye ≥ 2, süresi dolmamış) makine yetkinliği yok → DOĞRULAMA BEKLİYOR.'),
+                        note: 'Rozet bir takdirdir; yetki ya da prim/puantaj etkisi yoktur. Kazanım yalnız kanıtlı kayıtlardan (onaylı yetkinlik, biten operasyon, kalite sonucu) üretilir; kaynak kaydı olmayan rozet ailesi kazanılamaz. Kişi yalnız kendisini, yetkili kullanıcı başkalarını görür (sunucu kuralı).' },
+                ];
             });
             case 'PERSONNEL:aktif': return guard(async () => {
                 const p = await one('personnel', 'auth_user_id', id);
@@ -327,7 +341,18 @@ export function createObjectPassportApi(client, session, access, myUserId = sess
                 const nm = await names(uniq(r.map((x) => x.testedBy)));
                 return [{ title: 'Yetkili test sonuçları', table: tbl(['#', 'Sonuç', 'Not', 'Test eden', 'Zaman'], r.map((x) => [String(x.seq), pill(x.result, x.result === 'PASS' ? 'ok' : 'bad'), x.notes ?? '—', nm[x.testedBy] ?? x.testedBy.slice(0, 8), ts(x.testedAt)]), 'Henüz test sonucu yok.') }];
             });
-            case 'CUSTOMER:genel': return guard(async () => { const c = await one('customers', 'code,name,country,active,created_at', id); return [{ title: 'Kimlik', kv: [['Müşteri kodu', c.code], ['Ad', c.name], ['Ülke', c.country ?? '—'], ['Durum', c.active ? 'Aktif' : 'Pasif'], ['Kayıt', ts(c.createdAt)]], note: 'Yetkili kişiler, iletişim ve kalite şikâyeti alanları için kanonik tablo yok (BLOCKED).' }]; });
+            case 'CUSTOMER:genel': return guard(async () => { const c = await one('customers', 'code,name,country,active,created_at', id); return [{ title: 'Kimlik', kv: [['Müşteri kodu', c.code], ['Ad', c.name], ['Ülke', c.country ?? '—'], ['Durum', c.active ? 'Aktif' : 'Pasif'], ['Kayıt', ts(c.createdAt)]], note: 'Yetkili kişiler ve şartlar “Müşteriler” ekranındadır (yetkili roller; sunucu güncellemesi 0096 ile). Kalite şikâyeti alanı için kanonik tablo yok (BLOCKED).' }]; });
+            // KMI-006: contacts / terms / delivery come ONLY from the server-authorized customer_profile (read-only; the server refuses operator, quality and other roles and logs every read)
+            case 'CUSTOMER:kisiler': return guard(async () => {
+                const p = await client.rpc('customer_profile', { p_customer_id: id }, session);
+                return [{ title: 'İletişim kişileri', table: tbl(['Ad', 'Görev', 'Telefon', 'E-posta', 'Durum'], p.contacts.map((c) => [c.fullName + (c.isPrimary ? ' (birincil)' : ''), c.roleTitle ?? '—', c.phone ?? '—', c.email ?? '—', c.active ? 'Aktif' : 'Pasif']), 'Kayıtlı kişi yok (VERİ YOK).'), note: 'Kişi ekleme/düzenleme “Müşteriler” ekranındadır. Bu bölümü yalnız yetkili roller görür; her okuma kayda geçer.' }];
+            });
+            case 'CUSTOMER:sartlar': return guard(async () => {
+                const p = await client.rpc('customer_profile', { p_customer_id: id }, session);
+                const t = p.terms;
+                return [{ title: 'Şartlar', kv: t ? [['Ödeme', t.paymentTerms ?? '—'], ['Teslimat', t.deliveryTerms ?? '—'], ['Kalite', t.qualityRequirements ?? '—'], ['Not', t.note ?? '—']] : [['Şartlar', 'VERİ YOK']] },
+                    { title: 'Teslimat performansı', kv: [['Aktif sipariş', String(p.activeOrders)], ['Zamanında', p.delivery.onTimePct === null ? 'VERİ YOK' : `%${p.delivery.onTimePct} (${p.delivery.onTime}/${p.delivery.judged})`], ['Kârlılık', 'VERİ YOK']], note: 'Kârlılık maliyet defteri (KMI-070) olmadan hesaplanmaz.' }];
+            });
             case 'CUSTOMER:siparisler': return guard(async () => {
                 const o = await sel('orders', 'id,customer_po,status,created_at', { customer_id: `eq.${id}` }, 'created_at.desc', 200);
                 return [{ title: 'Siparişler', table: tbl(['Sipariş', 'Durum', 'Açılış'], o.map((x) => [lnk('ORDER', x.id, x.customerPo ?? x.id.slice(0, 8).toUpperCase()), x.status, ts(x.createdAt)]), 'Sipariş yok.') }];

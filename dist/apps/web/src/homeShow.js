@@ -14,7 +14,7 @@ import { bulletBar, shiftColumns, distributionBar, trendBadge, chartUnknown, CHA
 import { evaluateKpi } from '../../../packages/domain/src/kpiTrend.js';
 import { STATE_VISUAL } from './spindle.js';
 import { passportHref } from './passport/registry.js';
-import { buildPulse, fleetPriority } from '../../../packages/domain/src/homePulse.js';
+import { buildPulse, splitPulse, fleetPriority } from '../../../packages/domain/src/homePulse.js';
 import { decisionPanel, DECIDE_CSS } from './homeDecide.js';
 const SECTION_TITLE = { fleet: 'Canlı fabrika', perf: 'Üretim ve vardiya performansı', wos: 'İnsan ve iş akışı', flow: 'Günlük akış ve yaklaşanlar', quick: 'Hızlı erişim' };
 const PASSPORT_ENTITY = { MACHINE: 'MACHINE', WORK_ORDER: 'WORK_ORDER', STOCK_LOT: 'STOCK_LOT' };
@@ -101,7 +101,10 @@ export function renderHomeShow(host, i) {
             : h('div', { class: `hs-pt ${t.tone}`, 'data-testid': `home-pulse-${t.id}`, 'data-known': String(t.value !== null), 'data-tone': t.tone }, ...inner));
     };
     const pulseStrip = pulseWaiting ? h('section', { class: 'hs-pulse', 'data-testid': 'home-pulse', 'aria-busy': 'true', 'aria-label': 'Fabrika nabzı' }, ...Array.from({ length: sh ? 6 : 3 }, () => h('div', { class: 'hs-pt skel', 'data-testid': 'home-pulse-loading' }, h('div', { class: 'hs-pt-l' }, 'Yükleniyor…'), h('div', { class: 'hs-pt-v' }, ' '), h('div', { class: 'hs-pt-s' }, ' '))))
-        : tiles.length ? h('section', { class: `hs-pulse${stale ? ' is-stale' : ''}`, style: `--n:${tiles.length}`, 'data-testid': 'home-pulse', 'aria-label': 'Fabrika nabzı' }, ...tiles.map(tile)) : null;
+        : tiles.length ? (() => {
+            const { lead, rest } = splitPulse(tiles);
+            return h('section', { class: `hs-pulse-wrap${stale ? ' is-stale' : ''}`, 'data-testid': 'home-pulse', 'aria-label': 'Fabrika nabzı' }, h('div', { class: 'hs-pulse hs-pulse-lead', style: `--n:${lead.length}`, 'data-testid': 'home-hier-lead' }, ...lead.map(tile)), rest.length ? h('div', { class: 'hs-pulse hs-pulse-rest', 'data-testid': 'home-hier-rest' }, ...rest.map(tile)) : null);
+        })() : null;
     // ── Canlı fabrika (makine parkı): gerçek makine kartları + durum filtresi; dağılım çubuğu kartların yerine geçmez ─────────────────────
     const HEAD = fleetPriority(i.access);
     let fleet = null;
@@ -266,6 +269,9 @@ export const HOME_SHOW_CSS = CHART_CSS + DECIDE_CSS + `
 @media (min-width:1700px){.hs-grid{grid-template-columns:minmax(0,1fr) 440px}}
 .hs-role{font-size:12px;font-weight:700;padding:3px 10px;border-radius:999px;border:1px solid rgba(148,163,184,.3);color:#cbd5e1;white-space:nowrap}
 .hs-band{padding:2px 2px 0}.hs-pend b{font-size:22px}
+.hs-pulse-wrap{display:grid;gap:8px}.hs-pulse-lead{grid-template-columns:repeat(auto-fit,minmax(min(220px,100%),1fr))!important}.hs-pulse-lead .hs-pt{min-height:104px;padding:12px 14px}.hs-pulse-lead .hs-pt-v{font-size:30px;line-height:1.1}
+.hs-pulse-rest{grid-template-columns:repeat(auto-fit,minmax(min(170px,100%),1fr))!important;gap:6px}.hs-pulse-rest .hs-pt{min-height:0;padding:6px 10px;border-radius:10px;border-left-width:3px;flex-direction:row;flex-wrap:wrap;align-items:baseline;gap:2px 8px}.hs-pulse-rest .hs-pt-l{font-size:11px;flex-basis:100%}.hs-pulse-rest .hs-pt-v{font-size:16px}.hs-pulse-rest .hs-pt-s{font-size:11px;flex:1 1 100%;opacity:.85}
+@media (max-width:700px){.hs-pulse-lead .hs-pt{min-height:84px}.hs-pulse-lead .hs-pt-v{font-size:24px}.hs-pulse-rest .hs-pt{min-height:0}.hs-pulse-rest .hs-pt-s{display:none}.hs-pulse-rest .hs-pt-l{flex-basis:auto}}
 .hs-pulse{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}@media (min-width:1100px){.hs-pulse{grid-template-columns:repeat(var(--n,6),minmax(0,1fr))}}.hs-pulse.is-stale .hs-pt{opacity:.8}
 .hs-pt{display:flex;flex-direction:column;gap:2px;padding:10px 12px;border-radius:14px;background:linear-gradient(180deg,rgba(17,28,46,.95),rgba(11,18,32,.95));border:1px solid rgba(148,163,184,.16);border-left:4px solid #64748b;text-decoration:none;color:#e2e8f0;min-width:0;min-height:92px}
 a.hs-pt:hover,a.hs-pt:focus-visible{border-color:#67e8f9;outline:2px solid transparent}

@@ -19,13 +19,14 @@ export function identityLine(id) {
 export function createHeader(o) {
     const now = o.now ?? (() => new Date());
     const clock = h('time', { class: 'clock', 'data-testid': 'app-clock', title: 'Ekran saati (Türkiye). Kayıt damgaları sunucudan gelir.' });
-    const shiftChip = h('span', { class: 'chip shift', 'data-testid': 'app-shift', title: 'Üretim vardiyası (tanımlı vardiya saatlerine göre; gece vardiyası tanımlı değildir)' });
+    const shiftChip = h('span', { class: 'chip shift', 'data-testid': 'app-shift', title: 'Üretim vardiyası, tanımlı vardiya saatlerine göre: 1. Vardiya 08:00–16:00, 2. Vardiya 16:00–24:00. 00:00–08:00 arası için tanımlı vardiya yoktur; bu, vardiya verisinin eksik olduğu anlamına gelmez.' });
     const tick = () => {
         clock.textContent = formatStamp(now().toISOString(), true);
         clock.setAttribute('datetime', now().toISOString());
         const sh = productionShiftAt(now().toISOString());
-        shiftChip.textContent = sh ? sh.label : 'Vardiya tanımsız';
-        shiftChip.setAttribute('data-shift', sh ? sh.code : 'NONE');
+        // "no shift definition" and "now is outside the defined shifts" are different facts: the definitions exist (TeamK1 08–16, TeamK2 16–24); 00:00–08:00 simply has none.
+        shiftChip.textContent = sh ? sh.label : 'Vardiya dışı';
+        shiftChip.setAttribute('data-shift', sh ? sh.code : 'OFF_HOURS');
     };
     tick();
     const timer = setInterval(tick, 1000);
@@ -66,7 +67,7 @@ export function createHeader(o) {
         el,
         setChips(live, pulse) {
             const host = el.querySelector('[data-testid="app-header-chips"]');
-            host.replaceChildren(...(live ? [h('a', { class: 'chip live', href: '#/canli', 'data-testid': 'app-live-link' }, h('i', {}), 'KMI LIVE')] : []), ...(pulse ? [h('a', { class: 'chip pulse', href: '#/komuta', 'data-testid': 'app-pulse-link' }, 'Performans')] : []));
+            host.replaceChildren(...(live ? [h('a', { class: 'chip live', href: '#/canli', 'data-testid': 'app-live-link', title: 'KMI LIVE: KMI içinde kayıtlı iş ve durum verisinin canlı panosu. CNC makinelerine bağlantı yoktur (BAĞLI DEĞİL); yeşil nokta fiziksel makine bağlantısı anlamına gelmez.' }, h('i', {}), 'KMI LIVE')] : []), ...(pulse ? [h('a', { class: 'chip pulse', href: '#/komuta', 'data-testid': 'app-pulse-link' }, 'Performans')] : []));
         },
         setIdentity(id) {
             const name = id.name || o.initialName;

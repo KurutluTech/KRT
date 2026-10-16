@@ -38,13 +38,25 @@ export async function renderBadgesScreen(container, api, state = {}) {
     try {
         if (!pid)
             pid = await api.myPersonnelId();
+        if (pid && api.markSeen && !state.evaluated) {
+            try {
+                await api.evaluate(pid);
+            }
+            catch { /* the screen still shows the stored state */ }
+        }
         if (pid)
             profile = await api.profile(pid);
     }
     catch (e) {
         loadError = errText(e);
     }
-    const go = (next) => void renderBadgesScreen(container, api, { personnelId: pid, ...next });
+    const go = (next) => void renderBadgesScreen(container, api, { personnelId: pid, evaluated: true, ...next });
+    // celebrate each stored award exactly once: the server remembers what this person has already seen
+    let celebrateList = state.celebrate ?? null;
+    if (!celebrateList && profile?.unseen?.length && api.markSeen) {
+        celebrateList = profile.unseen.map((u) => ({ familyCode: u.familyCode, tier: u.tier, awardedAt: u.awardedAt, nameTr: profile.families.find((f) => f.code === u.familyCode)?.nameTr ?? u.familyCode }));
+        void api.markSeen(pid).catch(() => undefined);
+    }
     const familyCard = (p, f) => {
         const next = f.tiers.find((t) => !t.award);
         return h('section', { class: 'fam', 'data-testid': 'bdg-family', 'data-code': f.code }, h('div', { style: 'display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap' }, h('b', {}, f.nameTr), h('span', { style: 'font-size:12px;color:#94a3b8' }, f.descriptionTr)), h('div', { class: 'row', style: 'margin:8px 0' }, ...f.tiers.map((t) => {
@@ -52,25 +64,25 @@ export async function renderBadgesScreen(container, api, state = {}) {
             const el = h('span', { 'data-testid': 'bdg-medal', 'data-tier': String(t.tier), 'data-state': st, title: LADDER_TIER_NAME[t.tier] });
             el.innerHTML = ladderBadgeSvg(f.track, t.tier, st, 52, f.nameTr);
             return el;
-        })), !f.dataSourceAvailable
+        })), f.evidenceSourceTr ? h('div', { 'data-testid': 'bdg-source', style: 'font-size:11px;color:#94a3b8;margin-bottom:4px' }, `Doğrulama kaynağı: ${f.evidenceSourceTr}`) : null, !f.dataSourceAvailable
             ? h('div', { 'data-testid': 'bdg-no-source', style: 'font-size:12px;color:#fbbf24;font-weight:700' }, 'VERİ KAYNAĞI YOK — KMI bu alanda henüz kayıt tutmuyor; bu rozet şimdilik kazanılamaz.')
             : next
                 ? h('div', { 'data-testid': 'bdg-next', 'data-tier': String(next.tier) }, h('div', { style: 'font-size:12px;font-weight:700;margin-bottom:2px' }, `Sıradaki: ${LADDER_TIER_NAME[next.tier]}`), ...next.criteria.map((c) => {
                     const v = metricOf(p, c.metric);
                     const pr = criterionProgress(c, v);
-                    return h('div', { class: 'crit', 'data-testid': 'bdg-crit', 'data-metric': c.metric }, h('span', {}, `${METRIC_TR[c.metric]} ${c.op === '>=' ? '≥' : '≤'} ${c.value}`), h('div', { class: 'bar' }, h('i', { style: `width:${Math.round(pr.ratio * 100)}%` })), h('span', { 'data-testid': 'bdg-crit-value' }, pr.unknown ? 'VERİ YOK' : String(v)));
+                    return h('div', { class: 'crit', 'data-testid': 'bdg-crit', 'data-metric': c.metric }, h('span', {}, `${METRIC_TR[c.metric]} ${c.op === '>=' ? '≥' : '≤'} ${c.value}`), h('div', { class: 'bar' }, h('i', { style: `width:${Math.round(pr.ratio * 100)}%` })), h('span', { 'data-testid': 'bdg-crit-value' }, pr.unknown ? 'DOĞRULAMA BEKLİYOR' : String(v)));
                 }), next.requiresSkillCategory ? h('div', { style: 'font-size:12px;color:#94a3b8' }, `Ayrıca: doğrulanmış ${next.requiresSkillCategory} yetkinliği ≥ ${next.requiresSkillLevel}`) : null)
                 : h('div', { 'data-testid': 'bdg-complete', style: 'font-size:12px;color:#4ade80;font-weight:700' }, 'Tüm basamaklar tamam.'));
     };
-    const celebrate = state.celebrate && state.celebrate.length && profile
+    const celebrate = celebrateList && celebrateList.length && profile
         ? (() => {
-            const a = state.celebrate[0];
+            const a = celebrateList[0];
             const fam = profile.families.find((f) => f.code === a.familyCode);
             const medal = h('div', { class: 'medal' });
             medal.innerHTML = ladderBadgeSvg(fam?.track ?? 'QUALITY', a.tier, 'EARNED', 150, a.nameTr);
             const colors = ['#facc15', '#22d3ee', '#a78bfa', '#f472b6', '#34d399'];
             const confetti = Array.from({ length: 24 }, (_, i) => h('i', { class: 'cf', style: `left:${(i * 37) % 100}%;background:${colors[i % colors.length]};animation-delay:${(i % 8) * 90}ms` }));
-            const overlay = h('div', { class: 'cele', 'data-testid': 'bdg-celebrate', role: 'dialog', 'aria-label': 'Yeni rozet', onClick: () => go({}) }, ...confetti, medal, h('h2', {}, 'YENİ ROZET!'), h('p', { 'data-testid': 'bdg-celebrate-text' }, `${a.nameTr} — ${LADDER_TIER_NAME[a.tier]}`), state.celebrate.length > 1 ? h('p', { style: 'font-size:13px' }, `+${state.celebrate.length - 1} rozet daha`) : null, h('p', { style: 'font-size:12px;margin-top:14px;opacity:.7' }, 'Kapatmak için dokunun'));
+            const overlay = h('div', { class: 'cele', 'data-testid': 'bdg-celebrate', role: 'dialog', 'aria-label': 'Yeni rozet', onClick: () => go({}) }, ...confetti, medal, h('h2', {}, 'YENİ ROZET!'), h('p', { 'data-testid': 'bdg-celebrate-text' }, `${a.nameTr} — ${LADDER_TIER_NAME[a.tier]}`), celebrateList.length > 1 ? h('p', { style: 'font-size:13px' }, `+${celebrateList.length - 1} rozet daha`) : null, h('p', { style: 'font-size:12px;margin-top:14px;opacity:.7' }, 'Kapatmak için dokunun'));
             setTimeout(() => { if (overlay.isConnected)
                 go({}); }, 4500);
             return overlay;
@@ -87,5 +99,5 @@ export async function renderBadgesScreen(container, api, state = {}) {
             go({ message: errText(e) });
         }
     };
-    mount(container, h('div', { class: 'bdg' }, h('style', {}, CSS), h('h1', { 'data-testid': 'bdg-heading' }, 'Rozetlerim'), h('p', { style: 'font-size:12px;color:#94a3b8' }, 'Rozet bir takdirdir, yetki değildir: hiçbir rozet tek başına makine yetkisi vermez. Her basamak gerçek kayıtlarla ölçülür.'), loadError ? h('div', { 'data-testid': 'bdg-error', style: 'padding:10px;border-radius:8px;background:#7f1d1d;color:#fecaca' }, `Yüklenemedi: ${loadError}`) : null, !loadError && !pid ? h('div', { 'data-testid': 'bdg-not-linked', style: 'padding:10px;border-radius:8px;background:#78350f;color:#fde68a' }, 'Giriş hesabınız bir personel kaydına bağlı değil.') : null, state.message ? h('div', { 'data-testid': 'bdg-message', style: 'padding:10px;border-radius:8px;background:#1e3a8a;color:#dbeafe;margin:6px 0' }, state.message) : null, profile ? h('div', { style: 'display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:6px 0' }, h('b', { 'data-testid': 'bdg-name' }, profile.name), h('span', { 'data-testid': 'bdg-count', style: 'font-size:12px;color:#94a3b8' }, `Kazanılan: ${profile.history.filter((x) => !x.withdrawn).length}`), h('button', { type: 'button', 'data-testid': 'bdg-evaluate', onClick: () => void evaluate() }, 'Rozetlerimi kontrol et')) : null, ...(profile ? profile.families.map((f) => familyCard(profile, f)) : []), profile && profile.history.length ? h('section', { 'data-testid': 'bdg-history', style: 'margin:10px 0' }, h('h2', { style: 'font-size:16px' }, 'Başarı geçmişi'), ...profile.history.map((x) => h('div', { 'data-testid': 'bdg-history-item', style: 'font-size:12px;border-top:1px solid #f1f5f9;padding:3px 0' }, `${x.awardedAt.slice(0, 10)} · ${profile.families.find((f) => f.code === x.familyCode)?.nameTr ?? x.familyCode} — ${LADDER_TIER_NAME[x.tier]}${x.withdrawn ? ' (geri alındı)' : ''}`))) : null, celebrate));
+    mount(container, h('div', { class: 'bdg' }, h('style', {}, CSS), h('h1', { 'data-testid': 'bdg-heading' }, 'Rozetlerim'), h('p', { style: 'font-size:12px;color:#94a3b8' }, 'Rozet bir takdirdir, yetki değildir: hiçbir rozet tek başına makine yetkisi vermez. Her basamak gerçek kayıtlarla ölçülür.'), loadError ? h('div', { 'data-testid': 'bdg-error', style: 'padding:10px;border-radius:8px;background:#7f1d1d;color:#fecaca' }, `Yüklenemedi: ${loadError}`) : null, !loadError && !pid ? h('div', { 'data-testid': 'bdg-not-linked', style: 'padding:10px;border-radius:8px;background:#78350f;color:#fde68a' }, 'Giriş hesabınız bir personel kaydına bağlı değil.') : null, state.message ? h('div', { 'data-testid': 'bdg-message', style: 'padding:10px;border-radius:8px;background:#1e3a8a;color:#dbeafe;margin:6px 0' }, state.message) : null, profile ? h('div', { style: 'display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:6px 0' }, h('b', { 'data-testid': 'bdg-name' }, profile.name), h('span', { 'data-testid': 'bdg-count', style: 'font-size:12px;color:#94a3b8' }, `Kazanılan: ${profile.history.filter((x) => !x.withdrawn).length}`), (() => { const last = profile.history.filter((x) => !x.withdrawn).sort((a, b) => b.awardedAt.localeCompare(a.awardedAt))[0]; return last ? h('span', { 'data-testid': 'bdg-last', style: 'font-size:12px;color:#94a3b8' }, `Son: ${profile.families.find((f) => f.code === last.familyCode)?.nameTr ?? last.familyCode} — ${LADDER_TIER_NAME[last.tier]} (${last.awardedAt.slice(0, 10)})`) : null; })(), h('button', { type: 'button', 'data-testid': 'bdg-evaluate', onClick: () => void evaluate() }, 'Rozetlerimi kontrol et')) : null, ...(profile ? profile.families.map((f) => familyCard(profile, f)) : []), profile && profile.history.length ? h('section', { 'data-testid': 'bdg-history', style: 'margin:10px 0' }, h('h2', { style: 'font-size:16px' }, 'Başarı geçmişi'), ...profile.history.map((x) => h('div', { 'data-testid': 'bdg-history-item', style: 'font-size:12px;border-top:1px solid #f1f5f9;padding:3px 0' }, `${x.awardedAt.slice(0, 10)} · ${profile.families.find((f) => f.code === x.familyCode)?.nameTr ?? x.familyCode} — ${LADDER_TIER_NAME[x.tier]}${x.withdrawn ? ' (geri alındı)' : ''}`))) : null, celebrate));
 }

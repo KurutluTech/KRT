@@ -7,6 +7,8 @@ import { h, mount } from '../../../packages/ui/src/h.js';
 import { createKmiNextClient } from '../../../packages/data-client/src/client.js';
 import { renderTerminalScreen, rememberedMachine, remember as rememberMachine } from './screens/TerminalScreen.js';
 import { canOpen, featuredPaths, landingPath, NO_ACCESS } from './access.js';
+import { renderCustomersScreen } from './screens/CustomersScreen.js';
+import { createCustomersApi } from './customersApi.js';
 import { renderPersonnelAccessScreen } from './screens/PersonnelAccessScreen.js';
 import { createPersonnelAccessApi } from './personnelAccessApi.js';
 import { renderPuantajScreen } from './screens/PuantajScreen.js';
@@ -21,7 +23,7 @@ import { renderNoticesScreen } from './screens/NoticesScreen.js';
 import { createOperatorHomeApi } from './operatorHomeApi.js';
 import { createTerminalApi } from './terminalApi.js';
 import { withCockpit, liveCockpitSources } from './screens/DepartmentCockpit.js';
-import { FUNCTION_STATE_TR, resolveFunctions } from '../../../packages/domain/src/departmentFunctions.js';
+import { FUNCTION_STATE_TR, resolveFunctions, functionMaturity, liveLabelTr } from '../../../packages/domain/src/departmentFunctions.js';
 import { renderDepartmentHome } from './screens/DepartmentHomeScreen.js';
 import { renderQualityDesk } from './screens/QualityDeskScreen.js';
 import { renderDemandPanel } from './screens/DemandPanel.js';
@@ -332,6 +334,7 @@ export const ROUTES = [
     { path: '/giris-cikis', label: 'Giriş-Çıkış (GEÇKO)', group: 'Yönetim', inMenu: true, render: (el, c, s) => renderGeckoScreen(el, createGeckoApi(c, s)) },
     { path: '/yetkinlik-aktarim', label: 'Yetkinlik geçmişi aktarımı', group: 'Yönetim', inMenu: true, render: (el, c, s) => renderCompetencyImportScreen(el, createCompetencyImportApi(c, s)) },
     { path: '/akademi', label: 'Akademi & Yetkinlik', group: 'Yönetim', inMenu: true, render: (el, c, s) => renderAcademyScreen(el, createAcademyApi(c, s)) },
+    { path: '/musteriler', label: 'Müşteriler (kişiler · şartlar · teslimat)', group: 'Yönetim', inMenu: true, render: (el, c, s) => renderCustomersScreen(el, createCustomersApi(c, s)) },
     { path: '/siparisler', label: 'Siparişler', group: 'Yönetim', inMenu: true, render: (el, c, s) => renderOrdersScreen(el, createOrdersApi(c, s)) },
     { path: '/muhendislik', label: 'Ürün mühendisliği (revizyon · reçete · CAM)', group: 'Yönetim', inMenu: true, render: (el, c, s) => renderEngineeringScreen(el, createEngineeringApi(c, s)) },
     { path: '/katalog', label: 'Katalog (müşteri · tedarikçi · ürün)', group: 'Yönetim', inMenu: true, render: (el, c, s) => renderCatalogScreen(el, createCatalogApi(c, s)) },
@@ -372,6 +375,8 @@ export function parseHash(hash) {
     return { path: path || '/', query: new URLSearchParams(qs ?? '') };
 }
 /** Weak devices (≤2 cores or ≤2 GB) get the still K — no animation, same picture. */
+/** the panel lists only the latest few recent screens (the stored history can be longer); the section must not push the real menu down */
+const RECENT_SHOWN = 3;
 const lowPowerDevice = () => { try {
     const n = navigator;
     return (n.hardwareConcurrency ?? 8) <= 2 || (n.deviceMemory ?? 8) <= 2;
@@ -532,7 +537,7 @@ export async function startApp(root, opts = {}) {
         localStorage.setItem(LOGIN_MODE_KEY, m);
     }
     catch { /* storage may be blocked */ } };
-    const renderLogin = (message, requestedMode = rememberedMode()) => {
+    const renderLogin = (message, requestedMode = rememberedMode(), kind = 'info') => {
         const mode = operatorLoginEnabled ? requestedMode : 'EMAIL';
         const email = h('input', { type: 'email', autocomplete: 'username', 'data-testid': 'login-email', placeholder: 'E-posta', id: 'kmi-login-email' });
         const pass = h('input', { type: 'password', autocomplete: 'current-password', 'data-testid': 'login-password', placeholder: 'Şifre', id: 'kmi-login-password' });
@@ -566,13 +571,13 @@ export async function startApp(root, opts = {}) {
                     await route();
             }
             catch (err) {
-                renderLogin(err instanceof Error ? `Giriş başarısız: ${err.message}` : 'Giriş başarısız', mode);
+                renderLogin(err instanceof Error ? `Giriş başarısız: ${err.message}` : 'Giriş başarısız', mode, 'error');
             }
         };
         const dbText = h('span', {}, 'Veritabanı bağlantısı kontrol ediliyor…');
         const dbBox = h('div', { class: 'kmi-login-db', 'data-testid': 'login-db', 'data-state': 'checking', role: 'status' }, h('i', {}), dbText);
         const tab = (m, label, tid) => h('button', { type: 'button', class: `kmi-login-tab${mode === m ? ' on' : ''}`, 'data-testid': tid, 'aria-pressed': String(mode === m), onClick: () => { rememberMode(m); renderLogin(undefined, m); } }, label);
-        mount(root, h('div', {}, h('style', {}, SHELL_CSS), offlineBar(), h('div', { class: 'kmi-login', 'data-testid': 'login-screen', 'data-mode': mode, ...(lowPowerDevice() ? { 'data-lowpower': '' } : {}) }, h('div', { class: 'kmi-login-k', 'aria-hidden': 'true', 'data-testid': 'login-k' }, h('div', { class: 'kbody' }), h('div', { class: 'ksheen' }), h('span', { class: 'kstar' })), h('form', { class: 'kmi-login-card', 'data-testid': 'login-form', onSubmit: (e) => void submit(e) }, h('div', { class: 'brand' }, h('img', { src: './assets/kurutlu-k-symbol-white.png', alt: 'Kurutlu' }), h('h1', {}, BRAND), h('p', { class: 'sub' }, BRAND_SUB), h('div', { class: 'rule' })), operatorLoginEnabled ? h('div', { class: 'kmi-login-tabs' }, tab('EMAIL', 'Yetkili girişi', 'login-tab-email'), tab('OPERATOR', 'Operatör: Sicil No + PIN', 'login-tab-operator')) : null, message ? h('div', { class: 'kmi-login-err', 'data-testid': 'login-error', role: 'alert' }, message) : null, ...(mode === 'OPERATOR'
+        mount(root, h('div', {}, h('style', {}, SHELL_CSS), offlineBar(), h('div', { class: 'kmi-login', 'data-testid': 'login-screen', 'data-mode': mode, ...(lowPowerDevice() ? { 'data-lowpower': '' } : {}) }, h('div', { class: 'kmi-login-bg', 'aria-hidden': 'true' }, h('div', { class: 'kmi-login-k', 'data-testid': 'login-k' }, h('div', { class: 'kbody' }))), h('form', { class: 'kmi-login-card', 'data-testid': 'login-form', onSubmit: (e) => void submit(e) }, h('div', { class: 'brand' }, h('img', { src: './assets/kurutlu-k-symbol-white.png', alt: 'Kurutlu' }), h('h1', {}, BRAND), h('p', { class: 'sub' }, BRAND_SUB), h('div', { class: 'rule' })), operatorLoginEnabled ? h('div', { class: 'kmi-login-tabs' }, tab('EMAIL', 'Yetkili girişi', 'login-tab-email'), tab('OPERATOR', 'Operatör: Sicil No + PIN', 'login-tab-operator')) : null, message ? (kind === 'error' ? h('div', { class: 'kmi-login-err', 'data-testid': 'login-error', role: 'alert' }, message) : h('div', { class: 'kmi-login-note', 'data-testid': 'login-notice', role: 'status' }, message)) : null, ...(mode === 'OPERATOR'
             ? [h('label', { for: 'kmi-login-sicil' }, 'Sicil numarası'), sicil, h('label', { for: 'kmi-login-pin' }, 'Kişisel PIN (6 rakam)'), pin,
                 h('details', { class: 'kmi-login-badge-opt' }, h('summary', {}, 'Rozet / QR ile giriş (isteğe bağlı)'), h('label', { for: 'kmi-login-badge' }, 'Rozet / QR'), badge),
                 h('p', { class: 'kmi-login-hint' }, 'Rozet tek başına giriş yaptırmaz; PIN gerekir. Paylaşılan tablette işiniz bitince Çıkış yapın.')]
@@ -629,7 +634,7 @@ export async function startApp(root, opts = {}) {
             if (!bc)
                 return null;
             const first = NAV_TREE_FIRST[bc.workspaceId];
-            return h('nav', { class: 'kmi-crumb', 'aria-label': 'Konum', 'data-testid': 'app-breadcrumb' }, h('a', { href: '#/' }, 'Ana Sayfa'), h('span', { 'aria-hidden': 'true' }, '›'), ...(bc.workspace.toLowerCase() === bc.page.toLowerCase() ? [] : [first ? h('a', { href: `#${first}`, 'data-testid': 'app-crumb-ws' }, trTitle(bc.workspace)) : h('span', {}, trTitle(bc.workspace)), h('span', { 'aria-hidden': 'true' }, '›')]), h('b', { 'aria-current': 'page' }, bc.page));
+            return h('nav', { class: 'kmi-crumb', 'aria-label': 'Konum', 'data-testid': 'app-breadcrumb' }, h('a', { href: '#/' }, 'Ana Sayfa'), h('span', { 'aria-hidden': 'true' }, '›'), ...(!bc.workspace || bc.workspace.toLowerCase() === bc.page.toLowerCase() ? [] : [first ? h('a', { href: `#${first}`, 'data-testid': 'app-crumb-ws' }, trTitle(bc.workspace)) : h('span', {}, trTitle(bc.workspace)), h('span', { 'aria-hidden': 'true' }, '›')]), h('b', { 'aria-current': 'page' }, bc.page));
         };
         const collapsed0 = readCollapsed();
         document.documentElement.style.setProperty('--kmi-side-w', collapsed0 ? '84px' : '300px');
@@ -734,7 +739,7 @@ export async function startApp(root, opts = {}) {
         // (gates only group them); a screen may sit under two gates but is one route. Favourites and recently used screens are sections of "Benim KMI".
         const visibleItem = (p) => treeAll.some((g) => g.items.some((x) => x.path === p));
         const favVirt = () => { const items = navState.favorites.map((p) => NAV_ITEM_BY_PATH[p]).filter((i) => !!i && visibleItem(i.path)); return items.length ? { id: 'fav', short: 'Favori', title: 'FAVORİLERİM', icon: 'badge', items } : null; };
-        const recentVirt = () => { const items = navState.recent.filter((p) => p !== path).map((p) => NAV_ITEM_BY_PATH[p]).filter((i) => !!i && visibleItem(i.path)); return items.length ? { id: 'recent', short: 'Son', title: 'SON KULLANILAN', icon: 'clock', items } : null; };
+        const recentVirt = () => { const items = navState.recent.filter((p) => p !== path).map((p) => NAV_ITEM_BY_PATH[p]).filter((i) => !!i && visibleItem(i.path)).slice(0, RECENT_SHOWN); return items.length ? { id: 'recent', short: 'Son', title: 'SON KULLANILAN', icon: 'clock', items } : null; };
         const gatesNow = () => {
             const gs = visibleGates(treeAll);
             if (operatorSimple && navGroups[0]?.id === 'mine') {
@@ -800,7 +805,7 @@ export async function startApp(root, opts = {}) {
                     // KMI-001 §001.1 rich second level: the department's functions with their honest state (only the section the user is in, to keep the panel short)
                     const fnList = fl ? h('div', { class: 'nfn', 'data-testid': 'app-nav-functions' }, h('div', { class: 'nfh' }, 'İŞLEVLER'), ...fl.map((f) => {
                         const dot = h('i', { class: `fd fd-${f.state.toLowerCase()}`, title: FUNCTION_STATE_TR[f.state], 'aria-hidden': 'true' });
-                        const tx = h('span', {}, f.label, h('small', {}, f.pkg ? `${FUNCTION_STATE_TR[f.state]} · ${f.pkg}` : FUNCTION_STATE_TR[f.state]));
+                        const tx = h('span', {}, f.label, h('small', {}, [FUNCTION_STATE_TR[f.state], f.pkg ?? null, liveLabelTr(functionMaturity(f))].filter(Boolean).join(' · ')));
                         return f.link ? h('a', { href: f.link, class: 'nfi', 'data-testid': 'app-nav-function', 'data-state': f.state }, dot, tx) : h('div', { class: 'nfi off', 'data-testid': 'app-nav-function', 'data-state': f.state, title: f.note ?? '' }, dot, tx);
                     })) : null;
                     return h('section', { class: 'nsec', 'data-testid': 'app-nav-section', 'data-ws': sct.id, 'data-open': String(open) }, h('div', { class: 'nsh' }, head, toggle), ...(open ? rows : []), fnList);

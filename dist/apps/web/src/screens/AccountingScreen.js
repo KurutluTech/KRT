@@ -71,7 +71,7 @@ export async function renderAccountingScreen(container, orderItemId, api, banner
             h("td", null,
                 h("span", { class: "mut" }, "\u00D6denen:"),
                 " ",
-                h("span", { "data-testid": "invoice-paid" }, String(paid[inv.id] ?? 0))),
+                h("span", { "data-testid": "invoice-paid" }, paid[inv.id] === undefined ? "VERİ YOK" : String(paid[inv.id]))),
             h("td", null,
                 h("span", { class: `pill ${(INV_TR[inv.status] ?? ['', ''])[1]}`, "data-testid": "invoice-status", "data-code": inv.status }, (INV_TR[inv.status] ?? [inv.status])[0])),
             h("td", null, inv.status !== 'PAID'
