@@ -36,7 +36,7 @@ const KS_CSS = `
 .ks-chip-on{background:var(--ks-accent);color:#fff}
 .ks-card{display:flex;flex-direction:column;border:1px solid #e2e8f0;border-radius:10px;margin:4px 0;overflow:hidden}
 .ks-hit{display:block;padding:8px 10px;color:inherit;text-decoration:none;min-height:44px;box-sizing:border-box;overflow-wrap:anywhere}
-.ks-title{font-size:15px}.ks-sub{font-size:12px;color:#475569}.ks-why{font-size:11px;color:#64748b}.ks-nos{font-size:11px;color:#92400e}
+.ks-title{font-size:15px}.ks-sub{font-size:12px;color:inherit;opacity:.82}.ks-why{font-size:11px;color:#64748b}.ks-nos{font-size:11px;color:#92400e}
 .ks-actions{display:flex;border-top:1px solid #e2e8f0}
 .ks-act{flex:1;display:flex;align-items:center;justify-content:center;min-height:44px;color:inherit;text-decoration:none;font-weight:600;font-size:14px}
 .ks-act+.ks-act{border-left:1px solid #e2e8f0}.ks-act-main{color:#1d4ed8;font-weight:700}

@@ -39,7 +39,7 @@ const TF_CSS = DS_CSS + `
 .kd button.tf-chip{min-height:38px;border-radius:999px;border:1px solid #334155;background:#0f172a;color:#cbd5e1;padding:0 12px;font-weight:700;font-size:13px;cursor:pointer;white-space:nowrap}
 .kd button.tf-chip[aria-pressed="true"]{border-color:#22d3ee;background:rgba(34,211,238,.14);color:#fff}.kd button.tf-chip .c{margin-left:6px;font-weight:800;opacity:.85}
 .kd .tf-bar input[type=search],.kd .tf-bar select{min-height:40px;font-size:16px;border-radius:10px;border:1px solid #334155;background:#0f172a;color:#fff;padding:0 10px}.kd .tf-bar input[type=search]{flex:1 1 220px;min-width:0}
-.kd .tf-split{display:grid;grid-template-columns:minmax(340px,5fr) minmax(0,7fr);gap:12px;align-items:start}
+.kd .tf-empty-state{max-width:640px;padding:18px 4px}.kd .tf-empty-title{margin:0 0 6px;font-size:16px;font-weight:700;color:#e2e8f0}.kd .tf-empty-state p{margin:0 0 8px}.kd .tf-split{display:grid;grid-template-columns:minmax(340px,5fr) minmax(0,7fr);gap:12px;align-items:start}
 .kd .tf-listcol{display:flex;flex-direction:column;gap:6px;max-height:max(300px,calc(100vh - var(--tf-top,330px) - 16px));min-height:300px;overflow-y:auto;padding-right:4px;overscroll-behavior:contain}
 .kd .tf-detailcol{position:sticky;top:66px;max-height:calc(100vh - 80px);overflow-y:auto;border:1px solid #1e293b;border-radius:14px;background:#0f172a;padding:14px 16px;min-width:0;overscroll-behavior:contain}
 .kd .tf-task,.kd .tf-derived{border:1px solid #1e293b;border-left:5px solid #475569;border-radius:12px;margin:0;background:linear-gradient(180deg,#111c2e,#0f172a);display:flex;align-items:stretch;gap:6px;color:#e2e8f0;flex:0 0 auto}
@@ -389,7 +389,7 @@ export async function renderTaskFloorScreen(container, api, state = {}) {
     function paintDetail() {
         const x = ui.sel ? items.find((i) => i.id === ui.sel) ?? null : null;
         if (!x) {
-            detailHost.replaceChildren(h('div', { class: 'tf-empty-detail', 'data-testid': 'tf-detail-empty' }, 'Soldan bir iş seçin.'));
+            detailHost.replaceChildren(...(items.length ? [h('div', { class: 'tf-empty-detail', 'data-testid': 'tf-detail-empty' }, 'Ayrıntı için listeden bir iş seçin.')] : []));
             return;
         }
         loadDetailData(x);
@@ -503,8 +503,9 @@ export async function renderTaskFloorScreen(container, api, state = {}) {
         const countLine = h('div', { 'data-testid': 'tf-count', style: 'font-size:13px;color:#94a3b8' }, `${sum.actionable} iş şu an sizi bekliyor · ${sum.active} aktif`);
         const detailMode = !wide && ui.mobileDetail;
         const body = detailMode ? [detailHost]
-            : wide ? [h('div', { class: 'tf-split' }, h('div', { style: 'min-width:0;display:grid;gap:6px' }, countLine, listHost), detailHost)]
-                : [countLine, listHost];
+            : wide && items.length === 0 ? [h('div', { 'data-testid': 'tf-empty-state', class: 'tf-empty-state' }, h('p', { class: 'tf-empty-title' }, scope === 'ALL' ? 'Kayıtlı görev yok.' : 'Şu an size atanmış veya sizi bekleyen görev yok.'), h('p', { class: 'mut' }, scope === 'ALL' ? 'Yeni bir görev atandığında burada listelenir; ayrıntı ve işlem düğmeleri sağ panelde açılır.' : 'Başkalarının size açık görevlerini görmek için «Tümü» kapsamına geçebilirsiniz. Yetkiniz varsa «＋ Yeni görev ata» ile görev oluşturabilirsiniz.'), listHost)]
+                : wide ? [h('div', { class: 'tf-split' }, h('div', { style: 'min-width:0;display:grid;gap:6px' }, countLine, listHost), detailHost)]
+                    : [sum.actionable === 0 && sum.active === 0 && items.length === 0 ? '' : countLine, listHost];
         mount(container, h('div', { class: 'kd tf-screen' }, h('style', {}, TF_CSS), ...head(), ...(detailMode ? [] : [h('div', { 'data-testid': 'tf-summary', class: 'tiles' }, ...tiles), bar]), ...body));
         ui.shown = Math.max(ui.shown, PAGE);
         paintList();

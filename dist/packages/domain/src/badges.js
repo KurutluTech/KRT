@@ -7,7 +7,7 @@ export const METRIC_TR = {
     first_pass_qc_ops: 'İlk seferde kaliteden geçen operasyon', ops_done: 'Biten operasyon', scrap_rate_pct: 'Fire oranı %',
     first_piece_first_try: 'İlk denemede onaylanan ilk parça', first_piece_first_try_pct: 'İlk parça ilk deneme oranı %',
     measurement_skill_max: 'En yüksek ölçüm yetkinliği', academy_passes: 'Geçilen akademi değerlendirmesi', tool_wear_records: 'Takım aşınma kaydı',
-    confirmed_fault_reports: 'Onarımla doğrulanan arıza bildirimi', improvements_adopted: 'Uygulanan iyileştirme',
+    confirmed_fault_reports: 'Onarımla doğrulanan arıza bildirimi', improvements_adopted: 'Uygulanan iyileştirme', verified_machine_skills: 'Doğrulanmış makine yetkinliği (seviye ≥ 2)',
 };
 /** Same as kmi_next.badge_criteria_met: all criteria must hold; a null metric never meets one; empty list = false. */
 export function criteriaMet(criteria, metrics) {

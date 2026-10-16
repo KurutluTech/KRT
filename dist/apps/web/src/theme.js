@@ -18,19 +18,15 @@ a{color:var(--kmi-cyan2)}
 .ic{display:inline-flex;align-items:center;justify-content:center;flex:none}
 /* ---------- login (old KMI: spinning K watermark, 34 s, brand title) ---------- */
 .kmi-login{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:clamp(8px,2.4vh,22px);padding:16px;background:radial-gradient(ellipse at 50% 18%,rgba(56,189,248,.14),transparent 46%),radial-gradient(circle at 85% 100%,rgba(30,64,175,.22),transparent 48%),linear-gradient(180deg,#071122,#050b17);overflow:auto}
-/* KMI signature K: brushed-metal letter, slow tilt, one thin light sweep + a small star glint. Decorative only (aria-hidden); never covers the form. */
-.kmi-login-k{position:relative;flex:none;height:clamp(110px,31vh,330px);aspect-ratio:600/761;perspective:1000px;pointer-events:none;filter:drop-shadow(0 10px 28px rgba(56,189,248,.16))}
-.kmi-login-k .kbody,.kmi-login-k .ksheen{position:absolute;inset:0;-webkit-mask:url(./assets/kurutlu-k-symbol-white.png) center/contain no-repeat;mask:url(./assets/kurutlu-k-symbol-white.png) center/contain no-repeat}
-.kmi-login-k .kbody{background:linear-gradient(128deg,#ffffff 0%,#d5dde8 20%,#8693a6 42%,#f6f9fc 58%,#a3afc0 78%,#e9eff6 100%);transform-style:preserve-3d;animation:kmiKTilt 11s ease-in-out infinite}
-.kmi-login-k .ksheen{background:linear-gradient(105deg,transparent 42%,rgba(255,255,255,.95) 50%,transparent 58%) 160% 0/260% 100% no-repeat;mix-blend-mode:screen;animation:kmiKSweep 6s ease-in-out infinite}
-.kmi-login-k .kstar{position:absolute;left:61%;top:7%;width:clamp(18px,4.4vh,40px);aspect-ratio:1;opacity:0;transform:scale(.3) rotate(0deg);animation:kmiKStar 6s ease-in-out infinite;
-  background:radial-gradient(circle,#fff 0 12%,transparent 13%),linear-gradient(90deg,transparent 46%,#fff 50%,transparent 54%),linear-gradient(0deg,transparent 46%,#fff 50%,transparent 54%);filter:drop-shadow(0 0 6px rgba(186,230,253,.9))}
-@keyframes kmiKTilt{0%,100%{transform:rotateY(-16deg) rotateX(3deg)}50%{transform:rotateY(16deg) rotateX(-3deg)}}
-@keyframes kmiKSweep{0%,18%{background-position:160% 0}55%,100%{background-position:-60% 0}}
-@keyframes kmiKStar{0%,38%{opacity:0;transform:scale(.3) rotate(0deg)}46%{opacity:1;transform:scale(1) rotate(45deg)}56%,100%{opacity:0;transform:scale(.4) rotate(90deg)}}
-@media (prefers-reduced-motion:reduce){.kmi-login-k .kbody,.kmi-login-k .ksheen,.kmi-login-k .kstar{animation:none}.kmi-login-k .ksheen{background-position:30% 0;opacity:.55}.kmi-login-k .kstar{opacity:.85;transform:scale(.7)}}
-.kmi-login[data-lowpower] .kmi-login-k .kbody,.kmi-login[data-lowpower] .kmi-login-k .ksheen,.kmi-login[data-lowpower] .kmi-login-k .kstar{animation:none}.kmi-login[data-lowpower] .kmi-login-k .ksheen{background-position:30% 0;opacity:.55}.kmi-login[data-lowpower] .kmi-login-k .kstar{opacity:.85;transform:scale(.7)}
-@media (max-height:640px){.kmi-login-k{height:clamp(70px,18vh,150px)}}
+/* KMI signature K (R2): a large brushed-metal K that is part of the BACKGROUND, behind the card. It turns slowly and continuously about its vertical axis (transform-only animation = compositor work, no repaint, no JS). Decorative (aria-hidden), clipped to its own fixed layer so it can never overflow the page, never takes pointer events and is dimmed so the form stays readable. */
+.kmi-login-bg{position:fixed;inset:0;z-index:0;overflow:hidden;display:grid;place-items:center;pointer-events:none;contain:strict}
+.kmi-login-k{position:relative;flex:none;height:clamp(300px,min(88vh,150vw),900px);aspect-ratio:600/761;perspective:1400px;pointer-events:none;opacity:.34;filter:drop-shadow(0 10px 40px rgba(56,189,248,.18))}
+.kmi-login-k .kbody{position:absolute;inset:0;-webkit-mask:url(./assets/kurutlu-k-symbol-white.png) center/contain no-repeat;mask:url(./assets/kurutlu-k-symbol-white.png) center/contain no-repeat;background:linear-gradient(128deg,#ffffff 0%,#d5dde8 20%,#8693a6 42%,#f6f9fc 58%,#a3afc0 78%,#e9eff6 100%);transform-style:preserve-3d;will-change:transform;animation:kmiKSpin 36s linear infinite}
+@keyframes kmiKSpin{from{transform:rotateY(0deg)}to{transform:rotateY(360deg)}}
+@media (prefers-reduced-motion:reduce){.kmi-login-k .kbody{animation:none;transform:rotateY(-14deg)}}
+.kmi-login[data-lowpower] .kmi-login-k .kbody{animation:none;transform:rotateY(-14deg);will-change:auto}
+.kmi-login > :not(.kmi-login-bg){position:relative;z-index:1}
+.kmi-login-note{margin-top:12px;padding:10px;border-radius:8px;background:rgba(56,189,248,.10);border:1px solid rgba(56,189,248,.28);color:#bae6fd;font-size:14px}
 .kmi-login-db{display:flex;align-items:center;gap:8px;margin:14px 0 0;padding:8px 10px;border-radius:10px;background:rgba(15,23,42,.8);border:1px solid var(--kmi-line2);font-size:12px;color:#cbd5e1}
 .kmi-login-db i{width:10px;height:10px;border-radius:50%;background:#64748b;flex:none}
 .kmi-login-db[data-state=ok]{border-color:#15803d;color:#bbf7d0}.kmi-login-db[data-state=ok] i{background:#22c55e;box-shadow:0 0 8px #22c55e}
@@ -230,7 +226,7 @@ html[data-kmi-touch="1"] .kmi-panel .nfav{min-height:var(--kmi-target,48px);widt
 .kmi-content [style*="background:#fec"]{background:rgba(245,158,11,.24)!important}
 .kmi-content [style*="background:#efe"]{background:rgba(34,197,94,.18)!important}
 .chip.shift{font-size:11px;font-weight:800;padding:4px 10px;border-radius:999px;background:#0f2a4a;color:#bae6fd;border:1px solid #1d4ed8;white-space:nowrap}
-.chip.shift[data-shift=NONE]{background:#334155;color:#e2e8f0;border:1px dashed #94a3b8}
+.chip.shift[data-shift=OFF_HOURS]{background:#334155;color:#e2e8f0;border:1px dashed #94a3b8}
 @media (max-width:640px){.chip.shift{display:none}}
 .cp-head{min-width:0;display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:8px}
 .cp-fresh{font-size:11px;font-weight:800;padding:2px 9px;border-radius:999px;background:#14532d;color:#bbf7d0}
@@ -304,4 +300,8 @@ html[data-kmi-touch="1"] .kmi-panel .nfav{min-height:var(--kmi-target,48px);widt
 .cp-wait summary{cursor:pointer;font-weight:700;font-size:13px;color:#cbd5e1}.cp-wait p{margin:8px 0}
 .cp-wait .cp-row{opacity:.8}
 @media (max-width:700px){.kmi-hero{padding:8px 12px;gap:10px}.kmi-hero p,.kmi-hero .chips{display:none}.kmi-hero h1{font-size:13px;letter-spacing:.03em}.kmi-hero img{height:26px}}
+/* R2 §1.6 navigation density: pointer devices get tighter rows (touch keeps the 48 px targets); long names wrap instead of being cut */
+.kmi-panel a,.kmi-dw a{line-height:1.25;overflow-wrap:anywhere}
+html:not([data-kmi-touch="1"]) .kmi-panel a{min-height:36px;padding:4px 10px}
+html:not([data-kmi-touch="1"]) .kmi-panel .nsec{margin:0 0 6px;padding-top:4px}
 `;

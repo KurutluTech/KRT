@@ -49,6 +49,9 @@ const DEFAULT_ROLE_MATRIX = {
     DEVICE_MANAGE: ['ADMIN'],
     // Migration 0051: write-authorization closure — these writes previously checked only "signed in".
     PERSONNEL_MANAGE: ['ADMIN', 'MANAGEMENT'],
+    // Draft 0096 (KMI-006): customer contacts / terms are commercial + personal data.
+    CUSTOMER_MANAGE: ['ADMIN', 'MANAGEMENT'],
+    CUSTOMER_CONTACT_VIEW: ['ADMIN', 'MANAGEMENT', 'ACCOUNTING', 'SHIPPING'],
     ORDER_CREATE: ['ADMIN', 'MANAGEMENT'],
     WORK_ORDER_CREATE: ['ADMIN', 'MANAGEMENT'],
     PURCHASE_ORDER_MANAGE: ['ADMIN', 'MANAGEMENT', 'PURCHASING'],
