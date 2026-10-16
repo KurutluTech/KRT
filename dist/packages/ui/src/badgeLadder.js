@@ -12,6 +12,7 @@ const METAL = {
 };
 const TIER_NAME = { 1: 'BRONZ', 2: 'GÜMÜŞ', 3: 'ALTIN', 4: 'PLATİN', 5: 'USTA' };
 const GLYPH = {
+    MACHINE: '', DISCIPLINE: '', MULTI: '', TRAINING: '', SAFETY: '',
     QUALITY: '<circle cx="50" cy="50" r="15" fill="none" stroke="currentColor" stroke-width="4"/><path d="M42 50 l6 6 l11-13" fill="none" stroke="currentColor" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round"/>',
     SETUP: '<circle cx="50" cy="50" r="13" fill="none" stroke="currentColor" stroke-width="3.5"/><path d="M50 31v10M50 59v10M31 50h10M59 50h10" stroke="currentColor" stroke-width="3.5" stroke-linecap="round"/><circle cx="50" cy="50" r="3" fill="currentColor"/>',
     MEASUREMENT: '<path d="M36 34h28v8H46v24h-6V42h-4z" fill="currentColor"/><path d="M52 42v10h6V42" fill="none" stroke="currentColor" stroke-width="3"/><path d="M40 47h3M40 53h3M40 59h3" stroke="#00000055" stroke-width="1.5"/>',
@@ -19,6 +20,11 @@ const GLYPH = {
     MAINTENANCE: '<path d="M58 33a9 9 0 0 0-11 11L34 57a4 4 0 0 0 6 6l13-13a9 9 0 0 0 11-11l-6 6-5-1-1-5z" fill="currentColor"/>',
     IMPROVEMENT: '<path d="M50 32l13 14h-8v18h-10V46h-8z" fill="currentColor"/><path d="M36 68h28" stroke="currentColor" stroke-width="3.5" stroke-linecap="round"/>',
 };
+GLYPH.MACHINE = '<rect x="34" y="38" width="32" height="22" rx="3" fill="currentColor"/><path d="M42 38v-6h16v6M50 60v8M40 68h20" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" fill="none"/><circle cx="50" cy="49" r="4" fill="#00000055"/>';
+GLYPH.DISCIPLINE = '<path d="M50 30l16 7v12c0 10-7 17-16 21c-9-4-16-11-16-21V37z" fill="none" stroke="currentColor" stroke-width="4" stroke-linejoin="round"/><path d="M43 50l5 5l9-10" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round"/>';
+GLYPH.MULTI = '<rect x="30" y="40" width="18" height="16" rx="2" fill="currentColor"/><rect x="52" y="40" width="18" height="16" rx="2" fill="currentColor" opacity=".7"/><path d="M36 62h28" stroke="currentColor" stroke-width="3.5" stroke-linecap="round"/>';
+GLYPH.TRAINING = '<path d="M50 32l22 10l-22 10l-22-10z" fill="currentColor"/><path d="M38 50v10c0 4 24 4 24 0V50" fill="none" stroke="currentColor" stroke-width="3.5"/>';
+GLYPH.SAFETY = '<path d="M50 30l20 34H30z" fill="none" stroke="currentColor" stroke-width="4" stroke-linejoin="round"/><path d="M50 43v10" stroke="currentColor" stroke-width="4" stroke-linecap="round"/><circle cx="50" cy="59" r="2.5" fill="currentColor"/>';
 let seq = 0;
 function esc(s) {
     return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');

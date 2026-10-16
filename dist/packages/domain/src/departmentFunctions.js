@@ -18,6 +18,11 @@ export const DEPT_FUNCTIONS = {
         P('Üretim Geçmişi', '/gecmis', 'Genel olay geçmişi var; üretime özel geçmiş sayfası planlı.', 'KMI-037'),
         A('Üretim Analitiği', '/departman', '?d=prod&v=analitik'),
     ],
+    order: [
+        P('Müşteri ve ilişki yönetimi (liste · profil · kişiler · şartlar · teslimat)', '/musteriler', 'Sunucu güncellemesi 0096 production onayı bekliyor; uygulanana kadar ekran “Kurulum bekleniyor” der. Kârlılık KMI-070 gerektirir.', 'KMI-006'),
+        A('Siparişler', '/siparisler'),
+        A('Katalog (müşteri · tedarikçi · ürün)', '/katalog'),
+    ],
     plan: [
         A('Açık siparişlerden üretim ihtiyacı', '/planlama'),
         A('İş emri oluşturma ve yönetme', '/is-emirleri'),
@@ -125,3 +130,22 @@ export function resolveFunctions(wsId, canOpen) {
     });
 }
 export const FUNCTION_STATE_TR = { AVAILABLE: 'Açık', PARTIAL: 'Kısmi', PLANNED: 'Planlandı', BLOCKED: 'Engelli' };
+export const LIVE_VERIFIED_PATHS = new Set(['/', '/gorevler', '/onaylar', '/ara']);
+export function functionMaturity(f, liveVerified = LIVE_VERIFIED_PATHS) {
+    if (f.state === 'PLANNED' || f.state === 'BLOCKED' || !f.path)
+        return { screen: false, backend: false, authz: false, workflow: false, live: 'NOT_APPLICABLE' };
+    const live = liveVerified.has(f.path) ? 'VERIFIED' : 'PENDING';
+    return f.state === 'AVAILABLE' ? { screen: true, backend: true, authz: true, workflow: true, live } : { screen: true, backend: true, authz: true, workflow: false, live };
+}
+/** the label shown for a function: a state may only claim "Açık" when the four build facts hold; an incomplete flow is never labelled open */
+export function functionStateOf(f) {
+    const m = functionMaturity(f);
+    if (f.state === 'BLOCKED')
+        return 'BLOCKED';
+    if (!m.screen)
+        return 'PLANNED';
+    return m.backend && m.authz && m.workflow ? 'AVAILABLE' : 'PARTIAL';
+}
+export function liveLabelTr(m) {
+    return m.live === 'VERIFIED' ? 'canlı doğrulandı' : m.live === 'PENDING' ? 'canlı doğrulama bekliyor' : null;
+}

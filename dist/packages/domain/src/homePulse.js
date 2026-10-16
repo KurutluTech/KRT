@@ -15,7 +15,7 @@ export function buildPulse(i) {
     if (canSeeBoard) {
         const total = b?.machines.length ?? null;
         const active = cnt('ACTIVE_WORK_ORDER') !== null ? cnt('ACTIVE_WORK_ORDER') + (cnt('FIRST_PIECE') ?? 0) : null;
-        tiles.push({ id: 'machines', label: 'Aktif iş emri olan makine', value: active !== null && total !== null ? `${active} / ${total}` : null, sub: 'kayıtlı durum · fiziksel CNC doğrulanmaz', tone: active === null ? 'unknown' : 'info', href: i.canOpen('/canli') ? '#/canli' : null, domain: 'PRODUCTION' });
+        tiles.push({ id: 'machines', label: 'Aktif iş emri olan makine', value: active !== null && total !== null ? `${active} / ${total}` : null, sub: 'kayıtlı durum · fiziksel durum BİLİNMİYOR · CNC bağlantısı BAĞLI DEĞİL', tone: active === null ? 'unknown' : 'info', href: i.canOpen('/canli') ? '#/canli' : null, domain: 'PRODUCTION' });
         const wo = num(i.counters, 'workOrdersRunning');
         tiles.push({ id: 'workorders', label: 'Çalışan iş emri', value: wo !== null ? String(wo) : null, sub: 'ilk parça bekleyenler dahil', tone: wo === null ? 'unknown' : 'info', href: i.canOpen('/is-emirleri') ? '#/is-emirleri' : null, domain: 'PRODUCTION' });
         // assigned operators: only names the server delivered; "undefined" (not visible to this role) is unknown, an empty list of known names is 0
@@ -52,6 +52,22 @@ export function buildPulse(i) {
         tiles.push({ id: 'shiftprod', label: b?.shift ? `Vardiya sağlam adet · ${b.shift}` : 'Vardiya sağlam adet', value: good !== null ? NUM.format(good) : null, sub: scrap !== null ? `hurda ${NUM.format(scrap)}${rate !== null ? ` · %${String(rate).replace('.', ',')}` : ''}` : 'hurda okunamadı', tone: good === null ? 'unknown' : rate !== null && rate >= 5 ? 'warn' : 'info', href: i.canOpen('/oee') ? '#/oee' : null, domain: 'PRODUCTION' });
     }
     return orderPulse(tiles, i.access);
+}
+/**
+ * Management hierarchy (R2 §1.3): not seven equal cards. LEAD = what needs attention first — the machine/work-order picture, then every tile whose
+ * tone is bad (intervene) or warn (watch), at most four; REST = the other facts, shown compact. Same input → same split; a tile is never dropped,
+ * never reworded and never turned from unknown into a number — only its prominence changes.
+ */
+export function splitPulse(tiles) {
+    const rankOf = (t) => (t.tone === 'bad' ? 0 : t.tone === 'warn' ? 1 : t.id === 'machines' ? 2 : 9);
+    const picked = tiles.map((t, n) => ({ t, n, r: rankOf(t) })).filter((x) => x.r < 9).sort((a, b) => a.r - b.r || a.n - b.n).slice(0, 4);
+    if (picked.length < 2) {
+        const wo = tiles.map((t, n) => ({ t, n, r: 3 })).find((x) => x.t.id === 'workorders' && !picked.some((p) => p.n === x.n));
+        if (wo)
+            picked.push(wo);
+    }
+    const leadN = new Set(picked.map((x) => x.n));
+    return { lead: picked.map((x) => x.t), rest: tiles.filter((_, n) => !leadN.has(n)) };
 }
 /** Management sees the fixed executive order; a department role sees its own domains first (then cross-process tiles it may open), capped at 6. */
 export function orderPulse(tiles, access) {

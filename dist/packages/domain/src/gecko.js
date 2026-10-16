@@ -150,6 +150,21 @@ export function deriveGeckoDayAttendance(events) {
         unknownDirectionEvents: unknown,
     };
 }
+/**
+ * attendance_records has CHECK (check_out_at IS NULL OR check_in_at IS NULL OR check_out_at >= check_in_at).
+ * A person who leaves and re-enters (OUT 19:06, IN 19:17) has lastOut < firstIn: writing both makes the
+ * whole day's upsert fail (HTTP 400, repeated every sync tick) while the sync run still reads SUCCESS.
+ * The projection column is only a closed-session figure, so check-out is written ONLY when it is not
+ * before check-in; otherwise it is NULL (the person is inside — see openSession). The raw events stay
+ * untouched in the ledger; nothing is lost, nothing is invented.
+ */
+export function attendanceCheckOutForProjection(firstIn, lastOut) {
+    if (lastOut === null)
+        return null;
+    if (firstIn === null)
+        return lastOut;
+    return Date.parse(lastOut) >= Date.parse(firstIn) ? lastOut : null;
+}
 export const GECKO_FEED_STATE_TR = {
     NOT_CONNECTED: 'BAĞLI DEĞİL',
     OK: 'GÜNCEL',
