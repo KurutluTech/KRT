@@ -52,6 +52,11 @@ const DEFAULT_ROLE_MATRIX = {
     // Draft 0096 (KMI-006): customer contacts / terms are commercial + personal data.
     CUSTOMER_MANAGE: ['ADMIN', 'MANAGEMENT'],
     CUSTOMER_CONTACT_VIEW: ['ADMIN', 'MANAGEMENT', 'ACCOUNTING', 'SHIPPING'],
+    // Draft 0103 (KMI-007): quotes are commercial; cost/margin additionally need economic access (not a role). CAM/QUALITY do the technical (feasibility, operations) part only.
+    QUOTE_PREPARE: ['ADMIN', 'MANAGEMENT', 'ACCOUNTING'],
+    QUOTE_TECH: ['ADMIN', 'MANAGEMENT', 'CAM', 'QUALITY'],
+    QUOTE_VIEW: ['ADMIN', 'MANAGEMENT', 'ACCOUNTING'],
+    QUOTE_APPROVE: ['ADMIN', 'MANAGEMENT'],
     ORDER_CREATE: ['ADMIN', 'MANAGEMENT'],
     WORK_ORDER_CREATE: ['ADMIN', 'MANAGEMENT'],
     PURCHASE_ORDER_MANAGE: ['ADMIN', 'MANAGEMENT', 'PURCHASING'],
