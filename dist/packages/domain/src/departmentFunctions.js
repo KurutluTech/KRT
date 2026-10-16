@@ -20,6 +20,7 @@ export const DEPT_FUNCTIONS = {
     ],
     order: [
         P('Müşteri ve ilişki yönetimi (liste · profil · kişiler · şartlar · teslimat)', '/musteriler', 'Sunucu güncellemesi 0096 production onayı bekliyor; uygulanana kadar ekran “Kurulum bekleniyor” der. Kârlılık KMI-070 gerektirir.', 'KMI-006'),
+        P('Teklif ve talep yönetimi (RFQ · fizibilite · teklif · revizyon · onay · siparişe dönüşüm)', '/teklifler', 'Sunucu güncellemesi 0103 production onayı bekliyor; uygulanana kadar ekran “Kurulum bekleniyor” der. Gerçekleşen maliyet karşılaştırması KMI-070 gerektirir.', 'KMI-007'),
         A('Siparişler', '/siparisler'),
         A('Katalog (müşteri · tedarikçi · ürün)', '/katalog'),
     ],
