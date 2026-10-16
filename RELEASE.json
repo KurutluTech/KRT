@@ -1,8 +1,8 @@
 {
   "product": "KMI NEXT",
-  "commit": "2d250a15d5049578500d35b268ed441b002efa6a",
+  "commit": "da8e202792758954bcb8db34a5227addb17361f8",
   "builtFrom": "clean git tree",
-  "fileCount": 265,
+  "fileCount": 267,
   "migrationsInRepo": 73,
   "lastMigration": "0073_kmi_next_puantaj_month.sql",
   "note": "Release candidate. Publishing to https://flow.kurutlu.com is a manual owner action; this file is not a publication permit.",
@@ -64,8 +64,8 @@
     },
     {
       "path": "dist/apps/web/src/access.js",
-      "bytes": 5509,
-      "sha256": "bc8a089065f16b4cc665674057da3f266f4181bfcabb57976aadcaf0bf9ac31f"
+      "bytes": 5600,
+      "sha256": "33867e977c7ae58c3a6adbde0f95136a321a304933aa340e203092ab2aba2a75"
     },
     {
       "path": "dist/apps/web/src/accountingApi.js",
@@ -79,8 +79,8 @@
     },
     {
       "path": "dist/apps/web/src/app.js",
-      "bytes": 80145,
-      "sha256": "13aea48937b685b5f5100f6e11b787a2de132fdae53e1170a8880d6a8acc13fd"
+      "bytes": 80449,
+      "sha256": "d0d40f1bc6244f60e52eb0bbccd9f5c11f04a8fa657b0774c5f81a786f4cb627"
     },
     {
       "path": "dist/apps/web/src/approvalsInboxApi.js",
@@ -154,8 +154,8 @@
     },
     {
       "path": "dist/apps/web/src/errorText.js",
-      "bytes": 6351,
-      "sha256": "24432e7288baf8b611752f5fa7b0722e6d32a1294017325bd2eb3b7bb05cf27e"
+      "bytes": 10455,
+      "sha256": "0b47cecc11433f5bfae5aad58ce4485006d22d36adb747fc7b3775b7900451ea"
     },
     {
       "path": "dist/apps/web/src/geckoApi.js",
@@ -254,8 +254,8 @@
     },
     {
       "path": "dist/apps/web/src/nav.js",
-      "bytes": 16036,
-      "sha256": "3f8460c29d44d92e0cadfccaadab595ffc356ab1e5e03a30f8f394bed4e32c34"
+      "bytes": 16111,
+      "sha256": "3c7b9bd041df21718151c0b437dc35a82a4d0cb7bd5c3427dd95a1dd19f7f119"
     },
     {
       "path": "dist/apps/web/src/objectCard.js",
@@ -371,6 +371,11 @@
       "path": "dist/apps/web/src/qualityDeskApi.js",
       "bytes": 3067,
       "sha256": "bb6882f391922c241ca666e3514629061547beebb205ff1d9772141df1d89f86"
+    },
+    {
+      "path": "dist/apps/web/src/quotesApi.js",
+      "bytes": 5372,
+      "sha256": "3caadf4abb4434056f33d3a21a186a15526fbba3c8d751b9755fe59f0476824b"
     },
     {
       "path": "dist/apps/web/src/readinessApi.js",
@@ -638,6 +643,11 @@
       "sha256": "0f9a28cd6d7dbe2b28742cced1b8f51f5c28067f2f18ce4a9012ab7e7f1055ba"
     },
     {
+      "path": "dist/apps/web/src/screens/QuotesScreen.js",
+      "bytes": 56438,
+      "sha256": "f85ce0f9b0deb814f53505dfd33a626c2802e0b7936f2e5dd4ead2d9e73dcd61"
+    },
+    {
       "path": "dist/apps/web/src/screens/ReceivablesScreen.js",
       "bytes": 5096,
       "sha256": "7cf978eed8e53c191e63c3462813d85ba85fbf8ecb3ca31eb071f4186d9de937"
@@ -879,8 +889,8 @@
     },
     {
       "path": "dist/packages/domain/src/authorization.js",
-      "bytes": 5777,
-      "sha256": "2fc5f8ed48627422fd8c89d2fbd58b037f4cb82b069e095d94bb942ccc1340f2"
+      "bytes": 6171,
+      "sha256": "258a413454434d8ec1b802b37596d444b7102ccff0c8433fe8f77f9102e4c49e"
     },
     {
       "path": "dist/packages/domain/src/badges.js",
@@ -944,8 +954,8 @@
     },
     {
       "path": "dist/packages/domain/src/departmentFunctions.js",
-      "bytes": 10108,
-      "sha256": "8d3fd418e3d5c56de9f02c8684b3bcdc3da1ed0e6ed3eb92b6e6f3b9bc9a5aa8"
+      "bytes": 10421,
+      "sha256": "5f0c5a90f19aba7fde6b1bf1e7b565606d819d26ef0a5f6a00a01b39eee06eb5"
     },
     {
       "path": "dist/packages/domain/src/departmentHome.js",

@@ -55,6 +55,7 @@ export const NAV_TREE = [
         ] },
     { id: 'order', short: 'Sipariş', title: 'MÜŞTERİ & SİPARİŞ', icon: 'clipboard', items: [
             { path: '/musteriler', label: 'Müşteriler', icon: 'users' },
+            { path: '/teklifler', label: 'Teklifler', icon: 'clipboard' },
             { path: '/siparisler', label: 'Siparişler', icon: 'truck' },
             { path: '/katalog', label: 'Katalog', icon: 'book' },
         ] },

@@ -8,6 +8,8 @@ import { createKmiNextClient } from '../../../packages/data-client/src/client.js
 import { renderTerminalScreen, rememberedMachine, remember as rememberMachine } from './screens/TerminalScreen.js';
 import { canOpen, featuredPaths, landingPath, NO_ACCESS } from './access.js';
 import { renderCustomersScreen } from './screens/CustomersScreen.js';
+import { renderQuotesScreen } from './screens/QuotesScreen.js';
+import { createQuotesApi } from './quotesApi.js';
 import { createCustomersApi } from './customersApi.js';
 import { renderPersonnelAccessScreen } from './screens/PersonnelAccessScreen.js';
 import { createPersonnelAccessApi } from './personnelAccessApi.js';
@@ -334,6 +336,7 @@ export const ROUTES = [
     { path: '/giris-cikis', label: 'Giriş-Çıkış (GEÇKO)', group: 'Yönetim', inMenu: true, render: (el, c, s) => renderGeckoScreen(el, createGeckoApi(c, s)) },
     { path: '/yetkinlik-aktarim', label: 'Yetkinlik geçmişi aktarımı', group: 'Yönetim', inMenu: true, render: (el, c, s) => renderCompetencyImportScreen(el, createCompetencyImportApi(c, s)) },
     { path: '/akademi', label: 'Akademi & Yetkinlik', group: 'Yönetim', inMenu: true, render: (el, c, s) => renderAcademyScreen(el, createAcademyApi(c, s)) },
+    { path: '/teklifler', label: 'Teklifler (talep · fizibilite · teklif · onay)', group: 'Yönetim', inMenu: true, render: (el, c, s) => renderQuotesScreen(el, createQuotesApi(c, s)) },
     { path: '/musteriler', label: 'Müşteriler (kişiler · şartlar · teslimat)', group: 'Yönetim', inMenu: true, render: (el, c, s) => renderCustomersScreen(el, createCustomersApi(c, s)) },
     { path: '/siparisler', label: 'Siparişler', group: 'Yönetim', inMenu: true, render: (el, c, s) => renderOrdersScreen(el, createOrdersApi(c, s)) },
     { path: '/muhendislik', label: 'Ürün mühendisliği (revizyon · reçete · CAM)', group: 'Yönetim', inMenu: true, render: (el, c, s) => renderEngineeringScreen(el, createEngineeringApi(c, s)) },
