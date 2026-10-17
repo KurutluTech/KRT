@@ -1,8 +1,8 @@
 {
   "product": "KMI NEXT",
-  "commit": "da8e202792758954bcb8db34a5227addb17361f8",
+  "commit": "0db5efd9430ab75d7ed98e2fe3f7df8c188cba9b",
   "builtFrom": "clean git tree",
-  "fileCount": 267,
+  "fileCount": 269,
   "migrationsInRepo": 73,
   "lastMigration": "0073_kmi_next_puantaj_month.sql",
   "note": "Release candidate. Publishing to https://flow.kurutlu.com is a manual owner action; this file is not a publication permit.",
@@ -64,8 +64,8 @@
     },
     {
       "path": "dist/apps/web/src/access.js",
-      "bytes": 5600,
-      "sha256": "33867e977c7ae58c3a6adbde0f95136a321a304933aa340e203092ab2aba2a75"
+      "bytes": 5770,
+      "sha256": "9f5cdc4930e42c78bc2f66eb85bf7b5bd7b45622a649cc3c6368cf77c5c6bead"
     },
     {
       "path": "dist/apps/web/src/accountingApi.js",
@@ -79,8 +79,8 @@
     },
     {
       "path": "dist/apps/web/src/app.js",
-      "bytes": 80449,
-      "sha256": "d0d40f1bc6244f60e52eb0bbccd9f5c11f04a8fa657b0774c5f81a786f4cb627"
+      "bytes": 80768,
+      "sha256": "5ae959ee2435a0b6ac465cd638ba1206535c0b31e454e679511ad599421f5ce1"
     },
     {
       "path": "dist/apps/web/src/approvalsInboxApi.js",
@@ -154,8 +154,8 @@
     },
     {
       "path": "dist/apps/web/src/errorText.js",
-      "bytes": 10455,
-      "sha256": "0b47cecc11433f5bfae5aad58ce4485006d22d36adb747fc7b3775b7900451ea"
+      "bytes": 11521,
+      "sha256": "482dc7febb0b9f665c8c000380a0c352b05bcb964fc809d9ef213c880b65f6c0"
     },
     {
       "path": "dist/apps/web/src/geckoApi.js",
@@ -254,8 +254,8 @@
     },
     {
       "path": "dist/apps/web/src/nav.js",
-      "bytes": 16111,
-      "sha256": "3c7b9bd041df21718151c0b437dc35a82a4d0cb7bd5c3427dd95a1dd19f7f119"
+      "bytes": 16200,
+      "sha256": "fd28438ab33312b94ec959436bbfb0dfdac98aa79e9177cc1a45116d14f42356"
     },
     {
       "path": "dist/apps/web/src/objectCard.js",
@@ -281,6 +281,11 @@
       "path": "dist/apps/web/src/operatorHomeApi.js",
       "bytes": 680,
       "sha256": "e674feee9808cf8c9683242a41b050b0a8952e84806d6db2de81eb4c66da67a6"
+    },
+    {
+      "path": "dist/apps/web/src/orderCommandApi.js",
+      "bytes": 923,
+      "sha256": "9ab16ad83f94292b7e052e39f76616455ff4dab7ed09663023f69514932202da"
     },
     {
       "path": "dist/apps/web/src/ordersApi.js",
@@ -474,8 +479,8 @@
     },
     {
       "path": "dist/apps/web/src/screens/DepartmentHomeScreen.js",
-      "bytes": 15754,
-      "sha256": "ef83ba119df78daec2e6866c717e646d8028de618a146d5662416ea9c6d83da5"
+      "bytes": 15833,
+      "sha256": "f91d233806d4041f35167d22610bdbe3b51227b93a79eac4d9aa74b009e17022"
     },
     {
       "path": "dist/apps/web/src/screens/DepartmentScreen.js",
@@ -571,6 +576,11 @@
       "path": "dist/apps/web/src/screens/OperatorHomeScreen.js",
       "bytes": 14471,
       "sha256": "c5f8219e1bdd8808d3cd356ebd2b26dc5007c2820725245c4e4c13122343abd3"
+    },
+    {
+      "path": "dist/apps/web/src/screens/OrderCommandScreen.js",
+      "bytes": 18410,
+      "sha256": "25efaadd7140807ff7b299694c2a539f9da4b5b56aa7f21e8c86a819a60246ef"
     },
     {
       "path": "dist/apps/web/src/screens/OrdersScreen.js",
@@ -954,8 +964,8 @@
     },
     {
       "path": "dist/packages/domain/src/departmentFunctions.js",
-      "bytes": 10421,
-      "sha256": "5f0c5a90f19aba7fde6b1bf1e7b565606d819d26ef0a5f6a00a01b39eee06eb5"
+      "bytes": 10811,
+      "sha256": "4d17a9c175774947f811452fb71108a67315b0c55955d9caf806395262b20093"
     },
     {
       "path": "dist/packages/domain/src/departmentHome.js",

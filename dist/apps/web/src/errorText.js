@@ -100,6 +100,16 @@ const BUSINESS_TR = [
     [/^(?:SELECTION_REQUIRED|LINE_NOT_IN_QUOTE|LINE_SELECTED_TWICE)/, 'Dönüştürülecek kalemleri ve miktarlarını seçin (her kalem en fazla bir kez).'],
     [/^CHANGE_REASON_REQUIRED/, 'Revizyon nedeni zorunludur (en az 5 karakter).'],
     [/^(?:TIER_NOT_PRICED)/, 'Seçilen miktar kademesinin fiyatı girilmemiş.'],
+    [/^NOTHING_TO_CHANGE/, 'Değişiklik yok: adet, termin veya fiyat mevcut değerle aynı.'],
+    [/^QTY_BELOW_SHIPPED/, 'Adet, şimdiye kadar sevk edilen miktarın altına düşürülemez.'],
+    [/^QTY_BELOW_COMMITTED/, 'Adet, üretilen miktar ile açık iş emirlerinin toplamının altına düşürülemez. Önce ilgili iş emrini iptal edin veya tamamlayın.'],
+    [/^QTY_MUST_BE_POSITIVE/, 'Adet sıfırdan büyük olmalıdır.'],
+    [/^DUE_DATE_IN_PAST/, 'Onaylı siparişte termin geçmiş bir tarihe alınamaz.'],
+    [/^UNIT_PRICE_INVALID/, 'Birim fiyat geçerli bir sayı olmalıdır.'],
+    [/^ORDER_NOT_EDITABLE/, 'Bu siparişin durumu değişikliğe uygun değil (iptal, kapalı veya sevk edilmiş).'],
+    [/^ORDER_ITEM_NOT_FOUND|^ORDER_NOT_FOUND/, 'Sipariş veya kalem bulunamadı (silinmiş olabilir). Liste yenilendi.'],
+    [/^NOT_PRINTABLE/, 'İptal edilmiş sipariş için sipariş onayı basılamaz.'],
+    [/^FORBIDDEN: ECONOMIC_ACCESS/, 'Fiyat değişikliği için ekonomik bilgi yetkisi gerekir (yalnız sahip ve yetkilendirdikleri).'],
     [/Invalid schema|PGRST106|schema must be one of/i, 'Sunucu ayarı eksik: veri şeması (kmi_next) Supabase API ayarında açık değil. Sistem yöneticisine bildirin; bu bir kullanıcı hatası değildir.'],
 ];
 export const SETUP_PENDING_TR = 'Kurulum bekleniyor: bu bölümün veritabanı kurulumu henüz yapılmadı. Mevcut kayıtlarınız etkilenmedi; kurulum tamamlanınca bu bölüm açılır.';

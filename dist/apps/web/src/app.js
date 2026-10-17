@@ -10,6 +10,8 @@ import { canOpen, featuredPaths, landingPath, NO_ACCESS } from './access.js';
 import { renderCustomersScreen } from './screens/CustomersScreen.js';
 import { renderQuotesScreen } from './screens/QuotesScreen.js';
 import { createQuotesApi } from './quotesApi.js';
+import { renderOrderCommandScreen } from './screens/OrderCommandScreen.js';
+import { createOrderCommandApi } from './orderCommandApi.js';
 import { createCustomersApi } from './customersApi.js';
 import { renderPersonnelAccessScreen } from './screens/PersonnelAccessScreen.js';
 import { createPersonnelAccessApi } from './personnelAccessApi.js';
@@ -338,6 +340,7 @@ export const ROUTES = [
     { path: '/akademi', label: 'Akademi & Yetkinlik', group: 'Yönetim', inMenu: true, render: (el, c, s) => renderAcademyScreen(el, createAcademyApi(c, s)) },
     { path: '/teklifler', label: 'Teklifler (talep · fizibilite · teklif · onay)', group: 'Yönetim', inMenu: true, render: (el, c, s) => renderQuotesScreen(el, createQuotesApi(c, s)) },
     { path: '/musteriler', label: 'Müşteriler (kişiler · şartlar · teslimat)', group: 'Yönetim', inMenu: true, render: (el, c, s) => renderCustomersScreen(el, createCustomersApi(c, s)) },
+    { path: '/siparis-komuta', label: 'Sipariş Komuta Merkezi', group: 'Yönetim', inMenu: true, render: (el, c, s) => renderOrderCommandScreen(el, createOrderCommandApi(c, s)) },
     { path: '/siparisler', label: 'Siparişler', group: 'Yönetim', inMenu: true, render: (el, c, s) => renderOrdersScreen(el, createOrdersApi(c, s)) },
     { path: '/muhendislik', label: 'Ürün mühendisliği (revizyon · reçete · CAM)', group: 'Yönetim', inMenu: true, render: (el, c, s) => renderEngineeringScreen(el, createEngineeringApi(c, s)) },
     { path: '/katalog', label: 'Katalog (müşteri · tedarikçi · ürün)', group: 'Yönetim', inMenu: true, render: (el, c, s) => renderCatalogScreen(el, createCatalogApi(c, s)) },
