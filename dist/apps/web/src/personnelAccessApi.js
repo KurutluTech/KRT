@@ -2,7 +2,18 @@ export function createPersonnelAccessApi(client, session) {
     return {
         operator: {
             overview: async () => (await client.rpc('operator_credentials_overview', {}, session)),
-            async setPin(personId, pin, reason) { await client.rpc('set_operator_pin', { p_personnel_id: personId, p_pin: pin, p_reason: reason }, session); },
+            async setPin(personId, pin, _reason) {
+                // 4 haneli canlı hat: badge-login `set_pin` (yönetici JWT'si şart; sunucu 4 hane + zayıf PIN + audit + nesil uygular).
+                if (!session)
+                    throw new Error('Oturum gerekli.');
+                if (!/^[0-9]{4}$/.test(pin))
+                    throw new Error('PIN 4 rakamdan oluşmalıdır.');
+                const rows = (await client.rpc('operator_credentials_overview', {}, session));
+                const employeeNo = rows.find((r) => r.personnelId === personId)?.employeeNo;
+                if (!employeeNo)
+                    throw new Error('Sicil numarası bulunamadı.');
+                await client.managerSetPin(session, employeeNo, pin);
+            },
             issueBadge: (personId, label, replace) => client.rpc('issue_operator_badge', { p_personnel_id: personId, p_label: label, p_replace: replace }, session),
             async revokeBadge(badgeId, reason) { await client.rpc('revoke_operator_badge', { p_badge_id: badgeId, p_reason: reason }, session); },
             async deactivate(personId, reason) { await client.rpc('deactivate_operator_access', { p_personnel_id: personId, p_reason: reason }, session); },

@@ -1,5 +1,7 @@
+import { createDocumentControlApi } from './documentControlApi.js';
 export function createProductWorkspaceApi(client, session) {
     const rpc = (fn, args) => client.rpc(fn, args, session);
+    const dc = createDocumentControlApi(client, session);
     return {
         search: (q) => rpc('product_search', { p_q: q || null, p_family: null, p_status: 'ACTIVE', p_limit: 30 }),
         load: (p, r) => rpc('product_workspace', { p_product: p, p_revision: r }),
@@ -22,6 +24,14 @@ export function createProductWorkspaceApi(client, session) {
         reevaluate: (run, r) => rpc('calc_reevaluate', { p_run: run, p_reason: r }),
         upload: (i) => rpc('upload_document', { p_doc_type: i.docType, p_entity_type: i.entityType, p_entity_id: i.entityId, p_title: i.title, p_file_name: i.fileName, p_mime_type: i.mimeType,
             p_content_base64: i.contentBase64, p_valid_until: i.validUntil, p_note: i.note, p_document_id: i.documentId }),
+        async documentFile(documentId) {
+            const lc = await dc.lifecycle(documentId);
+            const eff = lc.versions.find((v) => v.control?.state === 'EFFECTIVE');
+            const v = eff ?? [...lc.versions].sort((a, b) => b.versionNo - a.versionNo)[0];
+            if (!v)
+                throw new Error('VERSION_NOT_FOUND');
+            return { versionNo: v.versionNo, effective: !!eff, content: await dc.content(v.id) };
+        },
     };
 }
 export const jobCardFor = (client, session, wo) => client.rpc('job_card', { p_wo: wo }, session);

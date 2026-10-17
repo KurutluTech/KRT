@@ -102,6 +102,12 @@ import { isKind, canonicalHref, LEGACY_TO_CANONICAL } from './passport/registry.
 import { decideLegacyPassport, isUuid } from './passport/compat.js';
 import { createTraceMounter } from './passport/traceTab.js';
 import { renderOrdersScreen } from './screens/OrdersScreen.js';
+import { renderPermissionAdminScreen } from './screens/PermissionAdminScreen.js';
+import { createPermissionAdminApi } from './permissionAdminApi.js';
+import { renderOrderImportScreen } from './screens/OrderImportScreen.js';
+import { createOrderImportApi } from './orderImportApi.js';
+import { renderPassportWorkspaceScreen } from './screens/PassportWorkspaceScreen.js';
+import { createPassportCardsApi } from './passportCardsApi.js';
 import { createOrdersApi } from './ordersApi.js';
 import { renderPurchasingScreen } from './screens/PurchasingScreen.js';
 import { createPurchasingApi } from './purchasingApi.js';
@@ -351,6 +357,9 @@ export const ROUTES = [
     { path: '/musteriler', label: 'Müşteriler (kişiler · şartlar · teslimat)', group: 'Yönetim', inMenu: true, render: (el, c, s) => renderCustomersScreen(el, createCustomersApi(c, s)) },
     { path: '/siparis-komuta', label: 'Sipariş Komuta Merkezi', group: 'Yönetim', inMenu: true, render: (el, c, s) => renderOrderCommandScreen(el, createOrderCommandApi(c, s)) },
     { path: '/siparisler', label: 'Siparişler', group: 'Yönetim', inMenu: true, render: (el, c, s) => renderOrdersScreen(el, createOrdersApi(c, s)) },
+    { path: '/pdf-siparis', label: 'PDF’ten Sipariş', group: 'Yönetim', inMenu: true, render: (el, c, s, q) => renderOrderImportScreen(el, createOrderImportApi(c, s), { id: q.get('id') }) },
+    { path: '/yetki-yonetimi', label: 'Yetki Yönetimi (sahipler · izinler)', group: 'Yönetim', inMenu: true, render: (el, c, s) => renderPermissionAdminScreen(el, createPermissionAdminApi(c, s)) },
+    { path: '/pasaport-calisma', label: 'Pasaport çalışma alanı', group: 'Yönetim', inMenu: false, needs: ['tur', 'id'], render: (el, c, s, q) => renderPassportWorkspaceScreen(el, createPassportCardsApi(c, s), { type: q.get('tur'), id: q.get('id') }) },
     { path: '/urun-calisma', label: 'Ürün Çalışma Alanı (rota & operasyon)', group: 'Yönetim', inMenu: true, render: (el, c, s, q) => renderProductWorkspaceScreen(el, createProductWorkspaceApi(c, s), { product: q.get('urun'), rev: q.get('rev') }) },
     { path: '/is-karti', label: 'İş kartı (operasyon belgeleri)', group: 'Saha', inMenu: false, render: (el, c, s, q) => renderJobCardScreen(el, { load: (wo) => jobCardFor(c, s, wo), scan: (input, wo) => scanCheck(c, s, input, wo) }, q.get('is')) },
     { path: '/urun-master', label: 'Ürün Master / Digital DNA', group: 'Yönetim', inMenu: true, render: (el, c, s, q) => renderProductMasterScreen(el, createProductMasterApi(c, s), { product: q.get('urun'), tab: q.get('sekme') ?? undefined }) },
@@ -558,7 +567,7 @@ export async function startApp(root, opts = {}) {
     const offlineBar = () => (navigator.onLine ? null : h('div', { class: 'offline', 'data-testid': 'app-offline' }, 'Bağlantı yok — kayıtlar gönderilemez, bağlantı gelince tekrar deneyin.'));
     // MAIN LOGIN SCREEN OFFERS BOTH METHODS (owner directive): "Yetkili girişi" (account) and "Operatör girişi" (Sicil No + PIN). The operator method is visible by
     // default — nobody has to know a hidden URL or a config switch. It is hidden only if a deployment explicitly sets config.js `operatorLogin: false`.
-    // When the server side (Edge Function operator-login + migration 0072) is not reachable the attempt says so plainly ("şu anda kullanılamıyor"); it never pretends.
+    // When the server side (Edge Function badge-login, 4 haneli PIN) is not reachable the attempt says so plainly ("şu anda kullanılamıyor"); it never pretends.
     // Only the chosen METHOD is remembered on the device (never a sicil, never a PIN) so a shared factory terminal opens on the operator form.
     const operatorLoginEnabled = window.KMI_NEXT_CONFIG?.operatorLogin !== false;
     const LOGIN_MODE_KEY = 'kmiLoginMode';
@@ -577,15 +586,14 @@ export async function startApp(root, opts = {}) {
         const email = h('input', { type: 'email', autocomplete: 'username', 'data-testid': 'login-email', placeholder: 'E-posta', id: 'kmi-login-email' });
         const pass = h('input', { type: 'password', autocomplete: 'current-password', 'data-testid': 'login-password', placeholder: 'Şifre', id: 'kmi-login-password' });
         const sicil = h('input', { type: 'text', inputmode: 'text', autocomplete: 'off', autocapitalize: 'characters', autocorrect: 'off', spellcheck: 'false', enterkeyhint: 'next', 'data-testid': 'login-sicil', placeholder: 'Sicil no (ör. S-1001)', id: 'kmi-login-sicil' });
-        const badge = h('input', { type: 'password', autocomplete: 'off', 'data-testid': 'login-badge', placeholder: 'Rozet / QR (isteğe bağlı — okutun)', id: 'kmi-login-badge' });
-        const pin = h('input', { type: 'password', inputmode: 'numeric', pattern: '[0-9]*', maxlength: '6', autocomplete: 'off', enterkeyhint: 'go', 'data-testid': 'login-pin', placeholder: '6 haneli PIN', id: 'kmi-login-pin' });
+        const pin = h('input', { type: 'password', inputmode: 'numeric', pattern: '[0-9]*', maxlength: '4', autocomplete: 'off', enterkeyhint: 'go', 'data-testid': 'login-pin', placeholder: '4 haneli PIN', id: 'kmi-login-pin' });
         const submit = async (e) => {
             e.preventDefault();
             try {
                 if (mode === 'OPERATOR') {
-                    if (!sicil.value.trim() && !badge.value.trim())
-                        throw new Error('Sicil numarası veya rozet gerekli.');
-                    session = await client.auth.signInOperator({ ...(sicil.value.trim() ? { employeeNo: sicil.value.trim() } : {}), ...(badge.value.trim() ? { badge: badge.value.trim() } : {}), pin: pin.value });
+                    if (!sicil.value.trim())
+                        throw new Error('Sicil numarası gerekli.');
+                    session = await client.auth.signInOperator({ employeeNo: sicil.value.trim(), pin: pin.value });
                 }
                 else {
                     session = await client.auth.signInWithPassword(email.value.trim(), pass.value);
@@ -613,8 +621,7 @@ export async function startApp(root, opts = {}) {
         const dbBox = h('div', { class: 'kmi-login-db', 'data-testid': 'login-db', 'data-state': 'checking', role: 'status' }, h('i', {}), dbText);
         const tab = (m, label, tid) => h('button', { type: 'button', class: `kmi-login-tab${mode === m ? ' on' : ''}`, 'data-testid': tid, 'aria-pressed': String(mode === m), onClick: () => { rememberMode(m); renderLogin(undefined, m); } }, label);
         mount(root, h('div', {}, h('style', {}, SHELL_CSS), offlineBar(), h('div', { class: 'kmi-login', 'data-testid': 'login-screen', 'data-mode': mode, ...(lowPowerDevice() ? { 'data-lowpower': '' } : {}) }, h('div', { class: 'kmi-login-bg', 'aria-hidden': 'true' }, h('div', { class: 'kmi-login-k', 'data-testid': 'login-k' }, h('div', { class: 'kbody' }))), h('form', { class: 'kmi-login-card', 'data-testid': 'login-form', onSubmit: (e) => void submit(e) }, h('div', { class: 'brand' }, h('img', { src: './assets/kurutlu-k-symbol-white.png', alt: 'Kurutlu' }), h('h1', {}, BRAND), h('p', { class: 'sub' }, BRAND_SUB), h('div', { class: 'rule' })), operatorLoginEnabled ? h('div', { class: 'kmi-login-tabs' }, tab('EMAIL', 'Yetkili girişi', 'login-tab-email'), tab('OPERATOR', 'Operatör: Sicil No + PIN', 'login-tab-operator')) : null, message ? (kind === 'error' ? h('div', { class: 'kmi-login-err', 'data-testid': 'login-error', role: 'alert' }, message) : h('div', { class: 'kmi-login-note', 'data-testid': 'login-notice', role: 'status' }, message)) : null, ...(mode === 'OPERATOR'
-            ? [h('label', { for: 'kmi-login-sicil' }, 'Sicil numarası'), sicil, h('label', { for: 'kmi-login-pin' }, 'Kişisel PIN (6 rakam)'), pin,
-                h('details', { class: 'kmi-login-badge-opt' }, h('summary', {}, 'Rozet / QR ile giriş (isteğe bağlı)'), h('label', { for: 'kmi-login-badge' }, 'Rozet / QR'), badge),
+            ? [h('label', { for: 'kmi-login-sicil' }, 'Sicil numarası'), sicil, h('label', { for: 'kmi-login-pin' }, 'Kişisel PIN (4 rakam)'), pin,
                 h('p', { class: 'kmi-login-hint' }, 'Rozet tek başına giriş yaptırmaz; PIN gerekir. Paylaşılan tablette işiniz bitince Çıkış yapın.')]
             : [h('label', { for: 'kmi-login-email' }, 'E-posta'), email, h('label', { for: 'kmi-login-password' }, 'Şifre'), pass]), h('button', { type: 'submit', 'data-testid': 'login-submit' }, 'Giriş'), idleGuardApplies(device.mode, mode === 'OPERATOR') ? h('p', { class: 'kmi-login-hint', 'data-testid': 'login-idle-note' }, `${device.mode === 'DESKTOP' ? 'Operatör oturumu' : device.mode === 'KIOSK' ? 'Kiosk modu' : 'Tablet modu'}: 60 saniye hareketsizlikte oturum otomatik kapanır.`) : null, dbBox))));
         // Green ONLY after a real reachability answer from the auth service; never assumed.

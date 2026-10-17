@@ -1,8 +1,8 @@
 {
   "product": "KMI NEXT",
-  "commit": "a5edb16e4ef111bfa913313d8c370a832264a050",
+  "commit": "6154ad742c1104e5529123b8adff040bf1e21555",
   "builtFrom": "clean git tree",
-  "fileCount": 278,
+  "fileCount": 288,
   "migrationsInRepo": 73,
   "lastMigration": "0073_kmi_next_puantaj_month.sql",
   "note": "Release candidate. Publishing to https://flow.kurutlu.com is a manual owner action; this file is not a publication permit.",
@@ -79,8 +79,8 @@
     },
     {
       "path": "dist/apps/web/src/app.js",
-      "bytes": 83167,
-      "sha256": "2d00018961013a0bd1393f7c4176159006f9467b150c53b6ce39071f7dffe4f0"
+      "bytes": 83747,
+      "sha256": "fd09078c5334e1ae87b9cec06b69e57c3f30ec524888f1347272f3cf7c22e371"
     },
     {
       "path": "dist/apps/web/src/approvalsInboxApi.js",
@@ -218,6 +218,11 @@
       "sha256": "53487e40817df3150cfc47851432f113dc367ffc89b07ad3781db1d50c3e466a"
     },
     {
+      "path": "dist/apps/web/src/kx.js",
+      "bytes": 15560,
+      "sha256": "acfe852d19cd7281185ece97696ed79536a04bbe2183e6498517774fb8865659"
+    },
+    {
       "path": "dist/apps/web/src/labelApi.js",
       "bytes": 517,
       "sha256": "bb273b62e689026a740560a5529ad04f07c409954915830e0db3ba221242f048"
@@ -293,6 +298,16 @@
       "sha256": "9ab16ad83f94292b7e052e39f76616455ff4dab7ed09663023f69514932202da"
     },
     {
+      "path": "dist/apps/web/src/orderImportApi.js",
+      "bytes": 2285,
+      "sha256": "3d8b37ebacf06ddac597805a3921c555338df33ff952438de92edc1bfb1521de"
+    },
+    {
+      "path": "dist/apps/web/src/orderImportExtract.js",
+      "bytes": 3268,
+      "sha256": "44ece717f76e27b7d3ba2333df765769f08fdc29d9d084b8351aa0db3a84217d"
+    },
+    {
       "path": "dist/apps/web/src/ordersApi.js",
       "bytes": 1496,
       "sha256": "db89a73708594221d1028b71a93cf93a0f915e67c40ec6b0852b7c677f331b6c"
@@ -328,14 +343,24 @@
       "sha256": "bbec5ae52ce8f38058e8830fd3d6024f851d0e905902c433ecb9b37ef0f275aa"
     },
     {
+      "path": "dist/apps/web/src/passportCardsApi.js",
+      "bytes": 1697,
+      "sha256": "1bcd0048f608f229932f2eb2b68c66a1ef942a37449b1414e18d40ddd92d5fe3"
+    },
+    {
       "path": "dist/apps/web/src/performanceCenterApi.js",
       "bytes": 1703,
       "sha256": "8be6d9d9455b2ea64bc9d0bfa831bf0eaee427ed862b876490859516e0f50424"
     },
     {
+      "path": "dist/apps/web/src/permissionAdminApi.js",
+      "bytes": 917,
+      "sha256": "7bfa91c92e541f8aa3d780f964455485f23f0e163ce2c7b55f487584f59370d9"
+    },
+    {
       "path": "dist/apps/web/src/personnelAccessApi.js",
-      "bytes": 1644,
-      "sha256": "8937ca818b746b751f9f658aa370490c4996cdc68c4c03e2dae1bf5e24544795"
+      "bytes": 2252,
+      "sha256": "7b209a495fe66f1f059c4fa4480627b712b05437493457101457717424a8daf1"
     },
     {
       "path": "dist/apps/web/src/personnelApi.js",
@@ -359,8 +384,8 @@
     },
     {
       "path": "dist/apps/web/src/productWorkspaceApi.js",
-      "bytes": 3245,
-      "sha256": "169a79449464c145d3594017cfc962727accec17802a3df07dc03644bc1a2ee9"
+      "bytes": 3825,
+      "sha256": "6cc1a432c622add0cffedbf5f180840634bb7aa79a85a2b6d8684b09c52426ca"
     },
     {
       "path": "dist/apps/web/src/productionApi.js",
@@ -479,8 +504,8 @@
     },
     {
       "path": "dist/apps/web/src/screens/CustomersScreen.js",
-      "bytes": 14380,
-      "sha256": "86502da79f08c546017ad749381b2113b02bbbb33028046b419266075704ebd5"
+      "bytes": 14506,
+      "sha256": "22dd6191f9f813909576d29294b60def5f0fd6aa9b6ac77c2c425aabb893a6c4"
     },
     {
       "path": "dist/apps/web/src/screens/DemandPanel.js",
@@ -509,8 +534,8 @@
     },
     {
       "path": "dist/apps/web/src/screens/DocumentControlScreen.js",
-      "bytes": 32708,
-      "sha256": "f23c3803c23003569a7cd96ffde4eea75158ab664212b788be3de5b81a8169c7"
+      "bytes": 35276,
+      "sha256": "48660de44ba132d3983b6dbaceaf47d6a7b382cc0de550ed1cb805201a76ea49"
     },
     {
       "path": "dist/apps/web/src/screens/DocumentsScreen.js",
@@ -589,8 +614,8 @@
     },
     {
       "path": "dist/apps/web/src/screens/ObjectPassportScreen.js",
-      "bytes": 21128,
-      "sha256": "6c8596a385b48306ea07148d7a6e053a3bdb5a6ace1791245c0384401a1848ad"
+      "bytes": 21373,
+      "sha256": "1ed6c6847016ea1f927938d5dec3decb5d5bad13a0adb2a59a7c3202c3b5b2f9"
     },
     {
       "path": "dist/apps/web/src/screens/OeeScreen.js",
@@ -608,9 +633,14 @@
       "sha256": "25efaadd7140807ff7b299694c2a539f9da4b5b56aa7f21e8c86a819a60246ef"
     },
     {
+      "path": "dist/apps/web/src/screens/OrderImportScreen.js",
+      "bytes": 19767,
+      "sha256": "dc9e390932f4c9e674ef695752a8b1d6c2f510c2143472c111f7b3fbaf45b688"
+    },
+    {
       "path": "dist/apps/web/src/screens/OrdersScreen.js",
-      "bytes": 9554,
-      "sha256": "a11108b8fcc6a241d56a1bf5451b28fc07218f04dd241e8920476f507c23eb26"
+      "bytes": 9750,
+      "sha256": "ce281b72d6ef6946bacc872387f9c6e01242a89e68cc8c0eb00106478a5488b6"
     },
     {
       "path": "dist/apps/web/src/screens/OwnerApplicationScreen.js",
@@ -623,14 +653,24 @@
       "sha256": "9eb552299c8e160b5a4b622222c9e54d6b031d52297a47134fb34413730d0eae"
     },
     {
+      "path": "dist/apps/web/src/screens/PassportWorkspaceScreen.js",
+      "bytes": 12925,
+      "sha256": "bd956f330ca4300bb60804b9da4a0028a18aed0ad584a0556e32d742503a53de"
+    },
+    {
       "path": "dist/apps/web/src/screens/PerformanceCenterScreen.js",
       "bytes": 40704,
       "sha256": "366c0817220341a408197f01264e1f832016ac28b4263c5ac9ef4c531ee414c4"
     },
     {
+      "path": "dist/apps/web/src/screens/PermissionAdminScreen.js",
+      "bytes": 7077,
+      "sha256": "39bf3eaafc356649d977c88185f3ec009dcbda0e14f236ed2380e158b51452d3"
+    },
+    {
       "path": "dist/apps/web/src/screens/PersonnelAccessScreen.js",
       "bytes": 12805,
-      "sha256": "284ef86d1a144f82ec77f29931b63e3cb0d393e56d33af85599fb12d0dc5a429"
+      "sha256": "38a9588bf8f0ad48cdb64f07f2a7291baa3c86a36411a8fe89a3e5923b9f193c"
     },
     {
       "path": "dist/apps/web/src/screens/PersonnelImportScreen.js",
@@ -639,8 +679,8 @@
     },
     {
       "path": "dist/apps/web/src/screens/PersonnelScreen.js",
-      "bytes": 13400,
-      "sha256": "ffaeacf887912d4108ddf4877c69522928ccfc8eba7d193bc3f4b392cb41dab4"
+      "bytes": 13544,
+      "sha256": "6f934c18507066a57a3f4f6cd83d43ccea275736c0e40560fa353dbe4ec74f31"
     },
     {
       "path": "dist/apps/web/src/screens/PlanningScreen.js",
@@ -654,8 +694,8 @@
     },
     {
       "path": "dist/apps/web/src/screens/ProductWorkspaceScreen.js",
-      "bytes": 39261,
-      "sha256": "2448f91cb372dc00527d09940064f947ef61a98bdb58427407017c8aa370677a"
+      "bytes": 59767,
+      "sha256": "a8b83995774b9be2317e36883579d3f2773a5588f52a024f7ba614027e5d9050"
     },
     {
       "path": "dist/apps/web/src/screens/ProductionDeskScreen.js",
@@ -904,8 +944,8 @@
     },
     {
       "path": "dist/packages/data-client/src/client.js",
-      "bytes": 15483,
-      "sha256": "8680096c1741d685a23d0342362e5e0f446b3312f856b1fc9e921b9bdebc47eb"
+      "bytes": 18315,
+      "sha256": "e4aa5315233f4b4f89ea147235a4f841c42b790dced9865e7c3465e9dc2e449a"
     },
     {
       "path": "dist/packages/data-client/src/index.js",
@@ -1059,8 +1099,8 @@
     },
     {
       "path": "dist/packages/domain/src/index.js",
-      "bytes": 2101,
-      "sha256": "b52b1823535340bbb6db5bb47078f88f8321bc8e1515f26c8e059718d120f000"
+      "bytes": 2156,
+      "sha256": "c6a5809734ed5703e0f04b2467fb8f0dc356b88e1852cf6dcd4a25b6d5028d1f"
     },
     {
       "path": "dist/packages/domain/src/intelligence.js",
@@ -1173,6 +1213,11 @@
       "sha256": "5e247bf28953125d4dd310d8237b23f90b61b744fc89400c518278c71e25a91b"
     },
     {
+      "path": "dist/packages/domain/src/orderPdf.js",
+      "bytes": 11336,
+      "sha256": "9efd5051a01797c22033781f371c4fead699828d13dd54a33bccdd5532caac3a"
+    },
+    {
       "path": "dist/packages/domain/src/parameters.js",
       "bytes": 4229,
       "sha256": "672a361c3867eeb7aefa5a4cff4e57a9dc9d613e296c1b2e8e70002cab125dee"
@@ -1181,6 +1226,11 @@
       "path": "dist/packages/domain/src/passport.js",
       "bytes": 4575,
       "sha256": "ecf750abd8df8823db5847bf7688f605bd70d1091025119abc3b7890a86b014c"
+    },
+    {
+      "path": "dist/packages/domain/src/pdfText.js",
+      "bytes": 18523,
+      "sha256": "debe0ff9d54d690dec87c931d412155ae7c01b87ab315abb5e3a743b28ac347b"
     },
     {
       "path": "dist/packages/domain/src/peopleCapacity.js",
