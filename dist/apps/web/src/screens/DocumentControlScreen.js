@@ -5,25 +5,19 @@ import { encodeQr, qrToSvg } from '../../../../packages/ui/src/qr.js';
 import { DOCUMENT_TYPES, bytesToHex, canUploadDocument, documentType } from '../../../../packages/domain/src/documents.js';
 import { guessMime } from './DocumentsScreen.js';
 import { errorText } from '../errorText.js';
-const CSS = `
-.dk{font-family:system-ui,-apple-system,"Segoe UI",sans-serif;padding:12px;max-width:1100px;margin:0 auto;box-sizing:border-box;color:#e2e8f0}
-.dk h1{color:#fff;font-size:20px;margin:6px 0}.dk h2{color:#fff;font-size:16px;margin:0 0 6px}
-.dk button{min-height:44px;font-size:15px;font-weight:700;border-radius:10px;border:0;padding:0 14px;cursor:pointer}
-.dk input,.dk textarea,.dk select{min-height:44px;font-size:16px;border-radius:10px;border:1px solid #334155;background:#0f172a;color:#fff;padding:0 10px;box-sizing:border-box;width:100%}
-.dk .card{background:linear-gradient(180deg,#111c2e,#0f172a);border:1px solid #1e293b;border-radius:14px;padding:14px;margin:10px 0;overflow-wrap:anywhere}
-.dk .row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}.dk .row>*{min-width:0}.dk .grid{display:grid;gap:8px;margin-top:8px;grid-template-columns:repeat(auto-fit,minmax(170px,1fr))}
-.dk .primary{background:#1d4ed8;color:#fff}.dk .ghost{background:#1e293b;color:#e2e8f0}.dk .danger{background:#7f1d1d;color:#fecaca}.dk .good{background:#166534;color:#dcfce7}
-.dk .chip{display:inline-block;padding:2px 9px;border-radius:999px;font-weight:800;font-size:11px;background:#1e293b;color:#e6edf7}
-.dk .ok{background:#14532d;color:#bbf7d0}.dk .warn{background:#78350f;color:#fde68a}.dk .bad{background:#7f1d1d;color:#fecaca}.dk .info{background:#1e3a8a;color:#dbeafe}
-.dk .card.bad{background:#0f172a;border-color:#b91c1c}.dk .card.ok{background:#0f172a;border-color:#15803d}.dk .card.warn{background:#0f172a;border-color:#b45309}
-.dk .mut{color:#94a3b8;font-size:12px}.dk label{font-size:12px;color:#94a3b8;display:block}
-.dk .tw{overflow-x:auto}.dk table{border-collapse:collapse;width:100%;font-size:13px}.dk th,.dk td{border-bottom:1px solid #1e293b;padding:6px 8px;text-align:left}.dk th{color:#94a3b8;white-space:nowrap}
-.dk .ver{border:1px solid #1e293b;border-radius:12px;padding:10px;margin:8px 0}.dk .ver.eff{border-color:#15803d}.dk .ver.old{opacity:.8}
-.dk iframe,.dk .prev img{width:100%;min-height:360px;border:1px solid #334155;border-radius:10px;background:#fff}.dk pre{white-space:pre-wrap;background:#0b1220;padding:8px;border-radius:8px;max-height:320px;overflow:auto}
+import { KX_CSS, card, chip as kchip, emptyState, field, fold, fromBase64 as kxFromBase64, invalid, kb as kxKb, showFile, toBase64 as kxToBase64 } from '../kx.js';
+// Ortak `kx` tasarım standardı (kx.ts) + yalnız bu ekrana özgü satır ızgaraları ve baskı stili.
+const CSS = KX_CSS + `
+.dk .dkg{grid-template-columns:130px minmax(0,2fr) minmax(0,1.5fr) 110px 150px minmax(0,1.2fr) auto}
+.dk .toolbar{display:grid;grid-template-columns:minmax(0,1fr) 210px auto auto;gap:10px;align-items:end}
+@media (max-width:900px){.dk .toolbar{grid-template-columns:1fr 1fr}.dk .toolbar .wide,.dk .toolbar>button{grid-column:1/-1}}
+.dk .clamp2{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.dk .ver{border:1px solid #1e293b;border-radius:12px;padding:12px;background:#0b1220;display:flex;flex-direction:column;gap:6px}.dk .ver.eff{border-color:#15803d}.dk .ver.old{opacity:.82}
+.dk .counts{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px}.dk .counts button{min-height:30px;padding:2px 10px;font-size:12px;background:#0f172a;border:1px solid #334155;color:#cbd5e1}.dk .counts button.on{background:#1d4ed8;border-color:#3b82f6;color:#fff}
 .dk-print{display:none}
 @media print{body *{visibility:hidden}.dk-print,.dk-print *{visibility:visible}.dk-print{display:block;position:absolute;inset:0;background:#fff;color:#000;padding:20px;font-family:system-ui,sans-serif}}
 .dk-print .hd{display:flex;justify-content:space-between;align-items:center;border-bottom:3px solid #b88718;padding-bottom:8px;margin-bottom:12px}.dk-print .hd b{letter-spacing:.12em;font-size:18px}
-.dk-print table{border-collapse:collapse;width:100%;font-size:12px;margin-top:8px}.dk-print th,.dk-print td{border:1px solid #999;padding:4px 6px;text-align:left}
+.dk-print table{border-collapse:collapse;width:100%;font-size:12px;margin-top:8px}.dk-print th,.dk-print td{border:1px solid #999;padding:4px 6px;text-align:left;color:#000;text-transform:none;letter-spacing:0}
 .dk-print .wm{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;font-size:54px;font-weight:900;color:rgba(200,0,0,.28);transform:rotate(-30deg);text-align:center;pointer-events:none}
 .dk-print svg{width:110px;height:110px}
 `;
@@ -48,28 +42,35 @@ const NA = 'VERİ YOK';
 const typeTr = (c) => documentType(c)?.titleTr ?? c;
 const val = (x) => x.value;
 const when = (s) => (s ? s.slice(0, 16).replace('T', ' ') : '—');
-const kb = (n) => (n < 1024 ? `${n} B` : n < 1048576 ? `${(n / 1024).toFixed(1)} KB` : `${(n / 1048576).toFixed(1)} MB`);
 const today = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Istanbul', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
-function toBase64(bytes) { let s = ''; for (let i = 0; i < bytes.length; i += 0x8000)
-    s += String.fromCharCode(...bytes.subarray(i, i + 0x8000)); return btoa(s); }
-function fromBase64(b64) { const s = atob(b64); const out = new Uint8Array(new ArrayBuffer(s.length)); for (let i = 0; i < s.length; i += 1)
-    out[i] = s.charCodeAt(i); return out; }
+const NEXT_TR = { DRAFT: 'Onaya gönderilmeli', IN_REVIEW: 'Kontrol / onay bekliyor', APPROVED: 'Yürürlüğe alınmalı', EFFECTIVE: 'İşlem yok', SUPERSEDED: 'Geçersiz — yeni sürüm kullanılır', REJECTED: 'Düzeltip yeni sürüm yükleyin' };
+const STEPS = [['DRAFT', 'Taslak'], ['IN_REVIEW', 'İnceleme'], ['APPROVED', 'Onay'], ['EFFECTIVE', 'Yürürlük']];
+const tone = (c) => (c === 'ok' || c === 'warn' || c === 'bad' || c === 'info' ? c : '');
+const E = (tag, props = null, ...kids) => h(tag, props, ...kids);
+const btnE = (cls, testid, text, fn, extra = {}) => E('button', { class: cls, type: 'button', ...(testid ? { 'data-testid': testid } : {}), onClick: fn, ...extra }, text);
+/** Onay akışı göstergesi: kullanıcı belgenin hangi adımda olduğunu görür (taslak → inceleme → onay → yürürlük). */
+const stepper = (st) => {
+    const idx = STEPS.findIndex(([k]) => k === st);
+    if (st === 'SUPERSEDED' || st === 'REJECTED')
+        return E('div', { class: 'steps', 'data-testid': 'dk-steps', 'data-step': st }, E('span', { class: 's bad' }, st === 'REJECTED' ? 'Reddedildi' : 'Geçersiz (yenisi yürürlükte)'));
+    return E('div', { class: 'steps', 'data-testid': 'dk-steps', 'data-step': st ?? 'NONE' }, ...STEPS.flatMap(([k, l], n) => [n ? E('span', { class: 'sep' }, '›') : null, E('span', { class: `s ${idx > n ? 'done' : idx === n ? 'cur' : ''}`, ...(idx === n ? { 'aria-current': 'step' } : {}) }, `${idx > n ? '✓ ' : ''}${l}`)]));
+};
 export async function renderDocumentControlScreen(container, api, state = {}) {
     const go = (s) => renderDocumentControlScreen(container, api, s);
-    const shell = (...kids) => mount(container, h('div', { class: 'dk', 'data-testid': 'dk-root' }, h('style', {}, CSS), ...kids));
-    const banner = state.banner ? h('div', { class: `card ${state.banner.kind === 'error' ? 'bad' : 'ok'}`, 'data-testid': 'dk-banner', 'data-kind': state.banner.kind }, state.banner.text) : null;
+    const shell = (...kids) => mount(container, h('div', { class: 'kx dk', 'data-testid': 'dk-root' }, h('style', {}, CSS), ...kids));
+    const banner = state.banner ? E('div', { class: `banner ${state.banner.kind === 'error' ? 'bad' : 'ok'}`, 'data-testid': 'dk-banner', 'data-kind': state.banner.kind, role: state.banner.kind === 'error' ? 'alert' : 'status' }, state.banner.text) : null;
     const fail = (e) => {
         const text = errorText(e);
         const root = container.querySelector('[data-testid="dk-root"]');
         let b = container.querySelector('[data-testid="dk-banner"]');
         if (!b && root) {
-            b = h('div', { class: 'card bad', 'data-testid': 'dk-banner', 'data-kind': 'error' }, text);
+            b = E('div', { class: 'banner bad', 'data-testid': 'dk-banner', 'data-kind': 'error', role: 'alert' }, text);
             const first = [...root.children].find((c) => c.tagName !== 'STYLE');
             root.insertBefore(b, first?.nextSibling ?? null);
         }
         else if (b) {
             b.textContent = text;
-            b.className = 'card bad';
+            b.className = 'banner bad';
             b.setAttribute('data-kind', 'error');
         }
         try {
@@ -77,11 +78,11 @@ export async function renderDocumentControlScreen(container, api, state = {}) {
         }
         catch { /* headless */ }
     };
-    const chip = (v, testid = 'dk-validity') => { const [t, c] = validityText(v); return h('span', { class: `chip ${c}`, 'data-testid': testid, 'data-value': v ?? '' }, t); };
+    const chip = (v, testid = 'dk-validity') => { const [t, c] = validityText(v); return kchip(t, tone(c), { 'data-testid': testid, 'data-value': v ?? '' }); };
     if (state.doc)
         return renderDetail(state.doc);
     return renderHome();
-    // ------------------------------------------------------------------------------------------------ home: list · verify · upload
+    // ------------------------------------------------------------------------------------------------ liste: arama · doğrulama · yükleme
     async function renderHome() {
         let rows = [];
         let err = null;
@@ -91,26 +92,50 @@ export async function renderDocumentControlScreen(container, api, state = {}) {
         catch (e) {
             err = errorText(e);
         }
-        const q = h('input', { 'data-testid': 'dk-q', placeholder: 'Doküman no · ürün kodu · başlık', value: state.q ?? '' });
-        const st = h('select', { 'data-testid': 'dk-state' }, ...[['', 'Tüm durumlar'], ['DRAFT', 'Taslak'], ['IN_REVIEW', 'Onay bekliyor'], ['APPROVED', 'Onaylı · yayımlanmadı'], ['EFFECTIVE', 'Geçerli'], ['SUPERSEDED', 'Geçersiz'], ['REJECTED', 'Reddedildi']].map(([v, l]) => h('option', { value: v, ...(v === (state.state ?? '') ? { selected: 'selected' } : {}) }, l)));
-        const all = h('input', { type: 'checkbox', 'data-testid': 'dk-all', ...(state.all ? { checked: 'checked' } : {}), style: 'width:auto;min-height:auto' });
+        const q = h('input', { 'data-testid': 'dk-q', placeholder: 'Doküman no · ürün kodu · başlık', value: state.q ?? '', 'aria-label': 'Ara' });
+        const st = h('select', { 'data-testid': 'dk-state', 'aria-label': 'Durum' }, ...[['', 'Tüm durumlar'], ['DRAFT', 'Taslak'], ['IN_REVIEW', 'Onay bekliyor'], ['APPROVED', 'Onaylı · yayımlanmadı'], ['EFFECTIVE', 'Geçerli'], ['SUPERSEDED', 'Geçersiz'], ['REJECTED', 'Reddedildi']].map(([v, l]) => h('option', { value: v, ...(v === (state.state ?? '') ? { selected: 'selected' } : {}) }, l)));
+        const all = h('input', { type: 'checkbox', 'data-testid': 'dk-all', ...(state.all ? { checked: 'checked' } : {}) });
         const vin = h('input', { 'data-testid': 'dk-verify-input', placeholder: 'Çıktıdaki Doküman no (DOC-000123) veya QR kodu', value: state.verify ?? '' });
-        const vout = h('div', { 'data-testid': 'dk-verify-result' });
+        const vout = E('div', { 'data-testid': 'dk-verify-result', style: 'margin-top:10px' });
         const verify = async () => {
             try {
                 const r = await api.verify(val(vin));
-                vout.replaceChildren();
-                vout.append(h('div', { class: `card ${r.isValid ? 'ok' : 'bad'}`, 'data-valid': String(!!r.isValid) }, h('b', {}, r.message), r.found ? h('div', { class: 'mut' }, `${r.docNo} · ${r.title} · sürüm ${r.versionNo}${r.currentVersionNo ? ` · güncel sürüm ${r.currentVersionNo}` : ''}`) : null));
+                vout.replaceChildren(E('div', { class: `banner ${r.isValid ? 'ok' : 'bad'}`, 'data-valid': String(!!r.isValid) }, E('b', {}, r.message), r.found ? E('div', { class: 'mut' }, `${r.docNo} · ${r.title} · sürüm ${r.versionNo}${r.currentVersionNo ? ` · güncel sürüm ${r.currentVersionNo}` : ''}`) : null));
             }
             catch (e) {
                 fail(e);
             }
         };
-        const apply = () => void go({ ...state, q: val(q), state: val(st), all: all.checked, banner: null, verify: val(vin) });
-        const card = (r) => h('div', { class: 'card', 'data-testid': 'dk-row', 'data-id': r.id, 'data-state': r.state ?? 'NONE' }, h('div', { class: 'row' }, h('b', {}, r.docNo), r.state ? chip(r.state, 'dk-row-state') : h('span', { class: 'chip' }, 'Kontrolsüz'), r.legacy ? h('span', { class: 'chip warn', 'data-testid': 'dk-legacy' }, 'ESKİ KAYIT — İNCELENMEDİ') : null, r.effectiveVersionNo && r.effectiveValidity && r.effectiveValidity !== 'EFFECTIVE' ? chip(r.effectiveValidity, 'dk-row-invalid') : null), h('div', {}, r.title, h('span', { class: 'mut' }, ` · ${typeTr(r.docType)}`)), h('div', { class: 'mut' }, `${r.productCode ? `${r.productCode} · ${r.productName ?? ''} · Rev ${r.revision ?? '—'}` : r.entityType} · son sürüm v${r.latestVersionNo ?? '—'}${r.effectiveVersionNo ? ` · yürürlükte v${r.effectiveVersionNo}` : ' · yürürlükte sürüm YOK'}${r.opLinks.length ? ` · operasyon ${r.opLinks.join(', ')}` : ''}`), h('div', { class: 'row', style: 'margin-top:6px' }, h('button', { class: 'primary', type: 'button', 'data-testid': 'dk-open', onClick: () => void go({ ...state, doc: r.id, banner: null }) }, 'Aç')));
-        shell(banner, h('h1', {}, 'Doküman Kontrol'), h('div', { class: 'mut' }, 'Teknik belgeler yalnız onaylı ve yürürlükteki sürümle üretimde geçerlidir. Geçerlilik sunucuda hesaplanır; belirsiz olan GEÇERLİ sayılmaz.'), h('div', { class: 'card', 'data-testid': 'dk-verify' }, h('h2', {}, 'Çıktı geçerli mi? (dijital doğrulama)'), h('div', { class: 'row' }, vin, h('button', { class: 'primary', type: 'button', 'data-testid': 'dk-verify-btn', onClick: () => void verify() }, 'Doğrula')), vout, h('div', { class: 'mut' }, 'Kâğıt çıktının hâlâ geçerli olduğu yalnızca bu kontrolle anlaşılır; baskı tarihi tek başına karar vermez.')), h('div', { class: 'card' }, h('div', { class: 'row' }, q, st, h('label', { style: 'display:flex;gap:6px;align-items:center' }, all, 'Kontrolsüz türleri de göster'), h('button', { class: 'ghost', type: 'button', 'data-testid': 'dk-apply', onClick: apply }, 'Ara / Süz'))), err ? h('div', { class: 'card bad', 'data-testid': 'dk-error' }, err) : null, h('div', { 'data-testid': 'dk-list' }, ...(rows.length ? rows.map(card) : [h('div', { class: 'card', 'data-testid': 'dk-empty' }, 'Bu süzgeçle doküman yok.')])), uploadCard(null));
+        const apply = (extra = {}) => void go({ ...state, q: val(q), state: val(st), all: all.checked, banner: null, verify: val(vin), ...extra });
+        q.addEventListener('keydown', (ev) => { if (ev.key === 'Enter')
+            apply(); });
+        st.addEventListener('change', () => apply());
+        // açılır bölümler: çıktı doğrulama ve yeni doküman yükleme yalnız istenince ekranı kaplar
+        const verifyHost = E('div', { 'data-testid': 'dk-verify-host' });
+        const uploadHost = E('div', { 'data-testid': 'dk-upload-host' });
+        const showVerify = () => {
+            if (verifyHost.childElementCount) {
+                verifyHost.replaceChildren();
+                return;
+            }
+            verifyHost.append(card({ title: 'Çıktı geçerli mi? (dijital doğrulama)', testid: 'dk-verify', span: 12 }, E('div', { class: 'row' }, E('div', { class: 'grow' }, vin), btnE('primary', 'dk-verify-btn', 'Doğrula', () => void verify())), vout, E('div', { class: 'mut', style: 'margin-top:8px' }, 'Kâğıt çıktının hâlâ geçerli olduğu yalnızca bu kontrolle anlaşılır; baskı tarihi tek başına karar vermez.')), E('div', { style: 'height:14px' }));
+            vin.focus?.();
+        };
+        const showUpload = () => { if (uploadHost.childElementCount) {
+            uploadHost.replaceChildren();
+            return;
+        } uploadHost.append(uploadCard(null), E('div', { style: 'height:14px' })); };
+        const counts = new Map();
+        for (const r of rows)
+            counts.set(r.state ?? 'NONE', (counts.get(r.state ?? 'NONE') ?? 0) + 1);
+        const flt = (k, label, n) => btnE(`${(state.state ?? '') === k ? 'on' : ''}`, `dk-count-${k || 'all'}`, `${label} ${n}`, () => apply({ state: k }));
+        const row = (r) => {
+            const invalidNow = !!(r.effectiveVersionNo && r.effectiveValidity && r.effectiveValidity !== 'EFFECTIVE');
+            return E('div', { class: 'r dkg', 'data-testid': 'dk-row', 'data-id': r.id, 'data-state': r.state ?? 'NONE' }, E('b', {}, r.docNo), E('div', {}, E('div', {}, r.title), E('div', { class: 'mut' }, typeTr(r.docType), r.opLinks.length ? ` · operasyon ${r.opLinks.join(', ')}` : '')), E('div', { class: 'mut clamp2', title: r.productCode ? `${r.productCode} ${r.productName ?? ''}` : r.entityType }, r.productCode ? [E('b', {}, r.productCode), ` ${r.productName ?? ''} · Rev ${r.revision ?? '—'}`] : r.entityType), E('div', { class: 'num' }, `v${r.latestVersionNo ?? '—'}`, E('div', { class: 'mut' }, r.effectiveVersionNo ? `yürürlükte v${r.effectiveVersionNo}` : 'yürürlükte YOK')), E('div', { class: 'stack', style: 'gap:4px;align-items:flex-start' }, r.state ? chip(r.state, 'dk-row-state') : kchip('Kontrolsüz'), r.legacy ? kchip('ESKİ KAYIT — İNCELENMEDİ', 'warn', { 'data-testid': 'dk-legacy' }) : null, invalidNow ? chip(r.effectiveValidity, 'dk-row-invalid') : null), E('div', { class: 'mut' }, r.state ? (r.awaiting ? 'Karar bekliyor' : NEXT_TR[r.state] ?? '—') : 'Kontrolsüz tür'), E('div', { class: 'acts' }, btnE('primary sm', 'dk-open', 'Aç', () => void go({ ...state, doc: r.id, banner: null }))));
+        };
+        shell(E('div', { class: 'page-head' }, E('div', { class: 'ttl' }, h('h1', {}, 'Doküman Kontrol'), E('div', { class: 'mut' }, 'Teknik belgeler yalnız onaylı ve yürürlükteki sürümle üretimde geçerlidir; belirsiz olan GEÇERLİ sayılmaz.')), E('div', { class: 'acts' }, btnE('ghost', 'dk-open-verify', 'Çıktı doğrula', showVerify), btnE('primary', 'dk-open-upload', '+ Yeni doküman', showUpload))), banner, verifyHost, uploadHost, card({ title: 'Dokümanlar', span: 12 }, E('div', { class: 'toolbar' }, E('div', { class: 'wide' }, field('Ara', q)), field('Durum', st), E('label', { class: 'chk' }, all, 'Kontrolsüz türler'), btnE('ghost', 'dk-apply', 'Ara / Süz', () => apply())), rows.length || state.state || state.q ? E('div', { class: 'counts', style: 'margin-top:12px' }, flt('', 'Hepsi', rows.length && !state.state ? rows.length : [...counts.values()].reduce((a, b) => a + b, 0)), ...STEPS.concat([['SUPERSEDED', 'Geçersiz'], ['REJECTED', 'Reddedildi']]).filter(([k]) => counts.get(k)).map(([k, l]) => flt(k, l, counts.get(k)))) : null, err ? E('div', { class: 'banner bad', 'data-testid': 'dk-error', style: 'margin-top:10px' }, err) : null, E('div', { 'data-testid': 'dk-list', style: 'margin-top:12px' }, rows.length ? E('div', { class: 'rows' }, E('div', { class: 'r hd dkg' }, ...['Doküman no', 'Başlık / tür', 'Ürün · revizyon', 'Sürüm', 'Durum', 'Gerekli işlem', ''].map((x) => E('span', {}, x))), ...rows.map(row)) : emptyState('Bu süzgeçle doküman yok.', 'Arama veya durum seçimini değiştirin; ya da “+ Yeni doküman” ile ekleyin.', 'dk-empty'))));
     }
-    // ------------------------------------------------------------------------------------------------ upload (new document from the product card, or a new version)
+    // ------------------------------------------------------------------------------------------------ yükleme (üründen yeni doküman ya da yeni sürüm)
     function uploadCard(lc) {
         const prod = h('input', { 'data-testid': 'dk-up-product', placeholder: 'Ürün kodu / adı ara', list: 'dk-products', autocomplete: 'off' });
         const plist = h('datalist', { id: 'dk-products' });
@@ -141,11 +166,17 @@ export async function renderDocumentControlScreen(container, api, state = {}) {
         });
         const save = async () => {
             const f = file.files?.[0];
-            if (!f)
+            if (!f) {
+                invalid(file, true);
                 return fail(new Error('CONTENT_REQUIRED'));
+            }
+            invalid(file, false);
             const entityId = lc ? lc.document.entityId : val(rev);
-            if (!entityId)
+            if (!entityId) {
+                invalid(rev, true);
                 return fail(new Error('ENTITY_REQUIRED'));
+            }
+            invalid(rev, false);
             const bytes = new Uint8Array(await f.arrayBuffer());
             const mime = guessMime(f.name, f.type);
             const docType = lc ? lc.document.docType : val(type);
@@ -155,28 +186,28 @@ export async function renderDocumentControlScreen(container, api, state = {}) {
             if (!pre.ok)
                 return fail(new Error(pre.reason));
             try {
-                const r = await api.upload({ docType, entityType: 'PRODUCT_REVISION', entityId, title: lc ? null : (val(title).trim() || `${typeTr(docType)} ${val(prod).trim()}`), fileName: f.name, mimeType: mime, contentBase64: toBase64(bytes), validUntil: val(until) || null, note: val(note).trim() || null, documentId: lc ? lc.document.id : null });
+                const r = await api.upload({ docType, entityType: 'PRODUCT_REVISION', entityId, title: lc ? null : (val(title).trim() || `${typeTr(docType)} ${val(prod).trim()}`), fileName: f.name, mimeType: mime, contentBase64: kxToBase64(bytes), validUntil: val(until) || null, note: val(note).trim() || null, documentId: lc ? lc.document.id : null });
                 void go({ doc: lc ? lc.document.id : r.documentId, banner: { kind: 'ok', text: `Yüklendi: sürüm ${r.versionNo} — TASLAK olarak. Üretimde geçerli olması için onaya gönderilip yürürlüğe alınmalı. Parmak izi ${r.sha256.slice(0, 12)}…` } });
             }
             catch (e) {
                 fail(e);
             }
         };
-        return h('div', { class: 'card', 'data-testid': lc ? 'dk-version-upload' : 'dk-upload' }, h('h2', {}, lc ? 'Yeni sürüm yükle (eskisi silinmez)' : 'Yeni doküman yükle'), lc ? null : h('div', { class: 'grid' }, h('div', {}, h('label', {}, 'Ürün'), prod, plist), h('div', {}, h('label', {}, 'Ürün revizyonu'), rev), h('div', {}, h('label', {}, 'Doküman türü'), type), h('div', {}, h('label', {}, 'Başlık'), title)), h('div', { class: 'grid' }, h('div', {}, h('label', {}, 'Dosya'), file), h('div', {}, h('label', {}, 'Geçerlilik sonu (varsa)'), until), h('div', {}, h('label', {}, lc ? 'Değişiklik notu' : 'Not'), note)), h('div', { class: 'row', style: 'margin-top:8px' }, h('button', { class: 'primary', type: 'button', 'data-testid': lc ? 'dk-version-save' : 'dk-up-save', onClick: () => void save() }, 'Yükle (TASLAK)')));
+        return card({ title: lc ? 'Yeni sürüm yükle (eskisi silinmez)' : 'Yeni doküman yükle', testid: lc ? 'dk-version-upload' : 'dk-upload', span: 12, tone: 'info' }, E('div', { class: 'stack', style: 'gap:12px' }, lc ? null : E('div', { class: 'fgrid' }, field('Ürün', prod), plist, field('Ürün revizyonu', rev), field('Doküman türü', type), field('Başlık', title)), E('div', { class: 'fgrid' }, field('Dosya', file), field('Geçerlilik sonu (varsa)', until), field(lc ? 'Değişiklik notu' : 'Not', note)), E('div', { class: 'row' }, btnE('primary', lc ? 'dk-version-save' : 'dk-up-save', 'Yükle (TASLAK)', () => void save()), E('span', { class: 'mut' }, 'Dosya TASLAK olarak eklenir; yürürlükteki sürümü değiştirmez.'))));
     }
-    // ------------------------------------------------------------------------------------------------ detail
+    // ------------------------------------------------------------------------------------------------ ayrıntı
     async function renderDetail(docId) {
         let lc;
         try {
             lc = await api.lifecycle(docId);
         }
         catch (e) {
-            shell(banner, h('button', { class: 'ghost', type: 'button', 'data-testid': 'dk-back', onClick: () => void go({ ...state, doc: null, banner: null }) }, '← Liste'), h('div', { class: 'card bad', 'data-testid': 'dk-error' }, errorText(e)));
+            shell(banner, btnE('ghost', 'dk-back', '← Liste', () => void go({ ...state, doc: null, banner: null })), E('div', { style: 'height:12px' }), E('div', { class: 'banner bad', 'data-testid': 'dk-error' }, errorText(e)));
             return;
         }
         const d = lc.document;
-        const prev = h('div', { class: 'prev', 'data-testid': 'dk-preview' });
-        const note = h('textarea', { 'data-testid': 'dk-note', rows: '2', placeholder: 'Neden / karar notu (en az 5 karakter)', style: 'min-height:60px;padding:8px' });
+        const prev = E('div', { class: 'fileview', 'data-testid': 'dk-preview' });
+        const note = h('textarea', { 'data-testid': 'dk-note', rows: '2', placeholder: 'Neden / karar notu (en az 5 karakter)' });
         const label = h('input', { 'data-testid': 'dk-label', placeholder: 'Belgenin üzerinde yazan revizyon (ör. A)', maxlength: '20' });
         const act = async (fn, msg) => { try {
             await fn();
@@ -188,42 +219,31 @@ export async function renderDocumentControlScreen(container, api, state = {}) {
         const open = async (v, download) => {
             try {
                 const c = await api.content(v.id);
-                const bytes = fromBase64(c.contentBase64);
+                const bytes = kxFromBase64(c.contentBase64);
                 const local = bytesToHex(await crypto.subtle.digest('SHA-256', bytes));
                 const okBoth = c.integrityOk && local === c.sha256;
                 prev.replaceChildren();
-                prev.append(h('div', { class: `card ${okBoth ? 'ok' : 'bad'}`, 'data-testid': 'dk-integrity', 'data-ok': String(okBoth) }, okBoth ? `Dosya açıldı · bütünlük doğrulandı (${c.sha256.slice(0, 12)}…) · durum: ${validityText(c.validity)[0]}` : 'BÜTÜNLÜK HATASI — dosya bozuk, KULLANMAYIN'));
+                prev.append(E('div', { class: `banner ${okBoth ? 'ok' : 'bad'}`, 'data-testid': 'dk-integrity', 'data-ok': String(okBoth) }, okBoth ? `Dosya açıldı · bütünlük doğrulandı (${c.sha256.slice(0, 12)}…) · durum: ${validityText(c.validity)[0]}` : 'BÜTÜNLÜK HATASI — dosya bozuk, KULLANMAYIN'));
                 if (!okBoth)
                     return;
-                const url = URL.createObjectURL(new Blob([bytes], { type: c.mimeType }));
-                if (download) {
-                    const a = document.createElement('a');
-                    a.href = url;
-                    a.download = c.fileName;
-                    a.dataset.testid = 'dk-download-link';
-                    a.textContent = `İndirilen: ${c.fileName}`;
-                    prev.append(a);
-                    a.click?.();
-                    return;
-                }
-                if (c.mimeType === 'application/pdf')
-                    prev.append(h('iframe', { src: url, title: c.fileName, 'data-testid': 'dk-frame' }));
-                else if (c.mimeType.startsWith('image/'))
-                    prev.append(h('img', { src: url, alt: c.fileName, 'data-testid': 'dk-img' }));
-                else
-                    prev.append(h('pre', { 'data-testid': 'dk-text' }, new TextDecoder().decode(bytes.subarray(0, 20000))));
+                showFile(prev, { bytes, mime: c.mimeType, fileName: c.fileName, download, testids: { frame: 'dk-frame', img: 'dk-img', text: 'dk-text', link: 'dk-download-link', none: 'dk-nopreview' } });
+                scrollInto(prev);
             }
             catch (e) {
                 fail(e);
             }
         };
-        const printHost = h('div', { class: 'dk-print', 'data-testid': 'dk-print-sheet' });
+        const scrollInto = (el) => { try {
+            el.scrollIntoView?.({ block: 'nearest' });
+        }
+        catch { /* headless */ } };
+        const printHost = E('div', { class: 'dk-print', 'data-testid': 'dk-print-sheet' });
         const doPrint = async (v) => {
             const why = container.querySelector('[data-testid="dk-print-reason"]')?.value ?? '';
             try {
                 const s = await api.printBegin(v.id, 'Atölye', why);
                 const qr = qrToSvg(encodeQr(s.verifyRef));
-                const qrBox = h('div', { 'data-testid': 'dk-print-qr' });
+                const qrBox = E('div', { 'data-testid': 'dk-print-qr' });
                 qrBox.innerHTML = qr;
                 printHost.replaceChildren();
                 printHost.append(...[
@@ -234,12 +254,12 @@ export async function renderDocumentControlScreen(container, api, state = {}) {
                     ].map(([k, vv]) => h('tr', {}, h('th', {}, k), h('td', {}, vv)))),
                     h('p', {}, `Doğrulama: ${s.verifyRef} — Doküman Kontrol ekranında “Çıktı geçerli mi?” alanına yazın veya QR'ı okutun.`), h('p', { style: 'font-size:11px' }, s.notice),
                 ].filter(Boolean));
-                // the file itself follows the cover sheet when it is an image (a PDF body cannot be re-stamped in the browser; the cover sheet + digital check carries the control information)
+                // dosya bir görüntüyse kapak sayfasından sonra gelir (PDF gövdesi tarayıcıda damgalanamaz; kapak + dijital doğrulama kontrol bilgisini taşır)
                 const c = await api.content(v.id);
                 if (c.mimeType.startsWith('image/')) {
                     const img = document.createElement('img');
                     img.style.maxWidth = '100%';
-                    img.src = URL.createObjectURL(new Blob([fromBase64(c.contentBase64)], { type: c.mimeType }));
+                    img.src = URL.createObjectURL(new Blob([kxFromBase64(c.contentBase64)], { type: c.mimeType }));
                     printHost.append(img);
                 }
                 window.print();
@@ -252,47 +272,56 @@ export async function renderDocumentControlScreen(container, api, state = {}) {
         const versionBox = (v, latest) => {
             const c = v.control;
             const stt = c?.state ?? 'NONE';
-            const btn = (cls, testid, text, fn) => h('button', { class: cls, type: 'button', 'data-testid': testid, onClick: fn }, text);
             const needNote = () => { const t = val(note).trim(); if (t.length < 5) {
+                invalid(note, true);
                 fail(new Error('REASON_REQUIRED'));
                 return null;
-            } return t; };
-            const actions = [btn('ghost', 'dk-view', 'Önizle', () => void open(v, false)), btn('ghost', 'dk-download', 'İndir', () => void open(v, true)),
-                btn('ghost', 'dk-print', 'Kontrollü yazdır', () => void doPrint(v))];
+            } invalid(note, false); return t; };
+            const actions = [btnE('ghost sm', 'dk-view', 'Önizle', () => void open(v, false)), btnE('ghost sm', 'dk-download', 'İndir', () => void open(v, true)), btnE('ghost sm', 'dk-print', 'Kontrollü yazdır', () => void doPrint(v))];
             if (stt === 'DRAFT')
-                actions.push(btn('primary', 'dk-submit', 'Onaya gönder', () => { const t = needNote(); if (t)
+                actions.push(btnE('primary sm', 'dk-submit', 'Onaya gönder', () => { const t = needNote(); if (t)
                     void act(() => api.submit(v.id, t, val(label).trim() || null), 'Onaya gönderildi.'); }));
             if (stt === 'IN_REVIEW' && !c?.reviewOk)
-                actions.push(btn('primary', 'dk-review-ok', 'Kontrol et: uygun', () => { const t = needNote(); if (t)
-                    void act(() => api.review(v.id, true, t), 'Kontrol kaydedildi.'); }), btn('danger', 'dk-review-no', 'Kontrol: reddet', () => { const t = needNote(); if (t)
+                actions.push(btnE('primary sm', 'dk-review-ok', 'Kontrol et: uygun', () => { const t = needNote(); if (t)
+                    void act(() => api.review(v.id, true, t), 'Kontrol kaydedildi.'); }), btnE('danger sm', 'dk-review-no', 'Kontrol: reddet', () => { const t = needNote(); if (t)
                     void act(() => api.review(v.id, false, t), 'Reddedildi.'); }));
             if (stt === 'IN_REVIEW' && c?.reviewOk)
-                actions.push(btn('good', 'dk-approve', 'Onayla', () => { const t = needNote(); if (t)
-                    void act(() => api.approve(v.id, true, t), 'Onaylandı (yürürlüğe almak için “Yürürlüğe al”).'); }), btn('danger', 'dk-approve-no', 'Onayı reddet', () => { const t = needNote(); if (t)
+                actions.push(btnE('good sm', 'dk-approve', 'Onayla', () => { const t = needNote(); if (t)
+                    void act(() => api.approve(v.id, true, t), 'Onaylandı (yürürlüğe almak için “Yürürlüğe al”).'); }), btnE('danger sm', 'dk-approve-no', 'Onayı reddet', () => { const t = needNote(); if (t)
                     void act(() => api.approve(v.id, false, t), 'Reddedildi.'); }));
             if (stt === 'APPROVED')
-                actions.push(btn('good', 'dk-publish', 'Yürürlüğe al (yayımla)', () => void act(() => api.publish(v.id, val(note).trim()), 'Yürürlüğe alındı — etkilenen açık işler Dağıtım bölümünde.')));
+                actions.push(btnE('good sm', 'dk-publish', 'Yürürlüğe al (yayımla)', () => void act(() => api.publish(v.id, val(note).trim()), 'Yürürlüğe alındı — etkilenen açık işler Dağıtım bölümünde.')));
             if (stt === 'EFFECTIVE')
-                actions.push(btn('danger', 'dk-obsolete', 'Geçersiz kıl', () => { const t = needNote(); if (t)
+                actions.push(btnE('danger sm', 'dk-obsolete', 'Geçersiz kıl', () => { const t = needNote(); if (t)
                     void act(() => api.obsolete(v.id, t), 'Sürüm geçersiz kılındı.'); }));
             const ppl = c ? `Hazırlayan: ${c.preparedBy ?? '—'} · Kontrol: ${c.reviewedBy ?? '—'}${c.reviewOk === false ? ' (red)' : ''} · Onay: ${c.approvedBy ?? '—'}${c.selfApproved ? ' (kendi onayı — gerekçeli)' : ''} · Yürürlük: ${c.effectiveBy ?? '—'}` : 'Kontrol kaydı yok';
-            return h('div', { class: `ver ${stt === 'EFFECTIVE' ? 'eff' : stt === 'SUPERSEDED' ? 'old' : ''}`, 'data-testid': 'dk-version', 'data-no': String(v.versionNo), 'data-state': stt, 'data-validity': v.validity }, h('div', { class: 'row' }, h('b', {}, `Sürüm ${v.versionNo}`), chip(v.validity), latest ? h('span', { class: 'chip info' }, 'son sürüm') : null, c?.legacy ? h('span', { class: 'chip warn' }, 'eski kayıt — incelenmedi') : null, c?.docRevisionLabel ? h('span', { class: 'chip' }, `belgede Rev ${c.docRevisionLabel}`) : null), h('div', { class: 'mut' }, `${v.fileName} · ${kb(v.sizeBytes)} · ${v.sha256.slice(0, 12)}… · ${when(v.uploadedAt)} · ${v.uploadedBy ?? '—'}${v.note ? ` · ${v.note}` : ''}${v.validUntil ? ` · geçerlilik sonu ${v.validUntil}` : ''}`), h('div', { class: 'mut' }, ppl), c?.changeReason ? h('div', { class: 'mut' }, `Değişiklik nedeni: ${c.changeReason}`) : null, c?.endedReason ? h('div', { class: 'mut' }, `Geçersiz: ${c.endedReason}${c.supersededByVersion ? ` (yerine v${c.supersededByVersion})` : ''}`) : null, v.diffFromPrevious ? h('div', { class: 'mut', 'data-testid': 'dk-diff' }, `v${v.diffFromPrevious.fromVersion} ile fark: ${v.diffFromPrevious.sameContent ? 'içerik AYNI' : 'içerik DEĞİŞTİ'} · boyut ${v.diffFromPrevious.sizeDelta >= 0 ? '+' : ''}${v.diffFromPrevious.sizeDelta} B${v.diffFromPrevious.fileNameChanged ? ' · dosya adı değişti' : ''}${v.diffFromPrevious.labelFrom !== v.diffFromPrevious.labelTo ? ` · belge revizyonu ${v.diffFromPrevious.labelFrom ?? '—'} → ${v.diffFromPrevious.labelTo ?? '—'}` : ''}`) : null, h('div', { class: 'row', style: 'margin-top:6px' }, ...actions));
+            return E('div', { class: `ver ${stt === 'EFFECTIVE' ? 'eff' : stt === 'SUPERSEDED' ? 'old' : ''}`, 'data-testid': 'dk-version', 'data-no': String(v.versionNo), 'data-state': stt, 'data-validity': v.validity }, E('div', { class: 'row' }, E('b', {}, `Sürüm ${v.versionNo}`), chip(v.validity), latest ? kchip('son sürüm', 'info') : null, c?.legacy ? kchip('eski kayıt — incelenmedi', 'warn') : null, c?.docRevisionLabel ? kchip(`belgede Rev ${c.docRevisionLabel}`) : null), stepper(stt === 'NONE' ? null : stt), E('div', { class: 'mut' }, `${v.fileName} · ${kxKb(v.sizeBytes)} · ${v.sha256.slice(0, 12)}… · ${when(v.uploadedAt)} · ${v.uploadedBy ?? '—'}${v.note ? ` · ${v.note}` : ''}${v.validUntil ? ` · geçerlilik sonu ${v.validUntil}` : ''}`), E('div', { class: 'mut' }, ppl), c?.changeReason ? E('div', { class: 'mut' }, `Değişiklik nedeni: ${c.changeReason}`) : null, c?.endedReason ? E('div', { class: 'mut' }, `Geçersiz: ${c.endedReason}${c.supersededByVersion ? ` (yerine v${c.supersededByVersion})` : ''}`) : null, v.diffFromPrevious ? E('div', { class: 'mut', 'data-testid': 'dk-diff' }, `v${v.diffFromPrevious.fromVersion} ile fark: ${v.diffFromPrevious.sameContent ? 'içerik AYNI' : 'içerik DEĞİŞTİ'} · boyut ${v.diffFromPrevious.sizeDelta >= 0 ? '+' : ''}${v.diffFromPrevious.sizeDelta} B${v.diffFromPrevious.fileNameChanged ? ' · dosya adı değişti' : ''}${v.diffFromPrevious.labelFrom !== v.diffFromPrevious.labelTo ? ` · belge revizyonu ${v.diffFromPrevious.labelFrom ?? '—'} → ${v.diffFromPrevious.labelTo ?? '—'}` : ''}`) : null, E('div', { class: 'row', style: 'margin-top:4px' }, ...actions));
         };
         const ackBox = (x) => {
             const why = h('input', { 'data-testid': 'dk-ack-reason', placeholder: 'Karar gerekçesi' });
-            return h('tr', { 'data-testid': 'dk-dist', 'data-ack': x.ackState }, h('td', {}, x.workOrderId.slice(0, 8)), h('td', {}, x.workOrderStatus), h('td', {}, `v${x.prevVersionNo ?? '—'} → v${x.versionNo ?? '—'}${x.kind === 'INVALIDATED' ? ' (geçersiz kılındı)' : ''}`), h('td', {}, h('span', { class: `chip ${x.ackState === 'PENDING' ? 'bad' : ''}` }, ACK_TR[x.ackState] ?? x.ackState), x.ackReason ? h('div', { class: 'mut' }, `${x.ackBy ?? ''}: ${x.ackReason}`) : null), h('td', {}, x.ackState === 'PENDING' ? h('div', { class: 'row' }, why, h('button', { class: 'good', type: 'button', 'data-testid': 'dk-ack-new', onClick: () => void act(() => api.ack(x.id, 'APPLY_NEW', val(why)), 'Karar kaydedildi.') }, 'Yeni sürüme geç'), h('button', { class: 'danger', type: 'button', 'data-testid': 'dk-ack-old', onClick: () => void act(() => api.ack(x.id, 'CONTINUE_ACCEPTED', val(why)), 'İstisna kaydedildi.') }, 'Eskisiyle devam (istisna)')) : ''));
+            return h('tr', { 'data-testid': 'dk-dist', 'data-ack': x.ackState }, h('td', {}, x.workOrderId.slice(0, 8)), h('td', {}, x.workOrderStatus), h('td', {}, `v${x.prevVersionNo ?? '—'} → v${x.versionNo ?? '—'}${x.kind === 'INVALIDATED' ? ' (geçersiz kılındı)' : ''}`), h('td', {}, kchip(ACK_TR[x.ackState] ?? x.ackState, x.ackState === 'PENDING' ? 'bad' : ''), x.ackReason ? h('div', { class: 'mut' }, `${x.ackBy ?? ''}: ${x.ackReason}`) : null), h('td', {}, x.ackState === 'PENDING' ? E('div', { class: 'row' }, E('div', { style: 'min-width:180px;flex:1' }, why), btnE('good sm', 'dk-ack-new', 'Yeni sürüme geç', () => void act(() => api.ack(x.id, 'APPLY_NEW', val(why)), 'Karar kaydedildi.')), btnE('danger sm', 'dk-ack-old', 'Eskisiyle devam (istisna)', () => void act(() => api.ack(x.id, 'CONTINUE_ACCEPTED', val(why)), 'İstisna kaydedildi.'))) : ''));
         };
         const opNo = h('input', { 'data-testid': 'dk-op-no', type: 'number', min: '1', placeholder: 'Op no', style: 'max-width:110px' });
         const latestNo = Math.max(...lc.versions.map((v) => v.versionNo));
-        shell(banner, h('div', { class: 'row' }, h('button', { class: 'ghost', type: 'button', 'data-testid': 'dk-back', onClick: () => void go({ ...state, doc: null, banner: null }) }, '← Liste'), h('h1', { 'data-testid': 'dk-title' }, `${d.docNo} · ${d.title}`), d.state ? chip(d.state, 'dk-doc-state') : null), h('div', { class: 'mut' }, `${typeTr(d.docType)} · ${d.productCode ? `${d.productCode} ${d.productName ?? ''} · Ürün revizyonu ${d.revision ?? '—'}` : d.entityType}${d.status === 'WITHDRAWN' ? ` · GERİ ÇEKİLDİ (${d.withdrawnReason ?? ''})` : ''}`), h('div', { class: 'mut' }, 'Ürün revizyonu ile belge sürümü ayrı kavramlardır: sürüm yeni dosyadır; “belgede yazan revizyon” ürün revizyonuyla eşleşmeyen belge yürürlüğe alınamaz.'), h('div', { class: 'card' }, h('label', {}, 'Karar / neden notu (aşağıdaki işlemlerde kullanılır)'), note, d.needsRevisionLabel ? h('div', {}, h('label', {}, 'Belge üzerindeki revizyon (onaya gönderirken zorunlu)'), label) : null, h('div', { class: 'row', style: 'margin-top:6px' }, h('input', { 'data-testid': 'dk-print-reason', placeholder: 'Yeniden baskı gerekçesi (2. ve sonraki baskıda zorunlu)' }))), h('h2', {}, 'Sürüm geçmişi'), h('div', { 'data-testid': 'dk-versions' }, ...lc.versions.map((v) => versionBox(v, v.versionNo === latestNo))), prev, printHost, uploadCard(lc), h('div', { class: 'card', 'data-testid': 'dk-dist-card' }, h('h2', {}, 'Dağıtım — etkilenen açık işler'), lc.distributions.length ? h('div', { class: 'tw' }, h('table', {}, h('thead', {}, h('tr', {}, ...['İş emri', 'Durum', 'Sürüm', 'Karar', ''].map((x) => h('th', {}, x)))), h('tbody', {}, ...lc.distributions.map(ackBox)))) : h('div', { class: 'mut' }, 'Henüz dağıtım kaydı yok. Başlamış bir işte yeni sürüm yayımlanırsa karar bekler ve işin başlatılması engellenir; eski işler sessizce yeni sürüme taşınmaz.')), d.entityType === 'PRODUCT_REVISION' ? h('div', { class: 'card', 'data-testid': 'dk-ops' }, h('h2', {}, 'Operasyon bağlantıları'), h('div', { class: 'mut' }, 'CAM föyü / NC programı gibi operasyona bağlı türlerde, bağlı operasyon yürürlükte belge olmadan başlatılamaz.'), h('div', { class: 'row' }, ...d.opLinks.map((n) => h('span', { class: 'chip info', 'data-testid': 'dk-op-chip' }, `Op ${n} `, h('a', { href: '#', 'data-testid': 'dk-op-off', onClick: (e) => { e.preventDefault(); void act(() => api.linkOperation(d.id, n, false), 'Bağlantı kaldırıldı.'); } }, '×')))), h('div', { class: 'row', style: 'margin-top:6px' }, opNo, h('button', { class: 'ghost', type: 'button', 'data-testid': 'dk-op-add', onClick: () => void act(() => api.linkOperation(d.id, Number(val(opNo)), true), 'Operasyona bağlandı.') }, 'Operasyona bağla'))) : null, h('div', { class: 'card', 'data-testid': 'dk-audit' }, h('h2', {}, 'Denetim izi'), h('div', { class: 'tw' }, h('table', {}, h('thead', {}, h('tr', {}, ...['Zaman', 'Olay', 'Sürüm', 'Kişi', 'Not'].map((x) => h('th', {}, x)))), h('tbody', {}, ...lc.events.map((e) => h('tr', { 'data-testid': 'dk-event', 'data-event': e.event }, h('td', {}, when(e.at)), h('td', {}, EV_TR[e.event] ?? e.event), h('td', {}, e.versionNo ? `v${e.versionNo}` : '—'), h('td', {}, e.actor), h('td', {}, e.reason ?? '')))))), lc.prints.length ? h('div', { class: 'mut', 'data-testid': 'dk-prints' }, `Baskılar: ${lc.prints.map((p) => `#${p.printNo} v${p.versionNo} ${when(p.at)} ${p.by ?? ''}${p.watermark ? ` [${p.watermark}]` : ''}${p.reason ? ` — ${p.reason}` : ''}`).join(' · ')}`) : null));
-        // the affected-jobs preview for the newest unpublished version (010.04): shown for approvers before they publish
+        const current = lc.versions.find((v) => v.versionNo === latestNo);
+        const flowState = current?.control?.state ?? null;
+        const uploadHost = E('div', { 'data-testid': 'dk-upload-host' });
+        const showUpload = () => { if (uploadHost.childElementCount) {
+            uploadHost.replaceChildren();
+            return;
+        } uploadHost.append(uploadCard(lc)); try {
+            uploadHost.scrollIntoView?.({ block: 'nearest' });
+        }
+        catch { /* headless */ } };
+        shell(banner, E('div', { class: 'page-head' }, E('div', { class: 'ttl' }, E('div', { class: 'crumb' }, btnE('', 'dk-back', '← Liste', () => void go({ ...state, doc: null, banner: null }))), E('div', { class: 'row' }, h('h1', { 'data-testid': 'dk-title' }, `${d.docNo} · ${d.title}`), d.state ? chip(d.state, 'dk-doc-state') : null), E('div', { class: 'mut' }, `${typeTr(d.docType)} · ${d.productCode ? `${d.productCode} ${d.productName ?? ''} · Ürün revizyonu ${d.revision ?? '—'}` : d.entityType}${d.status === 'WITHDRAWN' ? ` · GERİ ÇEKİLDİ (${d.withdrawnReason ?? ''})` : ''}`), stepper(flowState)), E('div', { class: 'acts' }, btnE('primary', 'dk-open-version-upload', '+ Yeni sürüm yükle', showUpload))), uploadHost, E('div', { class: 'kx-grid' }, card({ title: 'Karar ve notlar', span: 12 }, E('div', { class: 'fgrid w2' }, field('Karar / neden notu (aşağıdaki işlemlerde kullanılır)', note), E('div', { class: 'stack' }, d.needsRevisionLabel ? field('Belge üzerindeki revizyon (onaya gönderirken zorunlu)', label) : null, field('Yeniden baskı gerekçesi', h('input', { 'data-testid': 'dk-print-reason', placeholder: '2. ve sonraki baskıda zorunlu' })))), E('div', { style: 'margin-top:10px' }, fold('Revizyon kuralı', [E('div', { class: 'mut' }, 'Ürün revizyonu ile belge sürümü ayrı kavramlardır: sürüm yeni dosyadır; “belgede yazan revizyon” ürün revizyonuyla eşleşmeyen belge yürürlüğe alınamaz.')]))), card({ title: 'Sürüm geçmişi', span: 12 }, E('div', { class: 'stack', 'data-testid': 'dk-versions' }, ...lc.versions.map((v) => versionBox(v, v.versionNo === latestNo))), E('div', { style: 'margin-top:10px' }, prev), printHost), card({ title: 'Dağıtım — etkilenen açık işler', testid: 'dk-dist-card', span: lc.distributions.length ? 12 : 6 }, lc.distributions.length ? E('div', { class: 'tw' }, h('table', {}, h('thead', {}, h('tr', {}, ...['İş emri', 'Durum', 'Sürüm', 'Karar', ''].map((x) => h('th', {}, x)))), h('tbody', {}, ...lc.distributions.map(ackBox)))) : E('div', { class: 'mut' }, 'Henüz dağıtım kaydı yok. Başlamış bir işte yeni sürüm yayımlanırsa karar bekler ve işin başlatılması engellenir; eski işler sessizce yeni sürüme taşınmaz.')), ...(d.entityType === 'PRODUCT_REVISION' ? [card({ title: 'Operasyon bağlantıları', testid: 'dk-ops', span: 6 }, E('div', { class: 'mut' }, 'CAM föyü / NC programı gibi operasyona bağlı türlerde, bağlı operasyon yürürlükte belge olmadan başlatılamaz.'), E('div', { class: 'row', style: 'margin-top:8px' }, ...d.opLinks.map((n) => E('span', { class: 'chip info', 'data-testid': 'dk-op-chip' }, `Op ${n} `, h('a', { href: '#', 'data-testid': 'dk-op-off', onClick: (e) => { e.preventDefault(); void act(() => api.linkOperation(d.id, n, false), 'Bağlantı kaldırıldı.'); } }, '×')))), E('div', { class: 'row', style: 'margin-top:8px' }, E('div', { style: 'width:120px' }, opNo), btnE('ghost', 'dk-op-add', 'Operasyona bağla', () => void act(() => api.linkOperation(d.id, Number(val(opNo)), true), 'Operasyona bağlandı.'))))] : []), card({ title: 'Denetim izi', testid: 'dk-audit', span: 12 }, E('div', { class: 'tw' }, h('table', {}, h('thead', {}, h('tr', {}, ...['Zaman', 'Olay', 'Sürüm', 'Kişi', 'Not'].map((x) => h('th', {}, x)))), h('tbody', {}, ...lc.events.map((e) => h('tr', { 'data-testid': 'dk-event', 'data-event': e.event }, h('td', {}, when(e.at)), h('td', {}, EV_TR[e.event] ?? e.event), h('td', {}, e.versionNo ? `v${e.versionNo}` : '—'), h('td', {}, e.actor), h('td', {}, e.reason ?? '')))))), lc.prints.length ? E('div', { class: 'mut', 'data-testid': 'dk-prints', style: 'margin-top:8px' }, `Baskılar: ${lc.prints.map((p) => `#${p.printNo} v${p.versionNo} ${when(p.at)} ${p.by ?? ''}${p.watermark ? ` [${p.watermark}]` : ''}${p.reason ? ` — ${p.reason}` : ''}`).join(' · ')}`) : null)));
+        // yayımlanmamış en yeni sürüm için etkilenecek işler önizlemesi (010.04): onaylayan yayımlamadan önce görür
         const pend = lc.versions.find((v) => v.control?.state === 'APPROVED');
         if (pend) {
             try {
                 const imp = await api.impact(pend.id);
-                container.querySelector('[data-testid="dk-versions"]')?.before(h('div', { class: 'card warn', 'data-testid': 'dk-impact' }, `Yayımlanırsa etkilenecek: ${imp.workOrders.length} açık iş emri (${imp.workOrders.filter((w) => w.started).length} başlamış), ${imp.orderItemsOpen ?? NA} açık sipariş kalemi, ${imp.quoteLinesOpen ?? NA} açık teklif satırı, ${imp.camPrograms ?? NA} CAM programı, ${imp.controlPlans ?? NA} kontrol planı · hazırlık: ${imp.readiness ?? '—'}`));
+                container.querySelector('[data-testid="dk-versions"]')?.before(E('div', { class: 'banner', 'data-testid': 'dk-impact', style: 'border-color:#b45309;background:rgba(120,53,15,.3);color:#fde68a' }, `Yayımlanırsa etkilenecek: ${imp.workOrders.length} açık iş emri (${imp.workOrders.filter((w) => w.started).length} başlamış), ${imp.orderItemsOpen ?? NA} açık sipariş kalemi, ${imp.quoteLinesOpen ?? NA} açık teklif satırı, ${imp.camPrograms ?? NA} CAM programı, ${imp.controlPlans ?? NA} kontrol planı · hazırlık: ${imp.readiness ?? '—'}`));
             }
-            catch { /* impact is advisory; privileged users only */ }
+            catch { /* etki listesi danışmandır; yalnız yetkili kullanıcılar */ }
         }
     }
 }

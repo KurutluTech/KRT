@@ -114,27 +114,47 @@ export class KmiNextClient {
                 user: { id: String(user?.['id'] ?? ''), email: user?.['email'] ?? null },
             };
         },
-        /** Operator login without e-mail: sicil and/or badge secret + personal PIN, verified server-side (Edge Function operator-login). */
+        /**
+         * Operator login without e-mail: sicil + personal 4-digit PIN. The PIN is checked server-side by the live Edge Function `badge-login`
+         * (PBKDF2 hash, per-account lock: 5 wrong → 15 min, source limits). It answers with a one-time OTP which this client exchanges for a session.
+         * A badge / QR alone can never log in: the PIN is always required, and nothing but the sicil is sent.
+         */
         signInOperator: async (input) => {
-            const res = await this.fetchImpl(`${this.url}/functions/v1/operator-login`, {
+            const employeeNo = (input.employeeNo ?? '').trim();
+            if (!employeeNo)
+                throw new AuthError('Sicil numarası gerekli.', 400);
+            if (!/^[0-9]{4}$/.test(input.pin ?? ''))
+                throw new AuthError('PIN 4 rakamdan oluşmalıdır.', 400);
+            // A network/CORS failure (e.g. the gateway's CORS-less 404 for a function that is not deployed) surfaces in browsers as a raw
+            // TypeError "Failed to fetch". Never show that to a person: it is reported as a plain connectivity message.
+            const unreachable = new AuthError('Operatör girişi şu anda kullanılamıyor (bağlantı kurulamadı).', 0);
+            const res = await this.fetchImpl(`${this.url}/functions/v1/badge-login`, {
                 method: 'POST',
                 headers: { apikey: this.apiKey, 'content-type': 'application/json' },
-                body: JSON.stringify(input),
-            });
+                body: JSON.stringify({ action: 'login', employeeNo, pin: input.pin }),
+            }).catch(() => { throw unreachable; });
             const body = (await parseJsonSafe(res));
-            if (!res.ok || !body || typeof body['accessToken'] !== 'string') {
+            if (!res.ok || !body || typeof body['email'] !== 'string' || typeof body['otp'] !== 'string') {
                 const code = body && typeof body['error'] === 'string' ? body['error'] : '';
-                const msg = code === 'ACCOUNT_LOCKED' ? 'Hesap geçici olarak kilitli. 15 dakika sonra deneyin veya yöneticiye başvurun.'
-                    : code === 'RATE_LIMITED' ? 'Çok fazla deneme. Biraz sonra tekrar deneyin.'
+                const msg = res.status === 423 || code === 'locked' ? 'Hesap geçici olarak kilitli (5 hatalı deneme). 15 dakika sonra deneyin veya yöneticiye başvurun.'
+                    : res.status === 429 || code === 'try_later' ? 'Çok fazla deneme. Biraz sonra tekrar deneyin.'
                         : res.status >= 500 || res.status === 404 ? 'Operatör girişi şu anda kullanılamıyor.'
-                            : 'Sicil/rozet veya PIN hatalı.';
+                            : 'Sicil veya PIN hatalı.';
                 throw new AuthError(msg, res.status);
             }
-            const user = body['user'];
+            const vres = await this.fetchImpl(`${this.url}/auth/v1/verify`, {
+                method: 'POST',
+                headers: { apikey: this.apiKey, 'content-type': 'application/json' },
+                body: JSON.stringify({ type: 'magiclink', email: body['email'], token: body['otp'] }),
+            }).catch(() => { throw unreachable; });
+            const vbody = (await parseJsonSafe(vres));
+            if (!vres.ok || !vbody || typeof vbody['access_token'] !== 'string')
+                throw new AuthError('Operatör girişi şu anda kullanılamıyor.', vres.status);
+            const user = vbody['user'];
             return {
-                accessToken: String(body['accessToken']),
-                refreshToken: typeof body['refreshToken'] === 'string' ? body['refreshToken'] : null,
-                user: { id: String(user?.['id'] ?? ''), email: null, label: operatorLabel(body['person']) },
+                accessToken: String(vbody['access_token']),
+                refreshToken: typeof vbody['refresh_token'] === 'string' ? vbody['refresh_token'] : null,
+                user: { id: String(user?.['id'] ?? body['authUserId'] ?? ''), email: null, label: operatorLabel({ name: body['name'], employeeNo }) },
             };
         },
         signOut: async (session) => {
@@ -255,6 +275,22 @@ export class KmiNextClient {
         return again;
     }
     /** Calls a kmi_next.* RPC (the ONLY way this client ever mutates data). */
+    /** Yönetici PIN verme: Edge Function `badge-login` action `set_pin` (4 hane, sunucu doğrular). PIN hiçbir yerde loglanmaz. */
+    async managerSetPin(session, employeeNo, pin) {
+        if (!/^[0-9]{4}$/.test(pin))
+            throw new AuthError('PIN 4 rakamdan oluşmalıdır.', 400);
+        const res = await this.fetchImpl(`${this.url}/functions/v1/badge-login`, { method: 'POST',
+            headers: { apikey: this.apiKey, authorization: `Bearer ${session.accessToken}`, 'content-type': 'application/json' },
+            body: JSON.stringify({ action: 'set_pin', employeeNo, pin }) });
+        if (res.ok)
+            return;
+        const b = (await res.json().catch(() => ({})));
+        if (res.status === 422)
+            throw new AuthError(b.error === 'pin_reuse' ? 'Önceki PIN tekrar verilemez.' : 'PIN çok kolay (ardışık/tekrar). Başka bir PIN seçin.', 422);
+        if (res.status === 403)
+            throw new AuthError('Bu işlem için yönetici yetkisi gerekli.', 403);
+        throw new AuthError('PIN şu anda kaydedilemedi.', res.status);
+    }
     async rpc(fnName, args, session) {
         let res;
         try {

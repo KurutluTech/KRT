@@ -119,6 +119,7 @@ export async function renderOrdersScreen(container, api, banner) {
     }
     const screen = (h("div", { class: "orders-screen" },
         h("h1", { "data-testid": "orders-heading" }, "Sipari\u015Fler"),
+        h("a", { href: "#/pdf-siparis", "data-testid": "orders-pdf-import", style: "display:inline-block;margin:6px 0;color:#93c5fd;font-weight:700" }, "Yeni Sipari\u015F \u2192 PDF y\u00FCkle"),
         banner ? (h("div", { "data-testid": "banner", "data-kind": banner.kind }, banner.text)) : null,
         loadError ? (h("div", { "data-testid": "load-error" },
             "Sipari\u015F listesi y\u00FCklenemedi: ",

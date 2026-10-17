@@ -1,70 +1,79 @@
 // KMI-011 — Ürün Çalışma Alanı: ürün pasaportu + mühendislik kartları (kimlik, resim, CAD, CAM/NC, takım, BOM, rota/operasyon, parametre, kalite, hesap, geçmiş).
-// Aynı kanonik kaynaklara bağlanır (KMI-009/010); yetki, revizyon sınıfı, geçerlilik, hesap durumu SUNUCUDA. Boş değer 0 yazılmaz (VERİ YOK). Gerçek üretim ölçümü bu ekrandan değiştirilemez.
+// UX/UI turu: ortak `kx` tasarım standardı (kart, buton, input, rozet), özet üst bölüm, açılır düzenleme panelleri, dosya işlemleri (aç/önizle/indir/yeni sürüm/geçmiş), kompakt BOM tablosu,
+// okunur operasyon satırları, anlaşılır parametre kartı ve gerçek süre hesabı ekranı. Veri kaynakları ve sunucu kuralları DEĞİŞMEDİ: yetki, revizyon sınıfı, geçerlilik, hesap durumu SUNUCUDA.
+// ONE FACT → ONE SOURCE: kartlar kanonik kaynakları gösterir/düzenler; bağımsız kopya yok. Boş değer 0 yazılmaz (VERİ YOK). Gerçek üretim ölçümü bu ekrandan değiştirilemez.
 import { h, mount } from '../../../../packages/ui/src/h.js';
 import { CARD_STATE_TR, changeText } from '../../../../packages/domain/src/parameters.js';
+import { bytesToHex } from '../../../../packages/domain/src/documents.js';
 import { guessMime } from './DocumentsScreen.js';
 import { errorText } from '../errorText.js';
-const CSS = `
-.pw{font-family:system-ui,-apple-system,"Segoe UI",sans-serif;padding:12px;max-width:1100px;margin:0 auto;box-sizing:border-box;color:#e2e8f0}
-.pw h1{color:#fff;font-size:20px;margin:6px 0}.pw h2{color:#fff;font-size:16px;margin:0 0 6px}.pw h3{color:#cbd5e1;font-size:14px;margin:8px 0 4px}
-.pw button{min-height:44px;font-size:15px;font-weight:700;border-radius:10px;border:0;padding:0 14px;cursor:pointer}
-.pw input,.pw textarea,.pw select{min-height:44px !important;font-size:16px;border-radius:10px;border:1px solid #334155;background:#0f172a;color:#fff;padding:0 10px;box-sizing:border-box;width:100%}
-.pw textarea{padding:8px 10px;min-height:64px !important}.pw input[type=checkbox]{width:24px;min-height:24px !important}
-.pw .card{background:linear-gradient(180deg,#111c2e,#0f172a);border:1px solid #1e293b;border-radius:14px;padding:14px;margin:10px 0;overflow-wrap:anywhere}
-.pw .cards{display:grid;gap:10px;grid-template-columns:repeat(auto-fit,minmax(300px,1fr))}.pw .cards .card{margin:0}
-.pw .row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}.pw .row>*{min-width:0}.pw .grid{display:grid;gap:8px;margin-top:8px;grid-template-columns:repeat(auto-fit,minmax(150px,1fr))}
-.pw .primary{background:#1d4ed8;color:#fff}.pw .ghost{background:#1e293b;color:#e2e8f0}.pw .danger{background:#7f1d1d;color:#fecaca}
-.pw .chip{display:inline-block;padding:2px 9px;border-radius:999px;font-weight:800;font-size:11px;background:#1e293b;color:#e6edf7}
-.pw .ok{background:#14532d;color:#bbf7d0}.pw .warn{background:#78350f;color:#fde68a}.pw .bad{background:#7f1d1d;color:#fecaca}.pw .info{background:#1e3a8a;color:#dbeafe}
-.pw .card.bad{background:#0f172a;border-color:#b91c1c}.pw .card.info{background:#0f172a;border-color:#1d4ed8}.pw .card.ok{background:#0f172a;border-color:#15803d}
-.pw .mut{color:#94a3b8;font-size:12px}.pw label{font-size:12px;color:#94a3b8;display:block}.pw .op{border:1px solid #1e293b;border-radius:12px;padding:10px;margin:8px 0;background:#0b1220}
-.pw .op.off{opacity:.65}.pw .tw{overflow-x:auto}.pw table{border-collapse:collapse;width:100%;font-size:13px}.pw th,.pw td{border-bottom:1px solid #1e293b;padding:6px 8px;text-align:left}.pw th{color:#94a3b8}
-.pw a{color:#93c5fd}
+import { KX_CSS, NA, card, chip, emptyState, field, fmt, fold, fromBase64, invalid, isChecked, kvItem, showFile, toBase64, val, when } from '../kx.js';
+const PW_CSS = `
+.pw .opc{border:1px solid #1e293b;border-radius:12px;background:#0b1220;margin-top:8px;min-width:0}.pw .opc.open{border-color:#1d4ed8}.pw .opc.off{opacity:.65}
+.pw .opr{display:grid;gap:6px 14px;align-items:center;padding:10px 12px;grid-template-columns:62px minmax(0,1.7fr) minmax(0,.9fr) 78px 78px 84px minmax(0,.9fr) auto;min-width:0}
+.pw .opr>*{min-width:0;overflow-wrap:anywhere}.pw .opr .code{font-weight:800;color:#fff}.pw .opr .nm{font-weight:600;color:#fff}.pw .opr .num{font-variant-numeric:tabular-nums}.pw .opr .u{color:#94a3b8;font-size:11px}
+.pw .oph{padding:6px 12px 0;font-size:11px;letter-spacing:.04em;text-transform:uppercase;color:#94a3b8;font-weight:700;display:grid;gap:6px 14px;grid-template-columns:62px minmax(0,1.7fr) minmax(0,.9fr) 78px 78px 84px minmax(0,.9fr) auto}
+.pw .opr .acts,.pw .oph .acts{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}
+.pw .opx{padding:0 12px 10px;display:flex;flex-direction:column;gap:6px}.pw .opx .l{font-size:12px;color:#94a3b8;display:flex;flex-wrap:wrap;gap:4px 14px}.pw .opx .l b{color:#cbd5e1}
+.pw .opb{border-top:1px solid #1e293b;padding:12px}
+.pw .cl{display:none;font-size:11px;color:#94a3b8;margin-right:4px}
+@media (max-width:1100px){.pw .oph{display:none}.pw .opr{grid-template-columns:1fr 1fr;gap:6px 12px}.pw .opr .nm,.pw .opr .c-machine,.pw .opr .c-cam,.pw .opr .acts{grid-column:1/-1}.pw .opr .acts{justify-content:flex-start}.pw .cl{display:inline}}
+.pw .head-name{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.pw .bomg{grid-template-columns:minmax(0,2fr) minmax(0,1fr) minmax(0,1fr) minmax(0,1fr) auto}
+.pw .docg{grid-template-columns:minmax(0,1fr) auto}
+.pw .parg{grid-template-columns:minmax(0,1.3fr) repeat(3,minmax(0,1fr)) auto}
+.pw .pcell{display:flex;flex-direction:column;gap:1px;align-items:flex-start}.pw .pcell .cl{display:none}.pw .pcell .linkbtn{min-height:24px;padding:0;font-size:12px}
+@media (max-width:900px){.pw .pcell{flex-direction:row;flex-wrap:wrap;gap:4px 10px;align-items:center}.pw .pcell .cl{display:inline;min-width:120px}}
+.pw .calcg{grid-template-columns:minmax(0,1.3fr) repeat(4,minmax(0,.8fr)) minmax(0,1.4fr)}
+.pw .prevg{grid-template-columns:auto minmax(0,.7fr) minmax(0,.8fr) minmax(0,1fr) auto}
+.pw .prodg{grid-template-columns:110px minmax(0,2fr) 140px auto}
 `;
-const NA = 'VERİ YOK';
-const STATE_CLS = { MISSING: 'bad', DRAFT: 'info', APPROVED: 'ok', INVALID: 'warn' };
+const STATE_TONE = { MISSING: 'bad', DRAFT: 'info', APPROVED: 'ok', INVALID: 'warn' };
 const REV_TR = { DRAFT: 'Taslak', RELEASED: 'Yürürlükte', OBSOLETE: 'Eski' };
 const CALC_TR = { CURRENT: 'Güncel', STALE: 'Eskimiş', SUPERSEDED: 'Yenilendi' };
-const CALC_CLS = { CURRENT: 'ok', STALE: 'warn', SUPERSEDED: '' };
+const CALC_TONE = { CURRENT: 'ok', STALE: 'warn', SUPERSEDED: 'off' };
 const KIND_TR = { FIXTURE: 'Fikstür', TOOL: 'Takım', GAUGE: 'Mastar/Ölçü', RESOURCE: 'Kaynak', FIRST_PIECE: 'İlk parça', IN_PROCESS: 'Proses içi', FINAL: 'Son kontrol' };
 const DOC_TR = { DRAWING: 'Teknik resim', CAD_MODEL: 'CAD/STEP', NC_PROGRAM: 'NC programı', CAM_SETUP_SHEET: 'CAM setup', TOOL_LIST: 'Takım listesi', CONTROL_PLAN: 'Kontrol planı', WORK_INSTRUCTION: 'İş talimatı' };
 const CTL_TR = { DRAFT: 'Taslak', IN_REVIEW: 'İncelemede', APPROVED: 'Onaylandı', EFFECTIVE: 'Yürürlükte', SUPERSEDED: 'Geçersiz', REJECTED: 'Reddedildi' };
-const val = (x) => x.value;
-const checked = (x) => x.checked;
-const n = (v) => (v === null || v === undefined ? NA : v.toLocaleString('tr-TR', { maximumFractionDigits: 3 }));
+const CTL_TONE = { DRAFT: 'info', IN_REVIEW: 'warn', APPROVED: 'warn', EFFECTIVE: 'ok', SUPERSEDED: 'bad', REJECTED: 'bad' };
+const PARAMS = [
+    { code: 'OP_SETUP_MIN', name: 'Hazırlık süresi', unit: 'dk', src: 'Rota standardı' }, { code: 'OP_CYCLE_SEC', name: 'Çevrim süresi', unit: 'sn/adet', src: 'Rota standardı' }, { code: 'OP_INSPECTION_SEC', name: 'Muayene süresi', unit: 'sn/adet', src: 'Kalite standardı' }
+];
+const OWNER_TR = { ROUTING: 'Rota (Mühendislik)', QUALITY: 'Kalite', PRODUCTION: 'Üretim' };
 const num = (s) => { const t = s.trim().replace(',', '.'); if (t === '')
     return null; const x = Number(t); return Number.isFinite(x) ? x : null; };
-const when = (s) => (s ? s.slice(0, 16).replace('T', ' ') : '—');
 const isoToday = () => new Date().toLocaleDateString('sv-SE', { timeZone: 'Europe/Istanbul' });
-function toBase64(bytes) { let s = ''; for (let i = 0; i < bytes.length; i += 0x8000)
-    s += String.fromCharCode(...bytes.subarray(i, i + 0x8000)); return btoa(s); }
+const E = (tag, props = null, ...kids) => h(tag, props, ...kids);
+const btn = (cls, testid, text, fn, extra = {}) => E('button', { class: cls, type: 'button', ...(testid ? { 'data-testid': testid } : {}), onClick: fn, ...extra }, text);
+const lbl = (t, _v = '') => E('span', { class: 'cl' }, t);
 export async function renderProductWorkspaceScreen(container, api, state = {}) {
     const go = (s) => renderProductWorkspaceScreen(container, api, s);
-    const shell = (...kids) => mount(container, h('div', { class: 'pw', 'data-testid': 'pw-root' }, h('style', {}, CSS), ...kids));
-    const banner = state.banner ? h('div', { class: `card ${state.banner.kind === 'error' ? 'bad' : state.banner.kind === 'ok' ? 'ok' : 'info'}`, 'data-testid': 'pw-banner', 'data-kind': state.banner.kind }, state.banner.text) : null;
+    const shell = (...kids) => mount(container, h('div', { class: 'kx pw', 'data-testid': 'pw-root' }, h('style', {}, KX_CSS + PW_CSS), ...kids));
+    const banner = state.banner ? E('div', { class: `banner ${state.banner.kind === 'error' ? 'bad' : state.banner.kind === 'ok' ? 'ok' : ''}`, 'data-testid': 'pw-banner', 'data-kind': state.banner.kind, role: state.banner.kind === 'error' ? 'alert' : 'status' }, state.banner.text) : null;
     const fail = (e) => {
         const text = errorText(e);
         let b = container.querySelector('[data-testid="pw-banner"]');
         if (!b) {
             const root = container.querySelector('[data-testid="pw-root"]');
-            b = h('div', { class: 'card bad', 'data-testid': 'pw-banner', 'data-kind': 'error' });
+            b = E('div', { class: 'banner bad', 'data-testid': 'pw-banner', 'data-kind': 'error', role: 'alert' });
             const first = root ? [...root.children].find((c) => c.tagName !== 'STYLE') : null;
             if (root)
                 root.insertBefore(b, first ?? null);
         }
         b.textContent = text;
-        b.className = 'card bad';
+        b.className = 'banner bad';
         b.setAttribute('data-kind', 'error');
         try {
             b.scrollIntoView?.({ block: 'nearest' });
         }
         catch { /* headless */ }
     };
-    const chip = (s) => h('span', { class: `chip ${STATE_CLS[s]}`, 'data-state': s }, CARD_STATE_TR[s]);
+    const stateChip = (s) => chip(CARD_STATE_TR[s], STATE_TONE[s], { 'data-state': s });
     const reasonBox = (tid, ph = 'Gerekçe (en az 10 karakter)') => h('input', { 'data-testid': tid, placeholder: ph, maxlength: 400 });
     if (!state.product)
         return renderHome();
     return renderWorkspace(state.product);
+    // ------------------------------------------------------------------------------------------------ ürün listesi
     async function renderHome() {
         let rows = [];
         try {
@@ -73,11 +82,12 @@ export async function renderProductWorkspaceScreen(container, api, state = {}) {
         catch (e) {
             state = { ...state, banner: { kind: 'error', text: errorText(e) } };
         }
-        const q = h('input', { 'data-testid': 'pw-search', placeholder: 'Ürün kodu / adı', value: state.q ?? '' });
+        const q = h('input', { 'data-testid': 'pw-search', placeholder: 'Ürün kodu veya adı', value: state.q ?? '' });
         q.addEventListener('keydown', (ev) => { if (ev.key === 'Enter')
             void go({ q: val(q) }); });
-        shell(h('h1', {}, 'Ürün Çalışma Alanı'), state.banner ? h('div', { class: 'card bad', 'data-testid': 'pw-banner', 'data-kind': 'error' }, state.banner.text) : null, h('div', { class: 'card' }, h('div', { class: 'row' }, q, h('button', { class: 'primary', type: 'button', 'data-testid': 'pw-search-go', onClick: () => void go({ q: val(q) }) }, 'Ara')), h('div', { class: 'mut' }, 'Ürünün resim, CAD, CAM/NC, takım, BOM, rota, operasyon, süre, kalite ve değişiklik geçmişi tek yerde.')), ...rows.map((r) => h('div', { class: 'card row', 'data-testid': 'pw-product', 'data-code': r.code }, h('b', {}, r.code), h('span', {}, r.name), h('span', { class: 'mut' }, r.currentRevision ? `Rev ${r.currentRevision}` : 'revizyon yok'), h('button', { class: 'ghost', type: 'button', 'data-testid': `pw-open-${r.code}`, onClick: () => void go({ product: r.id }) }, 'Aç'))));
+        shell(E('div', { class: 'page-head' }, E('div', { class: 'ttl' }, h('h1', {}, 'Ürün Çalışma Alanı'), E('div', { class: 'mut' }, 'Ürünün resim, CAD, CAM/NC, takım, BOM, rota, süre, kalite ve değişiklik geçmişi tek yerde.'))), state.banner ? E('div', { class: 'banner bad', 'data-testid': 'pw-banner', 'data-kind': 'error', role: 'alert' }, state.banner.text) : null, card({ title: 'Ürün ara', span: 12 }, E('div', { class: 'row' }, E('div', { class: 'grow' }, q), btn('primary', 'pw-search-go', 'Ara', () => void go({ q: val(q) })))), E('div', { style: 'height:14px' }), card({ title: `Ürünler${rows.length ? ` (${rows.length})` : ''}`, span: 12 }, rows.length ? E('div', { class: 'rows' }, ...rows.map((r) => E('div', { class: 'r prodg', 'data-testid': 'pw-product', 'data-code': r.code }, E('b', {}, r.code), E('span', {}, r.name), E('span', { class: 'mut' }, r.currentRevision ? `Rev ${r.currentRevision}` : 'revizyon yok'), E('div', { class: 'acts' }, E('a', { class: 'btn ghost', href: `#/pasaport-calisma?tur=PRODUCT&id=${r.id}`, 'data-testid': 'pw-card-link' }, 'Dijital kart'), btn('ghost', `pw-open-${r.code}`, 'Aç', () => void go({ product: r.id })))))) : emptyState('Eşleşen ürün yok', 'Kodun veya adın bir bölümünü yazıp tekrar deneyin.')));
     }
+    // ------------------------------------------------------------------------------------------------ çalışma alanı
     async function renderWorkspace(productId) {
         let ws;
         let machines = [];
@@ -96,32 +106,113 @@ export async function renderProductWorkspaceScreen(container, api, state = {}) {
         const rev = ws.revision;
         const can = ws.can;
         const editable = !!rev && rev.status !== 'OBSOLETE';
-        const reload = (text, kind = 'ok', extra = {}) => go({ product: productId, rev: rev?.id ?? null, openOp: state.openOp, qty: state.qty, ...extra, banner: text ? { kind, text } : undefined });
-        const revSel = h('select', { 'data-testid': 'pw-rev' }, ...ws.revisions.map((r) => h('option', { value: r.id, selected: r.id === rev?.id }, `Rev ${r.revision} · ${REV_TR[r.status] ?? r.status}`)));
+        let openOp = state.openOp ?? null;
+        const reload = async (text, kind = 'ok', extra = {}) => {
+            const y = window.scrollY;
+            await go({ product: productId, rev: rev?.id ?? null, openOp, qty: state.qty, ...extra, banner: text ? { kind, text } : undefined });
+            try {
+                window.scrollTo(0, y);
+            }
+            catch { /* headless */ }
+        };
+        const scrollTo = (el) => { try {
+            el?.scrollIntoView?.({ block: 'nearest', behavior: 'smooth' });
+        }
+        catch { /* headless */ } };
+        const revSel = h('select', { 'data-testid': 'pw-rev', 'aria-label': 'Revizyon' }, ...ws.revisions.map((r) => h('option', { value: r.id, selected: r.id === rev?.id }, `Rev ${r.revision} · ${REV_TR[r.status] ?? r.status}`)));
         revSel.addEventListener('change', () => void go({ product: productId, rev: val(revSel) }));
-        // ---------------------------------------------------------------------------------------- document cards (resim / CAD / CAM / takım / kalite dokümanları)
-        const docCard = (tid, title, card, docType) => {
-            const st = (card?.state ?? 'MISSING');
-            const file = h('input', { type: 'file', 'data-testid': `pw-${tid}-file` });
-            const note = h('input', { 'data-testid': `pw-${tid}-note`, placeholder: 'Not / değişiklik (isteğe bağlı)' });
-            const upload = async () => {
-                const f = file.files?.[0];
-                if (!f || !rev)
-                    return fail(new Error('CONTENT_REQUIRED'));
+        // ---------------------------------------------------------------------------------------- doküman kartları (resim / CAD / CAM / takım): dosya yönetimi
+        const docCard = (tid, title, card0, docType, multi = false, span = 6) => {
+            const st = (card0?.state ?? 'MISSING');
+            const docs = card0?.documents ?? [];
+            const viewHost = E('div', { class: 'fileview', 'data-testid': `pw-${tid}-view`, style: 'margin-top:10px' });
+            const formHost = E('div', { 'data-testid': `pw-${tid}-formhost` });
+            const canUpload = !!(can.manageDocuments && editable);
+            const view = async (d, download) => {
+                viewHost.replaceChildren();
                 try {
-                    const bytes = new Uint8Array(await f.arrayBuffer());
-                    const existing = card?.documents.find((d) => d.docType === docType);
-                    const r = await api.upload({ docType: docType, entityType: 'PRODUCT_REVISION', entityId: rev.id, title: existing ? null : `${title} ${ws.product.code}`, fileName: f.name, mimeType: guessMime(f.name, f.type), contentBase64: toBase64(bytes), validUntil: null, note: val(note).trim() || null, documentId: existing?.id ?? null });
-                    await reload(`Yüklendi: sürüm ${r.versionNo} — TASLAK. Üretimde geçerli olması için Doküman Kontrol'den onay ve yürürlüğe alma gerekir.`);
+                    const f = await api.documentFile(d.id);
+                    const bytes = fromBase64(f.content.contentBase64);
+                    const local = bytesToHex(await crypto.subtle.digest('SHA-256', bytes));
+                    const ok = f.content.integrityOk && local === f.content.sha256;
+                    viewHost.append(E('div', { class: `banner ${ok ? (f.effective ? 'ok' : '') : 'bad'}`, 'data-testid': `pw-${tid}-integrity`, 'data-ok': String(ok) }, ok ? `${f.content.fileName} · sürüm v${f.versionNo} · ${f.effective ? 'YÜRÜRLÜKTE' : 'yürürlükte değil — üretimde kullanmayın'} · bütünlük doğrulandı (${f.content.sha256.slice(0, 12)}…)` : 'BÜTÜNLÜK HATASI — dosya bozuk, KULLANMAYIN'));
+                    if (!ok)
+                        return;
+                    showFile(viewHost, { bytes, mime: f.content.mimeType, fileName: f.content.fileName, download, testids: { frame: `pw-${tid}-frame`, img: `pw-${tid}-img`, text: `pw-${tid}-text`, link: `pw-${tid}-dl`, none: `pw-${tid}-nopreview` } });
+                    if (!download)
+                        viewHost.append(btn('ghost sm', null, 'Önizlemeyi kapat', () => viewHost.replaceChildren(), { style: 'margin-top:8px' }));
                 }
                 catch (e) {
                     fail(e);
                 }
             };
-            return h('div', { class: 'card', 'data-testid': `pw-card-${tid}`, 'data-state': st }, h('div', { class: 'row' }, h('h2', {}, title), chip(st)), ...(card?.documents ?? []).map((d) => h('div', { class: 'row', 'data-testid': 'pw-doc', 'data-doc-no': d.docNo ?? '' }, h('b', {}, d.docNo ?? '—'), h('span', {}, DOC_TR[d.docType] ?? d.docType), h('span', { class: `chip ${d.controlState === 'EFFECTIVE' ? 'ok' : ''}` }, CTL_TR[d.controlState ?? ''] ?? '—'), h('span', { class: 'mut' }, `v${d.versionNo ?? '—'}${d.effectiveVersionNo ? ` · yürürlükte v${d.effectiveVersionNo}` : ''}`), d.opNos.length ? h('span', { class: 'mut' }, `OP${d.opNos.join(', OP')}`) : null)), st === 'MISSING' ? h('div', { class: 'mut' }, `${NA} — bu revizyonda ${title.toLowerCase()} yok`) : null, docType && can.manageDocuments && editable ? h('div', { class: 'row', style: 'margin-top:8px' }, file, note, h('button', { class: 'ghost', type: 'button', 'data-testid': `pw-${tid}-upload`, onClick: () => void upload() }, 'Yükle (TASLAK)')) : null, h('div', { class: 'mut' }, h('a', { href: '#/dokuman-kontrol' }, 'Doküman Kontrol: onay, yürürlük, geçmiş')));
+            const openForm = (target) => {
+                if (formHost.childElementCount) {
+                    formHost.replaceChildren();
+                    if (!target && formHost.dataset.target === '')
+                        return;
+                }
+                formHost.dataset.target = target?.id ?? '';
+                const file = h('input', { type: 'file', 'data-testid': `pw-${tid}-file` });
+                const note = h('input', { 'data-testid': `pw-${tid}-note`, placeholder: target ? 'Bu sürümde ne değişti? (isteğe bağlı)' : 'Not (isteğe bağlı)' });
+                const ttl = multi && !target ? h('input', { 'data-testid': `pw-${tid}-title`, placeholder: 'Program adı (ör. OP10 tornalama)' }) : null;
+                const upload = async () => {
+                    const f = file.files?.[0];
+                    if (!f || !rev) {
+                        invalid(file, true);
+                        return fail(new Error('CONTENT_REQUIRED'));
+                    }
+                    try {
+                        const bytes = new Uint8Array(await f.arrayBuffer());
+                        const r = await api.upload({ docType, entityType: 'PRODUCT_REVISION', entityId: rev.id, title: target ? null : ((ttl && val(ttl).trim()) || `${title} ${ws.product.code}`), fileName: f.name, mimeType: guessMime(f.name, f.type), contentBase64: toBase64(bytes), validUntil: null, note: val(note).trim() || null, documentId: target?.id ?? null });
+                        await reload(`Yüklendi: sürüm ${r.versionNo} — TASLAK. Üretimde geçerli olması için Doküman Kontrol'den onay ve yürürlüğe alma gerekir.`);
+                    }
+                    catch (e) {
+                        fail(e);
+                    }
+                };
+                formHost.append(E('div', { class: 'formbox' }, E('div', { class: 'mut' }, target ? `${target.docNo ?? ''} için YENİ SÜRÜM: eski sürüm silinmez ve yürürlükteki sürüm değişmez; yeni dosya TASLAK olarak eklenir.` : 'Yeni doküman TASLAK olarak eklenir; onay ve yürürlüğe alma Doküman Kontrol’dedir.'), E('div', { class: 'fgrid w2' }, ...(ttl ? [field('Program adı', ttl)] : []), field('Dosya', file), field('Not', note)), E('div', { class: 'row' }, btn('primary', `pw-${tid}-upload`, 'Yükle (TASLAK)', () => void upload()), btn('ghost', null, 'Vazgeç', () => formHost.replaceChildren()))));
+            };
+            const docRow = (d) => E('div', { class: 'r docg', 'data-testid': 'pw-doc', 'data-doc-no': d.docNo ?? '' }, E('div', { class: 'stack', style: 'gap:3px' }, E('div', { class: 'row', style: 'gap:6px' }, E('b', {}, d.docNo ?? '—'), chip(CTL_TR[d.controlState ?? ''] ?? '—', CTL_TONE[d.controlState ?? ''] ?? ''), E('span', { class: 'mut' }, `v${d.versionNo ?? '—'}${d.effectiveVersionNo ? ` · yürürlükte v${d.effectiveVersionNo}` : ''}`)), E('div', {}, d.title), E('div', { class: 'mut' }, `${DOC_TR[d.docType] ?? d.docType}${d.fileName ? ` · ${d.fileName}` : ''}${d.opNos.length ? ` · OP${d.opNos.join(', OP')}` : ''}`)), E('div', { class: 'acts' }, btn('ghost sm', 'pw-doc-open', 'Önizle', () => void view(d, false)), btn('ghost sm', 'pw-doc-dl', 'İndir', () => void view(d, true)), h('a', { class: 'btn ghost sm', href: `#/dokuman-kontrol?doc=${d.id}`, 'data-testid': 'pw-doc-history' }, 'Geçmiş'), canUpload ? btn('ghost sm', `pw-${tid}-newver-${d.docNo ?? ''}`, 'Yeni sürüm', () => openForm(d)) : null));
+            const addBtn = canUpload && (docs.length === 0 || multi) ? btn(docs.length ? 'ghost sm' : 'primary sm', `pw-${tid}-open-upload`, docs.length ? '+ Yeni program' : 'Dosya yükle', () => openForm(null)) : null;
+            return card({ title, span, testid: `pw-card-${tid}`, chip: stateChip(st), attrs: { 'data-state': st }, actions: [addBtn] }, docs.length ? E('div', { class: 'rows' }, ...docs.map(docRow)) : emptyState(`${NA} — bu revizyonda ${title.toLowerCase()} yok`, canUpload ? 'İlk dosyayı “Dosya yükle” ile ekleyin.' : 'Yükleme yetkiniz yok ya da revizyon kapalı.'), formHost, viewHost);
         };
-        // ---------------------------------------------------------------------------------------- routing
+        // ---------------------------------------------------------------------------------------- rota ve operasyonlar
         const activeOps = ws.routing.filter((o) => o.active);
+        const quickReason = reasonBox('pw-quick-reason', 'Gerekçe (en az 10 karakter)');
+        const prompt0 = () => { const v = val(quickReason).trim(); if (v.length < 10) {
+            invalid(quickReason, true);
+            fail(new Error('REASON_REQUIRED: gerekçe en az 10 karakter'));
+            return null;
+        } invalid(quickReason, false); return v; };
+        const paramHistHost = E('div', { 'data-testid': 'pw-param-history', style: 'margin-top:10px' });
+        const showParam = async (o, code) => {
+            try {
+                paramHistHost.replaceChildren();
+                if (code === 'OP_INSPECTION_SEC') {
+                    const ph = await api.parameterHistory(code, o.id);
+                    if (!ph.versions.length)
+                        paramHistHost.append(emptyState(`${NA} — ${o.opCode} muayene süresi için hiç değer girilmemiş`));
+                    else
+                        paramHistHost.append(E('div', { class: 'kx-sub' }, E('b', {}, `${o.opCode} · ${ph.def.name} geçmişi`), E('div', { class: 'rows' }, ...ph.versions.map((v) => E('div', { class: 'r prevg', 'data-testid': 'pw-param-row' }, E('b', {}, `v${v.versionNo}`), E('span', {}, changeText(v.prevValue, v.value, ph.def.unit)), E('span', { class: 'mut' }, `${v.validFrom}${v.validTo ? ' → ' + v.validTo : ' →'}`), E('span', { class: 'mut' }, `${v.setBy ?? '—'} · ${v.reason}`), v.inForce ? chip('Yürürlükte', 'ok') : E('span', {}))))));
+                }
+                else {
+                    const rows = await api.opHistory(o.id);
+                    const setup = code === 'OP_SETUP_MIN';
+                    const unit = setup ? 'dk' : 'sn';
+                    paramHistHost.append(E('div', { class: 'kx-sub' }, E('b', {}, `${o.opCode} · ${setup ? 'Hazırlık' : 'Çevrim'} süresi geçmişi`), E('div', { class: 'rows' }, ...rows.map((r, i) => {
+                        const prev = rows[i + 1];
+                        const cur = setup ? r.setupMinutes : r.cycleSeconds;
+                        const was = prev ? (setup ? prev.setupMinutes : prev.cycleSeconds) : undefined;
+                        return E('div', { class: 'r prevg', 'data-testid': 'pw-param-row' }, E('b', {}, `v${r.versionNo}`), E('span', {}, prev ? changeText(was, cur, unit) : `${fmt(cur)} ${unit}`), E('span', { class: 'mut' }, when(r.at)), E('span', { class: 'mut' }, `${r.by ?? '—'} · ${r.reason ?? '—'}`), E('span', {}));
+                    }))));
+                }
+                scrollTo(paramHistHost);
+            }
+            catch (e) {
+                fail(e);
+            }
+        };
         const opEditor = (o) => {
             const op = o;
             const structural = !op || !op.active;
@@ -139,10 +230,15 @@ export async function renderProductWorkspaceScreen(container, api, state = {}) {
             ins.value = op?.instructions ?? '';
             const reason = reasonBox('pw-op-reason');
             const save = async () => {
-                const ids = mach.filter((x) => checked(x.box)).map((x) => x.m.id);
+                const ids = mach.filter((x) => isChecked(x.box)).map((x) => x.m.id);
                 const setupV = num(val(setup));
                 const cycleV = num(val(cycle));
                 const no = Number(val(noIn));
+                if (!val(name).trim()) {
+                    invalid(name, true);
+                    return fail(new Error('Eksik alan: operasyon adı'));
+                }
+                invalid(name, false);
                 const diffs = [];
                 if (op) {
                     if (setupV !== op.setupMinutes)
@@ -154,15 +250,54 @@ export async function renderProductWorkspaceScreen(container, api, state = {}) {
                 }
                 try {
                     const r = await api.saveOperation({ revisionId: rev.id, opNo: no, name: val(name).trim(), machineIds: ids, primaryId: val(primary) || null, skillCode: val(skill).trim() || null, skillLevel: num(val(level)),
-                        camId: op?.camProgramId ?? null, setup: setupV, cycle: cycleV, firstPiece: checked(fp), qc: checked(qc), instructions: val(ins).trim() || null, reason: val(reason).trim() });
+                        camId: op?.camProgramId ?? null, setup: setupV, cycle: cycleV, firstPiece: isChecked(fp), qc: isChecked(qc), instructions: val(ins).trim() || null, reason: val(reason).trim() });
+                    openOp = r.operationId;
                     await reload(`${r.opCode} ${r.created ? 'eklendi' : 'kaydedildi'} (sürüm ${r.versionNo}).${diffs.length ? ' ' + diffs.join(' · ') + '.' : ''}${r.recalculatedRuns ? ` ${r.recalculatedRuns} etkilenen hesap yeniden değerlendirildi (eski hesaplar korunur).` : ''}`, 'ok', { openOp: r.operationId });
                 }
                 catch (e) {
                     fail(e);
                 }
             };
-            return h('div', { class: 'op', 'data-testid': op ? 'pw-op-edit' : 'pw-op-new' }, h('div', { class: 'grid' }, h('div', {}, h('label', {}, 'Operasyon no'), noIn), h('div', {}, h('label', {}, 'Ad'), name), h('div', {}, h('label', {}, 'Hazırlık (dk)'), setup), h('div', {}, h('label', {}, 'Çevrim (sn/adet)'), cycle), h('div', {}, h('label', {}, 'Yeterlilik'), skill), h('div', {}, h('label', {}, 'Seviye (1-5)'), level), h('div', {}, h('label', {}, 'Öncelikli makine'), primary)), h('h3', {}, 'İzinli makineler'), h('div', { class: 'row' }, ...mach.map((x) => h('label', { class: 'row', style: 'color:#e2e8f0;font-size:14px' }, x.box, x.m.code))), h('div', { class: 'row', style: 'margin-top:6px' }, h('label', { class: 'row', style: 'color:#e2e8f0;font-size:14px' }, fp, 'İlk parça kontrolü şart'), h('label', { class: 'row', style: 'color:#e2e8f0;font-size:14px' }, qc, 'Kalite kontrolü şart')), h('div', { style: 'margin-top:6px' }, ins), !can.editStructure && structural ? h('div', { class: 'mut' }, 'Yeni operasyon eklemek için taslak revizyon gerekir.') : null, h('div', { class: 'row', style: 'margin-top:8px' }, reason, h('button', { class: 'primary', type: 'button', 'data-testid': 'pw-op-save', onClick: () => void save() }, 'Kaydet ve etkilenen hesapları yeniden değerlendir')));
+            return E('div', { class: 'stack', 'data-testid': op ? 'pw-op-edit' : 'pw-op-new' }, E('fieldset', { class: 'fsec' }, h('legend', {}, 'Genel'), E('div', { class: 'fgrid' }, field('Operasyon no', noIn), field('Ad', name), field('Öncelikli makine', primary), field('Yeterlilik', skill), field('Seviye (1-5)', level))), E('fieldset', { class: 'fsec' }, h('legend', {}, 'Süreler'), E('div', { class: 'fgrid' }, field('Hazırlık (dk)', setup), field('Çevrim (sn/adet)', cycle))), E('fieldset', { class: 'fsec' }, h('legend', {}, 'İzinli makineler'), E('div', { class: 'row', style: 'gap:4px 16px' }, ...mach.map((x) => h('label', { class: 'chk' }, x.box, x.m.code))), machines.length ? null : E('div', { class: 'mut' }, 'Makine listesi okunamadı.')), E('div', { class: 'row', style: 'gap:4px 20px' }, h('label', { class: 'chk' }, fp, 'İlk parça kontrolü şart'), h('label', { class: 'chk' }, qc, 'Kalite kontrolü şart')), field('Operatör talimatı', ins), !can.editStructure && structural ? E('div', { class: 'mut' }, 'Yeni operasyon eklemek için taslak revizyon gerekir.') : null, E('div', { class: 'row', style: 'align-items:flex-end' }, E('div', { class: 'grow' }, field('Değişiklik gerekçesi', reason, 'Her kayıt sürümlenir; eski hâli korunur.')), btn('primary', 'pw-op-save', 'Kaydet', () => void save())));
         };
+        const opExtras = (o) => {
+            const insp = h('input', { 'data-testid': 'pw-insp-value', inputmode: 'decimal', placeholder: 'sn/adet', value: o.inspectionSeconds != null ? String(o.inspectionSeconds) : '' });
+            const from = h('input', { 'data-testid': 'pw-insp-from', type: 'date', value: isoToday(), min: isoToday() });
+            const preason = reasonBox('pw-insp-reason');
+            const resKind = h('select', { 'data-testid': 'pw-res-kind' }, ...['FIXTURE', 'TOOL', 'GAUGE', 'RESOURCE'].map((k) => h('option', { value: k }, KIND_TR[k])));
+            const resCode = h('input', { 'data-testid': 'pw-res-code', placeholder: 'Kod (ör. T12)' });
+            const qcNo = h('input', { 'data-testid': 'pw-qc-no', type: 'number', min: 1, placeholder: 'No' });
+            const qcLabel = h('input', { 'data-testid': 'pw-qc-label', placeholder: 'Kontrol (ör. Çap Ø20 H7)' });
+            const plans = ws.quality.filter((q) => q.operationNo === null || q.operationNo === o.opNo);
+            const qcPlan = h('select', { 'data-testid': 'pw-qc-plan' }, h('option', { value: '' }, '— kontrol planı seçilmedi —'), ...plans.map((q) => h('option', { value: q.id }, `${q.operationNo != null ? 'OP' + q.operationNo : 'Genel'} v${q.version} (${q.status}) · ${q.characteristics} karakteristik`)));
+            const qcKind = h('select', { 'data-testid': 'pw-qc-kind' }, ...['FIRST_PIECE', 'IN_PROCESS', 'FINAL'].map((k) => h('option', { value: k }, KIND_TR[k])));
+            const depSel = h('select', { 'data-testid': 'pw-dep-sel' }, h('option', { value: '' }, '— ön koşul operasyon —'), ...activeOps.filter((x) => x.opNo < o.opNo && !o.dependsOn.some((d) => d.operationId === x.id)).map((x) => h('option', { value: x.id }, x.opCode)));
+            const act = async (fn, text) => { const why = prompt0(); if (why === null)
+                return; try {
+                await fn();
+                await reload(text, 'ok', { openOp: o.id });
+            }
+            catch (e) {
+                fail(e);
+            } };
+            const setInsp = async () => {
+                const v = num(val(insp));
+                if (v === null) {
+                    invalid(insp, true);
+                    return fail(new Error('VALUE_OUT_OF_RANGE'));
+                }
+                invalid(insp, false);
+                try {
+                    const r = await api.setParameter('OP_INSPECTION_SEC', o.id, v, val(from) || null, null, val(preason).trim());
+                    await reload(`Muayene süresi ${o.opCode}: ${changeText(r.oldValue, r.newValue, 'sn')} (sürüm ${r.versionNo}, ${r.validFrom} itibarıyla). Eski hesaplar eski parametre sürümüyle korunur; etkilenenler "Eskimiş" görünür.`, 'ok', { openOp: o.id });
+                }
+                catch (e) {
+                    fail(e);
+                }
+            };
+            return E('div', { class: 'stack' }, E('fieldset', { class: 'fsec', 'data-testid': 'pw-insp-box' }, h('legend', {}, 'Muayene süresi (parametre)'), E('div', { class: 'fgrid' }, field('Değer (sn/adet)', insp), field('Geçerlilik başlangıcı', from)), E('div', { style: 'margin-top:10px' }, field('Gerekçe', preason)), E('div', { class: 'row', style: 'margin-top:10px' }, btn('primary', 'pw-insp-save', 'Parametreyi kaydet', () => void setInsp()), btn('ghost', 'pw-param-hist-btn', 'Parametre geçmişi', () => void showParam(o, 'OP_INSPECTION_SEC')))), E('fieldset', { class: 'fsec' }, h('legend', {}, 'Kaynak / fikstür / takım'), E('div', { class: 'row' }, E('div', { style: 'width:150px' }, resKind), E('div', { style: 'width:150px' }, resCode), btn('ghost', 'pw-res-add', 'Ekle', () => void act(() => api.setResource(o.id, val(resKind), val(resCode).trim(), null, null, null, true, val(quickReason).trim()), 'Kaynak eklendi.'))), o.resources.length ? E('div', { class: 'row', style: 'margin-top:8px' }, ...o.resources.map((r) => btn('ghost sm', `pw-res-del-${r.code}`, `✕ ${KIND_TR[r.kind] ?? r.kind} ${r.code}`, () => void act(() => api.setResource(o.id, r.kind, r.code, r.label, r.qty, r.note, false, val(quickReason).trim()), `${r.code} kaldırıldı.`)))) : null), E('fieldset', { class: 'fsec' }, h('legend', {}, 'Kalite kontrol noktaları'), E('div', { class: 'fgrid' }, field('No', qcNo), field('Kontrol', qcLabel), field('Tür', qcKind), field('Kontrol planı', qcPlan)), E('div', { class: 'row', style: 'margin-top:10px' }, btn('ghost', 'pw-qc-add', 'Ekle / güncelle', () => void act(() => api.setQcPoint(o.id, Number(val(qcNo)), val(qcLabel).trim(), val(qcKind), val(qcPlan) || null, null, true, val(quickReason).trim()), 'Kalite noktası kaydedildi.')))), ...(can.editStructure ? [E('fieldset', { class: 'fsec' }, h('legend', {}, 'Bağımlılık (ön koşul)'), E('div', { class: 'row' }, E('div', { style: 'width:200px' }, depSel), btn('ghost', 'pw-dep-add', 'Ekle', () => void act(() => api.setDependency(o.id, val(depSel), true, val(quickReason).trim()), 'Bağımlılık eklendi.')), ...o.dependsOn.map((d) => btn('ghost sm', null, `✕ ${d.opCode}`, () => void act(() => api.setDependency(o.id, d.operationId, false, val(quickReason).trim()), `${d.opCode} bağımlılığı kaldırıldı.`)))))] : []));
+        };
+        const opsHost = E('div', { 'data-testid': 'pw-ops' });
         const move = async (o, dir) => {
             const ids = activeOps.map((x) => x.id);
             const i = ids.indexOf(o.id);
@@ -170,7 +305,7 @@ export async function renderProductWorkspaceScreen(container, api, state = {}) {
             if (j < 0 || j >= ids.length)
                 return;
             [ids[i], ids[j]] = [ids[j], ids[i]];
-            const why = prompt0('pw-reorder-reason');
+            const why = prompt0();
             if (why === null)
                 return;
             try {
@@ -181,83 +316,81 @@ export async function renderProductWorkspaceScreen(container, api, state = {}) {
                 fail(e);
             }
         };
-        // "reason" for quick actions comes from the shared reason box of the routing card (no browser dialogs)
-        const quickReason = reasonBox('pw-quick-reason', 'Hızlı işlem gerekçesi (sırala / pasife al / bağımlılık / kalite noktası)');
-        const prompt0 = (_tid) => { const v = val(quickReason).trim(); if (v.length < 10) {
-            fail(new Error('REASON_REQUIRED: gerekçe en az 10 karakter'));
-            return null;
-        } return v; };
-        const opCard = (o) => {
-            const open = state.openOp === o.id;
-            const insp = h('input', { 'data-testid': 'pw-insp-value', inputmode: 'decimal', placeholder: 'Muayene sn/adet', value: o.inspectionSeconds != null ? String(o.inspectionSeconds) : '' });
-            const from = h('input', { 'data-testid': 'pw-insp-from', type: 'date', value: isoToday(), min: isoToday() });
-            const preason = reasonBox('pw-insp-reason');
-            const hist = h('div', { 'data-testid': 'pw-op-history' });
-            const phist = h('div', { 'data-testid': 'pw-param-history' });
-            const resKind = h('select', { 'data-testid': 'pw-res-kind' }, ...['FIXTURE', 'TOOL', 'GAUGE', 'RESOURCE'].map((k) => h('option', { value: k }, KIND_TR[k])));
-            const resCode = h('input', { 'data-testid': 'pw-res-code', placeholder: 'Kod (ör. T12)' });
-            const qcNo = h('input', { 'data-testid': 'pw-qc-no', type: 'number', min: 1, placeholder: 'No' });
-            const qcLabel = h('input', { 'data-testid': 'pw-qc-label', placeholder: 'Kontrol (ör. Çap Ø20 H7)' });
-            const plans = ws.quality.filter((q) => q.operationNo === null || q.operationNo === o.opNo);
-            const qcPlan = h('select', { 'data-testid': 'pw-qc-plan' }, h('option', { value: '' }, '— kontrol planı seçilmedi —'), ...plans.map((q) => h('option', { value: q.id }, `${q.operationNo != null ? 'OP' + q.operationNo : 'Genel'} v${q.version} (${q.status}) · ${q.characteristics} karakteristik`)));
-            const qcKind = h('select', { 'data-testid': 'pw-qc-kind' }, ...['FIRST_PIECE', 'IN_PROCESS', 'FINAL'].map((k) => h('option', { value: k }, KIND_TR[k])));
-            const depSel = h('select', { 'data-testid': 'pw-dep-sel' }, h('option', { value: '' }, '— ön koşul operasyon —'), ...activeOps.filter((x) => x.opNo < o.opNo && !o.dependsOn.some((d) => d.operationId === x.id)).map((x) => h('option', { value: x.id }, x.opCode)));
-            const act = async (fn, text) => { const why = prompt0('x'); if (why === null)
-                return; try {
-                await fn();
-                await reload(text, 'ok', { openOp: o.id });
+        const clearBanner = () => container.querySelector('[data-testid="pw-banner"]')?.remove();
+        const toggleOp = (id) => { clearBanner(); openOp = openOp === id ? null : id; drawOps(); if (openOp)
+            scrollTo(opsHost.querySelector(`[data-op-id="${id}"]`)); };
+        const opCard = (o, idx) => {
+            const open = openOp === o.id;
+            const st = o.state;
+            const editOk = can.editRouting && editable;
+            const resLine = o.resources.length ? `Takım / fikstür: ${o.resources.map((r) => `${KIND_TR[r.kind] ?? r.kind} ${r.code}`).join(', ')}` : null;
+            const preLine = o.dependsOn.length ? `Ön koşul: ${o.dependsOn.map((d) => d.opCode).join(', ')}` : null;
+            const qcLine = o.qcPoints.length ? `Kalite noktaları: ${o.qcPoints.map((q) => `KN${q.pointNo} ${q.label}${q.controlPlan ? ` [plan ${q.controlPlan}]` : ''}`).join('; ')}` : null;
+            const docLine = o.documents.length ? `Belgeler: ${o.documents.map((d) => d.docNo).join(', ')}` : null;
+            return E('div', { class: `opc ${open ? 'open' : ''} ${o.active ? '' : 'off'}`, 'data-testid': 'pw-op', 'data-op': o.opCode, 'data-op-id': o.id, 'data-active': String(o.active), 'data-state': st }, E('div', { class: 'opr' }, E('span', { class: 'code' }, o.opCode), E('div', { class: 'nm' }, o.name, ' ', stateChip(st), o.active ? null : [' ', chip('Pasif', 'bad')]), E('div', { class: 'c-machine' }, lbl('Makine', ''), o.machines.length ? o.machines.map((m) => (m.primary ? `★${m.code}` : m.code)).join(', ') : NA), E('div', { class: 'num' }, lbl('Hazırlık', ''), `${fmt(o.setupMinutes)} `, E('span', { class: 'u' }, 'dk')), E('div', { class: 'num' }, lbl('Çevrim', ''), `${fmt(o.cycleSeconds)} `, E('span', { class: 'u' }, 'sn')), E('div', { class: 'num' }, lbl('Muayene', ''), `${fmt(o.inspectionSeconds)} `, E('span', { class: 'u' }, 'sn')), E('div', { class: 'c-cam' }, lbl('CAM', ''), o.camProgram ?? E('span', { class: 'mut' }, 'yok')), E('div', { class: 'acts' }, btn('ghost sm', `pw-op-toggle-${o.opCode}`, open ? 'Kapat' : (editOk && o.active ? 'Düzenle' : 'Aç'), () => toggleOp(o.id)), can.editStructure && o.active ? btn('ghost sm icon', `pw-op-up-${o.opCode}`, '↑', () => void move(o, -1), { 'aria-label': `${o.opCode} yukarı taşı`, ...(idx === 0 ? {} : {}) }) : null, can.editStructure && o.active ? btn('ghost sm icon', `pw-op-down-${o.opCode}`, '↓', () => void move(o, 1), { 'aria-label': `${o.opCode} aşağı taşı` }) : null, can.editStructure ? btn(o.active ? 'danger sm' : 'ghost sm', `pw-op-active-${o.opCode}`, o.active ? 'Pasife al' : 'Etkinleştir', () => { const why = prompt0(); if (why === null)
+                return; void (async () => { try {
+                await api.setActive(o.id, !o.active, why);
+                await reload(o.active ? `${o.opCode} pasife alındı (silinmez, geçmişi korunur).` : `${o.opCode} etkinleştirildi.`, 'ok', { openOp: o.id });
             }
             catch (e) {
                 fail(e);
-            } };
-            const showHist = async () => {
-                try {
-                    const rows = await api.opHistory(o.id);
-                    hist.replaceChildren(h('div', { class: 'tw' }, h('table', {}, h('thead', {}, h('tr', {}, ...['Sürüm', 'Tür', 'Kim / Ne zaman', 'Ad', 'Hazırlık', 'Çevrim', 'Gerekçe'].map((c) => h('th', {}, c)))), h('tbody', {}, ...rows.map((r, i) => {
-                        const prev = rows[i + 1];
-                        return h('tr', { 'data-testid': 'pw-op-hist-row' }, h('td', {}, `v${r.versionNo}`), h('td', {}, r.kind), h('td', {}, `${r.by ?? '—'} · ${when(r.at)}`), h('td', {}, r.name ?? '—'), h('td', {}, prev ? changeText(prev.setupMinutes, r.setupMinutes) : n(r.setupMinutes)), h('td', {}, prev ? changeText(prev.cycleSeconds, r.cycleSeconds) : n(r.cycleSeconds)), h('td', {}, r.reason ?? '—'));
-                    })))));
-                }
-                catch (e) {
-                    fail(e);
-                }
-            };
-            const showParam = async () => {
-                try {
-                    const ph = await api.parameterHistory('OP_INSPECTION_SEC', o.id);
-                    phist.replaceChildren(h('div', { class: 'mut' }, `${ph.def.canonicalSource} · sahip: ${ph.def.ownerDomain}`), ...ph.versions.map((v) => h('div', { 'data-testid': 'pw-param-row', class: 'row' }, h('b', {}, `v${v.versionNo}`), h('span', {}, changeText(v.prevValue, v.value, ph.def.unit)), h('span', { class: 'mut' }, `${v.validFrom}${v.validTo ? ' → ' + v.validTo : ' →'} · ${v.setBy ?? '—'} · ${v.reason}`), v.inForce ? h('span', { class: 'chip ok' }, 'Yürürlükte') : null)));
-                    if (!ph.versions.length)
-                        phist.replaceChildren(h('div', { class: 'mut' }, `${NA} — hiç değer girilmemiş`));
-                }
-                catch (e) {
-                    fail(e);
-                }
-            };
-            const setInsp = async () => {
-                const v = num(val(insp));
-                if (v === null)
-                    return fail(new Error('VALUE_OUT_OF_RANGE'));
-                try {
-                    const r = await api.setParameter('OP_INSPECTION_SEC', o.id, v, val(from) || null, null, val(preason).trim());
-                    await reload(`Muayene süresi ${o.opCode}: ${changeText(r.oldValue, r.newValue, 'sn')} (sürüm ${r.versionNo}, ${r.validFrom} itibarıyla). Eski hesaplar eski parametre sürümüyle korunur; etkilenenler "Eskimiş" görünür.`, 'ok', { openOp: o.id });
-                }
-                catch (e) {
-                    fail(e);
-                }
-            };
-            const st = o.state;
-            return h('div', { class: `op ${o.active ? '' : 'off'}`, 'data-testid': 'pw-op', 'data-op': o.opCode, 'data-active': String(o.active), 'data-state': st }, h('div', { class: 'row' }, h('b', {}, o.opCode), h('span', {}, o.name), chip(st), o.active ? null : h('span', { class: 'chip bad' }, 'Pasif'), h('span', { class: 'mut' }, `v${o.versionNo ?? '—'}${o.usedInWorkOrders ? ` · ${o.usedInWorkOrders} iş emrinde` : ''}`)), h('div', { class: 'row mut' }, h('span', {}, `Makine: ${o.machines.length ? o.machines.map((m) => (m.primary ? `★${m.code}` : m.code)).join(', ') : NA}`), h('span', {}, `Hazırlık ${n(o.setupMinutes)} dk`), h('span', {}, `Çevrim ${n(o.cycleSeconds)} sn`), h('span', {}, `Muayene ${n(o.inspectionSeconds)} sn`), o.camProgram ? h('span', {}, `CAM ${o.camProgram}`) : h('span', {}, 'CAM yok'), o.firstPieceRequired ? h('span', { class: 'chip warn' }, 'İlk parça') : null, o.qcRequired ? h('span', { class: 'chip warn' }, 'Kalite') : null), o.resources.length || o.qcPoints.length || o.dependsOn.length || o.documents.length ? h('div', { class: 'mut' }, o.resources.length ? `Kaynak: ${o.resources.map((r) => `${KIND_TR[r.kind] ?? r.kind} ${r.code}`).join(', ')}. ` : '', o.dependsOn.length ? `Ön koşul: ${o.dependsOn.map((d) => d.opCode).join(', ')}. ` : '', o.qcPoints.length ? `Kalite noktaları: ${o.qcPoints.map((q) => `${q.pointNo}-${q.label}${q.controlPlan ? ' [plan ' + q.controlPlan + ']' : ''}`).join('; ')}. ` : '', o.documents.length ? `Belgeler: ${o.documents.map((d) => d.docNo).join(', ')}.` : '') : null, h('div', { class: 'row', style: 'margin-top:6px' }, h('button', { class: 'ghost', type: 'button', 'data-testid': `pw-op-toggle-${o.opCode}`, onClick: () => void go({ product: productId, rev: rev?.id ?? null, openOp: open ? null : o.id, qty: state.qty }) }, open ? 'Kapat' : (can.editRouting && editable ? 'Aç / düzenle' : 'Aç')), can.editStructure && o.active ? h('button', { class: 'ghost', type: 'button', 'data-testid': `pw-op-up-${o.opCode}`, onClick: () => void move(o, -1) }, '↑') : null, can.editStructure && o.active ? h('button', { class: 'ghost', type: 'button', 'data-testid': `pw-op-down-${o.opCode}`, onClick: () => void move(o, 1) }, '↓') : null, can.editStructure ? h('button', { class: o.active ? 'danger' : 'ghost', type: 'button', 'data-testid': `pw-op-active-${o.opCode}`, onClick: () => void act(() => api.setActive(o.id, !o.active, val(quickReason).trim()), o.active ? `${o.opCode} pasife alındı (silinmez, geçmişi korunur).` : `${o.opCode} etkinleştirildi.`) }, o.active ? 'Pasife al' : 'Etkinleştir') : null), open ? h('div', {}, can.editRouting && editable && o.active ? opEditor(o) : h('div', { class: 'mut' }, o.active ? 'Bu revizyonu düzenleme yetkiniz yok ya da revizyon kapalı.' : 'Pasif operasyon düzenlenmez.'), o.active && can.editRouting && editable ? h('div', {}, h('h3', {}, 'Muayene süresi (parametre standardı)'), h('div', { class: 'grid' }, h('div', {}, h('label', {}, 'Değer (sn/adet)'), insp), h('div', {}, h('label', {}, 'Geçerlilik başlangıcı'), from), h('div', {}, h('label', {}, 'Gerekçe'), preason)), h('div', { class: 'row', style: 'margin-top:6px' }, h('button', { class: 'primary', type: 'button', 'data-testid': 'pw-insp-save', onClick: () => void setInsp() }, 'Parametreyi kaydet'), h('button', { class: 'ghost', type: 'button', 'data-testid': 'pw-param-hist-btn', onClick: () => void showParam() }, 'Parametre geçmişi')), phist, h('h3', {}, 'Kaynak / fikstür / takım'), h('div', { class: 'row' }, resKind, resCode, h('button', { class: 'ghost', type: 'button', 'data-testid': 'pw-res-add', onClick: () => void act(() => api.setResource(o.id, val(resKind), val(resCode).trim(), null, null, null, true, val(quickReason).trim()), 'Kaynak eklendi.') }, 'Ekle'), ...o.resources.map((r) => h('button', { class: 'ghost', type: 'button', 'data-testid': `pw-res-del-${r.code}`, onClick: () => void act(() => api.setResource(o.id, r.kind, r.code, r.label, r.qty, r.note, false, val(quickReason).trim()), `${r.code} kaldırıldı.`) }, `✕ ${r.code}`))), h('h3', {}, 'Kalite kontrol noktaları'), h('div', { class: 'row' }, qcNo, qcLabel, qcKind, qcPlan, h('button', { class: 'ghost', type: 'button', 'data-testid': 'pw-qc-add', onClick: () => void act(() => api.setQcPoint(o.id, Number(val(qcNo)), val(qcLabel).trim(), val(qcKind), val(qcPlan) || null, null, true, val(quickReason).trim()), 'Kalite noktası kaydedildi.') }, 'Ekle / güncelle')), ...(can.editStructure ? [h('h3', {}, 'Bağımlılık (ön koşul)'), h('div', { class: 'row' }, depSel, h('button', { class: 'ghost', type: 'button', 'data-testid': 'pw-dep-add', onClick: () => void act(() => api.setDependency(o.id, val(depSel), true, val(quickReason).trim()), 'Bağımlılık eklendi.') }, 'Ekle'), ...o.dependsOn.map((d) => h('button', { class: 'ghost', type: 'button', onClick: () => void act(() => api.setDependency(o.id, d.operationId, false, val(quickReason).trim()), `${d.opCode} bağımlılığı kaldırıldı.`) }, `✕ ${d.opCode}`)))] : [])) : null, h('div', { class: 'row', style: 'margin-top:8px' }, h('button', { class: 'ghost', type: 'button', 'data-testid': 'pw-op-hist-btn', onClick: () => void showHist() }, 'Operasyon geçmişi (önce → sonra)')), hist) : null);
+            } })(); }) : null)), E('div', { class: 'opx' }, E('div', { class: 'row', style: 'gap:6px' }, E('span', { class: 'mut' }, `v${o.versionNo ?? '—'}${o.usedInWorkOrders ? ` · ${o.usedInWorkOrders} iş emrinde` : ''}`), o.firstPieceRequired ? chip('İlk parça', 'warn') : null, o.qcRequired ? chip('Kalite', 'warn') : null), resLine || preLine || qcLine || docLine ? E('div', { class: 'l' }, ...[resLine, preLine, qcLine, docLine].filter(Boolean).map((t) => E('span', {}, t))) : null), open ? E('div', { class: 'opb' }, editOk && o.active ? E('div', { class: 'kx-grid' }, E('div', { class: 'kx-span-7' }, opEditor(o)), E('div', { class: 'kx-span-5' }, opExtras(o)))
+                : E('div', { class: 'mut' }, o.active ? 'Bu revizyonu düzenleme yetkiniz yok ya da revizyon kapalı.' : 'Pasif operasyon düzenlenmez.'), E('div', { class: 'row', style: 'margin-top:10px' }, btn('ghost', 'pw-op-hist-btn', 'Operasyon geçmişi (önce → sonra)', () => void showHist(o))), E('div', { 'data-testid': 'pw-op-history', 'data-op-hist': o.id })) : null);
         };
+        const showHist = async (o) => {
+            const hist = opsHost.querySelector(`[data-op-hist="${o.id}"]`);
+            if (!hist)
+                return;
+            try {
+                const rows = await api.opHistory(o.id);
+                hist.replaceChildren(E('div', { class: 'tw', style: 'margin-top:8px' }, h('table', {}, h('thead', {}, h('tr', {}, ...['Sürüm', 'Tür', 'Kim / Ne zaman', 'Ad', 'Hazırlık', 'Çevrim', 'Gerekçe'].map((c) => h('th', {}, c)))), h('tbody', {}, ...rows.map((r, i) => {
+                    const prev = rows[i + 1];
+                    return h('tr', { 'data-testid': 'pw-op-hist-row' }, h('td', {}, `v${r.versionNo}`), h('td', {}, r.kind), h('td', {}, `${r.by ?? '—'} · ${when(r.at)}`), h('td', {}, r.name ?? '—'), h('td', {}, prev ? changeText(prev.setupMinutes, r.setupMinutes) : fmt(r.setupMinutes)), h('td', {}, prev ? changeText(prev.cycleSeconds, r.cycleSeconds) : fmt(r.cycleSeconds)), h('td', {}, r.reason ?? '—'));
+                })))));
+            }
+            catch (e) {
+                fail(e);
+            }
+        };
+        function drawOps() {
+            opsHost.replaceChildren(...(ws.routing.length ? [E('div', { class: 'oph' }, E('span', {}, 'OP'), E('span', {}, 'Operasyon'), E('span', {}, 'Makine'), E('span', {}, 'Hazırlık'), E('span', {}, 'Çevrim'), E('span', {}, 'Muayene'), E('span', {}, 'CAM'), E('span', { class: 'acts' }, 'İşlem')), ...ws.routing.map(opCard)]
+                : [emptyState(`${NA} — bu revizyonda operasyon yok`, can.editStructure ? '“+ Operasyon ekle” ile ilk operasyonu tanımlayın.' : 'Operasyon tanımı için taslak revizyon gerekir.', 'pw-route-empty')]), ...(can.editStructure && openOp === 'NEW' ? [E('div', { class: 'opc open', style: 'margin-top:8px' }, E('div', { class: 'opb' }, E('b', {}, 'Yeni operasyon'), E('div', { style: 'margin-top:10px' }, opEditor(null)), E('div', { class: 'row', style: 'margin-top:8px' }, btn('ghost sm', null, 'Vazgeç', () => { openOp = null; drawOps(); }))))] : []));
+        }
         const checks = Array.isArray(ws.routingCheck) ? ws.routingCheck : ws.routingCheck?.checks ?? [];
-        const routingCard = h('div', { class: 'card', 'data-testid': 'pw-card-routing', style: 'grid-column:1/-1' }, h('div', { class: 'row' }, h('h2', {}, 'Rota ve operasyonlar'), chip(ws.routing.length ? (rev?.state ?? 'MISSING') : 'MISSING')), h('div', { class: 'row mut' }, ...checks.map((c) => h('span', { class: `chip ${c.status === 'OK' ? 'ok' : c.status === 'NA' ? '' : 'warn'}`, 'data-testid': 'pw-route-check', 'data-code': c.code, 'data-status': c.status, title: c.detail }, `${c.label}: ${c.detail}`))), can.editRouting && editable ? h('div', { class: 'row', style: 'margin-top:6px' }, quickReason) : null, !ws.routing.length ? h('div', { class: 'mut', 'data-testid': 'pw-route-empty' }, `${NA} — bu revizyonda operasyon yok`) : null, ...ws.routing.map(opCard), can.editStructure ? h('div', { style: 'margin-top:8px' }, state.openOp === 'NEW' ? opEditor(null) : h('button', { class: 'primary', type: 'button', 'data-testid': 'pw-op-add', onClick: () => void go({ product: productId, rev: rev?.id ?? null, openOp: 'NEW', qty: state.qty }) }, '+ Operasyon ekle')) : null, can.editRouting && rev?.status === 'RELEASED' ? h('div', { class: 'mut' }, 'Yürürlükteki revizyonda operasyon ekleme/sıralama/pasife alma yapılmaz; makine, süre, kaynak ve talimat güncellenir (sürümlenir). Yapısal değişiklik için taslak revizyon açın.') : null);
-        // ---------------------------------------------------------------------------------------- estimate & calculations
-        const qty = h('input', { 'data-testid': 'pw-calc-qty', type: 'number', min: 1, value: String(state.qty ?? 1) });
-        const out = h('div', { 'data-testid': 'pw-calc-out' });
+        const addOp = () => { clearBanner(); openOp = 'NEW'; drawOps(); scrollTo(opsHost.lastElementChild); };
+        const routingCard = card({ title: 'Rota ve operasyonlar', testid: 'pw-card-routing', span: 12, id: 'card-routing', chip: stateChip(ws.routing.length ? (rev?.state ?? 'MISSING') : 'MISSING'),
+            actions: [can.editStructure ? btn('primary', 'pw-op-add', '+ Operasyon ekle', addOp) : null] }, checks.length ? E('div', { class: 'row', style: 'gap:6px;margin-bottom:10px' }, ...checks.map((c) => chip(`${c.label}: ${c.detail}`, c.status === 'OK' ? 'ok' : c.status === 'NA' ? '' : 'warn', { 'data-testid': 'pw-route-check', 'data-code': c.code, 'data-status': c.status, title: c.detail, style: 'white-space:normal' }))) : null, can.editRouting && editable ? E('div', { class: 'row', style: 'margin-bottom:6px' }, E('div', { class: 'grow' }, field('Hızlı işlem gerekçesi', quickReason, 'Sırala, pasife al, bağımlılık, kaynak ve kalite noktası işlemleri bu gerekçeyi kullanır.'))) : null, opsHost, can.editRouting && rev?.status === 'RELEASED' ? E('div', { class: 'mut', style: 'margin-top:10px' }, 'Yürürlükteki revizyonda operasyon ekleme, sıralama ve pasife alma yapılmaz; makine, süre, kaynak ve talimat güncellenir (sürümlenir). Yapısal değişiklik için taslak revizyon açın.') : null);
+        drawOps();
+        // ---------------------------------------------------------------------------------------- süre hesabı
+        const qty = h('input', { 'data-testid': 'pw-calc-qty', type: 'number', min: 1, value: String(state.qty ?? 1), 'aria-label': 'Adet' });
+        const out = E('div', { 'data-testid': 'pw-calc-out', style: 'margin-top:10px' });
         const creason = reasonBox('pw-calc-reason', 'Yeniden değerlendirme gerekçesi (≥10)');
         const doEstimate = async () => {
             try {
-                const e = await api.estimate(rev.id, Number(val(qty)));
-                out.replaceChildren(h('div', { class: `chip ${e.complete ? 'ok' : 'warn'}`, 'data-testid': 'pw-calc-total', 'data-complete': String(e.complete) }, e.complete ? `Toplam ${n(e.totalMinutes)} dk` : `EKSİK VERİ — kısmi ${n(e.partialMinutes)} dk (toplam hesaplanamadı)`));
+                const q = Number(val(qty));
+                if (!(q > 0)) {
+                    invalid(qty, true);
+                    return fail(new Error('QTY_REQUIRED'));
+                }
+                invalid(qty, false);
+                const e = await api.estimate(rev.id, q);
+                // İstemci katmanı sunucu alanlarını camelCase'e çevirir (op_no → opNo); parametre kodları (OP_SETUP_MIN) aynen kalır.
+                const ops = e.operations;
+                const inputs = (e['inputs'] ?? []);
+                const missing = ops.filter((x) => x.state === 'MISSING');
+                const row = (x) => {
+                    const miss = x.state === 'MISSING';
+                    const pin = inputs.find((i) => i.opNo === x.opNo);
+                    const sMin = x.setupMin ?? null;
+                    const cMin = x.cycleSec != null ? (q * x.cycleSec) / 60 : null;
+                    const iMin = x.inspectionSec != null ? (q * x.inspectionSec) / 60 : 0;
+                    const consistent = !miss && sMin !== null && cMin !== null && x.minutes != null && Math.abs(sMin + cMin + iMin - x.minutes) < 0.02;
+                    return E('div', { class: 'r calcg', 'data-testid': 'pw-calc-op', 'data-state': miss ? 'MISSING' : 'OK' }, E('div', {}, E('b', {}, x.opCode ?? `OP${x.opNo}`), ' ', x.name ?? ''), E('div', { class: 'num' }, lbl('Hazırlık', ''), sMin === null ? NA : `${fmt(sMin)} dk`), E('div', { class: 'num' }, lbl('Çevrim', ''), miss || !consistent ? (cMin === null ? NA : `${fmt(cMin, 2)} dk`) : `${fmt(cMin, 2)} dk`), E('div', { class: 'num' }, lbl('Muayene', ''), x.inspectionSec == null ? NA : `${fmt(iMin, 2)} dk`), miss ? chip('EKSİK STANDART', 'bad') : E('b', { class: 'num' }, `${fmt(x.minutes, 2)} dk`), E('div', { class: 'mut' }, pin ? ['OP_SETUP_MIN', 'OP_CYCLE_SEC', 'OP_INSPECTION_SEC'].map((k, i) => `${['Hazırlık', 'Çevrim', 'Muayene'][i]} ${pin.params[k]?.versionNo ? `v${pin.params[k].versionNo}` : NA}`).join(' · ') : ''));
+                };
+                out.replaceChildren(...[E('div', { class: 'row', style: 'gap:8px' }, chip(e.complete ? `Toplam ${fmt(e.totalMinutes)} dk` : `EKSİK VERİ — kısmi ${fmt(e.partialMinutes)} dk (toplam hesaplanamadı)`, e.complete ? 'ok' : 'warn', { 'data-testid': 'pw-calc-total', 'data-complete': String(e.complete) }), E('span', { class: 'mut' }, `${q} adet · henüz kaydedilmedi`)),
+                    missing.length ? E('div', { class: 'banner bad', style: 'margin-top:8px' }, `Hesaplanamayan operasyon: ${missing.map((m) => m.opCode ?? `OP${m.opNo}`).join(', ')} — hazırlık veya çevrim standardı girilmemiş. Sonuç 0 kabul edilmedi.`) : null,
+                    E('div', { class: 'rows', style: 'margin-top:8px' }, E('div', { class: 'r hd calcg' }, E('span', {}, 'Operasyon'), E('span', {}, 'Hazırlık'), E('span', {}, 'Çevrim'), E('span', {}, 'Muayene'), E('span', {}, 'Toplam'), E('span', {}, 'Kullanılan parametre sürümü')), ...ops.map(row)),
+                    E('div', { class: 'mut', style: 'margin-top:6px' }, String(e.formula ?? ''))].filter(Boolean));
             }
             catch (e) {
                 fail(e);
@@ -277,46 +410,108 @@ export async function renderProductWorkspaceScreen(container, api, state = {}) {
         catch (e) {
             fail(e);
         } };
-        const calcCard = h('div', { class: 'card', 'data-testid': 'pw-card-calc' }, h('h2', {}, 'Süre hesabı ve geçmişi'), rev ? h('div', { class: 'row' }, qty, h('button', { class: 'ghost', type: 'button', 'data-testid': 'pw-calc-run', onClick: () => void doEstimate() }, 'Hesapla'), can.editRouting ? h('button', { class: 'ghost', type: 'button', 'data-testid': 'pw-calc-save', onClick: () => void saveCalc() }, 'Hesabı kaydet') : null) : null, out, h('div', { class: 'mut' }, 'Formül: Σ (hazırlık + adet × (çevrim + muayene) / 60). Eksik standart VERİ YOK sayılır, 0 yazılmaz. Gerçek üretim ölçümü (ProductionSession) bu ekrandan değiştirilemez.'), ...(ws.calculations.length ? [creason] : []), ...ws.calculations.map((c) => h('div', { class: 'row', 'data-testid': 'pw-calc-row', 'data-state': c.state ?? '' }, h('span', { class: `chip ${CALC_CLS[c.state ?? ''] ?? ''}` }, CALC_TR[c.state ?? ''] ?? '—'), h('span', {}, `${c.qty} adet`), h('b', {}, c.complete ? `${n(c.totalMinutes)} dk` : 'EKSİK'), h('span', { class: 'mut' }, when(c.computedAt)), c.state === 'STALE' && can.editRouting ? h('button', { class: 'primary', type: 'button', 'data-testid': 'pw-calc-reeval', onClick: () => void reeval(c.runId) }, 'Yeniden değerlendir') : null)));
-        const idCard = h('div', { class: 'card', 'data-testid': 'pw-card-identity' }, h('div', { class: 'row' }, h('h2', {}, 'Kimlik'), chip((rev?.state ?? 'MISSING'))), h('div', { class: 'grid' }, ...[['Kod', ws.product.code], ['Ad', ws.product.name], ['Aile', ws.product.family], ['Malzeme', ws.product.material], ['Durum', ws.product.status], ['Revizyon', rev ? `Rev ${rev.revision} · ${REV_TR[rev.status]}` : null],
-            ...(ws.product.customerName ? [['Müşteri', ws.product.customerName], ['Müşteri parça no', ws.product.customerPartNo ?? null]] : [])]
-            .map(([k, v]) => h('div', {}, h('label', {}, k), h('b', {}, v ?? NA)))), h('div', { class: 'mut' }, h('a', { href: `#/urun-master?urun=${ws.product.id}` }, 'Pasaport / QR / hazırlık kontrolü')));
-        const bomCode = h('input', { 'data-testid': 'pw-bom-code', placeholder: 'Malzeme kodu' });
-        const bomQty = h('input', { 'data-testid': 'pw-bom-qty', inputmode: 'decimal', placeholder: 'Adet başına' });
-        const bomScrap = h('input', { 'data-testid': 'pw-bom-scrap', inputmode: 'decimal', placeholder: 'Fire %', value: '0' });
-        const bomReason = reasonBox('pw-bom-reason');
-        const bomEditable = can.manageBom && rev?.status === 'DRAFT';
-        const bomSave = async (code, qty, scrap, before) => {
-            if (qty === null || scrap === null)
-                return fail(new Error('QTY_PER_UNIT_MUST_BE_POSITIVE'));
-            try {
-                const r = await api.saveBomLine(rev.id, code, qty, scrap, val(bomReason).trim());
-                await reload(r.created ? `BOM satırı eklendi: ${code} ${n(qty)} /adet.` : `BOM satırı güncellendi: ${code} — adet ${changeText(before?.q, qty)}, fire % ${changeText(before?.s, scrap)}.`);
-            }
-            catch (e) {
-                fail(e);
-            }
-        };
-        const bomRows = ws.bom.map((b) => {
-            const q = h('input', { 'data-testid': 'pw-bom-row-qty', inputmode: 'decimal', value: String(b.qtyPerUnit), style: 'max-width:110px' });
-            const sc = h('input', { 'data-testid': 'pw-bom-row-scrap', inputmode: 'decimal', value: String(b.scrapAllowancePct ?? 0), style: 'max-width:90px' });
-            return h('div', { class: 'row', 'data-testid': 'pw-bom-row', 'data-code': b.materialCode }, h('b', {}, b.materialCode), bomEditable ? h('span', { class: 'row' }, q, sc, h('button', { class: 'ghost', type: 'button', 'data-testid': 'pw-bom-row-save', onClick: () => void bomSave(b.materialCode, num(val(q)), num(val(sc)), { q: b.qtyPerUnit, s: b.scrapAllowancePct }) }, 'Güncelle'), h('button', { class: 'danger', type: 'button', 'data-testid': 'pw-bom-row-del', onClick: async () => { try {
-                    await api.removeBomLine(rev.id, b.materialCode, val(bomReason).trim());
-                    await reload(`BOM satırı kaldırıldı: ${b.materialCode} (geçmişte kalır).`);
+        const hasStale = ws.calculations.some((c) => c.state === 'STALE') && can.editRouting;
+        const calcCard = card({ title: 'Süre hesabı', testid: 'pw-card-calc', span: 7, id: 'card-calc' }, rev ? E('div', { class: 'row', style: 'align-items:flex-end' }, E('div', { style: 'width:120px' }, field('Adet', qty)), btn('ghost', 'pw-calc-run', 'Hesapla', () => void doEstimate()), can.editRouting ? btn('primary', 'pw-calc-save', 'Hesabı kaydet', () => void saveCalc()) : null) : null, E('div', { class: 'mut', style: 'margin-top:6px' }, '“Hesapla” yalnız gösterir, kayıt oluşturmaz. “Hesabı kaydet” değişmez bir hesap kaydı oluşturur. Eksik standart VERİ YOK sayılır, 0 yazılmaz. Gerçek üretim süresi bu ekrandan değiştirilemez.'), out, ws.calculations.length ? E('div', { style: 'margin-top:14px' }, h('h3', {}, 'Önceki kayıtlı hesaplar'), hasStale ? E('div', { style: 'margin-bottom:8px' }, field('Yeniden değerlendirme gerekçesi', creason)) : null, E('div', { class: 'rows' }, ...ws.calculations.map((c) => E('div', { class: 'r prevg', 'data-testid': 'pw-calc-row', 'data-state': c.state ?? '' }, chip(CALC_TR[c.state ?? ''] ?? '—', CALC_TONE[c.state ?? ''] ?? ''), E('span', {}, `${c.qty} adet`), E('b', {}, c.complete ? `${fmt(c.totalMinutes)} dk` : 'EKSİK'), E('span', { class: 'mut' }, when(c.computedAt)), E('div', { class: 'acts' }, c.state === 'STALE' && can.editRouting ? btn('primary sm', 'pw-calc-reeval', 'Yeniden değerlendir', () => void reeval(c.runId)) : null))))) : E('div', { class: 'mut', style: 'margin-top:12px' }, 'Henüz kayıtlı hesap yok.'));
+        // ---------------------------------------------------------------------------------------- kimlik
+        const idCard = card({ title: 'Kimlik', testid: 'pw-card-identity', span: 12, chip: stateChip((rev?.state ?? 'MISSING')), actions: [h('a', { class: 'btn ghost sm', href: `#/urun-master?urun=${ws.product.id}` }, 'Pasaport / QR / hazırlık')] }, E('div', { class: 'kv' }, kvItem('Kod', ws.product.code), kvItem('Ad', ws.product.name), kvItem('Aile', ws.product.family), kvItem('Malzeme', ws.product.material), kvItem('Durum', ws.product.status), kvItem('Revizyon', rev ? `Rev ${rev.revision} · ${REV_TR[rev.status]}` : null), ...(ws.product.customerName ? [kvItem('Müşteri', ws.product.customerName), kvItem('Müşteri parça no', ws.product.customerPartNo ?? null)] : [])));
+        // ---------------------------------------------------------------------------------------- BOM
+        const bomEditable = !!(can.manageBom && rev?.status === 'DRAFT');
+        const bomHost = E('div');
+        let bomMode = null;
+        const bomPanel = () => {
+            if (!bomMode)
+                return null;
+            const m = bomMode;
+            const cur = m.kind === 'add' ? null : ws.bom.find((b) => b.materialCode === m.code) ?? null;
+            const code = h('input', { 'data-testid': 'pw-bom-code', placeholder: 'ör. AISI4140-D45', value: cur?.materialCode ?? '', disabled: m.kind !== 'add' });
+            const q = h('input', { 'data-testid': 'pw-bom-qty', inputmode: 'decimal', placeholder: 'ör. 1,15', value: cur ? String(cur.qtyPerUnit) : '' });
+            const sc = h('input', { 'data-testid': 'pw-bom-scrap', inputmode: 'decimal', placeholder: '0', value: cur ? String(cur.scrapAllowancePct ?? 0) : '0' });
+            const reason = reasonBox('pw-bom-reason', m.kind === 'remove' ? 'Neden kaldırılıyor?' : 'Neden ekleniyor / değişiyor?');
+            const submit = async () => {
+                const qv = num(val(q));
+                const sv = num(val(sc));
+                const missing = [];
+                invalid(code, false);
+                invalid(q, false);
+                invalid(sc, false);
+                invalid(reason, false);
+                if (m.kind === 'add' && !val(code).trim()) {
+                    invalid(code, true);
+                    missing.push('Malzeme kodu');
+                }
+                if (m.kind !== 'remove') {
+                    if (qv === null || qv <= 0) {
+                        invalid(q, true);
+                        missing.push('Miktar (0’dan büyük sayı)');
+                    }
+                    if (sv === null || sv < 0 || sv > 100) {
+                        invalid(sc, true);
+                        missing.push('Fire % (0–100)');
+                    }
+                }
+                if (val(reason).trim().length < 10) {
+                    invalid(reason, true);
+                    missing.push('Gerekçe (en az 10 karakter)');
+                }
+                if (missing.length)
+                    return fail(new Error(`Eksik veya hatalı alan: ${missing.join(', ')}. ${missing.some((x) => x.startsWith('Gerekçe')) ? 'Gerekçe zorunlu.' : ''}`.trim()));
+                try {
+                    if (m.kind === 'remove') {
+                        await api.removeBomLine(rev.id, m.code, val(reason).trim());
+                        await reload(`BOM satırı kaldırıldı: ${m.code} (geçmişte kalır).`);
+                        return;
+                    }
+                    const c = m.kind === 'add' ? val(code).trim() : m.code;
+                    const r = await api.saveBomLine(rev.id, c, qv, sv, val(reason).trim());
+                    await reload(r.created ? `BOM satırı eklendi: ${c} ${fmt(qv)} /adet.` : `BOM satırı güncellendi: ${c} — adet ${changeText(cur?.qtyPerUnit, qv)}, fire % ${changeText(cur?.scrapAllowancePct, sv)}.`);
                 }
                 catch (e) {
                     fail(e);
-                } } }, 'Kaldır'))
-                : h('span', {}, `${n(b.qtyPerUnit)} /adet${b.scrapAllowancePct != null ? ` · fire %${n(b.scrapAllowancePct)}` : ''}`));
-        });
-        const bomCard = h('div', { class: 'card', 'data-testid': 'pw-card-bom' }, h('div', { class: 'row' }, h('h2', {}, 'BOM'), chip(ws.bom.length ? (rev?.state ?? 'MISSING') : 'MISSING')), ...(bomRows.length ? bomRows : [h('div', { class: 'mut' }, `${NA} — bu revizyonda BOM yok`)]), bomEditable ? h('div', { style: 'margin-top:8px' }, h('div', { class: 'grid' }, h('div', {}, h('label', {}, 'Malzeme'), bomCode), h('div', {}, h('label', {}, 'Adet başına'), bomQty), h('div', {}, h('label', {}, 'Fire %'), bomScrap), h('div', {}, h('label', {}, 'Gerekçe'), bomReason)), h('div', { class: 'row', style: 'margin-top:6px' }, h('button', { class: 'primary', type: 'button', 'data-testid': 'pw-bom-add', onClick: () => void bomSave(val(bomCode).trim(), num(val(bomQty)), num(val(bomScrap))) }, 'Satır ekle')))
-            : h('div', { class: 'mut', 'data-testid': 'pw-bom-note' }, !can.manageBom ? 'BOM düzenleme yetkiniz yok.' : rev?.status === 'RELEASED' ? 'Yürürlükteki revizyonun BOM’u teknik veridir: değişiklik için yeni (taslak) revizyon açın — kaynak aynı BOM’dur, ikinci reçete oluşmaz.' : ''), h('div', { class: 'mut' }, h('a', { href: `#/urun-master?urun=${ws.product.id}` }, 'Yeni revizyon / BOM taslağı / yayın: Ürün Master')));
-        const qualityCard = h('div', { class: 'card', 'data-testid': 'pw-card-quality' }, h('div', { class: 'row' }, h('h2', {}, 'Kalite planı'), chip(ws.quality.length ? (rev?.state ?? 'MISSING') : 'MISSING')), ...(ws.quality.length ? ws.quality.map((q) => {
+                }
+            };
+            return E('div', { class: 'formbox', 'data-testid': 'pw-bom-form' }, E('b', {}, m.kind === 'add' ? 'Yeni BOM satırı' : m.kind === 'edit' ? `Satırı düzenle: ${m.code}` : `Satırı kaldır: ${m.code}`), m.kind === 'remove' ? E('div', { class: 'mut' }, 'Satır taslak revizyondan kaldırılır; değişiklik geçmişte kalır.') : E('div', { class: 'fgrid' }, field('Malzeme kodu', code), field('Miktar (ürün başına)', q), field('Fire %', sc)), field('Değişiklik gerekçesi', reason, 'Gerekçe ve değişiklik ürün geçmişine yazılır.'), E('div', { class: 'row' }, btn(m.kind === 'remove' ? 'danger' : 'primary', m.kind === 'add' ? 'pw-bom-add' : m.kind === 'edit' ? 'pw-bom-row-save' : 'pw-bom-row-del', m.kind === 'add' ? 'Satır ekle' : m.kind === 'edit' ? 'Güncelle' : 'Kaldır', () => void submit()), btn('ghost', null, 'Vazgeç', () => { bomMode = null; drawBom(); })));
+        };
+        function drawBom() {
+            const revTone = (rev ? { DRAFT: 'info', RELEASED: 'ok', OBSOLETE: 'off' }[rev.status] : '') ?? '';
+            bomHost.replaceChildren(...[
+                ws.bom.length ? E('div', { class: 'rows' }, E('div', { class: 'r hd bomg' }, E('span', {}, 'Malzeme kodu'), E('span', {}, 'Miktar / ürün'), E('span', {}, 'Fire %'), E('span', {}, 'Durum'), E('span', { class: 'acts' }, bomEditable ? 'İşlem' : '')), ...ws.bom.map((b) => E('div', { class: 'r bomg', 'data-testid': 'pw-bom-row', 'data-code': b.materialCode }, E('b', {}, b.materialCode), E('span', { class: 'num' }, lbl('Miktar', ''), `${fmt(b.qtyPerUnit)} adet/ürün`), E('span', { class: 'num' }, lbl('Fire', ''), b.scrapAllowancePct != null ? `%${fmt(b.scrapAllowancePct)}` : NA), E('span', {}, chip(rev ? REV_TR[rev.status] ?? rev.status : '—', revTone)), E('div', { class: 'acts' }, bomEditable ? [btn('ghost sm', 'pw-bom-row-edit', 'Düzenle', () => { bomMode = { kind: 'edit', code: b.materialCode }; drawBom(); }), btn('danger sm', 'pw-bom-row-remove', 'Kaldır', () => { bomMode = { kind: 'remove', code: b.materialCode }; drawBom(); })] : null))))
+                    : emptyState(`${NA} — bu revizyonda BOM yok`, bomEditable ? '“+ Satır ekle” ile ilk malzemeyi tanımlayın. Eksik kalırsa ürün hazırlığı tamamlanmış sayılmaz.' : 'BOM, taslak revizyonda tanımlanır.'),
+                bomPanel(), bomEditable ? null : E('div', { class: 'mut', 'data-testid': 'pw-bom-note', style: 'margin-top:10px' }, !can.manageBom ? 'BOM düzenleme yetkiniz yok.' : rev?.status === 'RELEASED' ? 'Yürürlükteki revizyonun BOM’u teknik veridir: değişiklik için yeni (taslak) revizyon açın — kaynak aynı BOM’dur, ikinci reçete oluşmaz.' : '')
+            ].filter(Boolean));
+        }
+        const bomCard = card({ title: 'BOM', testid: 'pw-card-bom', span: 12, id: 'card-bom', chip: stateChip(ws.bom.length ? (rev?.state ?? 'MISSING') : 'MISSING'), actions: [bomEditable && !bomMode ? btn('primary sm', 'pw-bom-open-add', '+ Satır ekle', () => { bomMode = { kind: 'add' }; drawBom(); }) : null] }, bomHost, E('div', { class: 'kx-foot' }, h('a', { href: `#/urun-master?urun=${ws.product.id}` }, 'Yeni revizyon / BOM taslağı / yayın: Ürün Master')));
+        drawBom();
+        // satır ekleme düğmesi panel açıkken gizlenmez: panel kapanınca kart başlığı yeniden çizilmez; düğme her zaman çalışır
+        const bomAdd = bomCard.querySelector('[data-testid="pw-bom-open-add"]');
+        bomAdd?.addEventListener('click', () => scrollTo(bomHost));
+        // ---------------------------------------------------------------------------------------- kalite planı
+        const qualityCard = card({ title: 'Kalite planı', testid: 'pw-card-quality', span: 5, id: 'card-quality', chip: stateChip(ws.quality.length ? (rev?.state ?? 'MISSING') : 'MISSING') }, ws.quality.length ? E('div', { class: 'rows' }, ...ws.quality.map((q) => {
             const linked = ws.routing.flatMap((o) => o.qcPoints.filter((p) => p.controlPlanId === q.id).map((p) => `${o.opCode} KN${p.pointNo}`));
-            return h('div', { class: 'row', 'data-testid': 'pw-plan', 'data-linked': String(linked.length) }, h('b', {}, q.operationNo != null ? `OP${q.operationNo}` : 'Genel'), h('span', {}, `v${q.version} · ${q.status}`), h('span', { class: 'mut' }, `${q.characteristics} karakteristik`), h('span', { class: `chip ${linked.length ? 'ok' : ''}` }, linked.length ? `Bağlı: ${linked.join(', ')}` : 'Operasyona bağlı değil'));
-        }) : [h('div', { class: 'mut' }, `${NA} — kontrol planı yok`)]), h('div', { class: 'mut' }, 'Kontrol planı kaynağı Kalite’dir; burada yalnız mevcut plan seçilir ve operasyonun kalite noktasına bağlanır (yeni kalite verisi oluşmaz). Bağlama: ilgili operasyonu açın → Kalite kontrol noktaları.'), h('div', { class: 'mut' }, h('a', { href: '#/kalite' }, 'Kontrol planı düzenleme: Kalite')));
-        const paramCard = h('div', { class: 'card', 'data-testid': 'pw-card-params' }, h('h2', {}, 'Parametre standardı'), ...ws.parameterDefs.map((d) => h('div', { 'data-testid': 'pw-param-def', 'data-code': d.code, style: 'margin:4px 0' }, h('b', {}, `${d.name} (${d.unit})`), h('span', { class: `chip ${d.changeClass === 'TECHNICAL' ? 'warn' : ''}`, style: 'margin-left:6px' }, d.changeClass === 'TECHNICAL' ? 'Teknik: revizyon+onay' : 'Operasyonel'), h('div', { class: 'mut' }, `Sahip: ${d.ownerDomain} · Kaynak: ${d.canonicalSource}${d.min != null || d.max != null ? ` · aralık ${n(d.min)}–${n(d.max)}` : ''}`))), h('div', { class: 'mut' }, 'Her değer: sürüm, geçerlilik başlangıç/bitişi, kim/ne zaman/neden, eski→yeni. Geçmişe dönük değişmez; eski hesaplar eski sürümle kalır.'));
-        const histCard = h('div', { class: 'card', 'data-testid': 'pw-card-history' }, h('h2', {}, 'Değişiklik geçmişi'), h('div', { class: 'mut' }, 'Revizyon, doküman, operasyon ve parametre değişiklikleri ürünün olay kaydında tutulur.'), h('a', { href: `#/urun-master?urun=${ws.product.id}&sekme=gecmis` }, 'Olay kaydını aç'));
-        shell(h('div', { class: 'row' }, h('h1', {}, `${ws.product.code} — ${ws.product.name}`), h('button', { class: 'ghost', type: 'button', 'data-testid': 'pw-back', onClick: () => void go({}) }, '← Ürünler')), banner, h('div', { class: 'row' }, revSel, rev ? chip(rev.state) : null, h('span', { class: 'mut' }, can.editRouting ? 'Düzenleme yetkiniz var' : 'Yalnız görüntüleme')), h('div', { class: 'cards' }, idCard, docCard('drawing', 'Teknik resim', ws.cards.drawing, 'DRAWING'), docCard('cad', 'CAD / STEP', ws.cards.cad, 'CAD_MODEL'), docCard('cam', 'CAM / NC', ws.cards.cam, 'NC_PROGRAM'), docCard('tools', 'Takım listesi', ws.cards.tools, 'TOOL_LIST'), bomCard, routingCard, paramCard, qualityCard, calcCard, histCard));
+            return E('div', { class: 'r', style: 'grid-template-columns:minmax(0,1fr) auto', 'data-testid': 'pw-plan', 'data-linked': String(linked.length) }, E('div', {}, E('b', {}, q.operationNo != null ? `OP${q.operationNo}` : 'Genel'), ` · v${q.version} · ${q.status}`, E('div', { class: 'mut' }, `${q.characteristics} karakteristik`)), chip(linked.length ? `Bağlı: ${linked.join(', ')}` : 'Operasyona bağlı değil', linked.length ? 'ok' : 'warn'));
+        })) : emptyState(`${NA} — kontrol planı yok`, 'Kontrol planı Kalite’de hazırlanır.'), E('div', { class: 'mut', style: 'margin-top:10px' }, 'Plan kaynağı Kalite’dir; burada yalnız mevcut plan, operasyonun kalite noktasına bağlanır (yeni kalite verisi oluşmaz). Bağlama: operasyonu açın → Kalite kontrol noktaları.'), E('div', { class: 'kx-foot' }, h('a', { href: '#/kalite' }, 'Kontrol planı düzenleme: Kalite')));
+        // ---------------------------------------------------------------------------------------- parametreler
+        const editOk = can.editRouting && editable;
+        const pCell = (o, p, value, from, ver) => {
+            const since = E('span', { class: 'mut', 'data-testid': 'pw-param-from' }, from ? `${from}${ver ? ` · v${ver}` : ''}` : (value === null ? 'geçerlilik: yok' : '…'));
+            if (p.code === 'OP_INSPECTION_SEC' && value !== null)
+                void api.parameterHistory(p.code, o.id).then((ph) => { const v = ph.versions.find((x) => x.inForce); since.textContent = v ? `${v.validFrom} itibarıyla · v${v.versionNo}` : '—'; }).catch(() => { since.textContent = '—'; });
+            return E('div', { class: 'pcell', 'data-testid': 'pw-param-line', 'data-op': o.opCode, 'data-param': p.code }, E('span', { class: 'cl' }, p.name), E('b', { class: 'num' }, value === null ? NA : `${fmt(value)} ${p.unit}`), since, btn('linkbtn sm', `pw-param-hist-${o.opCode}-${p.code}`, 'Geçmiş', () => void showParam(o, p.code)));
+        };
+        const paramCard = card({ title: 'Parametreler (operasyon bazlı)', testid: 'pw-card-params', span: 12, id: 'card-params' }, activeOps.length ? E('div', { class: 'rows' }, E('div', { class: 'r hd parg' }, E('span', {}, 'Operasyon'), ...PARAMS.map((p) => E('span', {}, `${p.name} · ${p.src}`)), E('span', { class: 'acts' }, 'İşlem')), ...activeOps.map((o) => E('div', { class: 'r parg', 'data-testid': 'pw-param-op', 'data-op': o.opCode }, E('span', {}, E('b', {}, o.opCode), ' ', o.name), pCell(o, PARAMS[0], o.setupMinutes, o.setupValidFrom, o.setupVersion), pCell(o, PARAMS[1], o.cycleSeconds, o.cycleValidFrom, o.cycleVersion), pCell(o, PARAMS[2], o.inspectionSeconds, null, null), E('div', { class: 'acts' }, editOk ? btn('ghost sm', `pw-param-edit-${o.opCode}`, 'Düzenle', () => { openOp = o.id; drawOps(); scrollTo(opsHost.querySelector(`[data-op-id="${o.id}"]`)); }) : null))))
+            : emptyState(`${NA} — aktif operasyon yok`, 'Parametreler operasyonlar tanımlanınca burada görünür.'), paramHistHost, E('div', { class: 'mut', style: 'margin-top:10px' }, 'Bu değerler operasyon bazlıdır; ürün geneli için tek değer yoktur. Her değişiklikte kaynak, gerekçe, zaman ve sürüm saklanır; geçmişe dönük değişmez. Eski hesaplar kendi parametre sürümüyle kalır, yeni hesaplar yürürlükteki değeri kullanır.'), can.editRouting ? E('div', { style: 'margin-top:10px' }, fold('Teknik ayrıntı (yetkili)', ws.parameterDefs.map((d) => E('div', { 'data-testid': 'pw-param-def', 'data-code': d.code, class: 'mut', style: 'margin:6px 0' }, E('b', {}, `${d.name} (${d.unit})`), ' ', chip(d.changeClass === 'TECHNICAL' ? 'Teknik: revizyon+onay' : 'Operasyonel', d.changeClass === 'TECHNICAL' ? 'warn' : ''), E('div', {}, `Sahip: ${OWNER_TR[d.ownerDomain] ?? d.ownerDomain} · Kaynak alanı: ${d.canonicalSource}${d.min != null || d.max != null ? ` · aralık ${fmt(d.min)}–${fmt(d.max)}` : ''}`))), false, 'pw-param-tech')) : null);
+        const histCard = card({ title: 'Değişiklik geçmişi', testid: 'pw-card-history', span: 12, id: 'card-history' }, E('div', { class: 'row', style: 'justify-content:space-between' }, E('span', { class: 'mut' }, 'Revizyon, doküman, operasyon ve parametre değişiklikleri ürünün olay kaydında tutulur.'), h('a', { class: 'btn ghost sm', href: `#/urun-master?urun=${ws.product.id}&sekme=gecmis` }, 'Olay kaydını aç')));
+        // ---------------------------------------------------------------------------------------- üst bölüm: başlık, hazırlık özeti, ana işlemler
+        const docState = (c) => (c?.state ?? 'MISSING');
+        const rs = (rev?.state ?? 'MISSING');
+        const ready = [
+            { label: 'Teknik resim', st: docState(ws.cards.drawing), target: 'drawing' }, { label: 'CAD/STEP', st: docState(ws.cards.cad), target: 'cad' }, { label: 'CAM/NC', st: docState(ws.cards.cam), target: 'cam' }, { label: 'Takım listesi', st: docState(ws.cards.tools), target: 'tools' },
+            { label: 'BOM', st: ws.bom.length ? rs : 'MISSING', target: 'bom' }, { label: 'Rota', st: ws.routing.length ? rs : 'MISSING', target: 'routing' }, { label: 'Kalite planı', st: ws.quality.length ? rs : 'MISSING', target: 'quality' }
+        ];
+        const missingN = ready.filter((r) => r.st === 'MISSING');
+        const readyCard = card({ title: 'Hazırlık özeti', testid: 'pw-ready', span: 12, tone: missingN.length ? 'warn' : 'ok', chip: chip(missingN.length ? `${missingN.length} eksik` : 'Temel veriler tanımlı', missingN.length ? 'warn' : 'ok') }, E('div', { class: 'ready' }, ...ready.map((r) => E('button', { type: 'button', class: STATE_TONE[r.st], 'data-testid': `pw-ready-${r.target}`, 'data-state': r.st, onClick: () => scrollTo(container.querySelector(`[data-testid="pw-card-${r.target}"]`)) }, E('span', { class: 'dot' }), `${r.label}: ${CARD_STATE_TR[r.st]}`))), missingN.length ? E('div', { class: 'mut', style: 'margin-top:8px' }, `Eksik veri: ${missingN.map((m) => m.label).join(', ')}. Eksik değerler 0 sayılmaz; üretime hazırlık için tamamlanmalıdır.`) : null);
+        const head = E('div', { class: 'page-head' }, E('div', { class: 'ttl' }, E('div', { class: 'crumb' }, btn('', 'pw-back', '← Ürünler', () => void go({}))), E('h1', { title: `${ws.product.code} — ${ws.product.name}` }, E('span', { class: 'head-name' }, `${ws.product.code} — ${ws.product.name}`)), E('div', { class: 'row', style: 'gap:6px' }, rev ? stateChip(rev.state) : null, E('span', { class: 'mut' }, can.editRouting ? 'Düzenleme yetkiniz var' : 'Yalnız görüntüleme'))), E('div', { class: 'acts' }, E('div', { style: 'min-width:180px' }, revSel), h('a', { class: 'btn ghost', href: '#/dokuman-kontrol' }, 'Doküman Kontrol'), h('a', { class: 'btn ghost', href: `#/urun-master?urun=${ws.product.id}` }, 'Ürün Master'), can.editStructure ? btn('primary', 'pw-top-op-add', '+ Operasyon', () => { addOp(); scrollTo(container.querySelector('[data-testid="pw-card-routing"]')); }) : null));
+        shell(head, banner, readyCard, E('div', { style: 'height:14px' }), E('div', { class: 'kx-grid' }, idCard, docCard('drawing', 'Teknik resim', ws.cards.drawing, 'DRAWING'), docCard('cad', 'CAD / STEP', ws.cards.cad, 'CAD_MODEL'), docCard('cam', 'CAM / NC', ws.cards.cam, 'NC_PROGRAM', true), docCard('tools', 'Takım listesi', ws.cards.tools, 'TOOL_LIST'), bomCard, routingCard, paramCard, qualityCard, calcCard, histCard));
+        if (state.openOp && state.openOp !== 'NEW')
+            scrollTo(opsHost.querySelector(`[data-op-id="${state.openOp}"]`));
     }
 }

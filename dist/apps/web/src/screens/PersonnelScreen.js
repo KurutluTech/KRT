@@ -94,6 +94,7 @@ export async function renderPersonnelScreen(container, deps, banner, ui = {}) {
             " \u00B7 ",
             person.skills.length,
             " yetkinlik"),
+        h("a", { class: "btn ghost", href: `#/pasaport-calisma?tur=PERSONNEL&id=${person.id}`, "data-testid": "person-card" }, "Dijital kart"),
         h("span", { "data-testid": "person-active", "data-active": String(person.active), class: `pill ${person.active ? 'ok' : 'warn'}` }, person.active ? 'Aktif' : 'Pasif'),
         life ? h("span", { class: "mut", "data-testid": "person-meta" },
             "Sicil ",

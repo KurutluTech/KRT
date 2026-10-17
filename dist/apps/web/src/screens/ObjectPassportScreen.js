@@ -75,7 +75,7 @@ export async function renderObjectPassportScreen(container, api, state, ctx) {
     const tabs = h('div', { class: 'tabs', role: 'tablist' }, ...def.tabs.map((t) => h('button', { type: 'button', role: 'tab', class: t.key === tabKey ? 'on' : '', 'aria-selected': String(t.key === tabKey), 'data-testid': `pp-tab-${t.key}`, onClick: () => go({ tab: t.key }) }, t.label)));
     const body = h('div', { 'data-testid': 'pp-body', style: 'display:flex;flex-direction:column;gap:12px' });
     const actions = actionsPanel();
-    shell(h('div', { class: 'head' }, h('a', { class: 'btn ghost', href: '#/ara', 'data-testid': 'pp-search' }, '← Arama')), head, tabs, h('div', { class: `pp-cols${actions ? ' has-actions' : ''}` }, body, actions));
+    shell(h('div', { class: 'head' }, h('a', { class: 'btn ghost', href: '#/ara', 'data-testid': 'pp-search' }, '← Arama'), ['MACHINE', 'PRODUCT', 'PERSONNEL', 'CUSTOMER'].includes(state.kind) ? h('a', { class: 'btn ghost', href: `#/pasaport-calisma?tur=${state.kind}&id=${state.id}`, 'data-testid': 'pp-card-link' }, 'Dijital kart: belgeler, fotoğraf, veri') : null), head, tabs, h('div', { class: `pp-cols${actions ? ' has-actions' : ''}` }, body, actions));
     if (tabKey === 'zaman')
         await renderTimeline(body);
     else if (tabKey === 'iz') {

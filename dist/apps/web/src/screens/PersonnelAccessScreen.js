@@ -64,7 +64,7 @@ export async function renderPersonnelAccessScreen(container, api, state = {}) {
         if (operatorSetupPending)
             return h('div', { 'data-testid': 'pa-operator' }, setupPending('Operatör girişi (sicil + rozet + PIN)', 'Operatör girişi henüz kurulmadı. E-posta ile giriş çalışmaya devam eder; mevcut hesaplar ve kayıtlar etkilenmedi.'));
         const c = creds.get(p.id);
-        const pinIn = h('input', { type: 'password', inputmode: 'numeric', maxlength: '6', autocomplete: 'off', placeholder: '6 haneli yeni PIN', 'data-testid': 'pa-op-pin' });
+        const pinIn = h('input', { type: 'password', inputmode: 'numeric', maxlength: '4', autocomplete: 'off', placeholder: '4 haneli yeni PIN', 'data-testid': 'pa-op-pin' });
         const why = h('input', { type: 'text', placeholder: c?.hasPin ? 'Gerekçe (PIN sıfırlama / iptal için zorunlu)' : 'Gerekçe (iptal / kapatma için)', 'data-testid': 'pa-op-reason' });
         const needReason = () => { const r = why.value.trim(); if (r.length < 5) {
             void go({ banner: { kind: 'error', text: 'Gerekçe zorunlu (en az 5 karakter).' }, open: p.id });
