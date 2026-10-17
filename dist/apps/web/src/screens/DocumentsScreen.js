@@ -8,7 +8,7 @@ import { h, mount } from '../../../../packages/ui/src/h.js';
 import { DOCUMENT_ENTITY_TYPES, DOCUMENT_TYPES, ENTITY_TR, MAX_DOCUMENT_BYTES, bytesToHex, canUploadDocument, documentType, } from '../../../../packages/domain/src/documents.js';
 import { CONSISTENCY_TR, EXTRACTION_FLAG_TR, GATE_TR } from '../../../../packages/domain/src/asBuilt.js';
 import { errorText as sharedErrorText } from '../errorText.js';
-const STATE_TR = { PRESENT: 'VAR', MISSING: 'EKSİK', EXPIRED: 'SÜRESİ DOLMUŞ' };
+const STATE_TR = { PRESENT: 'VAR', MISSING: 'EKSİK', EXPIRED: 'SÜRESİ DOLMUŞ', NOT_EFFECTIVE: 'ONAYLI / YÜRÜRLÜKTE DEĞİL' };
 const EXPIRY_TR = { NO_EXPIRY: '', VALID: 'geçerli', EXPIRING_SOON: 'süresi doluyor', EXPIRED: 'SÜRESİ DOLDU' };
 const typeTr = (code) => documentType(code)?.titleTr ?? code;
 const errText = (e) => sharedErrorText(e);

@@ -80,8 +80,12 @@ export class KmiNextClient {
     onSessionRefreshed = null;
     /** Technical-usability hook (KMI-001 §001.7): called with the HTTP status (0 = network) when an RPC fails. Carries no payload, no message, no identity. */
     onRequestFailed = null;
-    /** Called once when the session can no longer be renewed (no refresh token, or the server refused it). */
+    /** Called when THAT session can no longer be renewed (no refresh token, or the server explicitly refused it). The failing session object is passed so the app can ignore a
+     *  straggler request of an OLD session (signed out / replaced by a new login) instead of ending the current one. */
     onSessionExpired = null;
+    /** Pauses between attempts when a refresh fails TRANSIENTLY (network / 5xx / 408 / 429 / unrecognised answer). Kept short: GoTrue accepts a re-used refresh token only inside its reuse
+     *  interval (10 s by default), so a lost response is best recovered immediately. Tests set [0, 0]. */
+    refreshRetryDelaysMs = [800, 1600];
     refreshing = new Map();
     constructor(config) {
         this.url = config.url.replace(/\/$/, '');
@@ -180,29 +184,55 @@ export class KmiNextClient {
             return inflight;
         const run = (async () => {
             try {
-                const res = await this.fetchImpl(`${this.url}/auth/v1/token?grant_type=refresh_token`, {
-                    method: 'POST', headers: { apikey: this.apiKey, 'content-type': 'application/json' }, body: JSON.stringify({ refresh_token: rt }),
-                });
-                const body = (await parseJsonSafe(res));
-                // Only an explicit refusal ends the session. A server hiccup (5xx/408/429) says nothing about the refresh token: keep the session.
-                if (res.status >= 500 || res.status === 408 || res.status === 429)
-                    return 'transient';
-                if (!res.ok || !body || typeof body['access_token'] !== 'string')
-                    return 'rejected';
-                session.accessToken = body['access_token'];
-                session.refreshToken = typeof body['refresh_token'] === 'string' ? body['refresh_token'] : rt;
-                this.onSessionRefreshed?.(session);
-                return 'ok';
+                for (let attempt = 0;; attempt += 1) {
+                    const outcome = await this.refreshOnce(session, rt);
+                    if (outcome !== 'transient')
+                        return outcome;
+                    const wait = this.refreshRetryDelaysMs[attempt];
+                    if (wait === undefined)
+                        return 'transient'; // session kept; the caller may retry
+                    if (wait > 0)
+                        await new Promise((r) => setTimeout(r, wait));
+                }
             }
-            catch {
-                return 'transient';
-            } // network error / aborted by navigation: the refresh token may still be valid — never log the user out for that
             finally {
                 setTimeout(() => this.refreshing.delete(rt), 0);
             }
         })();
         this.refreshing.set(rt, run);
         return run;
+    }
+    /** One refresh attempt. ONLY an explicit refusal by the auth service (a JSON error body on 400/401/403/422, e.g. refresh_token_not_found / already_used / session_not_found) ends the
+     *  session. Everything else — network error, aborted navigation, 5xx/408/429, an HTML/empty answer from a proxy, WAF or captive portal, a 200 without a token — says nothing about
+     *  the refresh token and is TRANSIENT: the session is kept. */
+    async refreshOnce(session, rt) {
+        try {
+            const res = await this.fetchImpl(`${this.url}/auth/v1/token?grant_type=refresh_token`, {
+                method: 'POST', headers: { apikey: this.apiKey, 'content-type': 'application/json' }, body: JSON.stringify({ refresh_token: rt }),
+            });
+            const body = (await parseJsonSafe(res));
+            if (res.ok) {
+                if (!body || typeof body['access_token'] !== 'string')
+                    return 'transient';
+                // another tab/straggler may have rotated this session object meanwhile; never overwrite a newer token pair with an older answer
+                if (session.refreshToken !== rt)
+                    return 'ok';
+                session.accessToken = body['access_token'];
+                session.refreshToken = typeof body['refresh_token'] === 'string' ? body['refresh_token'] : rt;
+                this.onSessionRefreshed?.(session, rt);
+                return 'ok';
+            }
+            if (res.status >= 500 || res.status === 408 || res.status === 429)
+                return 'transient';
+            const code = body && typeof body === 'object' ? String(body['error_code'] ?? body['error'] ?? '') : '';
+            if (/rate_limit|timeout|unexpected|unavailable/i.test(code))
+                return 'transient';
+            const refusal = [400, 401, 403, 422].includes(res.status) && !!body && typeof body === 'object' && ('error' in body || 'error_code' in body || 'msg' in body || 'message' in body);
+            return refusal ? 'rejected' : 'transient';
+        }
+        catch {
+            return 'transient';
+        } // network error / aborted by navigation: the refresh token may still be valid — never log the user out for that
     }
     async authed(send, session) {
         const startToken = session ? session.accessToken : ''; // the token THIS request was sent with
@@ -214,12 +244,12 @@ export class KmiNextClient {
         if (ok === 'transient')
             throw new AuthError('REFRESH_UNAVAILABLE', 503); // session kept; the caller may retry
         if (ok === 'rejected') {
-            this.onSessionExpired?.();
+            this.onSessionExpired?.(session);
             throw new AuthError('SESSION_EXPIRED', 401);
         }
         const again = await send();
         if (again.status === 401) {
-            this.onSessionExpired?.();
+            this.onSessionExpired?.(session);
             throw new AuthError('SESSION_EXPIRED', 401);
         }
         return again;
