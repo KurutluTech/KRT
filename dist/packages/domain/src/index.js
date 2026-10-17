@@ -28,6 +28,8 @@ export * from './smartAssignment';
 export * from './passport';
 export * from './reports';
 export * from './documents';
+export * from './pdfText';
+export * from './orderPdf';
 export * from './economics';
 export * from './competencyImport';
 export * from './routing';
