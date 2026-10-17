@@ -72,6 +72,7 @@ export const NAV_TREE = [
             { path: '/planlama', label: 'Üretim Planlama', icon: 'layers' },
         ] },
     { id: 'cam', short: 'CAM', title: 'CAM & MÜHENDİSLİK', icon: 'gear', items: [
+            { path: '/urun-master', label: 'Ürün Master / Digital DNA', icon: 'book' },
             { path: '/muhendislik', label: 'CAM / Programlama', icon: 'gear' },
             { path: '/rota', label: 'Rota / Operasyon', icon: 'link' },
         ] },

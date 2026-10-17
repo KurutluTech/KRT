@@ -12,6 +12,8 @@ import { renderQuotesScreen } from './screens/QuotesScreen.js';
 import { createQuotesApi } from './quotesApi.js';
 import { renderOrderCommandScreen } from './screens/OrderCommandScreen.js';
 import { createOrderCommandApi } from './orderCommandApi.js';
+import { renderProductMasterScreen } from './screens/ProductMasterScreen.js';
+import { createProductMasterApi } from './productMasterApi.js';
 import { createCustomersApi } from './customersApi.js';
 import { renderPersonnelAccessScreen } from './screens/PersonnelAccessScreen.js';
 import { createPersonnelAccessApi } from './personnelAccessApi.js';
@@ -342,6 +344,7 @@ export const ROUTES = [
     { path: '/musteriler', label: 'Müşteriler (kişiler · şartlar · teslimat)', group: 'Yönetim', inMenu: true, render: (el, c, s) => renderCustomersScreen(el, createCustomersApi(c, s)) },
     { path: '/siparis-komuta', label: 'Sipariş Komuta Merkezi', group: 'Yönetim', inMenu: true, render: (el, c, s) => renderOrderCommandScreen(el, createOrderCommandApi(c, s)) },
     { path: '/siparisler', label: 'Siparişler', group: 'Yönetim', inMenu: true, render: (el, c, s) => renderOrdersScreen(el, createOrdersApi(c, s)) },
+    { path: '/urun-master', label: 'Ürün Master / Digital DNA', group: 'Yönetim', inMenu: true, render: (el, c, s, q) => renderProductMasterScreen(el, createProductMasterApi(c, s), { product: q.get('urun'), tab: q.get('sekme') ?? undefined }) },
     { path: '/muhendislik', label: 'Ürün mühendisliği (revizyon · reçete · CAM)', group: 'Yönetim', inMenu: true, render: (el, c, s) => renderEngineeringScreen(el, createEngineeringApi(c, s)) },
     { path: '/katalog', label: 'Katalog (müşteri · tedarikçi · ürün)', group: 'Yönetim', inMenu: true, render: (el, c, s) => renderCatalogScreen(el, createCatalogApi(c, s)) },
     { path: '/ana-veri-aktarim', label: 'Ana veri aktarımı (eski KMI)', group: 'Yönetim', inMenu: true, render: (el, c, s) => renderMasterImportScreen(el, createMasterImportApi(c, s)) },

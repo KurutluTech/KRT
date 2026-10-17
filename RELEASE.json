@@ -1,8 +1,8 @@
 {
   "product": "KMI NEXT",
-  "commit": "0db5efd9430ab75d7ed98e2fe3f7df8c188cba9b",
+  "commit": "eceae3b26aabbe5a948b336fe857a02d5996d10a",
   "builtFrom": "clean git tree",
-  "fileCount": 269,
+  "fileCount": 271,
   "migrationsInRepo": 73,
   "lastMigration": "0073_kmi_next_puantaj_month.sql",
   "note": "Release candidate. Publishing to https://flow.kurutlu.com is a manual owner action; this file is not a publication permit.",
@@ -79,8 +79,8 @@
     },
     {
       "path": "dist/apps/web/src/app.js",
-      "bytes": 80768,
-      "sha256": "5ae959ee2435a0b6ac465cd638ba1206535c0b31e454e679511ad599421f5ce1"
+      "bytes": 81159,
+      "sha256": "58b77ff53df20500a37e9fc6581f17450a58bc477fe6ab601b4611d459b5724a"
     },
     {
       "path": "dist/apps/web/src/approvalsInboxApi.js",
@@ -154,8 +154,8 @@
     },
     {
       "path": "dist/apps/web/src/errorText.js",
-      "bytes": 11521,
-      "sha256": "482dc7febb0b9f665c8c000380a0c352b05bcb964fc809d9ef213c880b65f6c0"
+      "bytes": 13040,
+      "sha256": "7f0f607bde216cb13bdd0fe052ff4393d698bc2b898da23988fcda32078966bd"
     },
     {
       "path": "dist/apps/web/src/geckoApi.js",
@@ -254,8 +254,8 @@
     },
     {
       "path": "dist/apps/web/src/nav.js",
-      "bytes": 16200,
-      "sha256": "fd28438ab33312b94ec959436bbfb0dfdac98aa79e9177cc1a45116d14f42356"
+      "bytes": 16290,
+      "sha256": "4d3699e08936368fc55e5fdbfd9955127ed89d1b7b31d2dfdb8ccee029d51b93"
     },
     {
       "path": "dist/apps/web/src/objectCard.js",
@@ -346,6 +346,11 @@
       "path": "dist/apps/web/src/planningApi.js",
       "bytes": 1775,
       "sha256": "747fd01725493e74d309e6169df589cee861513394afce24d1a4710a72400cea"
+    },
+    {
+      "path": "dist/apps/web/src/productMasterApi.js",
+      "bytes": 2544,
+      "sha256": "46d2fcd65fb58c3716d42e8b670271eb7ec6640fb439337e1bb80fa4246ed5f2"
     },
     {
       "path": "dist/apps/web/src/productionApi.js",
@@ -479,8 +484,8 @@
     },
     {
       "path": "dist/apps/web/src/screens/DepartmentHomeScreen.js",
-      "bytes": 15833,
-      "sha256": "f91d233806d4041f35167d22610bdbe3b51227b93a79eac4d9aa74b009e17022"
+      "bytes": 15923,
+      "sha256": "927810b5627ad9386ce1e245800cd222978e216418d26884d8944ddea611b383"
     },
     {
       "path": "dist/apps/web/src/screens/DepartmentScreen.js",
@@ -621,6 +626,11 @@
       "path": "dist/apps/web/src/screens/PlanningScreen.js",
       "bytes": 14495,
       "sha256": "f48fafe1842ceaa3dc0eee3f48985974a3f51a014cc288fa9cdb9289094c8604"
+    },
+    {
+      "path": "dist/apps/web/src/screens/ProductMasterScreen.js",
+      "bytes": 38979,
+      "sha256": "95676b4502cd8b6e6d05e041837838a37ae682f890378856cacd3515137e600f"
     },
     {
       "path": "dist/apps/web/src/screens/ProductionDeskScreen.js",
@@ -899,8 +909,8 @@
     },
     {
       "path": "dist/packages/domain/src/authorization.js",
-      "bytes": 6171,
-      "sha256": "258a413454434d8ec1b802b37596d444b7102ccff0c8433fe8f77f9102e4c49e"
+      "bytes": 6232,
+      "sha256": "7c0d9d48f078c5234d56831ce7d73154974562532099eb5f97171c210d6a0a28"
     },
     {
       "path": "dist/packages/domain/src/badges.js",
@@ -964,8 +974,8 @@
     },
     {
       "path": "dist/packages/domain/src/departmentFunctions.js",
-      "bytes": 10811,
-      "sha256": "4d17a9c175774947f811452fb71108a67315b0c55955d9caf806395262b20093"
+      "bytes": 11265,
+      "sha256": "2ca85512c4f2032fe1796f371600d7dd1f17c2e2712f456baac4d251533eca37"
     },
     {
       "path": "dist/packages/domain/src/departmentHome.js",
