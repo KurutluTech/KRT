@@ -51,6 +51,7 @@ export const DEPT_FUNCTIONS = {
         B('LockCell entegrasyonu', 'Cihaz protokolü ve kanıtı yok; sahte bağlantı gösterilmez.', 'KMI-027'),
     ],
     cam: [
+        P('Ürün Master / Digital DNA (tekil kimlik · revizyon onayı · geçmiş · hazırlık · gerçek süre · pasaport/QR · AI BOM taslağı)', '/urun-master', 'Sunucu güncellemesi 0105 production onayı bekliyor; uygulanana kadar ekran “Kurulum bekleniyor” der. AI servisi bağlı değil (yalnız taslak/onay akışı); ortak QR standardı KMI-081 ve belge kontrolü KMI-010 bekliyor; maliyet/kârlılık KMI-070 gerektirir.', 'KMI-009'),
         A('CAM / Programlama', '/muhendislik'),
         A('Routing / operasyon rotası', '/rota'),
         P('NC program yönetimi', '/muhendislik', 'Program kaydı ve yayın onayı var; revizyon karşılaştırma ve dosya yedeği planlı.', 'KMI-019'),
