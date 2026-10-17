@@ -14,6 +14,12 @@ import { renderOrderCommandScreen } from './screens/OrderCommandScreen.js';
 import { createOrderCommandApi } from './orderCommandApi.js';
 import { renderProductMasterScreen } from './screens/ProductMasterScreen.js';
 import { createProductMasterApi } from './productMasterApi.js';
+import { adoptSiblingRefresh, expiryAppliesTo } from './sessionSync.js';
+import { renderProductWorkspaceScreen } from './screens/ProductWorkspaceScreen.js';
+import { createProductWorkspaceApi, jobCardFor, scanCheck } from './productWorkspaceApi.js';
+import { renderJobCardScreen } from './screens/JobCardScreen.js';
+import { renderDocumentControlScreen } from './screens/DocumentControlScreen.js';
+import { createDocumentControlApi } from './documentControlApi.js';
 import { createCustomersApi } from './customersApi.js';
 import { renderPersonnelAccessScreen } from './screens/PersonnelAccessScreen.js';
 import { createPersonnelAccessApi } from './personnelAccessApi.js';
@@ -248,6 +254,7 @@ export const ROUTES = [
     },
     { path: '/muhasebe', label: 'Muhasebe / Fatura (kalem)', group: 'Yönetim', inMenu: false, needs: ['kalem'], render: (el, c, s, q) => renderAccountingScreen(el, q.get('kalem') ?? '', createAccountingApi(c, s)) },
     { path: '/tara', label: 'QR / Barkod Okut', group: 'Saha', inMenu: true, render: (el, c, s, q, a) => renderScanScreen(el, createScanApi(c, s), undefined, { code: q.get('kod'), access: a }) },
+    { path: '/dokuman-kontrol', label: 'Doküman Kontrol (sürüm · onay · geçerlilik)', group: 'Yönetim', inMenu: true, render: (el, c, s, q) => renderDocumentControlScreen(el, createDocumentControlApi(c, s), { doc: q.get('doc'), q: q.get('ara') ?? undefined }) },
     {
         path: '/dokumanlar', label: 'Dokümanlar', group: 'Saha', inMenu: true,
         // ?tip=<WORK_ORDER|STOCK_LOT|PRODUCT_REVISION|…>&id=<uuid> opens a record's documents (links from the passport)
@@ -344,6 +351,8 @@ export const ROUTES = [
     { path: '/musteriler', label: 'Müşteriler (kişiler · şartlar · teslimat)', group: 'Yönetim', inMenu: true, render: (el, c, s) => renderCustomersScreen(el, createCustomersApi(c, s)) },
     { path: '/siparis-komuta', label: 'Sipariş Komuta Merkezi', group: 'Yönetim', inMenu: true, render: (el, c, s) => renderOrderCommandScreen(el, createOrderCommandApi(c, s)) },
     { path: '/siparisler', label: 'Siparişler', group: 'Yönetim', inMenu: true, render: (el, c, s) => renderOrdersScreen(el, createOrdersApi(c, s)) },
+    { path: '/urun-calisma', label: 'Ürün Çalışma Alanı (rota & operasyon)', group: 'Yönetim', inMenu: true, render: (el, c, s, q) => renderProductWorkspaceScreen(el, createProductWorkspaceApi(c, s), { product: q.get('urun'), rev: q.get('rev') }) },
+    { path: '/is-karti', label: 'İş kartı (operasyon belgeleri)', group: 'Saha', inMenu: false, render: (el, c, s, q) => renderJobCardScreen(el, { load: (wo) => jobCardFor(c, s, wo), scan: (input, wo) => scanCheck(c, s, input, wo) }, q.get('is')) },
     { path: '/urun-master', label: 'Ürün Master / Digital DNA', group: 'Yönetim', inMenu: true, render: (el, c, s, q) => renderProductMasterScreen(el, createProductMasterApi(c, s), { product: q.get('urun'), tab: q.get('sekme') ?? undefined }) },
     { path: '/muhendislik', label: 'Ürün mühendisliği (revizyon · reçete · CAM)', group: 'Yönetim', inMenu: true, render: (el, c, s) => renderEngineeringScreen(el, createEngineeringApi(c, s)) },
     { path: '/katalog', label: 'Katalog (müşteri · tedarikçi · ürün)', group: 'Yönetim', inMenu: true, render: (el, c, s) => renderCatalogScreen(el, createCatalogApi(c, s)) },
@@ -495,10 +504,27 @@ export async function startApp(root, opts = {}) {
     const stopIdleGuard = (announce) => { if (announce)
         idleGuard?.announce(); idleGuard?.dispose(); idleGuard = null; };
     // Silent JWT refresh keeps the stored session current; an unrenewable session ends cleanly (once) instead of looping on 401s.
-    client.onSessionRefreshed = (s) => saveSession(s);
+    // P0 session stability: tabs that hold the SAME refresh token (a duplicated tab copies sessionStorage) tell each other about the rotation (same origin, in memory only).
+    let syncBus = null;
+    try {
+        if (typeof BroadcastChannel !== 'undefined') {
+            syncBus = new BroadcastChannel('kmi-session-sync');
+            syncBus.onmessage = (e) => { if (adoptSiblingRefresh(session, e.data))
+                saveSession(session); };
+        }
+    }
+    catch {
+        syncBus = null;
+    }
+    client.onSessionRefreshed = (s, prev) => { saveSession(s); try {
+        syncBus?.postMessage({ prev, session: s });
+    }
+    catch { /* channel closed */ } };
     let expiredHandled = false;
     let loginNotice; // survives the re-render the interrupted screen may still trigger
-    client.onSessionExpired = () => {
+    client.onSessionExpired = (failed) => {
+        if (!expiryAppliesTo(session, failed))
+            return; // a straggler request of an OLD session must not end the current one
         if (expiredHandled || !session)
             return;
         expiredHandled = true;

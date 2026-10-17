@@ -72,6 +72,7 @@ export const NAV_TREE = [
             { path: '/planlama', label: 'Üretim Planlama', icon: 'layers' },
         ] },
     { id: 'cam', short: 'CAM', title: 'CAM & MÜHENDİSLİK', icon: 'gear', items: [
+            { path: '/urun-calisma', label: 'Ürün Çalışma Alanı', icon: 'book' },
             { path: '/urun-master', label: 'Ürün Master / Digital DNA', icon: 'book' },
             { path: '/muhendislik', label: 'CAM / Programlama', icon: 'gear' },
             { path: '/rota', label: 'Rota / Operasyon', icon: 'link' },
@@ -110,6 +111,7 @@ export const NAV_TREE = [
             { path: '/zeka', label: 'KMI Zekâ', icon: 'bolt' },
             { path: '/raporlar', label: 'Raporlama', icon: 'chart' },
             { path: '/dokumanlar', label: 'Dokümanlar', icon: 'file' },
+            { path: '/dokuman-kontrol', label: 'Doküman Kontrol', icon: 'file' },
             { path: '/gecmis', label: 'Olay Geçmişi', icon: 'clock' },
         ] },
     { id: 'fin', short: 'Finans', title: 'FİNANS & MALİYET ZEKÂSI', icon: 'calc', items: [
