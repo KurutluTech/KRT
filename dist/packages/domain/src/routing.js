@@ -24,6 +24,8 @@ export const START_REFUSAL_TR = {
     OPERATOR_QUALIFICATION_EXPIRED: 'Operatörün yetkinliği süresi dolmuş',
     MACHINE_SKILL_REQUIREMENTS_UNKNOWN: 'Makinenin yetkinlik şartı bilinmiyor — yetkili doğrulama gerekli',
     CAM_PROGRAM_NOT_RELEASED: 'CAM programı yayınlanmamış',
+    DOCUMENT_NOT_EFFECTIVE: 'Teknik doküman onaylı ve yürürlükte değil (Doküman Kontrol)',
+    DOCUMENT_CHANGE_UNACKNOWLEDGED: 'İş açıkken doküman sürümü değişti — karar bekliyor (Doküman Kontrol > Dağıtım)',
     CAM_PROGRAM_WRONG_REVISION: 'CAM programı başka revizyona ait',
     QUALITY_HOLD_OPEN: 'İş emrinde açık kalite bekletmesi var',
     MATERIAL_NOT_READY: 'Malzeme hazır değil',

@@ -31,6 +31,7 @@ export * from './documents';
 export * from './economics';
 export * from './competencyImport';
 export * from './routing';
+export * from './parameters';
 export * from './badges';
 export * from './assignment';
 export * from './asBuilt';

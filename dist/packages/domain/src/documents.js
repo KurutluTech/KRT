@@ -23,6 +23,7 @@ export const ENTITY_TR = {
 export const DOCUMENT_TYPES = [
     { code: 'DRAWING', titleTr: 'Teknik resim', sensitivity: 'GENERAL', hasExpiry: false },
     { code: 'CONTROL_PLAN', titleTr: 'Kontrol planı', sensitivity: 'GENERAL', hasExpiry: false },
+    { code: 'WORK_INSTRUCTION', titleTr: 'Üretim talimatı', sensitivity: 'GENERAL', hasExpiry: false },
     { code: 'CAM_SETUP_SHEET', titleTr: 'Bağlama / ayar föyü', sensitivity: 'GENERAL', hasExpiry: false },
     { code: 'NC_PROGRAM', titleTr: 'CNC programı', sensitivity: 'GENERAL', hasExpiry: false },
     { code: 'MATERIAL_CERTIFICATE', titleTr: 'Malzeme sertifikası', sensitivity: 'GENERAL', hasExpiry: false },

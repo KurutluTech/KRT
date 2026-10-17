@@ -52,6 +52,7 @@ export const DEPT_FUNCTIONS = {
     ],
     cam: [
         P('Ürün Master / Digital DNA (tekil kimlik · revizyon onayı · geçmiş · hazırlık · gerçek süre · pasaport/QR · AI BOM taslağı)', '/urun-master', 'Sunucu güncellemesi 0105 production onayı bekliyor; uygulanana kadar ekran “Kurulum bekleniyor” der. AI servisi bağlı değil (yalnız taslak/onay akışı); ortak QR standardı KMI-081 ve belge kontrolü KMI-010 bekliyor; maliyet/kârlılık KMI-070 gerektirir.', 'KMI-009'),
+        P('Ürün Çalışma Alanı (rota · operasyon · parametre standardı · süre hesabı · iş kartı belgeleri)', '/urun-calisma', 'Sunucu güncellemesi 0107 production onayı bekliyor (0106 sonrası); uygulanana kadar “Kurulum bekleniyor”. Yürürlükteki revizyonda yapısal rota değişikliği yeni taslak revizyon ister; gerçek BOM düzenleme Mühendislik’te.', 'KMI-011'),
         A('CAM / Programlama', '/muhendislik'),
         A('Routing / operasyon rotası', '/rota'),
         P('NC program yönetimi', '/muhendislik', 'Program kaydı ve yayın onayı var; revizyon karşılaştırma ve dosya yedeği planlı.', 'KMI-019'),
@@ -114,6 +115,7 @@ export const DEPT_FUNCTIONS = {
         A('KMI Zekâ', '/zeka'),
         A('Raporlama', '/raporlar'),
         A('Dokümanlar', '/dokumanlar'),
+        P('Doküman ve Revizyon Kontrolü (sürüm · inceleme/onay/yürürlük · dağıtım · geçerlilik · kontrollü baskı)', '/dokuman-kontrol', 'Sunucu güncellemesi 0106 production onayı bekliyor; uygulanana kadar ekran “Kurulum bekleniyor” der. PDF gövdesine filigran tarayıcıda basılamaz (kapak sayfası + dijital doğrulama kullanılır); ortak QR standardı KMI-081; operasyon/rota bağlantısı KMI-011.', 'KMI-010'),
         A('Olay geçmişi', '/gecmis'),
         P('Yönetim komuta merkezi', '/yonetim', 'Kararlar ekranı var; birleşik yönetim komuta merkezi planlı.', 'KMI-068'),
         P('Yönetim onay merkezi', '/onaylar', 'Onay kutusu var; yönetim bakışı ve toplu karar planlı.', 'KMI-069'),
