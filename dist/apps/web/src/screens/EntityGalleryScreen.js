@@ -20,6 +20,7 @@ const withSnake = (o) => { const out = { ...o }; for (const [k, v] of Object.ent
 const norm = (s) => s.toLocaleLowerCase('tr-TR');
 export async function renderEntityGalleryScreen(container, deps, opts) {
     const { kind } = opts;
+    const cat = opts.catalog;
     const [title, sub] = TITLE[kind];
     const dataKind = kind === 'MEASUREMENT' ? 'MACHINE' : kind;
     const root = h('div', { class: 'kx eg', 'data-testid': 'eg-root', 'data-kind': kind }, h('style', {}, ENTITY_CARD_CSS + MACHINE_CARD_CSS), h('h1', { class: 'eg-h1' }, title), h('p', { class: 'eg-note' }, 'Yükleniyor…'));
@@ -105,7 +106,8 @@ export async function renderEntityGalleryScreen(container, deps, opts) {
             const released = f.state === 'RELEASED' || f.state === 'APPROVED';
             node = entityCard({ kind, id: f.id, href: hrefOf(f), title: f.title, subtitle: str(x.customer_part_no) ? `Müşteri parça no: ${x.customer_part_no}` : null, code: f.code, initials: initialsOf(f.code ?? f.title), shape: 'square',
                 badge: { text: (REV_TR[f.state] ?? f.state).toLocaleUpperCase('tr-TR'), tone: released ? 'ok' : f.state === 'NO_REVISION' ? 'bad' : 'warn' },
-                facts: [{ label: 'REVİZYON', value: rev ? `Rev ${rev}` : null }, { label: 'AİLE', value: str(x.family_code) }, { label: 'MALZEME', value: str(x.material) }, { label: 'REVİZYON SAYISI', value: Number(x.revisions ?? 0) }],
+                facts: [{ label: 'REVİZYON', value: rev ? `Rev ${rev}` : null }, { label: 'AİLE', value: str(x.family_code) }, { label: 'MALZEME', value: str(x.material) }, { label: 'REVİZYON SAYISI', value: Number(x.revisions ?? 0) },
+                    ...(cat?.productInfo ? [{ label: 'KAYIT', value: cat.productInfo[f.id]?.status === 'PASSIVE' ? 'Pasif' : 'Aktif', tone: cat.productInfo[f.id]?.status === 'PASSIVE' ? 'warn' : undefined }, ...(cat.productInfo[f.id]?.customerName ? [{ label: 'MÜŞTERİ', value: cat.productInfo[f.id].customerName }] : [])] : [])],
                 alert: !released ? `Üretime serbest değil (${REV_TR[f.state] ?? f.state})${missing.length ? ` · eksik: ${missing.join(', ')}` : ''}` : missing.length ? `Eksik: ${missing.join(', ')}` : null,
                 updated: dateTr(x.created_at), action: 'Çalışma alanını aç →', testid: 'eg-card' }, ph);
         }
@@ -145,18 +147,32 @@ export async function renderEntityGalleryScreen(container, deps, opts) {
             const ph = photoSlot(initialsOf(f.title), 'square');
             slot = ph;
             node = entityCard({ kind: 'CUSTOMER', id: f.id, href: hrefOf(f), title: f.title, subtitle: str(x.country), code: f.code, initials: initialsOf(f.title), shape: 'square', badge: f.active ? { text: 'AKTİF', tone: 'ok' } : { text: 'PASİF', tone: 'mut' },
-                facts: [{ label: 'ÜLKE', value: str(x.country) }, ...f.face.slice(0, 3).map((a) => ({ label: a.label.toLocaleUpperCase('tr-TR'), value: a.value }))], testid: 'eg-card' }, ph);
+                facts: [{ label: 'ÜLKE', value: str(x.country) }, ...(cat?.customerOrders ? [{ label: 'SİPARİŞ', value: cat.customerOrders[f.id] ?? 0 }] : []), ...f.face.slice(0, 3).map((a) => ({ label: a.label.toLocaleUpperCase('tr-TR'), value: a.value }))], testid: 'eg-card' }, ph);
         }
         return { state: stateKey, built: { key: f.id, haystack: norm([f.code, f.title, ...f.face.map((a) => a.value)].filter(Boolean).join(' ')), node, fill: fill ?? (slot ? (src) => slot.fill(src, 'fotoğraf') : null), photo: f.photoVersionId, mime: f.photoMime } };
     };
-    const rows = faces.map(build);
+    const activeOf = (f) => (kind === 'PRODUCT' ? (cat?.productInfo?.[f.id]?.status ?? 'ACTIVE') === 'ACTIVE' : f.active);
+    const rows = faces.map((f) => {
+        const r = build(f);
+        if (cat) {
+            r.state = activeOf(f) ? 'ACTIVE' : 'PASSIVE';
+            const extra = cat.actions?.(f) ?? null;
+            if (extra)
+                r.built.node = h('div', { class: 'eg-wrap', 'data-testid': 'eg-wrap' }, r.built.node, extra);
+        }
+        return r;
+    });
     const CAL_TR = { NO_CERT: 'Sertifika yok', NO_DATE: 'Tarih yok', EXPIRED: 'Süresi geçmiş', SOON: '30 gün içinde', VALID: 'Geçerli' };
     const LOCT = { CABINET: 'Takım dolabı', MOUNTED: 'Makinede', ISSUED: 'Zimmetli', SCRAP: 'Hurda' };
     const STATE_LABEL = (k) => (kind === 'MEASUREMENT' ? CAL_TR[k] ?? k : kind === 'TOOL' ? LOCT[k] ?? k : kind === 'MACHINE' ? HEADLINE_TR[k] ?? k : kind === 'PRODUCT' ? REV_TR[k] ?? k : k === 'ACTIVE' ? 'Aktif' : k === 'PASSIVE' ? 'Pasif' : k);
     const counts = new Map();
+    if (cat) {
+        counts.set('ACTIVE', 0);
+        counts.set('PASSIVE', 0);
+    }
     rows.forEach((r) => counts.set(r.state, (counts.get(r.state) ?? 0) + 1));
-    let filter = null;
-    let q = '';
+    let filter = cat?.initialFilter ?? null;
+    let q = norm((cat?.initialQuery ?? '').trim());
     const grid = h('div', { class: 'eg-grid', 'data-testid': 'eg-grid' });
     const count = h('div', { class: 'eg-note', 'data-testid': 'eg-count' });
     const chipRow = h('div', { class: 'eg-bar', 'data-testid': 'eg-filters' });
@@ -168,10 +184,10 @@ export async function renderEntityGalleryScreen(container, deps, opts) {
         count.setAttribute('data-total', String(rows.length));
         chipRow.querySelectorAll('button.eg-chip').forEach((b) => b.setAttribute('aria-pressed', String((b.getAttribute('data-f') || null) === filter)));
     };
-    const chip = (label, f, n) => h('button', { type: 'button', class: 'eg-chip', 'data-f': f ?? '', 'data-testid': `eg-filter-${f ?? 'ALL'}`, 'aria-pressed': 'false', onClick: () => { filter = f; paint(); } }, `${label} (${n})`);
-    const search = h('input', { type: 'search', placeholder: 'Ara: kod, ad…', 'aria-label': 'Kart ara', 'data-testid': 'eg-search', onInput: (e) => { q = norm(e.target.value.trim()); paint(); } });
-    chipRow.append(search, chip('Tümü', null, rows.length), ...[...counts.entries()].sort((a, b) => b[1] - a[1]).map(([k, n]) => chip(STATE_LABEL(k), k, n)));
-    mount(container, h('div', { class: 'kx eg', 'data-testid': 'eg-root', 'data-kind': kind }, h('style', {}, ENTITY_CARD_CSS + MACHINE_CARD_CSS), h('h1', { class: 'eg-h1' }, title), h('p', { class: 'eg-note' }, sub, opts.listHref ? [' ', h('a', { href: opts.listHref, 'data-testid': 'eg-list-link' }, opts.listLabel ?? 'Liste görünümü')] : null), chipRow, count, kind === 'MACHINE' ? h('p', { class: 'eg-note', 'data-testid': 'eg-physical-note' }, 'Durum kayıtlı (elle girilen) durumdur; CNC bağlantısı olmadığından fiziksel çalışma doğrulanmaz.') : null, grid));
+    const chip = (label, f, n) => h('button', { type: 'button', class: 'eg-chip', 'data-f': f ?? '', 'data-testid': `eg-filter-${f ?? 'ALL'}`, 'aria-pressed': 'false', onClick: () => { filter = f; paint(); cat?.onChange?.(q, filter); } }, `${label} (${n})`);
+    const search = h('input', { type: 'search', placeholder: 'Ara: kod, ad…', 'aria-label': 'Kart ara', 'data-testid': 'eg-search', value: cat?.initialQuery ?? '', onInput: (e) => { q = norm(e.target.value.trim()); paint(); cat?.onChange?.(q, filter); } });
+    chipRow.append(search, chip('Tümü', null, rows.length), ...[...counts.entries()].sort((a, b) => (cat ? (a[0] === 'ACTIVE' ? -1 : 1) : b[1] - a[1])).map(([k, n]) => chip(STATE_LABEL(k), k, n)));
+    mount(container, h('div', { class: 'kx eg', 'data-testid': 'eg-root', 'data-kind': kind }, h('style', {}, ENTITY_CARD_CSS + MACHINE_CARD_CSS), opts.embedded ? null : h('h1', { class: 'eg-h1' }, title), opts.embedded ? null : h('p', { class: 'eg-note' }, sub, opts.listHref ? [' ', h('a', { href: opts.listHref, 'data-testid': 'eg-list-link' }, opts.listLabel ?? 'Liste görünümü')] : null), chipRow, count, kind === 'MACHINE' ? h('p', { class: 'eg-note', 'data-testid': 'eg-physical-note' }, 'Durum kayıtlı (elle girilen) durumdur; CNC bağlantısı olmadığından fiziksel çalışma doğrulanmaz.') : null, grid));
     paint();
     // photos: after first paint, 4 at a time; a failure leaves the initials (never a broken image)
     const queue = rows.filter((r) => r.built.photo && r.built.fill);

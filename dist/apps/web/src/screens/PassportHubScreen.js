@@ -231,11 +231,21 @@ export async function renderPassportHubScreen(container, deps, state) {
         void cards.content(store.card.photo.versionId).then((c) => { photoHost.fill(`data:${c.mimeType};base64,${c.contentBase64}`, card.title); if (kind === 'MACHINE') { /* machine keeps its spindle; photo is shown in the media topic */ } }).catch(() => undefined);
     const def = KINDS[kind];
     const listHref = { PERSONNEL: '#/personel', MACHINE: '#/makineler', PRODUCT: '#/urun-liste', WORK_ORDER: '#/is-emirleri', TASK: '#/gorevler', CUSTOMER: '#/musteriler', SUPPLIER: '#/tedarikciler', TOOL: '#/takim-kartlari', STOCK_LOT: '#/is-emirleri', ORDER: '#/siparisler', SHIPMENT: '#/is-emirleri' }[kind] ?? '#/';
+    // opened from the Katalog Merkezi: "back" returns to that tab / search (sessionStorage set by the catalog on card click)
+    let fromCatalog = null;
+    if (kind === 'CUSTOMER' || kind === 'SUPPLIER' || kind === 'PRODUCT') {
+        try {
+            const v = sessionStorage.getItem('kmi.catalog.from');
+            if (v && v.startsWith('#/katalog'))
+                fromCatalog = v;
+        }
+        catch { /* storage unavailable */ }
+    }
     const extra = head;
     const input = {
         kind, kindTr: def.tr, title: head.title, code: head.code ?? null, subtitle: head.subtitle ?? null, subtitleUnknown: extra.subtitleUnknown ?? 'Girilmemiş', initials: head.initials, shape: head.shape, accent,
         emblem: useSlot ? photoHost.el : emblem, badges: head.badges, headPoints: [...head.headPoints, ...(extra.lastEvent ? [pt('Son hareket', extra.lastEvent)] : [])].slice(0, 5), alerts,
-        listHref, listLabel: def.plural, topics, active: state.topic ?? null, hrefFor: (tid) => kartHref(kind, id, tid), banner: state.banner ?? null,
+        listHref: fromCatalog ?? listHref, listLabel: fromCatalog ? 'Katalog Merkezi' : def.plural, topics, active: state.topic ?? null, hrefFor: (tid) => kartHref(kind, id, tid), banner: state.banner ?? null,
         notes: [...(extra.machineNote ? [extra.machineNote] : []), `Kaynak: ${def.tr} kaydı ve bağlı kanonik tablolar · güncelleme ${dt(nowIso())}. Eksik veri sıfır sayılmaz; ${UNKNOWN} olarak gösterilir.`],
     };
     await renderPassportShell(container, input);
