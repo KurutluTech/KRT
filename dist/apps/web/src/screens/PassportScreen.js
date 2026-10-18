@@ -7,7 +7,7 @@ import { h, mount } from '../../../../packages/ui/src/h.js';
 import { PASSPORT_GAP_TR, classifyPassportInput } from '../../../../packages/domain/src/passport.js';
 import { errorText as sharedErrorText } from '../errorText.js';
 const STATUS_TR = {
-    PLANNED: 'PLANLANDI', MACHINE_ASSIGNED: 'MAKİNE ATANDI', IN_PROGRESS: 'ÜRETİMDE', FIRST_PIECE_PENDING: 'İLK PARÇA BEKLİYOR',
+    PLANNED: 'PLANA ALINDI', PRODUCTION_DONE: 'ÜRETİM BİTTİ · ONAY BEKLİYOR', MACHINE_ASSIGNED: 'MAKİNE ATANDI', IN_PROGRESS: 'ÜRETİMDE', FIRST_PIECE_PENDING: 'İLK PARÇA BEKLİYOR',
     FIRST_PIECE_APPROVED: 'İLK PARÇA ONAYLI', COMPLETED: 'TAMAMLANDI', ON_HOLD: 'BEKLETMEDE', CANCELLED: 'İPTAL',
 };
 const KIND_TR = { LOT: 'Lot pasaportu', WORK_ORDER: 'İş emri pasaportu', PRODUCT: 'Ürün Dijital DNA' };

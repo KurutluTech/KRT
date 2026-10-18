@@ -6,8 +6,8 @@
 // Kiosk: giriş yok, yalnız ekran anahtarı (#/ekran?t=...) — PUBLIC.
 import { h, mount } from '../../../../packages/ui/src/h.js';
 import { FRESHNESS_TR } from '../../../../packages/domain/src/live.js';
-import { machineState, HEADLINE_TR, AVAILABILITY_TR, PHYSICAL_TR, MACHINE_CLASS_TR, MACHINE_CLASS_UNKNOWN_TR } from '../../../../packages/domain/src/machineState.js';
-import { spindleIcon } from '../spindle.js';
+import { machineState, HEADLINE_TR, AVAILABILITY_TR, PHYSICAL_TR, DATA_SOURCE_TR, STALE_TR, MACHINE_CLASS_TR, MACHINE_CLASS_UNKNOWN_TR } from '../../../../packages/domain/src/machineState.js';
+import { spindleForState } from '../spindle.js';
 import { percentLabel } from '../../../../packages/domain/src/oee.js';
 import { sumPeriods, distinctActiveWorkOrders, rankMachines, deadlineRisk, scrapShare, meanOee } from '../../../../packages/domain/src/liveKpi.js';
 import { passportHref } from '../passport/registry.js';
@@ -139,7 +139,7 @@ export async function renderLiveScreen(container, api, state) {
         const mi = info.get(m.code);
         const cls = mi?.machineClass ?? null;
         const clsTr = cls && cls in MACHINE_CLASS_TR ? MACHINE_CLASS_TR[cls] : MACHINE_CLASS_UNKNOWN_TR;
-        return h('div', { class: 'm', 'data-testid': 'live-machine', 'data-code': m.code, 'data-status': m.status, 'data-headline': ms.headline, 'data-class': cls ?? 'UNKNOWN' }, h('div', { class: 'mh' }, h('span', { class: 'ico' }, spindleIcon(ms.headline, 44)), h('div', { style: 'min-width:0' }, h('div', { class: m.code.length > 5 ? 'code long' : 'code' }, m.code), mi ? h('div', { class: 'small', 'data-testid': 'live-name' }, mi.name) : null), h('span', { class: 'st', 'data-testid': 'live-status', title: AVAILABILITY_TR[ms.availability] }, HEADLINE_TR[ms.headline])), h('div', { class: 'small' }, h('span', { 'data-testid': 'live-class' }, clsTr), mi?.id && state.mode === 'APP' ? [' · ', h('a', { class: 'pp', href: passportHref('MACHINE', mi.id), 'data-testid': 'live-passport' }, 'Pasaport →')] : null), ms.conflict ? h('div', { class: 'conflict', 'data-testid': 'live-conflict' }, `Kayıt: ${AVAILABILITY_TR[ms.availability]} — ama aktif iş emri var`) : null, h('div', { class: 'small', 'data-testid': 'live-since' }, `Durum kaydı: ${fmt(m.since)}`), ...m.active.map((a) => {
+        return h('div', { class: 'm', 'data-testid': 'live-machine', 'data-code': m.code, 'data-status': m.status, 'data-headline': ms.headline, 'data-class': cls ?? 'UNKNOWN' }, h('div', { class: 'mh' }, h('span', { class: 'ico' }, spindleForState(ms, 44)), h('div', { style: 'min-width:0' }, h('div', { class: m.code.length > 5 ? 'code long' : 'code' }, m.code), mi ? h('div', { class: 'small', 'data-testid': 'live-name' }, mi.name) : null), h('span', { class: 'st', 'data-testid': 'live-status', title: AVAILABILITY_TR[ms.availability] }, ms.stale ? STALE_TR : HEADLINE_TR[ms.headline])), h('div', { class: 'small', 'data-testid': 'live-datasource', 'data-source': ms.dataSource }, `Veri kaynağı: ${DATA_SOURCE_TR[ms.dataSource]}`), h('div', { class: 'small' }, h('span', { 'data-testid': 'live-class' }, clsTr), mi?.id && state.mode === 'APP' ? [' · ', h('a', { class: 'pp', href: passportHref('MACHINE', mi.id), 'data-testid': 'live-passport' }, 'Pasaport →')] : null), ms.conflict ? h('div', { class: 'conflict', 'data-testid': 'live-conflict' }, `Kayıt: ${AVAILABILITY_TR[ms.availability]} — ama aktif iş emri var`) : null, h('div', { class: 'small', 'data-testid': 'live-since' }, `Durum kaydı: ${fmt(m.since)}`), ...m.active.map((a) => {
             const d = detailFor(m.code, a.productCode);
             const opName = a.operator !== undefined ? a.operator : d?.operatorName ?? null;
             const named = a.operator !== undefined || d !== null;

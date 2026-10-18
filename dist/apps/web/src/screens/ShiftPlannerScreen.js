@@ -5,9 +5,10 @@
 import { mount } from '../../../../packages/ui/src/h.js';
 import { blockRisks, constraintsOf, delayReason, indexSlots, operatorConflicts, operatorsWithoutShift, planVsActual, riskLevel, slotKey, slotState, addDays } from '../../../../packages/domain/src/planCockpit.js';
 import { errorText } from '../errorText.js';
+import { machineSpindle } from '../machineStateLoader.js';
 import { WO_STATUS_TR } from './WorkOrderHubScreen.js';
 import { E, PLAN_CSS, PROD_SHIFTS, RISK_GLYPH, RISK_NAME, SHIFT_LABEL, dayLabel, hhmm, loadAll, rangeDates, shortId } from './planCockpitKit.js';
-const STATUS_COLOR = { PLANNED: '#64748b', MACHINE_ASSIGNED: '#38bdf8', IN_PROGRESS: '#22c55e', FIRST_PIECE_PENDING: '#2dd4bf', FIRST_PIECE_APPROVED: '#2dd4bf', ON_HOLD: '#f59e0b', COMPLETED: '#475569' };
+const STATUS_COLOR = { PLANNED: '#64748b', PRODUCTION_DONE: '#a78bfa', MACHINE_ASSIGNED: '#38bdf8', IN_PROGRESS: '#22c55e', FIRST_PIECE_PENDING: '#2dd4bf', FIRST_PIECE_APPROVED: '#2dd4bf', ON_HOLD: '#f59e0b', COMPLETED: '#475569' };
 const REFUSAL_TR = {
     CAPACITY_EXCEEDED: 'Vardiya kapasitesi aşılıyor', MACHINE_NOT_PLANNABLE: 'Makine planlanamaz (arıza/bakım)', OPERATOR_NOT_IN_SHIFT: 'Operatör bu vardiyada değil', PERSON_INACTIVE: 'Operatör pasif',
     PERSON_NOT_OPERATOR: 'Seçilen kişi operatör değil', SHIFT_NOT_PRODUCTION: 'Üretim vardiyası değil', PLANNED_MINUTES_REQUIRED: 'Planlı süre girilmeli', HARD_CAP_EXCEEDED: 'Operatör en fazla 3 makineye atanabilir',
@@ -20,6 +21,7 @@ export async function renderShiftPlanner(container, deps, init = {}, flash) {
     const { api, today, canPlan } = deps;
     const st = { s: init.s && /^\d{4}-\d{2}-\d{2}$/.test(init.s) ? init.s : today, days: init.days === 14 ? 14 : 7, m: init.m ?? '', v: init.v ?? '', c: init.c ?? '', w: init.w ?? '', r: init.r ?? '', wo: init.wo ?? '', sc: init.sc ?? '',
         view: (init.view ?? (deps.narrow ? 'list' : 'grid')), placing: '' };
+    let mst = null;
     let d = null;
     let scenarios = null;
     let scNote = null;
@@ -34,6 +36,14 @@ export async function renderShiftPlanner(container, deps, init = {}, flash) {
     async function reload() {
         const to = addDays(st.s, st.days - 1);
         d = await loadAll(api, st.s, to);
+        if (deps.machineStates) {
+            try {
+                mst = await deps.machineStates();
+            }
+            catch {
+                mst = null;
+            }
+        }
         if (canPlan) {
             try {
                 scenarios = await api.scenarios();
@@ -210,7 +220,7 @@ export async function renderShiftPlanner(container, deps, init = {}, flash) {
         })());
         // ---------------- grid / list
         const gridCols = `150px repeat(${dates.length * shifts.length}, minmax(112px,1fr))`;
-        const grid = E('div', { class: 'pk-scroll', 'data-testid': 'pl-grid' }, E('div', { class: 'pk-g', style: `grid-template-columns:${gridCols}`, role: 'table', 'aria-label': 'Makine, tarih ve vardiya bazlı plan' }, E('div', { class: 'pk-gh stick' }, 'Makine'), ...dates.flatMap((dt) => shifts.map((sh) => E('div', { class: 'pk-gh', 'data-testid': 'pl-head' }, E('b', null, dayLabel(dt)), E('small', null, SHIFT_LABEL[sh])))), ...shownMachines.flatMap((m) => [E('div', { class: 'pk-gm stick', 'data-testid': 'pl-machine', 'data-machine': m.code }, E('b', null, m.code), m.status !== 'UP' ? E('small', null, m.status === 'HOLD' ? 'BEKLEME' : m.status === 'DOWN' ? 'ARIZA' : 'BAKIM') : null),
+        const grid = E('div', { class: 'pk-scroll', 'data-testid': 'pl-grid' }, E('div', { class: 'pk-g', style: `grid-template-columns:${gridCols}`, role: 'table', 'aria-label': 'Makine, tarih ve vardiya bazlı plan' }, E('div', { class: 'pk-gh stick' }, 'Makine'), ...dates.flatMap((dt) => shifts.map((sh) => E('div', { class: 'pk-gh', 'data-testid': 'pl-head' }, E('b', null, dayLabel(dt)), E('small', null, SHIFT_LABEL[sh])))), ...shownMachines.flatMap((m) => [E('div', { class: 'pk-gm stick', 'data-testid': 'pl-machine', 'data-machine': m.code }, E('b', { style: 'display:inline-flex;align-items:center;gap:5px', 'data-testid': 'pl-machine-state' }, machineSpindle(mst, m.code, m.status, 20), m.code), m.status !== 'UP' ? E('small', null, m.status === 'HOLD' ? 'BEKLEME' : m.status === 'DOWN' ? 'ARIZA' : 'BAKIM') : null),
             ...dates.flatMap((dt) => shifts.map((sh) => cell(m, dt, sh)))])));
         const list = E('div', { 'data-testid': 'pl-list' }, ...dates.map((dt) => E('div', { class: 'pk-panel' }, E('h2', null, dayLabel(dt)), ...shifts.map((sh) => {
             const rows = shownMachines.flatMap((m) => placedIn(m.id, dt, sh).map((b) => ({ m, b })));

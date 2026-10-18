@@ -24,7 +24,7 @@ const CSS = `
 `;
 const NA = 'VERİ YOK';
 const ST_TR = { DRAFT: 'Taslak', CONFIRMED: 'Onaylandı', IN_PRODUCTION: 'Üretimde', PARTIALLY_SHIPPED: 'Kısmen sevk edildi', SHIPPED: 'Sevk edildi', CLOSED: 'Kapandı', CANCELLED: 'İptal' };
-const WO_TR = { PLANNED: 'Planlandı', RELEASED: 'Serbest', IN_PROGRESS: 'Üretimde', COMPLETED: 'Tamamlandı', CANCELLED: 'İptal', ON_HOLD: 'Bekletmede' };
+const WO_TR = { PLANNED: 'Plana alındı', PRODUCTION_DONE: 'Üretim bitti · onay bekliyor', RELEASED: 'Serbest', IN_PROGRESS: 'Üretimde', COMPLETED: 'Tamamlandı', CANCELLED: 'İptal', ON_HOLD: 'Bekletmede' };
 const stChip = (s) => (['CONFIRMED', 'IN_PRODUCTION', 'SHIPPED', 'CLOSED'].includes(s) ? 'ok' : s === 'CANCELLED' ? 'bad' : s === 'DRAFT' ? 'info' : 'warn');
 const newId = () => (typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(16).slice(2)}`);
 const n = (v) => (v === null || v === undefined ? NA : v.toLocaleString('tr-TR', { maximumFractionDigits: 4 }));

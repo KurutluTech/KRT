@@ -5,6 +5,8 @@
 import { h, mount } from '../../../../packages/ui/src/h.js';
 import { errorText as sharedErrorText } from '../errorText.js';
 import { OPERATOR_CSS, operatorButton } from '../operatorControls.js';
+import { machineState } from '../../../../packages/domain/src/machineState.js';
+import { spindleForState } from '../spindle.js';
 import { WO_STATUS_TR } from './WorkOrderHubScreen.js';
 import { tashihPanel, TASHIH_CSS } from '../tashihPanel.js';
 // A declaration that failed on the network keeps its numbers AND its request id: the retry is the same declaration, so a
@@ -12,6 +14,17 @@ import { tashihPanel, TASHIH_CSS } from '../tashihPanel.js';
 const lastSnapshot = new Map();
 const err = (e) => sharedErrorText(e);
 const rid = (p) => `${p}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+// KMI-013: ONE request id per START / FINISH attempt, kept across a failed attempt (retry = the same request, counted once by the server); dropped once the server confirmed.
+const startIds = new Map();
+const startRid = (wo) => { let r = startIds.get(wo); if (!r) {
+    r = rid('term-start');
+    startIds.set(wo, r);
+} return r; };
+const finishIds = new Map();
+const finishRid = (wo) => { let r = finishIds.get(wo); if (!r) {
+    r = rid('term-finish');
+    finishIds.set(wo, r);
+} return r; };
 const STORE_KEY = 'kmi-next.terminal.machine';
 export function remember(id) {
     try {
@@ -147,19 +160,28 @@ export async function renderTerminalScreen(container, api, state, opts = {}) {
     const tashihEl = snap.active ? tashihPanel({ machineId, workOrderId: snap.active.workOrderId, productCode: snap.active.productCode, shift: null, operatorName: snap.active.operatorName ?? null,
         remainingQty: Math.max(0, snap.active.qtyPlanned - snap.active.qtyProduced - (snap.active.qtyScrap ?? 0)), initialQty: 1, errorText: err,
         submit: api.declareTashih ? (text, q, reqId) => api.declareTashih(snap.active.workOrderId, q, text, reqId) : null, onSaved: () => undefined }) : h('span', {});
+    // KMI-013 FINISH: the values in SAĞLAM / FİRE become the last declaration, tashih is declared here, the session closes and the machine is free again.
+    const tashihFin = h('input', { type: 'number', min: '0', inputmode: 'numeric', value: '0', 'data-testid': 'term-finish-tashih', style: 'width:110px' });
+    const noteFin = h('input', { type: 'text', placeholder: 'Not (isteğe bağlı)', 'data-testid': 'term-finish-note', style: 'flex:1 1 220px' });
+    const finishBlock = (w) => {
+        const wired = !api.finish ? { state: 'NOT_WIRED', why: 'bitirme bu cihazda açık değil' }
+            : w.status === 'IN_PROGRESS' ? { state: 'WIRED' } : { state: 'NOT_WIRED', why: 'yalnız üretimde olan iş bitirilebilir (ilk parça onayından sonra)' };
+        return h('div', { class: 'card', 'data-testid': 'term-finish-block', style: 'margin-top:14px' }, h('div', { class: 'mut', style: 'margin-bottom:8px' }, 'İŞİ BİTİR: yukarıdaki SAĞLAM / FİRE değerleri son beyan olarak kaydedilir, oturum kapanır, makine boşa çıkar. Geri alınamaz. Bitiş zamanı sunucu saatiyle mühürlenir.'), h('div', { class: 'row' }, h('label', { class: 'mut' }, 'TASHİH ', tashihFin), noteFin), h('div', { class: 'ctl' }, operatorButton({ action: 'FINISH', icon, availability: wired,
+            run: () => act(async () => { await api.finish(w.workOrderId, Number(goodIn.value || 0), Number(scrapIn.value || 0), Number(tashihFin.value || 0), noteFin.value.trim(), finishRid(w.workOrderId)); finishIds.delete(w.workOrderId); }, 'İş bitirildi — sonraki departman onayı bekleniyor.') })));
+    };
     const activeCard = (w) => {
         const pct = w.qtyPlanned > 0 ? Math.min(100, Math.round((w.qtyProduced / w.qtyPlanned) * 100)) : 0;
         return h('div', { class: 'card', 'data-testid': 'term-active', 'data-wo': w.workOrderId }, h('div', { class: 'row', style: 'justify-content:space-between' }, h('strong', { style: 'font-size:22px' }, w.productCode ?? `İş emri ${w.workOrderId.slice(0, 8)}`), h('span', { class: 'chip ok', 'data-testid': 'term-active-status', 'data-status': w.status }, icon('cnc', 16), woStatusText(w.status))), h('div', { 'data-testid': 'term-progress', class: 'big', style: 'margin:8px 0' }, `${w.qtyProduced} / ${w.qtyPlanned} sağlam · fire ${w.qtyScrap ?? 0}`), h('div', { class: 'bar' }, h('div', { style: `width:${pct}%` })), h('div', { class: 'mut', style: 'margin-top:6px' }, w.operatorName ? `Sorumlu: ${w.operatorName}` : 'Sorumlu operatör atanmamış'), h('div', { class: 'row', style: 'margin-top:12px' }, h('label', { class: 'mut' }, 'SAĞLAM ', goodIn), h('label', { class: 'mut' }, 'FİRE ', scrapIn)), h('div', { class: 'ctl3', 'data-testid': 'term-counters' }, operatorButton({ action: 'GOOD_PLUS', icon, testid: 'term-good-plus', run: increment(goodIn) }), operatorButton({ action: 'TAHSIS_PLUS', icon, testid: 'term-tashih', run: () => { tashihEl.hidden = !tashihEl.hidden; if (!tashihEl.hidden)
                 tashihEl.scrollIntoView({ block: 'nearest' }); } }), operatorButton({ action: 'SCRAP_PLUS', icon, testid: 'term-scrap-plus', run: increment(scrapIn) })), tashihEl, h('div', { class: 'ctl' }, h('button', { type: 'button', class: 'primary', style: 'min-height:64px;flex:1 1 220px;font-size:18px', 'data-testid': 'term-declare',
             onClick: () => void act(() => api.declare(w.workOrderId, Number(goodIn.value || 0), Number(scrapIn.value || 0), declareRequestId), 'Üretim kaydedildi.', { workOrderId: w.workOrderId, good: goodIn.value, scrap: scrapIn.value, requestId: declareRequestId }) }, 'ÜRETİM KAYDET'), w.status === 'IN_PROGRESS'
             ? operatorButton({ action: 'CALL_QUALITY', icon, testid: 'term-first-piece', label: 'İLK PARÇA · KALİTE ÇAĞIR', run: () => act(() => api.requestFirstPiece(w.workOrderId), 'İlk parça kalite onayına gönderildi.') })
-            : null), stopBlock, h('details', { class: 'term-more', 'data-testid': 'term-more' }, h('summary', {}, 'Diğer işlemler: takım değişimi, operasyon bitir'), h('div', { class: 'ctl' }, operatorButton({ action: 'FINISH', icon, availability: { state: 'NOT_WIRED', why: 'operasyon oturumu kapanışı üretim paketinde bağlanacak' }, run: () => undefined }), h('div', { class: 'row' }, toolCodeIn, operatorButton({ action: 'TOOL_CHANGE', icon, availability: toolWired, testid: 'term-tool-change', run: () => act(() => api.toolChange(machineId, w.workOrderId, toolCodeIn.value.trim(), rid('term-tool')), 'Takım değişimi kaydedildi.') })))));
+            : null), finishBlock(w), stopBlock, h('details', { class: 'term-more', 'data-testid': 'term-more' }, h('summary', {}, 'Diğer işlemler: takım değişimi, operasyon bitir'), h('div', { class: 'ctl' }, h('div', { class: 'row' }, toolCodeIn, operatorButton({ action: 'TOOL_CHANGE', icon, availability: toolWired, testid: 'term-tool-change', run: () => act(() => api.toolChange(machineId, w.workOrderId, toolCodeIn.value.trim(), rid('term-tool')), 'Takım değişimi kaydedildi.') })))));
     };
     const queueRow = (w) => h('div', { class: 'card', 'data-testid': 'term-queue-row', 'data-wo': w.workOrderId }, h('div', { class: 'row', style: 'justify-content:space-between' }, h('strong', { style: 'font-size:18px' }, w.productCode ?? `İş emri ${w.workOrderId.slice(0, 8)}`), h('span', { class: 'chip warn' }, woStatusText(w.status))), h('div', { class: 'mut' }, `${w.qtyPlanned} adet${w.plannedDate ? ` · ${w.plannedDate} ${w.plannedShiftCode === 'TeamK2' ? '2. Vardiya' : '1. Vardiya'}` : ''}`), w.openQualityHold ? h('div', { class: 'chip bad', style: 'margin-top:6px' }, icon('shield', 16), 'KALİTE BEKLETMESİ') : null, w.startRefusal
         ? h('div', { 'data-testid': 'term-refusal', 'data-code': w.startRefusal, style: 'color:#fecaca;margin:8px 0;font-weight:700' }, `Başlatılamaz: ${refusalText(w.startRefusal)}`)
-        : null, h('div', { class: 'ctl' }, operatorButton({ action: 'START', icon, testid: 'term-start', disabled: !!w.startRefusal, run: () => act(() => api.start(w.workOrderId), 'İş emri başlatıldı.') })));
+        : null, h('div', { class: 'ctl' }, operatorButton({ action: 'START', icon, testid: 'term-start', disabled: !!w.startRefusal, run: () => act(async () => { await api.start(w.workOrderId, startRid(w.workOrderId)); startIds.delete(w.workOrderId); }, 'İş emri başlatıldı.') })));
     const stopped = m.label === 'ARIZA' || m.label === 'BAKIM';
-    const screen = h('div', { class: 'term', 'data-testid': 'term-root' }, h('style', {}, CSS), h('div', { class: 'row', style: 'justify-content:space-between' }, h('div', {}, h('div', { style: 'font-size:22px;font-weight:900', 'data-testid': 'term-machine' }, `${m.code} · ${m.name}`), h('span', { class: `chip ${chipClass}`, 'data-testid': 'term-machine-label' }, icon(m.eligible ? 'cnc' : 'gauge', 16), m.label)), h('div', { class: 'row' }, h('button', { type: 'button', class: 'ghost', 'data-testid': 'term-refresh', onClick: () => void go({ machineId }) }, '↻'), h('button', { type: 'button', class: 'ghost', 'data-testid': 'term-change', onClick: () => { remember(null); void go({ machineId: null }); } }, 'Makine değiştir'))), staleSince ? h('div', { class: 'card bad', 'data-testid': 'term-stale' }, `BAĞLANTI YOK — aşağıdaki bilgi SON BİLİNEN durumdur, bu işlem sunucuya ULAŞMADI. Girdiğiniz değerler korundu; bağlantı gelince aynı düğmeye tekrar basın (iki kez sayılmaz). (${staleSince})`) : null, state.banner ? h('div', { class: `card ${state.banner.kind === 'error' ? 'bad' : 'ok'}`, 'data-testid': 'term-banner', 'data-kind': state.banner.kind }, state.banner.text) : null, stopped
+    const screen = h('div', { class: 'term', 'data-testid': 'term-root' }, h('style', {}, CSS), h('div', { class: 'row', style: 'justify-content:space-between' }, h('div', { style: 'display:flex;align-items:center;gap:12px' }, h('span', { 'data-testid': 'term-spindle' }, spindleForState(machineState({ status: m.status, active: snap.active ? [{ runStatus: snap.active.status }] : [] }), 48)), h('div', {}, h('div', { style: 'font-size:22px;font-weight:900', 'data-testid': 'term-machine' }, `${m.code} · ${m.name}`), h('span', { class: `chip ${chipClass}`, 'data-testid': 'term-machine-label' }, icon(m.eligible ? 'cnc' : 'gauge', 16), m.label))), h('div', { class: 'row' }, h('button', { type: 'button', class: 'ghost', 'data-testid': 'term-refresh', onClick: () => void go({ machineId }) }, '↻'), h('button', { type: 'button', class: 'ghost', 'data-testid': 'term-change', onClick: () => { remember(null); void go({ machineId: null }); } }, 'Makine değiştir'))), staleSince ? h('div', { class: 'card bad', 'data-testid': 'term-stale' }, `BAĞLANTI YOK — aşağıdaki bilgi SON BİLİNEN durumdur, bu işlem sunucuya ULAŞMADI. Girdiğiniz değerler korundu; bağlantı gelince aynı düğmeye tekrar basın (iki kez sayılmaz). (${staleSince})`) : null, state.banner ? h('div', { class: `card ${state.banner.kind === 'error' ? 'bad' : 'ok'}`, 'data-testid': 'term-banner', 'data-kind': state.banner.kind }, state.banner.text) : null, stopped
         ? h('div', { class: 'card bad', 'data-testid': 'term-stopped' }, `${m.label}: makine yetkili bakım testiyle açılacak. Üretim başlatılamaz.`)
         : null, snap.active ? activeCard(snap.active) : h('div', { class: 'card', 'data-testid': 'term-no-active' }, 'Bu makinede çalışan iş emri yok.'), h('h2', {}, 'Sıradaki işler'), snap.queue.length ? h('div', {}, ...snap.queue.map(queueRow)) : h('div', { class: 'card', 'data-testid': 'term-no-queue' }, 'Planlı iş yok.'), h('div', { class: 'card', 'data-testid': 'term-machine-controls' }, snap.active ? null : stopBlock, h('div', { class: 'ctl' }, stopped
         ? null

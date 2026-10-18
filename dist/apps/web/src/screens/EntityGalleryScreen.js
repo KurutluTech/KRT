@@ -70,7 +70,7 @@ export async function renderEntityGalleryScreen(container, deps, opts) {
             const a = live?.active[0];
             const cls = str(x.machine_class) && x.machine_class in MACHINE_CLASS_TR ? MACHINE_CLASS_TR[x.machine_class] : null;
             const open = Number(x.open_tickets ?? 0);
-            node = machineIdentityCard({ code: f.code ?? '—', name: f.title, classTr: cls, headline: ms.headline, size: 'compact', passportHref: hrefOf(f), testid: 'eg-card', fresh: !!board,
+            node = machineIdentityCard({ code: f.code ?? '—', name: f.title, classTr: cls, headline: ms.headline, stale: ms.stale, size: 'compact', passportHref: hrefOf(f), testid: 'eg-card', fresh: !!board,
                 sinceLabel: sinceText(str(x.down_since) ?? live?.since ?? null, nowIso) ? `${sinceText(str(x.down_since) ?? live?.since ?? null, nowIso)} süredir` : null,
                 conflictNote: ms.conflict ? 'Kayıt: kullanılamaz — ama aktif iş emri var' : null, shift: board?.shift ?? null,
                 wo: a ? { no: a.wo, product: a.productCode, operator: a.operator, planned: null, produced: null, scrap: null } : null, woCount: live?.active.length ?? 0,

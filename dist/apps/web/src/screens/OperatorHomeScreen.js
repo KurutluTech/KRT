@@ -29,7 +29,7 @@ const CSS = `
 `;
 const KIND_TR = { CHANGE: 'Takım değişimi', BREAK: 'Takım kırıldı', WORN: 'Takım aşındı' };
 const MACHINE_TR = { DOWN: 'ARIZA', HOLD: 'BEKLEME', MAINTENANCE: 'BAKIM', UP: 'ÇALIŞIYOR' };
-const STATUS_TR = { IN_PROGRESS: 'ÜRETİMDE', FIRST_PIECE_PENDING: 'İLK PARÇA KALİTEDE', FIRST_PIECE_APPROVED: 'İLK PARÇA ONAYLI', PLANNED: 'PLANLI', MACHINE_ASSIGNED: 'MAKİNE ATANDI', ON_HOLD: 'BEKLETİLİYOR' };
+const STATUS_TR = { IN_PROGRESS: 'ÜRETİMDE', FIRST_PIECE_PENDING: 'İLK PARÇA KALİTEDE', FIRST_PIECE_APPROVED: 'İLK PARÇA ONAYLI', PLANNED: 'PLANA ALINDI', PRODUCTION_DONE: 'ÜRETİM BİTTİ · ONAY BEKLİYOR', MACHINE_ASSIGNED: 'MAKİNE ATANDI', ON_HOLD: 'BEKLETİLİYOR' };
 const hhmm = (iso) => (iso ? new Date(iso).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Istanbul' }) : '—');
 export async function renderOperatorHomeScreen(container, api, opts, state = {}) {
     const go = (s) => renderOperatorHomeScreen(container, api, opts, s);

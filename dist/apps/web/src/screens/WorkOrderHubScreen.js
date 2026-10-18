@@ -10,12 +10,12 @@ import { renderShipmentScreen } from './ShipmentScreen.js';
 import { renderCommercialApprovalScreen } from './CommercialApprovalScreen.js';
 import { errorText } from '../errorText.js';
 import { collectBlockers, readinessHeadline } from '../woReadiness.js';
-export const WO_STATUS_TR = { PLANNED: 'Planlandı', MACHINE_ASSIGNED: 'Makine atandı', IN_PROGRESS: 'Üretimde', FIRST_PIECE_PENDING: 'İlk parça bekliyor',
+export const WO_STATUS_TR = { PLANNED: 'Plana alındı', MACHINE_ASSIGNED: 'Makine atandı', PRODUCTION_DONE: 'Üretim bitti · onay bekliyor', IN_PROGRESS: 'Üretimde', FIRST_PIECE_PENDING: 'İlk parça bekliyor',
     FIRST_PIECE_APPROVED: 'İlk parça onaylı', COMPLETED: 'Tamamlandı', ON_HOLD: 'Bekletmede (HOLD)', CANCELLED: 'İptal' };
 const TARGETS = ['MACHINE_ASSIGNED', 'IN_PROGRESS', 'FIRST_PIECE_PENDING', 'FIRST_PIECE_APPROVED', 'COMPLETED', 'ON_HOLD', 'CANCELLED'];
 const OPEN_ST = ['PLANNED', 'MACHINE_ASSIGNED', 'IN_PROGRESS', 'FIRST_PIECE_PENDING', 'FIRST_PIECE_APPROVED', 'ON_HOLD'];
 const link = (q, text, testid) => h('a', { href: `#/is-emirleri${q}`, ...(testid ? { 'data-testid': testid } : {}), class: 'woc-link' }, text);
-const STATUS_TONE = { PLANNED: 'mut', MACHINE_ASSIGNED: 'info', IN_PROGRESS: 'info', FIRST_PIECE_PENDING: 'warn', FIRST_PIECE_APPROVED: 'ok', COMPLETED: 'ok', ON_HOLD: 'bad', CANCELLED: 'mut' };
+const STATUS_TONE = { PRODUCTION_DONE: 'warn', PLANNED: 'mut', MACHINE_ASSIGNED: 'info', IN_PROGRESS: 'info', FIRST_PIECE_PENDING: 'warn', FIRST_PIECE_APPROVED: 'ok', COMPLETED: 'ok', ON_HOLD: 'bad', CANCELLED: 'mut' };
 const istanbulToday = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Istanbul' }).format(new Date());
 const isLate = (w) => !!w.dueDate && OPEN_ST.includes(w.status) && w.dueDate < istanbulToday();
 const pct = (a, b) => (b > 0 ? Math.max(0, Math.min(100, Math.round((a / b) * 100))) : 0);

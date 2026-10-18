@@ -125,7 +125,7 @@ function machinePark(m) {
     const fresh = m.fresh === true;
     const groups = f.value.groups.map((g) => h('div', { class: 'cls', 'data-class': g.klass }, h('div', { class: 'lab' }, `${g.label} · ${g.tiles.length}`, ...Object.entries(g.counts).filter(([, n]) => n > 0).map(([k, n]) => h('span', {}, `${HEADLINE_TR[k]} ${n}`))), h('div', { class: 'park' }, ...g.tiles.map((t) => {
         const kpi = m.machines.find((x) => x.code === t.code);
-        return machineIdentityCard({ code: t.code, headline: t.headline, size: 'compact', testid: 'pc-machine', passportHref: t.id ? passportHref('MACHINE', t.id) : '#/canli',
+        return machineIdentityCard({ code: t.code, headline: t.headline, stale: t.state.stale, size: 'compact', testid: 'pc-machine', passportHref: t.id ? passportHref('MACHINE', t.id) : '#/canli',
             sinceLabel: null, wo: t.activeWo ? { no: t.activeWo, product: null, operator: undefined, planned: null, produced: kpi && kpi.good !== null ? kpi.good : null, scrap: kpi && kpi.scrap !== null ? kpi.scrap : null } : null,
             alert: null, fresh });
     }))));

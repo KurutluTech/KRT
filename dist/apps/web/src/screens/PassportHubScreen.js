@@ -7,6 +7,7 @@ import { createPassportCardsApi } from '../passportCardsApi.js';
 import { createProductWorkspaceApi } from '../productWorkspaceApi.js';
 import { KINDS, HUB_KIND_LIST, objectHref } from '../passport/registry.js';
 import { passportEmblem } from '../passport/passportHeader.js';
+import { visualFor } from '../spindle.js';
 import { renderPassportShell } from '../passport/shell.js';
 import { photoSlot, UNKNOWN } from '../passport/kit.js';
 import { errorText } from '../errorText.js';
@@ -140,7 +141,7 @@ export async function renderPassportHubScreen(container, deps, state) {
                 const opIds = [...new Set((wos ?? []).map((w) => w.operatorId).filter((x) => !!x))];
                 const ops = opIds.length ? await io.sel('personnel', 'id,name', { id: `in.(${opIds.join(',')})` }, undefined, 10).catch(() => []) : [];
                 head.badges = [{ text: (MACHINE_TR[m.status] ?? m.status).toLocaleUpperCase('tr-TR'), tone: MACHINE_TONE[m.status] ?? 'mut' }];
-                accent = m.status === 'DOWN' ? '#f87171' : m.status === 'MAINTENANCE' ? '#38bdf8' : m.status === 'HOLD' ? '#fbbf24' : '#4ade80';
+                accent = visualFor(card.machineHeadline).color; // KMI-013: the accent follows the SAME canonical spindle colour (green running · blue idle · red fault · orange maintenance)
                 head.headPoints = [pt('Aktif iş emri', wos === null ? null : wos.length, { source: 'work_orders', href: topicHref('aktif-is'), tone: wos && wos.length ? 'info' : 'mut' }), pt('Operatör', ops.length ? ops.map((o) => o.name).join(', ') : (wos && !wos.length ? '—' : null), { source: 'work_orders.operator_id' }),
                     pt('Açık bakım / arıza', tk === null ? null : tk.length, { source: 'maintenance_tickets', href: topicHref('bakim'), tone: tk && tk.length ? 'warn' : 'ok' }), pt('Toplam duruş', m.totalDownMinutes === null ? null : nf(m.totalDownMinutes, 'dk'), { source: 'machines.total_down_minutes' })];
                 if (m.status === 'MAINTENANCE' || m.status === 'DOWN')
