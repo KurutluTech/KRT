@@ -61,7 +61,7 @@ export function canOpen(path, a) {
 }
 /** Role → the screens featured first on that role's home (directive §3 examples, mapped onto existing roles only). */
 export const ROLE_HOME = {
-    OPERATOR: ['/operator', '/gorevler', '/terminal', '/tara', '/giris-cikislarim', '/rozetlerim', '/zirvedekiler'],
+    OPERATOR: ['/operator', '/is-karti', '/gorevler', '/terminal', '/tara', '/giris-cikislarim', '/rozetlerim', '/zirvedekiler'],
     QUALITY: ['/kalite', '/is-emirleri', '/gorevler', '/dokumanlar', '/tara'],
     MAINTENANCE: ['/bakim', '/gorevler', '/takimhane', '/terminal'],
     CAM: ['/muhendislik', '/fizibilite', '/rota', '/takimhane', '/dokumanlar', '/gorevler'],

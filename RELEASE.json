@@ -1,8 +1,8 @@
 {
   "product": "KMI NEXT",
-  "commit": "bfd13ada5ed65255a9e813de39733586973a1141",
+  "commit": "43cb3f54211dc904288260c021cff96e52036fe0",
   "builtFrom": "clean git tree",
-  "fileCount": 305,
+  "fileCount": 336,
   "migrationsInRepo": 73,
   "lastMigration": "0073_kmi_next_puantaj_month.sql",
   "note": "Release candidate. Publishing to https://flow.kurutlu.com is a manual owner action; this file is not a publication permit.",
@@ -64,8 +64,8 @@
     },
     {
       "path": "dist/apps/web/src/access.js",
-      "bytes": 6963,
-      "sha256": "b8267fef8eb88d283e831608f969ed0e30bdf01184faa888211984b039ad6c7e"
+      "bytes": 6976,
+      "sha256": "ceecfc314edda483e122be229349d19a9f3d780d37b11746caefcfe5f0cc4d36"
     },
     {
       "path": "dist/apps/web/src/accountingApi.js",
@@ -79,8 +79,8 @@
     },
     {
       "path": "dist/apps/web/src/app.js",
-      "bytes": 87340,
-      "sha256": "db74ead094b259d2f8e0699abb3481a95d6fc310b0897065324bc8fb73de4121"
+      "bytes": 87967,
+      "sha256": "5b7003df84753694f06ea971880014e24dd4aa171df457285f29423aed4c5252"
     },
     {
       "path": "dist/apps/web/src/approvalsInboxApi.js",
@@ -284,8 +284,8 @@
     },
     {
       "path": "dist/apps/web/src/objectPassportApi.js",
-      "bytes": 54148,
-      "sha256": "d755e8fff49213055f913d25a4c0d8cd2820f0409b67b718b6a89af6b383ea47"
+      "bytes": 54142,
+      "sha256": "03e2d6aef23966a9d80cc94ecd3822a5fdf3af50a42f1081bd0ca5dd31d980fe"
     },
     {
       "path": "dist/apps/web/src/oeeApi.js",
@@ -303,6 +303,16 @@
       "sha256": "e674feee9808cf8c9683242a41b050b0a8952e84806d6db2de81eb4c66da67a6"
     },
     {
+      "path": "dist/apps/web/src/operatorWoCard.js",
+      "bytes": 3174,
+      "sha256": "57afe071847be9ac57e5eac6b9150ac4de4711d02f8956f158c8155a6d69467e"
+    },
+    {
+      "path": "dist/apps/web/src/operatorWoCardApi.js",
+      "bytes": 4123,
+      "sha256": "a1e968f32fa328e7c2a728bd8a10c414329682f41ae65622ae2a5b23c2f358e9"
+    },
+    {
       "path": "dist/apps/web/src/orderCommandApi.js",
       "bytes": 923,
       "sha256": "9ab16ad83f94292b7e052e39f76616455ff4dab7ed09663023f69514932202da"
@@ -314,8 +324,8 @@
     },
     {
       "path": "dist/apps/web/src/orderImportExtract.js",
-      "bytes": 3268,
-      "sha256": "44ece717f76e27b7d3ba2333df765769f08fdc29d9d084b8351aa0db3a84217d"
+      "bytes": 5133,
+      "sha256": "91fa923c17276739c80c0264fd248c27075c680466b6b4abd3ea44160c00b07d"
     },
     {
       "path": "dist/apps/web/src/ordersApi.js",
@@ -374,8 +384,8 @@
     },
     {
       "path": "dist/apps/web/src/passport/topics/machine.js",
-      "bytes": 11699,
-      "sha256": "1b4424178688787046d123f128003d9088b7232bfb5c5ee778534428c2320066"
+      "bytes": 11747,
+      "sha256": "336585bac3d8bb6a86a61af1d25b8c8892a0baedf9bbeb4e9374bd7b963d77c2"
     },
     {
       "path": "dist/apps/web/src/passport/topics/personnel.js",
@@ -416,6 +426,11 @@
       "path": "dist/apps/web/src/passportCardsApi.js",
       "bytes": 2448,
       "sha256": "4b94fa7d89734004dfab4ca8c387040d076f6c96ed410a6b394aa785ba556608"
+    },
+    {
+      "path": "dist/apps/web/src/pdfRender.js",
+      "bytes": 1745,
+      "sha256": "3d5e57b8faa7a590bee319874a7c70ce0a93c9250af83d492fe386e0dfe09f50"
     },
     {
       "path": "dist/apps/web/src/performanceCenterApi.js",
@@ -704,8 +719,13 @@
     },
     {
       "path": "dist/apps/web/src/screens/OperatorHomeScreen.js",
-      "bytes": 14471,
-      "sha256": "c5f8219e1bdd8808d3cd356ebd2b26dc5007c2820725245c4e4c13122343abd3"
+      "bytes": 14910,
+      "sha256": "3fe5dd61d1b79d2ceff07e4342ecb17592fe8420f13ea4a2f9582e4d9bf1e516"
+    },
+    {
+      "path": "dist/apps/web/src/screens/OperatorWoCardScreen.js",
+      "bytes": 8613,
+      "sha256": "2b5dfc3e3b3d38afe5b2cabc996f603ad5d71f41f1920297e3e8f02fe30373c7"
     },
     {
       "path": "dist/apps/web/src/screens/OrderCommandScreen.js",
@@ -714,8 +734,8 @@
     },
     {
       "path": "dist/apps/web/src/screens/OrderImportScreen.js",
-      "bytes": 19767,
-      "sha256": "dc9e390932f4c9e674ef695752a8b1d6c2f510c2143472c111f7b3fbaf45b688"
+      "bytes": 19975,
+      "sha256": "ccaad71699559d5b0fa73de4de49fe9d17993f45455fa72fb72b3af1b9daeddf"
     },
     {
       "path": "dist/apps/web/src/screens/OrdersScreen.js",
@@ -789,8 +809,8 @@
     },
     {
       "path": "dist/apps/web/src/screens/ProductionScreen.js",
-      "bytes": 9365,
-      "sha256": "09952b45915d5e5c2d433cfe42fbd7ae6274486765b5c2468560e07f2a0cb71e"
+      "bytes": 9706,
+      "sha256": "13b8854c204a2dcb3ccbbe26a17431c9b731c5b4267ed70f61bb9d6b8b2e4f72"
     },
     {
       "path": "dist/apps/web/src/screens/PuantajScreen.js",
@@ -884,8 +904,8 @@
     },
     {
       "path": "dist/apps/web/src/screens/WorkOrderHubScreen.js",
-      "bytes": 12933,
-      "sha256": "e195a3f2ac3eafabdf24167a89035b3c458304849a39873b972ccef951cfd8ec"
+      "bytes": 22704,
+      "sha256": "7b62c033f7c63a25b658b5c94c2c40b423fde15f424d47513a4f8b56b3e9afbc"
     },
     {
       "path": "dist/apps/web/src/screens/WorkOrdersScreen.js",
@@ -1018,14 +1038,149 @@
       "sha256": "3e92c3efc1a1ac691c86c4f063e4e765411c6759b0793e1081f83eb097e9b50f"
     },
     {
+      "path": "dist/apps/web/src/woReadiness.js",
+      "bytes": 4213,
+      "sha256": "2b2824e60e75626704442c40478ef6e41e462fc6be228bf00e6ef5daacd384e0"
+    },
+    {
       "path": "dist/apps/web/src/workOrderHubApi.js",
-      "bytes": 4366,
-      "sha256": "5caed2ab6e17563911bfc0fd1033b455a577a10c3bcb8e22bcf8d6179676d90f"
+      "bytes": 4480,
+      "sha256": "bf4f754a9ce91dac5ad6514de388cbe25b21870ff5c2a6cc961ab4190f5c68ea"
     },
     {
       "path": "dist/apps/web/src/workOrdersApi.js",
       "bytes": 1318,
       "sha256": "b74a4986a24299ffe5b15c536cad745dd393a05306a26975996c3284372156b2"
+    },
+    {
+      "path": "dist/apps/web/vendor/ocr/README.md",
+      "bytes": 427,
+      "sha256": "003b62013d5dd43a361b8f489a510d6b615c494e97661af2408b6dae097d2a5d"
+    },
+    {
+      "path": "dist/apps/web/vendor/ocr/engine.js",
+      "bytes": 1658,
+      "sha256": "fec3b2451848e7fec0754bb44ee420a18833c038d8baa06c8c634c63adc01168"
+    },
+    {
+      "path": "dist/apps/web/vendor/ocr/tesseract/LICENSE-tesseract.js.txt",
+      "bytes": 11357,
+      "sha256": "b40930bbcf80744c86c46a12bc9da056641d722716c378f5659b9e555ef833e1"
+    },
+    {
+      "path": "dist/apps/web/vendor/ocr/tesseract/SHA256SUMS.txt",
+      "bytes": 848,
+      "sha256": "a0e7f13561f6ab30afca63f9a1406ef6d9f27fb0d4657882b9104a0ae2ca3dc3"
+    },
+    {
+      "path": "dist/apps/web/vendor/ocr/tesseract/core/tesseract-core-lstm.wasm.js",
+      "bytes": 3938277,
+      "sha256": "8f04aa0cc81e7bde33f80e92fa01a7a665f0b4884d098acf5de9c7104a11dfaa"
+    },
+    {
+      "path": "dist/apps/web/vendor/ocr/tesseract/core/tesseract-core-simd-lstm.wasm.js",
+      "bytes": 3938657,
+      "sha256": "ce20eda9533cbed1e6c2b4276fbae1e0adc61b6754b5513084be601787b457cf"
+    },
+    {
+      "path": "dist/apps/web/vendor/ocr/tesseract/core/tesseract-core-simd.wasm.js",
+      "bytes": 4735153,
+      "sha256": "63f232c4f7a97b04e52eb940202700b2c6239783a75d0ff0553274fac530cd5c"
+    },
+    {
+      "path": "dist/apps/web/vendor/ocr/tesseract/core/tesseract-core.wasm.js",
+      "bytes": 4734777,
+      "sha256": "2b8c8c92b8788807061fb4bb16c5acdf000c149e100255f879f78d2c58ca9969"
+    },
+    {
+      "path": "dist/apps/web/vendor/ocr/tesseract/lang/eng.traineddata.gz",
+      "bytes": 1976293,
+      "sha256": "2a66ec904bc0e7657b27e200a874c01e1bc8a58b756cbbaa9afbae736fa50edc"
+    },
+    {
+      "path": "dist/apps/web/vendor/ocr/tesseract/lang/tur.traineddata.gz",
+      "bytes": 2017169,
+      "sha256": "644d2c99a79ffc78e9faa052012f219a29b86960e4f4905a5f4dee1771e34dc9"
+    },
+    {
+      "path": "dist/apps/web/vendor/ocr/tesseract/tesseract.min.js",
+      "bytes": 66695,
+      "sha256": "a8e29918d098b2b06e1012bdaeffb4aec0445c5d5654709023e0bd1f442a80e8"
+    },
+    {
+      "path": "dist/apps/web/vendor/ocr/tesseract/worker.min.js",
+      "bytes": 123724,
+      "sha256": "aca1229639fc9907d86f96e825955a2b7c5716d17f3bc3acd71f9c7ab66181fc"
+    },
+    {
+      "path": "dist/apps/web/vendor/pdfjs/LICENSE",
+      "bytes": 10174,
+      "sha256": "0d542e0c8804e39aa7f37eb00da5a762149dc682d7829451287e11b938e94594"
+    },
+    {
+      "path": "dist/apps/web/vendor/pdfjs/SHA256SUMS.txt",
+      "bytes": 414,
+      "sha256": "5870745a609748a5b5cc300b9cbecda600179558548c34cfa9605cf180d7fae2"
+    },
+    {
+      "path": "dist/apps/web/vendor/pdfjs/VERSION.txt",
+      "bytes": 46,
+      "sha256": "b5ddb1927d7b7d5e5f767ae9bd0dc2e7011b1fb2528bad62555577ca1a6284af"
+    },
+    {
+      "path": "dist/apps/web/vendor/pdfjs/pdf.min.mjs",
+      "bytes": 496989,
+      "sha256": "93a1c3b8106822070313c9a001623d086be33bc1f7743081eef27353f7266959"
+    },
+    {
+      "path": "dist/apps/web/vendor/pdfjs/pdf.worker.min.mjs",
+      "bytes": 1286284,
+      "sha256": "cd10f3bdfa9bb5eb7632776675385f5948f4b09afe6b8b563b6199aa99d5da52"
+    },
+    {
+      "path": "dist/apps/web/vendor/pdfjs/wasm/LICENSE_JBIG2",
+      "bytes": 12862,
+      "sha256": "9e66b7f1b934a28b37f3bc4dac97915de1674271e79a0a88182a18ed9731b4d1"
+    },
+    {
+      "path": "dist/apps/web/vendor/pdfjs/wasm/LICENSE_OPENJPEG",
+      "bytes": 2112,
+      "sha256": "a6af136f3e15038a666b61f376612a07d9a4e48cb7c01adbf3e33b3f14ab49b6"
+    },
+    {
+      "path": "dist/apps/web/vendor/pdfjs/wasm/LICENSE_PDFJS_JBIG2",
+      "bytes": 555,
+      "sha256": "aad3cce09842e00e9e11ad5e8fef8cc02fbc3a3768fe2f007443b9cee37aaee5"
+    },
+    {
+      "path": "dist/apps/web/vendor/pdfjs/wasm/LICENSE_PDFJS_OPENJPEG",
+      "bytes": 1285,
+      "sha256": "717fc62da03292dbb4dd0c8280bd4ce7bb8550dcf31d772bc93455fb50313425"
+    },
+    {
+      "path": "dist/apps/web/vendor/pdfjs/wasm/LICENSE_PDFJS_QCMS",
+      "bytes": 1285,
+      "sha256": "eb5104ca33552be007857a28351bc408f379ddd4bfacab1226b09c6d1e9fd7c4"
+    },
+    {
+      "path": "dist/apps/web/vendor/pdfjs/wasm/LICENSE_QCMS",
+      "bytes": 1121,
+      "sha256": "36d847ae882f6574ebc72f56a4f354e4f104fde4a584373496482e97d52d31bc"
+    },
+    {
+      "path": "dist/apps/web/vendor/pdfjs/wasm/jbig2.wasm",
+      "bytes": 104852,
+      "sha256": "e6bee67724a7b5436fe8162638e3708cfc8d52b6342db69a49715e30ff27cfdc"
+    },
+    {
+      "path": "dist/apps/web/vendor/pdfjs/wasm/openjpeg.wasm",
+      "bytes": 252032,
+      "sha256": "004a0e62db930ba9ff2a22212f4554d0bb57a0635a8287caf70f98117cee14ba"
+    },
+    {
+      "path": "dist/apps/web/vendor/pdfjs/wasm/qcms_bg.wasm",
+      "bytes": 88837,
+      "sha256": "bfdaeb649178748e54bcdaa819bcd5c5c5a4278c8eaaf5feb5a26071e1c25bfc"
     },
     {
       "path": "dist/packages/data-client/src/client.js",
@@ -1299,8 +1454,8 @@
     },
     {
       "path": "dist/packages/domain/src/orderPdf.js",
-      "bytes": 11336,
-      "sha256": "9efd5051a01797c22033781f371c4fead699828d13dd54a33bccdd5532caac3a"
+      "bytes": 11451,
+      "sha256": "402b159e233fd1d516776efab3878c392a80196231a2ea507972f3252dff66d2"
     },
     {
       "path": "dist/packages/domain/src/parameters.js",

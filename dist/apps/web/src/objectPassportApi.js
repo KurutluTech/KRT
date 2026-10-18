@@ -195,7 +195,7 @@ export function createObjectPassportApi(client, session, access, myUserId = sess
                 const def = KINDS[kind];
                 const docs = def.docEntity ? await sel('documents', 'id,doc_type,title,status,created_at', { entity_type: `eq.${def.docEntity}`, entity_id: `eq.${id}` }, 'created_at.desc') : [];
                 return [{ title: 'Belgeler', table: tbl(['Tür', 'Başlık', 'Durum', 'Eklenme'], docs.map((d) => [d.docType, d.title, d.status === 'ACTIVE' ? pill('Aktif', 'ok') : pill('Geri çekildi', 'warn'), ts(d.createdAt)]), def.docEntity ? 'Bu nesneye bağlı belge yok.' : 'Bu nesne türüne belge bağlama şu an tanımlı değil (dokümanlar ürün revizyonu, iş emri, sipariş, parti, sevkiyat, NCR, makine ve takıma bağlanır).'),
-                        note: def.docEntity ? `Belge eklemek için Dokümanlar ekranı kullanılır: #/dokumanlar?tip=${def.docEntity}&id=${id}` : undefined }];
+                        note: def.docEntity ? `Belge eklemek için Dokümanlar ekranı kullanılır.` : undefined }];
             });
         switch (`${kind}:${key}`) {
             case 'MACHINE:genel': return guard(async () => {
@@ -230,7 +230,7 @@ export function createObjectPassportApi(client, session, access, myUserId = sess
                     const w = await one('work_orders', 'created_at,planned_date,planned_shift_code,planned_minutes,product_revision_id,cam_program_id', id);
                     const rev = w.productRevisionId ? (await sel('product_revisions', 'revision,status', { id: `eq.${w.productRevisionId}` }, undefined, 1))[0] : undefined;
                     const cam = w.camProgramId ? (await sel('cam_programs', 'program_no,revision', { id: `eq.${w.camProgramId}` }, undefined, 1))[0] : undefined;
-                    return [{ title: 'Kimlik', kv: [['İş emri kimliği', id], ['Açılış', ts(w.createdAt)], ['Planlanan gün', w.plannedDate ?? '—'], ['Planlanan vardiya', w.plannedShiftCode ?? '—'], ['Planlanan süre', w.plannedMinutes === null ? 'BİLİNMİYOR' : `${w.plannedMinutes} dk`], ['Ürün revizyonu', rev ? `${rev.revision} (${rev.status})` : 'atanmadı'], ['CAM programı', cam ? `${cam.programNo} rev ${cam.revision}` : 'atanmadı']],
+                    return [{ title: 'Kimlik', kv: [['İş emri referansı', `İE-${id.slice(0, 8).toUpperCase()}`], ['Açılış', ts(w.createdAt)], ['Planlanan gün', w.plannedDate ?? '—'], ['Planlanan vardiya', w.plannedShiftCode ?? '—'], ['Planlanan süre', w.plannedMinutes === null ? 'BİLİNMİYOR' : `${w.plannedMinutes} dk`], ['Ürün revizyonu', rev ? `${rev.revision} (${rev.status})` : 'atanmadı'], ['CAM programı', cam ? `${cam.programNo} rev ${cam.revision}` : 'atanmadı']],
                             note: 'Ayrıntılı izlenebilirlik zinciri (eksik halkalar, as-built, malzeme, parti, sevkiyat) bu pasaportun "İzlenebilirlik zinciri" sekmesinde.' }];
                 }
                 if (key === 'operasyonlar') {

@@ -33,6 +33,8 @@ import { createEngineeringApi } from './engineeringApi.js';
 import { renderOperatorHomeScreen } from './screens/OperatorHomeScreen.js';
 import { renderNoticesScreen } from './screens/NoticesScreen.js';
 import { createOperatorHomeApi } from './operatorHomeApi.js';
+import { createOperatorWoCardApi } from './operatorWoCardApi.js';
+import { renderOperatorWoCardScreen } from './screens/OperatorWoCardScreen.js';
 import { createTerminalApi } from './terminalApi.js';
 import { withCockpit, liveCockpitSources } from './screens/DepartmentCockpit.js';
 import { FUNCTION_STATE_TR, resolveFunctions, functionMaturity, liveLabelTr } from '../../../packages/domain/src/departmentFunctions.js';
@@ -272,6 +274,11 @@ export const ROUTES = [
         render: (el, c, s) => renderOperatorHomeScreen(el, createOperatorHomeApi(c, s), {
             openTerminal: (machineId) => { rememberMachine(machineId); location.hash = '#/terminal'; }, goTasks: () => { location.hash = '#/gorevler'; }
         }),
+    },
+    {
+        // operator-safe work-order card (no commercial fields); non-assigned work orders are simply not returned by RLS
+        path: '/is-karti', label: 'İş Emri Kartı (operatör)', group: 'Saha', inMenu: false,
+        render: (el, c, s, q) => renderOperatorWoCardScreen(el, { api: createOperatorWoCardApi(c, s), openTerminal: (machineId) => { rememberMachine(machineId); location.hash = '#/terminal'; }, go: (hash) => { location.hash = hash; } }, q.get('wo')),
     },
     { path: '/terminal', label: 'Makine Terminali', group: 'Saha', inMenu: true, render: (el, c, s) => renderTerminalScreen(el, createTerminalApi(c, s), { machineId: rememberedMachine() }, { icon: (n, z) => icon(n, z) }) },
     {
