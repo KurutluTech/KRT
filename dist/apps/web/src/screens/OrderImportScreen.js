@@ -68,7 +68,7 @@ export async function renderOrderImportScreen(container, api, state = {}) {
                 const up = await api.uploadPdf(imp.import_id, f.name, toBase64(bytes), null);
                 status.textContent = 'Veri çıkarılıyor…';
                 status.textContent = 'Veri çıkarılıyor… (taranmış PDF’lerde OCR 10–60 sn sürebilir)';
-                const out = await extractOrder(bytes);
+                const out = await extractOrder(bytes, { onProgress: (p) => { status.textContent = p.phase === 'TEXT' ? 'Metin katmanı okunuyor…' : `Sayfa ${p.page}/${p.pages} ${p.phase === 'RENDER' ? 'görüntüye çevriliyor' : 'OCR ile okunuyor'}…`; } });
                 const ex = out.extraction;
                 await api.attach(imp.import_id, up.versionId, ex);
                 await go({ id: imp.import_id, banner: EXTRACT_BANNER[out.mode] });

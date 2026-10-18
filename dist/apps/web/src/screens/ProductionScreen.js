@@ -27,11 +27,11 @@ export async function renderProductionScreen(container, workOrderId, deps, banne
     catch (err) {
         loadError = errorText(err);
     }
-    const goodInput = h('input', { type: 'number', min: '0', 'data-testid': 'decl-good-input' });
-    const scrapInput = h('input', { type: 'number', min: '0', 'data-testid': 'decl-scrap-input' });
+    const goodInput = h('input', { type: 'number', min: '0', 'data-testid': 'decl-good-input', placeholder: 'İyi adet', 'aria-label': 'İyi adet' });
+    const scrapInput = h('input', { type: 'number', min: '0', 'data-testid': 'decl-scrap-input', placeholder: 'Hurda adet', 'aria-label': 'Hurda adet' });
     const holdReasonInput = h('input', { type: 'text', 'data-testid': 'hold-reason-input', placeholder: 'Kalite hold nedeni' });
-    const correctionGoodDeltaInput = h('input', { type: 'number', 'data-testid': 'correction-good-delta-input' });
-    const correctionScrapDeltaInput = h('input', { type: 'number', 'data-testid': 'correction-scrap-delta-input' });
+    const correctionGoodDeltaInput = h('input', { type: 'number', 'data-testid': 'correction-good-delta-input', placeholder: 'İyi adet farkı (+/−)', 'aria-label': 'İyi adet farkı (+/−)' });
+    const correctionScrapDeltaInput = h('input', { type: 'number', 'data-testid': 'correction-scrap-delta-input', placeholder: 'Hurda adet farkı (+/−)', 'aria-label': 'Hurda adet farkı (+/−)' });
     const correctionReasonInput = h('input', { type: 'text', 'data-testid': 'correction-reason-input', placeholder: 'Düzeltme nedeni (zorunlu)' });
     async function handleDeclare(e) {
         e.preventDefault();
@@ -77,7 +77,7 @@ export async function renderProductionScreen(container, workOrderId, deps, banne
             await renderProductionScreen(container, workOrderId, deps, { kind: 'error', text: errorText(err) });
         }
     }
-    const rejectQtyInput = h('input', { type: 'number', min: '1', 'data-testid': 'reject-qty-input' });
+    const rejectQtyInput = h('input', { type: 'number', min: '1', 'data-testid': 'reject-qty-input', placeholder: 'Reddedilen adet', 'aria-label': 'Reddedilen adet' });
     const rejectReasonInput = h('input', { type: 'text', 'data-testid': 'reject-reason-input', placeholder: 'Ret nedeni (zorunlu)' });
     async function handleReject(e) {
         e.preventDefault();
