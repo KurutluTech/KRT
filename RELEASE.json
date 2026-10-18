@@ -1,6 +1,6 @@
 {
   "product": "KMI NEXT",
-  "commit": "1a9517cb984b47e718ec2a41378b97e9b767e317",
+  "commit": "8a837ff66bf7a4edc176d89c253ea9b34219dc05",
   "builtFrom": "clean git tree",
   "fileCount": 336,
   "migrationsInRepo": 73,
@@ -64,8 +64,8 @@
     },
     {
       "path": "dist/apps/web/src/access.js",
-      "bytes": 6976,
-      "sha256": "ceecfc314edda483e122be229349d19a9f3d780d37b11746caefcfe5f0cc4d36"
+      "bytes": 7159,
+      "sha256": "26ee432da04c9741d26dad34b2ed28453f774a8ec2799cfc93088d8c0580098b"
     },
     {
       "path": "dist/apps/web/src/accountingApi.js",
@@ -79,8 +79,8 @@
     },
     {
       "path": "dist/apps/web/src/app.js",
-      "bytes": 88049,
-      "sha256": "e5b4ba2f2eef2a189744e62cb2f240d662a1725ea9d7b08d9ca8674c8d03a598"
+      "bytes": 89378,
+      "sha256": "c0e60a23b26c68b53f2db1d0a98b5d090b98120efb33706ea17ca9bf6aeb870a"
     },
     {
       "path": "dist/apps/web/src/approvalsInboxApi.js",
@@ -274,8 +274,8 @@
     },
     {
       "path": "dist/apps/web/src/nav.js",
-      "bytes": 17449,
-      "sha256": "c83a7016c5fbec84d05e25eb1f57d08fa6145c95ca59bd6ff0c44269dde5dc6f"
+      "bytes": 17457,
+      "sha256": "0055c9aa91935f55861cd65feb2ab45e18ddf0b96f3270acfaa159ece19e5b0e"
     },
     {
       "path": "dist/apps/web/src/objectCard.js",
@@ -563,9 +563,9 @@
       "sha256": "dc04760b334f5c76fcb324748456875d56a9652b05894b9b7119d8df2be779df"
     },
     {
-      "path": "dist/apps/web/src/screens/CatalogScreen.js",
-      "bytes": 4649,
-      "sha256": "859925b962c94974cfa72195d6a57daf8d4c8cfd7d94a17b001422947636234d"
+      "path": "dist/apps/web/src/screens/CatalogCenterScreen.js",
+      "bytes": 14226,
+      "sha256": "99b604a89f5d374be26d52b63d90e93a4bf34fc918124c0b8e5d173a5904c890"
     },
     {
       "path": "dist/apps/web/src/screens/CommercialApprovalScreen.js",
@@ -639,8 +639,8 @@
     },
     {
       "path": "dist/apps/web/src/screens/EntityGalleryScreen.js",
-      "bytes": 16756,
-      "sha256": "d564452fdaa4a377b32044ddf2f9bcbb13ee3b1b960ff754b994796835447d97"
+      "bytes": 17985,
+      "sha256": "df0721b34f77e2bbb88e9cf54d72f907f6cbfe91f668fd527310a281f2cef266"
     },
     {
       "path": "dist/apps/web/src/screens/FeasibilityScreen.js",
@@ -749,8 +749,8 @@
     },
     {
       "path": "dist/apps/web/src/screens/PassportHubScreen.js",
-      "bytes": 18334,
-      "sha256": "7cd9f2137f7df7883d573025bdc36b70a62281a029ae6f19a0fac83efeb73534"
+      "bytes": 18844,
+      "sha256": "b4ba104140636d4fe7530611ab904e7d2a117157d1195baa4a8c469dbdc0b055"
     },
     {
       "path": "dist/apps/web/src/screens/PassportScreen.js",

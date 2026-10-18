@@ -60,7 +60,7 @@ export const NAV_TREE = [
             { path: '/siparis-komuta', label: 'Sipariş Komuta Merkezi', icon: 'grid' },
             { path: '/siparisler', label: 'Siparişler', icon: 'truck' },
             { path: '/pdf-siparis', label: 'PDF’ten Sipariş', icon: 'upload' },
-            { path: '/katalog', label: 'Katalog', icon: 'book' },
+            { path: '/katalog', label: 'Katalog Merkezi', icon: 'book' },
         ] },
     { id: 'prod', short: 'Üretim', title: 'ÜRETİM', icon: 'cnc', items: [
             { path: '/uretim', label: 'Üretim Masası', icon: 'cnc' },

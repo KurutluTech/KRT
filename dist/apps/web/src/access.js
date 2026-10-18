@@ -14,7 +14,7 @@ export const OPEN_RULES = {
     '/tedarikci-fatura': { any: ['PURCHASE_ORDER_MANAGE', 'ACCOUNTING_MUTATION'], economics: true },
     '/ana-veri-aktarim': { any: ['MASTER_DATA_IMPORT'] },
     '/muhendislik': { any: ['BOM_RELEASE'] },
-    '/katalog': { any: ['ORDER_CREATE', 'PURCHASE_ORDER_MANAGE', 'MASTER_DATA_IMPORT'] },
+    '/katalog': { any: ['ORDER_CREATE', 'PURCHASE_ORDER_MANAGE', 'MASTER_DATA_IMPORT', 'CUSTOMER_MANAGE', 'CUSTOMER_CONTACT_VIEW', 'BOM_RELEASE'] }, // Katalog Merkezi: each tab is further gated by its own entry (/musteriler, /tedarikciler, /urun-master) and by the server
     '/siparis-komuta': { any: ['ORDER_CREATE', 'ORDER_CONFIRM', 'WORK_ORDER_CREATE', 'COMMERCIAL_RELEASE', 'MANAGEMENT_RELEASE'] },
     '/siparisler': { any: ['ORDER_CREATE', 'ORDER_CONFIRM', 'WORK_ORDER_CREATE', 'COMMERCIAL_RELEASE', 'MANAGEMENT_RELEASE'] },
     '/musteriler': { any: ['CUSTOMER_MANAGE', 'CUSTOMER_CONTACT_VIEW'] },
