@@ -10,7 +10,7 @@ const cnt = (xs, f) => (xs ? xs.filter(f).length : null);
 const c = (s, key) => (s && typeof s.counters[key] === 'number' ? s.counters[key] : null);
 const alertsOf = (s, kind) => (s ? s.alerts.filter((a) => a.kind === kind).length : null);
 const dueOrder = (a, b) => (a.dueDate ?? '9999').localeCompare(b.dueDate ?? '9999');
-const wolink = (id) => `#/nesne?t=WORK_ORDER&id=${encodeURIComponent(id)}`;
+const wolink = (id) => `#/kart?t=WORK_ORDER&id=${encodeURIComponent(id)}`;
 export function buildCockpit(id, i) {
     const s = i.snapshot, wo = i.workOrders ?? null;
     switch (id) {
@@ -107,7 +107,7 @@ export function buildCockpit(id, i) {
                 kpis: [k('wip', 'Üretimde (WIP) lot', cnt(l, (x) => x.state === 'WIP'), 'stok lotları okunamadı', flat, '#/depo'), k('fg', 'Mamul (FG) lot', cnt(l, (x) => x.state === 'FG'), 'stok lotları okunamadı', flat, '#/depo'),
                     k('hold', 'HOLD lot', cnt(l, (x) => x.state === 'HOLD'), 'stok lotları okunamadı', hot('red'), '#/depo'), k('staged', 'Sevkiyata hazır lot', cnt(l, (x) => x.state === 'STAGED'), 'stok lotları okunamadı', flat, '#/sevkiyat'),
                     k('incoming', 'Giriş kalite bekleyen', c(s, 'incomingQcWaiting'), 'komuta anlık görüntüsü yok', hot('amber'), '#/satinalma'), k('shortage', 'Yakın planda malzeme eksiği', alertsOf(s, 'MATERIAL_SHORTAGE_SOON'), 'komuta anlık görüntüsü yok', hot('red'), '#/depo')],
-                queueTitle: 'HOLD / hurda lotlar', queue: l ? l.filter((x) => x.state === 'HOLD' || x.state === 'SCRAP').slice(0, 8).map((x) => ({ label: `Lot ${x.id.slice(0, 8)}`, detail: `${x.qty} adet · ${x.state}`, href: `#/nesne?t=STOCK_LOT&id=${encodeURIComponent(x.id)}`, tone: 'red' })) : null, queueReason: l ? null : 'stok lotları okunamadı',
+                queueTitle: 'HOLD / hurda lotlar', queue: l ? l.filter((x) => x.state === 'HOLD' || x.state === 'SCRAP').slice(0, 8).map((x) => ({ label: `Lot ${x.id.slice(0, 8)}`, detail: `${x.qty} adet · ${x.state}`, href: `#/kart?t=STOCK_LOT&id=${encodeURIComponent(x.id)}`, tone: 'red' })) : null, queueReason: l ? null : 'stok lotları okunamadı',
                 workflow: [{ step: 'WIP', count: cnt(l, (x) => x.state === 'WIP') }, { step: 'FG', count: cnt(l, (x) => x.state === 'FG') }, { step: 'Hazır', count: cnt(l, (x) => x.state === 'STAGED') }, { step: 'Sevk edildi', count: cnt(l, (x) => x.state === 'SHIPPED') }],
                 risks: (s?.alerts ?? []).filter((a) => a.domain === 'MATERIAL').map((a) => ({ text: a.title, href: null })), crossLinks: [{ label: 'Satınalma', href: '#/satinalma', why: 'mal kabul' }, { label: 'Kalite', href: '#/kalite', why: 'HOLD lotlar' }, { label: 'Sevkiyat', href: '#/sevkiyat', why: 'hazır lotlar' }] };
         }
@@ -128,7 +128,7 @@ export function buildCockpit(id, i) {
                 kpis: [k('staged', 'Sevkiyata hazır lot', cnt(l, (x) => x.state === 'STAGED' || x.state === 'AVAILABLE'), 'stok lotları okunamadı', flat, '#/sevkiyat'), k('draft', 'Hazırlanan sevkiyat', c(s, 'shipmentsDraft'), 'komuta anlık görüntüsü yok', flat, '#/sevkiyat'),
                     k('late', 'Termini geçen kalem', c(s, 'orderItemsOverdue'), 'komuta anlık görüntüsü yok', hot('red'), '#/siparisler'), k('shipped', 'Sevk edilmiş lot', cnt(l, (x) => x.state === 'SHIPPED'), 'stok lotları okunamadı', flat, '#/sevkiyat'),
                     k('hold', 'HOLD lot (sevk edilemez)', cnt(l, (x) => x.state === 'HOLD'), 'stok lotları okunamadı', hot('red'), '#/depo')],
-                queueTitle: 'Sevkiyata hazır lotlar', queue: l ? l.filter((x) => x.state === 'STAGED' || x.state === 'AVAILABLE').slice(0, 8).map((x) => ({ label: `Lot ${x.id.slice(0, 8)}`, detail: `${x.qty} adet · ${x.state}`, href: `#/nesne?t=STOCK_LOT&id=${encodeURIComponent(x.id)}`, tone: 'blue' })) : null, queueReason: l ? null : 'stok lotları okunamadı',
+                queueTitle: 'Sevkiyata hazır lotlar', queue: l ? l.filter((x) => x.state === 'STAGED' || x.state === 'AVAILABLE').slice(0, 8).map((x) => ({ label: `Lot ${x.id.slice(0, 8)}`, detail: `${x.qty} adet · ${x.state}`, href: `#/kart?t=STOCK_LOT&id=${encodeURIComponent(x.id)}`, tone: 'blue' })) : null, queueReason: l ? null : 'stok lotları okunamadı',
                 workflow: [{ step: 'FG', count: cnt(l, (x) => x.state === 'FG') }, { step: 'Hazır', count: cnt(l, (x) => x.state === 'STAGED') }, { step: 'Taslak sevkiyat', count: c(s, 'shipmentsDraft') }, { step: 'Sevk edildi', count: cnt(l, (x) => x.state === 'SHIPPED') }],
                 risks: (s?.alerts ?? []).filter((a) => a.domain === 'SHIPMENT').map((a) => ({ text: a.title, href: null })), crossLinks: [{ label: 'Muhasebe kuyruğu', href: '#/onay-kuyrugu', why: 'ticari onay' }, { label: 'Siparişler', href: '#/siparisler', why: 'termin' }, { label: 'Kalite', href: '#/kalite', why: 'sevk öncesi kapı' }] };
         }
@@ -145,7 +145,7 @@ export function buildCockpit(id, i) {
             return { id, title: 'İnsan Kaynakları kokpiti', owner: 'Personel / İK (yetkili kullanıcılar) — ayrı İK rolü yoktur', actions: ['Personel kaydı', 'Hesap bağla / PIN', 'Çoklu makine ataması'],
                 kpis: [k('active', 'Aktif personel', act ? act.length : null, 'personel listesi okunamadı', flat, '#/personel'), k('inactive', 'Pasif personel', p ? p.length - (act?.length ?? 0) : null, 'personel listesi okunamadı', flat, '#/personel'),
                     k('unassigned', 'Bölümü belirsiz (UNASSIGNED) aktif kişi', cnt(act, (x) => x.department === 'UNASSIGNED'), 'personel listesi okunamadı', hot('amber'), '#/personel'), k('production', 'Üretim bölümü aktif', cnt(act, (x) => x.department === 'URETIM'), 'personel listesi okunamadı', flat, '#/personel')],
-                queueTitle: 'Bölümü belirsiz kişiler', queue: act ? act.filter((x) => x.department === 'UNASSIGNED').slice(0, 8).map((x) => ({ label: x.name, detail: 'bölüm atanmamış — yetki vermez', href: `#/nesne?t=PERSONNEL&id=${encodeURIComponent(x.id)}`, tone: 'amber' })) : null, queueReason: act ? null : 'personel listesi okunamadı',
+                queueTitle: 'Bölümü belirsiz kişiler', queue: act ? act.filter((x) => x.department === 'UNASSIGNED').slice(0, 8).map((x) => ({ label: x.name, detail: 'bölüm atanmamış — yetki vermez', href: `#/kart?t=PERSONNEL&id=${encodeURIComponent(x.id)}`, tone: 'amber' })) : null, queueReason: act ? null : 'personel listesi okunamadı',
                 workflow: [{ step: 'Kayıt', count: p ? p.length : null }, { step: 'Aktif', count: act ? act.length : null }], risks: [], crossLinks: [{ label: 'Puantaj & Prim', href: '#/puantaj', why: 'ay gerçekleri (V47 değişmez)' }, { label: 'Personel Erişimi', href: '#/personel-yetki', why: 'hesap/PIN' }, { label: 'Rozetler / Akademi', href: '#/akademi', why: 'yetkinlik' }] };
         }
     }

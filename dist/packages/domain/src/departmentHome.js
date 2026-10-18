@@ -27,7 +27,7 @@ const count = (xs, key) => {
     return [...m.entries()].sort((a, b) => b[1] - a[1]).map(([k, v]) => ({ label: statusTr(k), value: v, tone: toneOf(k) }));
 };
 const OPEN = (s) => s !== 'COMPLETED' && s !== 'CANCELLED';
-const wolink = (id) => `#/nesne?t=WORK_ORDER&id=${encodeURIComponent(id)}`;
+const wolink = (id) => `#/kart?t=WORK_ORDER&id=${encodeURIComponent(id)}`;
 const rec = (id, cells, href, tone) => ({ id, cells, href, tone, search: cells.join(' ').toLocaleLowerCase('tr-TR') });
 export function dueBuckets(rows, todayIso) {
     const today = todayIso.slice(0, 10), plus7 = new Date(Date.parse(today) + 7 * 864e5).toISOString().slice(0, 10);

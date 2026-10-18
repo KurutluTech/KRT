@@ -104,14 +104,14 @@ export function buildPerformanceCenter(i) {
         });
         for (const w of s.liveWorkOrders) {
             if (w.status === 'FIRST_PIECE_PENDING' && w.since && minutesAgo(w.since, i.nowIso) >= FIRST_PIECE_WAIT_MIN)
-                bottlenecks.push({ kind: 'FIRST_PIECE_WAIT', title: `İlk parça onayı bekliyor · ${w.machineCode ?? '—'} · ${w.productCode ?? '—'}`, evidence: `${minutesAgo(w.since, i.nowIso)} dk bekliyor (eşik ${FIRST_PIECE_WAIT_MIN} dk) — kayıt: iş emri durumu`, href: `#/nesne?t=WORK_ORDER&id=${encodeURIComponent(w.workOrderId)}` });
+                bottlenecks.push({ kind: 'FIRST_PIECE_WAIT', title: `İlk parça onayı bekliyor · ${w.machineCode ?? '—'} · ${w.productCode ?? '—'}`, evidence: `${minutesAgo(w.since, i.nowIso)} dk bekliyor (eşik ${FIRST_PIECE_WAIT_MIN} dk) — kayıt: iş emri durumu`, href: `#/kart?t=WORK_ORDER&id=${encodeURIComponent(w.workOrderId)}` });
         }
     }
     else
         workOrders = unknown('Komuta anlık görüntüsü okunamadı');
     for (const t of tiles) {
         if (t.activeWo && (t.headline === 'DOWN' || t.headline === 'HOLD' || t.headline === 'MAINTENANCE'))
-            bottlenecks.push({ kind: 'MACHINE_BLOCKED', title: `${t.code} durumu "${t.headline === 'DOWN' ? 'arıza' : t.headline === 'HOLD' ? 'bekletme' : 'bakım'}" ama üzerinde iş emri ${t.activeWo} var`, evidence: 'Makine durum kaydı ile iş emri kaydı çelişiyor / iş durmuş', href: t.id ? `#/nesne?t=MACHINE&id=${encodeURIComponent(t.id)}` : '#/bakim' });
+            bottlenecks.push({ kind: 'MACHINE_BLOCKED', title: `${t.code} durumu "${t.headline === 'DOWN' ? 'arıza' : t.headline === 'HOLD' ? 'bekletme' : 'bakım'}" ama üzerinde iş emri ${t.activeWo} var`, evidence: 'Makine durum kaydı ile iş emri kaydı çelişiyor / iş durmuş', href: t.id ? `#/kart?t=MACHINE&id=${encodeURIComponent(t.id)}` : '#/bakim' });
     }
     const pb = i.processBottleneck;
     if (pb?.bottleneck)
@@ -151,7 +151,7 @@ export function buildPerformanceCenter(i) {
     // explainable risks: every alert says why + where it came from; every rule suggestion carries its evidence class
     const risks = [];
     for (const a of prioritizeAlerts(s?.alerts ?? [])) {
-        risks.push({ key: `${a.kind}:${a.entityId}`, severity: a.severity, domain: a.domain, title: a.title, why: [ALERT_KINDS[a.kind]?.label ?? a.kind, a.detail].filter(Boolean).join(' — '), evidence: `Kayıt: ${a.entityType}${a.since ? ` · ${a.since}` : ''} · kural: ${a.kind} (${a.severity})`, href: a.entityId && ['MACHINE', 'WORK_ORDER', 'STOCK_LOT'].includes(a.entityType) ? `#/nesne?t=${a.entityType}&id=${encodeURIComponent(a.entityId)}` : ENTITY_HREF[a.entityType] ?? null, since: a.since, kind: 'ALERT' });
+        risks.push({ key: `${a.kind}:${a.entityId}`, severity: a.severity, domain: a.domain, title: a.title, why: [ALERT_KINDS[a.kind]?.label ?? a.kind, a.detail].filter(Boolean).join(' — '), evidence: `Kayıt: ${a.entityType}${a.since ? ` · ${a.since}` : ''} · kural: ${a.kind} (${a.severity})`, href: a.entityId && ['MACHINE', 'WORK_ORDER', 'STOCK_LOT'].includes(a.entityType) ? `#/kart?t=${a.entityType}&id=${encodeURIComponent(a.entityId)}` : ENTITY_HREF[a.entityType] ?? null, since: a.since, kind: 'ALERT' });
     }
     for (const n of i.nba ?? []) {
         risks.push({ key: `nba:${n.key}`, severity: 'ADVISORY', domain: null, title: n.titleTr, why: n.reasonTr, evidence: `Kayıt üzerinden kural (yapay zekâ değil) · etki: ${n.effectTr} · öncelik ${n.risk}`, href: `#${n.source.route}`.replace('##', '#'), since: n.since, kind: 'RULE' });
