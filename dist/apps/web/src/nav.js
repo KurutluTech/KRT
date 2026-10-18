@@ -68,6 +68,7 @@ export const NAV_TREE = [
             { path: '/gorevler', label: 'Görevlerim', icon: 'tasks' },
             { path: '/is-emirleri', label: 'İş Emirleri', icon: 'factory' },
             { path: '/terminal', label: 'Makine Terminali', icon: 'chip' },
+            { path: '/varliklar', label: 'Dijital Varlık Merkezi', icon: 'chip' },
             { path: '/tara', label: 'QR / Barkod', icon: 'scan' },
         ] },
     { id: 'plan', short: 'Planlama', title: 'ÜRETİM PLANLAMA', icon: 'layers', items: [
@@ -216,7 +217,7 @@ export function trTitle(t) {
 export const DETAIL_CRUMBS = {
     '/pasaport-calisma': { ws: '', page: 'Dijital pasaport' }, '/kart': { ws: '', page: 'Dijital pasaport' }, '/urun-calisma': { ws: 'cam', page: 'Ürün Çalışma Alanı' }, '/is-karti': { ws: 'prod', page: 'İş kartı' },
     '/musteriler-liste': { ws: 'order', page: 'Müşteriler (liste)' }, '/personel-liste': { ws: 'hr', page: 'Personel yönetimi (liste)' }, '/urun-liste': { ws: 'cam', page: 'Ürün Master listesi' },
-    '/ara': { ws: '', page: 'Arama' }, '/nesne': { ws: '', page: 'Nesne pasaportu' },
+    '/varlik': { ws: 'prod', page: 'Varlık pasaportu' }, '/ara': { ws: '', page: 'Arama' }, '/nesne': { ws: '', page: 'Nesne pasaportu' },
     '/muhasebe': { ws: 'fin', page: 'Muhasebe / Fatura (kalem)' }, '/tedarikci-fatura': { ws: 'buy', page: 'Tedarikçi Faturası' },
     '/etiket': { ws: 'wh', page: 'Etiket' }, '/malzeme': { ws: 'wh', page: 'Hammadde / BOM' }, '/takim-hazirlik': { ws: 'tool', page: 'Takım Hazırlığı' },
 };

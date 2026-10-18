@@ -1,8 +1,8 @@
 {
   "product": "KMI NEXT",
-  "commit": "8a837ff66bf7a4edc176d89c253ea9b34219dc05",
+  "commit": "758d185ea5afe48291b36e3ac5347adf3ef44320",
   "builtFrom": "clean git tree",
-  "fileCount": 336,
+  "fileCount": 339,
   "migrationsInRepo": 73,
   "lastMigration": "0073_kmi_next_puantaj_month.sql",
   "note": "Release candidate. Publishing to https://flow.kurutlu.com is a manual owner action; this file is not a publication permit.",
@@ -64,8 +64,8 @@
     },
     {
       "path": "dist/apps/web/src/access.js",
-      "bytes": 7159,
-      "sha256": "26ee432da04c9741d26dad34b2ed28453f774a8ec2799cfc93088d8c0580098b"
+      "bytes": 7173,
+      "sha256": "bc77f06bbb2a0f7124237c11a0d4bc477cfff6bce414dd91e6ff9092a49ce91d"
     },
     {
       "path": "dist/apps/web/src/accountingApi.js",
@@ -79,13 +79,18 @@
     },
     {
       "path": "dist/apps/web/src/app.js",
-      "bytes": 89378,
-      "sha256": "c0e60a23b26c68b53f2db1d0a98b5d090b98120efb33706ea17ca9bf6aeb870a"
+      "bytes": 90519,
+      "sha256": "b53daf75097c25882ef3e4e6ab025756eb389230cd4da0e7fa2fa78144a9c6db"
     },
     {
       "path": "dist/apps/web/src/approvalsInboxApi.js",
       "bytes": 12078,
       "sha256": "b8fb8c38c08190ad33b4b023e89431242f276fe375a3a4fb64791c0579907e4a"
+    },
+    {
+      "path": "dist/apps/web/src/assetApi.js",
+      "bytes": 4998,
+      "sha256": "8df55b650a915fa319ebc44c930c740402bba8e198e86a7dabf82baba8062939"
     },
     {
       "path": "dist/apps/web/src/badgesApi.js",
@@ -94,8 +99,8 @@
     },
     {
       "path": "dist/apps/web/src/cardKit.js",
-      "bytes": 7454,
-      "sha256": "d1a1921c2eab6f68cd9136488eb3cf81d135d288c9c9dae99797a0ec4c8721b5"
+      "bytes": 7489,
+      "sha256": "c08cd435042ac74aab3ffa2f5804f88001771cc2b481a623dbf666ec113e2f72"
     },
     {
       "path": "dist/apps/web/src/charts.js",
@@ -164,8 +169,8 @@
     },
     {
       "path": "dist/apps/web/src/errorText.js",
-      "bytes": 19850,
-      "sha256": "b04dd3009e9eac9a49a2c634ceae3f64d8667afe8e40e337e3ff01131a83de38"
+      "bytes": 22639,
+      "sha256": "8a41b5a6d889d648c6b9031f814b776bc063e9ed5796af5e6841d44c0300643a"
     },
     {
       "path": "dist/apps/web/src/feasibilityApi.js",
@@ -274,8 +279,8 @@
     },
     {
       "path": "dist/apps/web/src/nav.js",
-      "bytes": 17457,
-      "sha256": "0055c9aa91935f55861cd65feb2ab45e18ddf0b96f3270acfaa159ece19e5b0e"
+      "bytes": 17595,
+      "sha256": "252e156d445e66f8c378b280eb989b0c44c753790399b11a41e610946fedf757"
     },
     {
       "path": "dist/apps/web/src/objectCard.js",
@@ -558,6 +563,16 @@
       "sha256": "78cc627dd00c655e104f7d84e553e6ba2fde11badf6cb32567b656d12c0240b2"
     },
     {
+      "path": "dist/apps/web/src/screens/AssetCenterScreen.js",
+      "bytes": 22061,
+      "sha256": "f527c4462f08764ca8d1f3cbd387f19a3c86a254709bd9459533780095c7cfc9"
+    },
+    {
+      "path": "dist/apps/web/src/screens/AssetPassportScreen.js",
+      "bytes": 19210,
+      "sha256": "78946ebfa401405cbc4920fca4dc77e731c2f20cca6f965236f15ee6357605c4"
+    },
+    {
       "path": "dist/apps/web/src/screens/BadgesScreen.js",
       "bytes": 10287,
       "sha256": "dc04760b334f5c76fcb324748456875d56a9652b05894b9b7119d8df2be779df"
@@ -749,8 +764,8 @@
     },
     {
       "path": "dist/apps/web/src/screens/PassportHubScreen.js",
-      "bytes": 18844,
-      "sha256": "b4ba104140636d4fe7530611ab904e7d2a117157d1195baa4a8c469dbdc0b055"
+      "bytes": 20124,
+      "sha256": "19fcf2751c35cb0087d73bbcd8e9996c944dc1e4205774758362d68da6350730"
     },
     {
       "path": "dist/apps/web/src/screens/PassportScreen.js",
@@ -784,8 +799,8 @@
     },
     {
       "path": "dist/apps/web/src/screens/PersonnelScreen.js",
-      "bytes": 13530,
-      "sha256": "aae2045790daffaef831d13e6975fb913ffd69d6edf5a69e38ad15f2ae532d94"
+      "bytes": 13638,
+      "sha256": "6671cab9c350806237931cf36b88bdf7a91a9ad15094e8a5cbe47e4ca50e8e3a"
     },
     {
       "path": "dist/apps/web/src/screens/PlanningScreen.js",
@@ -854,8 +869,8 @@
     },
     {
       "path": "dist/apps/web/src/screens/ScanScreen.js",
-      "bytes": 4363,
-      "sha256": "d1e50e21e799559bc67d3f8d7271d09fa8cafb715a97c7101715b0e72e0bedd1"
+      "bytes": 4489,
+      "sha256": "f0f90b7043f249f5bd3569ef72ef86542d728538d097cc31c96159e7b80e9ebb"
     },
     {
       "path": "dist/apps/web/src/screens/SearchScreen.js",
@@ -1219,8 +1234,8 @@
     },
     {
       "path": "dist/packages/domain/src/authorization.js",
-      "bytes": 6638,
-      "sha256": "93f124c020a6d7f403727063332a5c1302ba2f0ae3665ea391629252208659fd"
+      "bytes": 6781,
+      "sha256": "563f6045bfad701fb9b0566488fe4c5ef9e58ce7aab5cc23963d4daeef4b8d74"
     },
     {
       "path": "dist/packages/domain/src/badges.js",
@@ -1559,8 +1574,8 @@
     },
     {
       "path": "dist/packages/domain/src/scan.js",
-      "bytes": 2391,
-      "sha256": "ee5677a0cff36e8843becf32e878f17f9656149d15ef6568bf1a04cdcd36b330"
+      "bytes": 2400,
+      "sha256": "2a074ca4cc0fd20cc104cf93b87097e0027c72cbed1826a11c548f203362ddf8"
     },
     {
       "path": "dist/packages/domain/src/semanticColors.js",

@@ -2,8 +2,8 @@
 // Pure DOM, no data access: the caller passes already-permissioned facts. Unknown value → BİLİNMİYOR / "girilmemiş", never 0 or an invented value.
 // A card is a single link (whole card clickable) to the passport / workspace. Photo: lazy, from the canonical KMI-010 document version (ASSET_PHOTO).
 import { h } from '../../../packages/ui/src/h.js';
-const KIND_TR = { PERSONNEL: 'PERSONEL', PRODUCT: 'ÜRÜN', CUSTOMER: 'MÜŞTERİ', MACHINE: 'MAKİNE', SUPPLIER: 'TEDARİKÇİ', TOOL: 'TAKIM' };
-const ACCENT = { PERSONNEL: '#f472b6', PRODUCT: '#a78bfa', CUSTOMER: '#fbbf24', MACHINE: '#38bdf8', SUPPLIER: '#34d399', TOOL: '#fb923c' };
+const KIND_TR = { PERSONNEL: 'PERSONEL', PRODUCT: 'ÜRÜN', CUSTOMER: 'MÜŞTERİ', MACHINE: 'MAKİNE', SUPPLIER: 'TEDARİKÇİ', TOOL: 'TAKIM', ASSET: 'VARLIK' };
+const ACCENT = { PERSONNEL: '#f472b6', PRODUCT: '#a78bfa', CUSTOMER: '#fbbf24', MACHINE: '#38bdf8', SUPPLIER: '#34d399', TOOL: '#fb923c', ASSET: '#2dd4bf' };
 const NUM = new Intl.NumberFormat('tr-TR');
 export const textOf = (v) => (v === null || v === undefined || v === '' ? 'BİLİNMİYOR' : typeof v === 'number' ? NUM.format(v) : v);
 export function initialsOf(name) { const w = name.trim().split(/\s+/).filter(Boolean); return ((w[0]?.[0] ?? '?') + (w.length > 1 ? w[w.length - 1][0] : '')).toLocaleUpperCase('tr-TR'); }

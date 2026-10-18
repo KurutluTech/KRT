@@ -124,6 +124,9 @@ import { createPersonnelApi } from './personnelApi.js';
 import { createPersonnelImportApi } from './personnelImportApi.js';
 import { createMasterImportApi, createCatalogApi } from './masterImportApi.js';
 import { renderMasterImportScreen } from './screens/MasterImportScreen.js';
+import { createAssetApi } from './assetApi.js';
+import { renderAssetCenterScreen } from './screens/AssetCenterScreen.js';
+import { renderAssetPassportScreen } from './screens/AssetPassportScreen.js';
 import { renderCatalogCenterScreen } from './screens/CatalogCenterScreen.js';
 import { createSearchApi } from './searchApi.js';
 import { renderSearchScreen } from './screens/SearchScreen.js';
@@ -400,6 +403,15 @@ export const ROUTES = [
             : renderEntityGalleryScreen(el, galleryDeps(c, s), { kind: 'PRODUCT', listHref: '#/urun-liste', listLabel: 'Ürün Master listesi (tablo)' })) },
     { path: '/urun-liste', label: 'Ürün Master listesi', group: 'Yönetim', inMenu: false, render: (el, c, s, q) => renderProductMasterScreen(el, createProductMasterApi(c, s), { product: null, tab: undefined, ...(q.get('yeni') === '1' ? { creating: true } : {}) }) },
     { path: '/muhendislik', label: 'Ürün mühendisliği (revizyon · reçete · CAM)', group: 'Yönetim', inMenu: true, render: (el, c, s) => renderEngineeringScreen(el, createEngineeringApi(c, s)) },
+    { path: '/varliklar', label: 'Dijital Varlık Merkezi', group: 'Saha', inMenu: true, render: (el, c, s, q, a) => {
+            const f = q.get('f');
+            const k = q.get('k');
+            return renderAssetCenterScreen(el, { api: createAssetApi(c, s), canManage: a.actions.includes('ASSET_MANAGE'), remember: (hash) => { try {
+                    history.replaceState(null, '', hash);
+                }
+                catch { /* ignore */ } } }, { cls: (k ?? 'ALL'), q: q.get('q') ?? '', f: (f === 'INACTIVE' || f === 'ARCHIVED' || f === 'ALL' ? f : 'ACTIVE'), dept: q.get('d') ?? '', panel: q.get('z') === '1' });
+        } },
+    { path: '/varlik', label: 'Varlık pasaportu', group: 'Saha', inMenu: false, needs: ['id'], render: (el, c, s, q, a) => renderAssetPassportScreen(el, q.get('id') ?? '', { api: createAssetApi(c, s), canLabel: a.actions.includes('ASSET_MANAGE'), back: () => { location.hash = '#/varliklar'; } }) },
     { path: '/katalog', label: 'Katalog Merkezi (müşteri · tedarikçi · ürün)', group: 'Yönetim', inMenu: true, render: (el, c, s, q, a) => {
             const tabOk = (p) => canOpen(p, a);
             const k = q.get('k');
