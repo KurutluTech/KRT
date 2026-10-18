@@ -28,6 +28,7 @@ const DEFAULT_ROLE_MATRIX = {
     READINESS_EXEMPTION_GRANT: ['ADMIN', 'MANAGEMENT'],
     // Migration 0024: second physical label for the same record (traceability risk).
     LABEL_REPRINT: ['ADMIN', 'MANAGEMENT', 'QUALITY'],
+    ASSET_MANAGE: ['ADMIN', 'MANAGEMENT'], // 0119 KMI-ASSET-001: register / edit / retire assets, start transfers for others, release custody
     GECKO_ATTENDANCE_VIEW: ['ADMIN', 'MANAGEMENT'],
     GECKO_MAPPING_VERIFY: ['ADMIN', 'MANAGEMENT'],
     GECKO_SYNC_RUN: ['ADMIN', 'MANAGEMENT'],
