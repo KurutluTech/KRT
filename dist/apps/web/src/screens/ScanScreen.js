@@ -15,6 +15,7 @@ const LABEL = {
     MACHINE: 'Makine',
     SHIP: 'Sevkiyat',
     PO: 'Satınalma siparişi',
+    ASSET: 'Varlık',
 };
 export function renderScanScreen(container, api, last, opts = {}) {
     const input = h('input', { type: 'text', 'data-testid': 'scan-input', placeholder: 'QR / barkod okutun veya yazın' });
@@ -55,7 +56,7 @@ export function renderScanScreen(container, api, last, opts = {}) {
                 ? `${LABEL[r.scanType ?? ''] ?? r.scanType} bulunamadı: ${r.scanRef} (okutma kaydedildi)`
                 : `Eski/serbest kod kaydedildi: ${r.raw}`;
         const kind = r.resolution === 'RESOLVED' ? SCAN_TO_KIND[r.scanType ?? ''] : undefined;
-        const open = kind && r.resolvedId && opts.access && canOpenPassport(kind, opts.access) ? passportHref(kind, r.resolvedId) : null;
+        const open = r.resolution === 'RESOLVED' && r.scanType === 'ASSET' && r.resolvedId ? `#/varlik?id=${r.resolvedId}` : kind && r.resolvedId && opts.access && canOpenPassport(kind, opts.access) ? passportHref(kind, r.resolvedId) : null;
         resultNode = h('div', {}, h('div', { 'data-testid': 'scan-result', 'data-resolution': r.resolution }, text), open ? h('a', { href: open, 'data-testid': 'scan-open-passport', style: 'display:inline-flex;align-items:center;min-height:44px;margin-top:8px;padding:0 14px;border:1px solid #1d4ed8;border-radius:10px;color:#1d4ed8;font-weight:700;text-decoration:none' }, 'Pasaportu aç →') : null);
     }
     const screen = h('div', { class: 'scan-screen' }, h('h1', { 'data-testid': 'scan-heading' }, 'KMI SCAN — QR / Barkod'), input, h('button', { type: 'button', 'data-testid': 'scan-manual-btn', onClick: () => submit('MANUAL') }, 'Kaydet'), h('div', { 'data-testid': 'scan-camera-status' }, cameraSupported ? 'Kamera ile okuma bu cihazda kullanılabilir.' : 'Kamera ile okuma bu cihazda desteklenmiyor — okutucu veya elle giriş kullanın.'), resultNode);

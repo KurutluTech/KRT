@@ -1,3 +1,6 @@
+// KMI-CARD-004 — PASSPORT HUB (/kart?t=<KIND>&id=<id>&s=<topic>). ONE digital passport shell for every card family: fixed identity header → grouped topic pages (iPhone-Settings style).
+// The hub owns no data. The header reads the object's canonical card (objectApi.card + the passport store photo); every topic reads its canonical table/RPC. A topic the person may not open is not listed.
+import { createAssetApi } from '../assetApi.js';
 import { h } from '../../../../packages/ui/src/h.js';
 import { createObjectPassportApi } from '../objectPassportApi.js';
 import { createPassportCardsApi } from '../passportCardsApi.js';
@@ -99,16 +102,23 @@ export async function renderPassportHubScreen(container, deps, state) {
                 head.subtitleUnknown = 'İş unvanı doğrulanmamış (veri eksik)';
                 head.shape = 'round';
                 head.badges = [{ text: p.active ? 'AKTİF' : 'PASİF', tone: p.active ? 'ok' : 'bad' }];
-                const [wos, tasks] = await Promise.all([
+                const [wos, tasks, custody] = await Promise.all([
                     io.sel('work_orders', 'id,status,machine_id', { operator_id: `eq.${id}`, status: `in.(${ACTIVE_WO.join(',')})` }, undefined, 20).catch(() => null),
                     own || canManageTasks(deps.access) ? floorTasks(ctx).catch(() => null) : Promise.resolve(null),
+                    // KMI-ASSET-001: held assets come from the asset registry (server decides who may see a person's custody: self or asset manager); no copy, a count with a link
+                    createAssetApi(deps.client, deps.session).personnelCustody(id).catch(() => null),
                 ]);
                 const myTasks = tasks === null ? null : (own ? tasks.filter((t) => t.assignedToMe) : tasks.filter((t) => t.assigneeLabel === p.name)).filter((t) => t.status === 'OPEN' || t.status === 'IN_PROGRESS');
                 const lateTasks = (myTasks ?? []).filter((t) => t.isLate).length;
                 head.headPoints = [pt('Bölüm', p.department), pt('Vardiya', p.shiftCode, { tone: p.shiftCode ? 'info' : 'mut' }), pt('Aktif iş emri', wos === null ? null : wos.length, { source: 'work_orders', asOf: dt(nowIso()), href: topicHref('is-emirleri'), tone: wos && wos.length ? 'info' : 'mut' }),
+                    pt('Zimmetli varlık', custody === null ? null : custody.holding.length, { source: 'asset_registry', href: '#/varliklar', tone: custody && !p.active && custody.holding.length ? 'bad' : 'mut' }),
                     pt('Bekleyen görev', myTasks === null ? null : myTasks.length, { source: 'tasks', href: topicHref('gorevler'), tone: lateTasks ? 'bad' : 'mut' })];
                 if (lateTasks)
                     alerts.push(`${lateTasks} görev hedef bitişini geçti`);
+                if (custody && custody.pending.length)
+                    alerts.push(`${custody.pending.length} bekleyen zimmet talebi`);
+                if (custody && !p.active && custody.holding.length)
+                    alerts.push(`Pasif kişide ${custody.holding.length} zimmetli varlık var — zimmet kapatılmalı`);
                 if (!p.active)
                     alerts.push('Kişi pasif: sisteme giriş ve atama kapalı olmalı');
                 topics = personnelTopics(ctx, p);
