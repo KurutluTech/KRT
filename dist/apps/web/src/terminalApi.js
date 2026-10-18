@@ -2,8 +2,11 @@ export function createTerminalApi(client, session) {
     return {
         machines: () => client.rpc('machine_eligibility', {}, session),
         terminal: (machineId) => client.rpc('operator_terminal', { p_machine_id: machineId }, session),
-        async start(id) {
-            await client.rpc('transition_work_order_status', { p_work_order_id: id, p_to_status: 'IN_PROGRESS', p_reason: 'terminal' }, session);
+        async start(id, rid) {
+            await client.rpc('wo_start_run', { p_work_order_id: id, p_client_request_id: rid }, session);
+        },
+        async finish(id, good, scrap, tashih, note, rid) {
+            await client.rpc('wo_finish_run', { p_work_order_id: id, p_qty_good: good, p_qty_scrap: scrap, p_qty_tashih: tashih, p_note: note, p_client_request_id: rid }, session);
         },
         async requestFirstPiece(id) {
             await client.rpc('transition_work_order_status', { p_work_order_id: id, p_to_status: 'FIRST_PIECE_PENDING', p_reason: 'terminal' }, session);

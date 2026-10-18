@@ -5,15 +5,17 @@
 // HONESTY RULE: there is no CNC/sensor connection. The rotating cutter therefore means "a work order is recorded as ACTIVE on this machine"
 // (headline ACTIVE_WORK_ORDER) — NEVER "the spindle is physically turning". The icon's tooltip/aria says exactly that. Every other state is static.
 import { SEMANTIC } from '../../../packages/domain/src/semanticColors.js';
+import { displayKey } from '../../../packages/domain/src/machineState.js';
 /** Canonical status language. Order of severity: DOWN > HOLD > MAINTENANCE > STOPPED/FIRST_PIECE > ACTIVE > IDLE > UNKNOWN. */
 export const STATE_VISUAL = {
     ACTIVE_WORK_ORDER: { key: 'ACTIVE_WORK_ORDER', label: 'ÜRETİMDE', color: SEMANTIC.ok.fg, soft: 'rgba(52,211,153,.14)', animated: true, meaning: 'Aktif iş emri kayıtlı — fiziksel dönüş sensörle doğrulanmadı' },
     FIRST_PIECE: { key: 'FIRST_PIECE', label: 'İLK PARÇA', color: SEMANTIC.warn.fg, soft: 'rgba(251,191,36,.14)', animated: false, meaning: 'İlk parça onayı bekleniyor / verildi' },
     STOPPED: { key: 'STOPPED', label: 'DURUYOR', color: SEMANTIC.warn.fg, soft: 'rgba(251,191,36,.14)', animated: false, meaning: 'Üretim duruş kaydı (fiziksel acil stop değil)' },
-    READY_IDLE: { key: 'READY_IDLE', label: 'BOŞTA', color: '#b6c2d6', soft: 'rgba(148,163,184,.12)', animated: false, meaning: 'Kullanıma hazır, aktif iş emri yok' },
+    READY_IDLE: { key: 'READY_IDLE', label: 'BOŞTA', color: '#4da3ff', soft: 'rgba(77,163,255,.16)', animated: false, meaning: 'Kullanıma hazır, aktif iş emri yok' },
     DOWN: { key: 'DOWN', label: 'ARIZALI', color: SEMANTIC.bad.fg, soft: 'rgba(248,113,113,.16)', animated: false, meaning: 'Arızalı / DOWN kaydı' },
-    MAINTENANCE: { key: 'MAINTENANCE', label: 'BAKIMDA', color: SEMANTIC.info.fg, soft: 'rgba(56,189,248,.14)', animated: false, meaning: 'Bakımda' },
+    MAINTENANCE: { key: 'MAINTENANCE', label: 'BAKIMDA', color: '#ff8a1f', soft: 'rgba(255,138,31,.16)', animated: false, meaning: 'Bakımda' },
     HOLD: { key: 'HOLD', label: 'KALİTE HOLD', color: SEMANTIC.hold.fg, soft: 'rgba(196,181,253,.14)', animated: false, meaning: 'Kalite engeli / bekletme' },
+    STALE: { key: 'STALE', label: 'BAYAT OTURUM', color: '#bdb5a5', soft: 'rgba(189,181,165,.14)', animated: false, meaning: 'Açık oturum var ama uzun süredir hareket yok — çalışıyor sayılmaz' },
     UNKNOWN: { key: 'UNKNOWN', label: 'BİLİNMİYOR', color: SEMANTIC.unknown.fg, soft: 'rgba(100,116,139,.12)', animated: false, meaning: 'Durum kaydı yok veya okunamadı' },
 };
 // ---- ORIGINAL artwork (KMI-001 final): vertical CNC spindle head — head block with two status lamps, cone, tool-holder collar, fluted cutter, chips.
@@ -28,7 +30,7 @@ const OUT = '#0b1220';
  *  the state shows ONLY in the band, the lamp and the badge — so it can never read as a face or a cartoon. */
 const body = (v) => {
     const c = v.color;
-    const unk = v.key === 'UNKNOWN';
+    const unk = v.key === 'UNKNOWN' || v.key === 'STALE';
     const dash = unk ? ' stroke-dasharray="3 2.4"' : '';
     const steel = unk ? '#3a475c' : '#52617d';
     const steel2 = unk ? '#2c384b' : '#3d4b66';
@@ -42,7 +44,7 @@ const body = (v) => {
         `<rect x="19.75" y="22" width="24.5" height="4" fill="${unk ? '#64748b' : c}" opacity="${unk ? '.55' : '1'}"/>` +
         `<clipPath id="spc"><path d="M29.6 42.6v14.4l2.4 1.8 2.4-1.8V42.6z"/></clipPath>` +
         `<g clip-path="url(#spc)"><g class="sp-rot" stroke="${OUT}" stroke-width="1.6" stroke-linecap="round"><path d="M27 60l10-8M27 52l10-8M27 44l10-8M27 68l10-8"/></g></g>` +
-        `<rect x="39.2" y="6.2" width="3.6" height="3.6" rx=".8" fill="${v.key === 'READY_IDLE' || unk ? '#64748b' : c}" stroke="${OUT}" stroke-width="1"/>` +
+        `<rect x="39.2" y="6.2" width="3.6" height="3.6" rx=".8" fill="${unk ? '#64748b' : c}" stroke="${OUT}" stroke-width="1"/>` +
         `<g class="sp-chips" stroke="${edge}" stroke-width="1.6" stroke-linecap="round"><path d="M24 55l-5-3M23 59.5h-6M40 55l5-3M41 59.5h6"/></g>`;
 };
 /** Overlay badges (bottom-right): each state has its own silhouette, so the icon reads in greyscale too. ACTIVE and IDLE need none (chips / lamps tell). */
@@ -57,11 +59,14 @@ const OVERLAY = {
     DOWN: (c) => BADGE(c, `<path d="M48 46l8 8M56 46l-8 8" stroke="${c}" stroke-width="2.6" stroke-linecap="round"/>`),
     MAINTENANCE: (c) => BADGE(c, `<path d="M47.4 54.6l6.6-6.6M53.6 45.4a3.2 3.2 0 1 0 4 4" fill="none" stroke="${c}" stroke-width="2.2" stroke-linecap="round"/>`),
     HOLD: (c) => BADGE(c, `<path d="M52 47.4v5M52 55v.5" stroke="${c}" stroke-width="2.4" stroke-linecap="round"/>`, true),
+    STALE: (c) => BADGE(c, `<circle cx="52" cy="50" r="5.2" fill="none" stroke="${c}" stroke-width="1.8"/><path d="M52 47v3.2l2.2 1.4" fill="none" stroke="${c}" stroke-width="1.8" stroke-linecap="round"/>`),
     UNKNOWN: (c) => BADGE(c, `<path d="M49.4 47.4a2.7 2.7 0 1 1 3.6 2.5c-.9.4-1.2.9-1.2 1.8M52 55v.4" fill="none" stroke="${c}" stroke-width="2" stroke-linecap="round"/>`),
 };
 export function visualFor(headline) {
     return STATE_VISUAL[headline in STATE_VISUAL ? headline : 'UNKNOWN'];
 }
+/** Canonical entry point: ONE call per machine surface — feed the `machineState()` result, get the same icon everywhere (KMI-013 §3). */
+export function spindleForState(s, size = 56) { return spindleIcon(displayKey(s), size, s.stale || s.declaredVsCnc === 'CONFLICT'); }
 /** Inline SVG markup of the spindle icon for one state. `size` in px (square). */
 export function spindleSvg(headline, size = 56, still = false) {
     const v = visualFor(headline);
