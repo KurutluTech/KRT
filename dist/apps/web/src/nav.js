@@ -56,8 +56,10 @@ export const NAV_TREE = [
     { id: 'order', short: 'Sipariş', title: 'MÜŞTERİ & SİPARİŞ', icon: 'clipboard', items: [
             { path: '/musteriler', label: 'Müşteriler', icon: 'users' },
             { path: '/teklifler', label: 'Teklifler', icon: 'clipboard' },
+            { path: '/fizibilite', label: 'Teknik Fizibilite', icon: 'cnc' },
             { path: '/siparis-komuta', label: 'Sipariş Komuta Merkezi', icon: 'grid' },
             { path: '/siparisler', label: 'Siparişler', icon: 'truck' },
+            { path: '/pdf-siparis', label: 'PDF’ten Sipariş', icon: 'upload' },
             { path: '/katalog', label: 'Katalog', icon: 'book' },
         ] },
     { id: 'prod', short: 'Üretim', title: 'ÜRETİM', icon: 'cnc', items: [
@@ -73,18 +75,21 @@ export const NAV_TREE = [
         ] },
     { id: 'cam', short: 'CAM', title: 'CAM & MÜHENDİSLİK', icon: 'gear', items: [
             { path: '/urun-calisma', label: 'Ürün Çalışma Alanı', icon: 'book' },
-            { path: '/urun-master', label: 'Ürün Master / Digital DNA', icon: 'book' },
+            { path: '/urun-master', label: 'Ürün Kartları', icon: 'book' },
             { path: '/muhendislik', label: 'CAM / Programlama', icon: 'gear' },
             { path: '/rota', label: 'Rota / Operasyon', icon: 'link' },
         ] },
     { id: 'tool', short: 'Takımhane', title: 'TAKIMHANE', icon: 'spindle', items: [
             { path: '/takimhane', label: 'Takım Odası', icon: 'wrench' },
+            { path: '/takim-kartlari', label: 'Takım kartları', icon: 'spindle' },
         ] },
     { id: 'qc', short: 'Kalite', title: 'KALİTE & METROLOJİ', icon: 'shield', items: [
             { path: '/kalite', label: 'Kalite / Metroloji', icon: 'shield' },
             { path: '/tahsis', label: 'TAHSİS (ölçü düzeltme)', icon: 'tasks' },
+            { path: '/olcum-ekipmani', label: 'Ölçüm ekipmanı', icon: 'gauge' },
         ] },
     { id: 'maint', short: 'Bakım', title: 'BAKIM', icon: 'gauge', items: [
+            { path: '/makineler', label: 'Makineler', icon: 'factory' },
             { path: '/bakim', label: 'Bakım', icon: 'wrench' },
         ] },
     { id: 'wh', short: 'Depo', title: 'DEPO & STOK', icon: 'box', items: [
@@ -93,6 +98,7 @@ export const NAV_TREE = [
     { id: 'buy', short: 'Satınalma', title: 'SATINALMA', icon: 'cart', items: [
             { path: '/satinalma', label: 'Satınalma / Mal Kabul', icon: 'cart' },
             { path: '/talepler', label: 'Satınalma Talepleri', icon: 'box' },
+            { path: '/tedarikciler', label: 'Tedarikçi kartları', icon: 'cart' },
         ] },
     { id: 'ship', short: 'Sevkiyat', title: 'LOJİSTİK & SEVKİYAT', icon: 'truck', items: [
             { path: '/sevkiyat', label: 'Sevkiyat / Lojistik', icon: 'truck' },
@@ -125,6 +131,7 @@ export const NAV_TREE = [
             { path: '/ana-veri-aktarim', label: 'Ana Veri Aktarımı', icon: 'upload' },
             { path: '/personel-aktarim', label: 'Personel Aktarımı', icon: 'upload' },
             { path: '/yetkinlik-aktarim', label: 'Yetkinlik Aktarımı', icon: 'upload' },
+            { path: '/yetki-yonetimi', label: 'Yetki Yönetimi', icon: 'shield' },
             { path: '/ekonomi-basvuru', label: 'Ekonomik Sahiplik Başvurusu', icon: 'shield' },
         ] },
 ];
@@ -207,6 +214,8 @@ export function trTitle(t) {
 }
 /** Detail / helper routes that are not menu entries still get a location line, so no screen is without a "where am I". ws = '' means directly under Ana Sayfa. */
 export const DETAIL_CRUMBS = {
+    '/pasaport-calisma': { ws: '', page: 'Dijital pasaport' }, '/urun-calisma': { ws: 'cam', page: 'Ürün Çalışma Alanı' }, '/is-karti': { ws: 'prod', page: 'İş kartı' },
+    '/musteriler-liste': { ws: 'order', page: 'Müşteriler (liste)' }, '/personel-liste': { ws: 'hr', page: 'Personel yönetimi (liste)' }, '/urun-liste': { ws: 'cam', page: 'Ürün Master listesi' },
     '/ara': { ws: '', page: 'Arama' }, '/nesne': { ws: '', page: 'Nesne pasaportu' },
     '/muhasebe': { ws: 'fin', page: 'Muhasebe / Fatura (kalem)' }, '/tedarikci-fatura': { ws: 'buy', page: 'Tedarikçi Faturası' },
     '/etiket': { ws: 'wh', page: 'Etiket' }, '/malzeme': { ws: 'wh', page: 'Hammadde / BOM' }, '/takim-hazirlik': { ws: 'tool', page: 'Takım Hazırlığı' },

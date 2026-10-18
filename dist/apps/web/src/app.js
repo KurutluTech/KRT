@@ -37,6 +37,8 @@ import { createTerminalApi } from './terminalApi.js';
 import { withCockpit, liveCockpitSources } from './screens/DepartmentCockpit.js';
 import { FUNCTION_STATE_TR, resolveFunctions, functionMaturity, liveLabelTr } from '../../../packages/domain/src/departmentFunctions.js';
 import { renderDepartmentHome } from './screens/DepartmentHomeScreen.js';
+import { renderFeasibilityScreen } from './screens/FeasibilityScreen.js';
+import { createFeasibilityApi } from './feasibilityApi.js';
 import { renderQualityDesk } from './screens/QualityDeskScreen.js';
 import { renderDemandPanel } from './screens/DemandPanel.js';
 import { renderProductionDesk } from './screens/ProductionDeskScreen.js';
@@ -106,6 +108,7 @@ import { renderPermissionAdminScreen } from './screens/PermissionAdminScreen.js'
 import { createPermissionAdminApi } from './permissionAdminApi.js';
 import { renderOrderImportScreen } from './screens/OrderImportScreen.js';
 import { createOrderImportApi } from './orderImportApi.js';
+import { renderEntityGalleryScreen } from './screens/EntityGalleryScreen.js';
 import { renderPassportWorkspaceScreen } from './screens/PassportWorkspaceScreen.js';
 import { createPassportCardsApi } from './passportCardsApi.js';
 import { createOrdersApi } from './ordersApi.js';
@@ -223,6 +226,10 @@ function downloadText(name, text) {
     a.click();
     a.remove();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+function galleryDeps(c, s, withBoard = false) {
+    const pc = createPassportCardsApi(c, s);
+    return { faces: (t) => pc.faces(t), content: (v) => pc.content(v), ...(withBoard ? { board: () => createLiveApi(c, s).board('OFFICE') } : {}) };
 }
 export const ROUTES = [
     {
@@ -353,8 +360,14 @@ export const ROUTES = [
     { path: '/giris-cikis', label: 'Giriş-Çıkış (GEÇKO)', group: 'Yönetim', inMenu: true, render: (el, c, s) => renderGeckoScreen(el, createGeckoApi(c, s)) },
     { path: '/yetkinlik-aktarim', label: 'Yetkinlik geçmişi aktarımı', group: 'Yönetim', inMenu: true, render: (el, c, s) => renderCompetencyImportScreen(el, createCompetencyImportApi(c, s)) },
     { path: '/akademi', label: 'Akademi & Yetkinlik', group: 'Yönetim', inMenu: true, render: (el, c, s) => renderAcademyScreen(el, createAcademyApi(c, s)) },
+    { path: '/fizibilite', label: 'Teknik Fizibilite (parça · malzeme · üretilebilirlik)', group: 'Yönetim', inMenu: true, render: (el, c, s) => renderFeasibilityScreen(el, createFeasibilityApi(c, s)) },
     { path: '/teklifler', label: 'Teklifler (talep · fizibilite · teklif · onay)', group: 'Yönetim', inMenu: true, render: (el, c, s) => renderQuotesScreen(el, createQuotesApi(c, s)) },
-    { path: '/musteriler', label: 'Müşteriler (kişiler · şartlar · teslimat)', group: 'Yönetim', inMenu: true, render: (el, c, s) => renderCustomersScreen(el, createCustomersApi(c, s)) },
+    { path: '/musteriler', label: 'Müşteriler (kartlar)', group: 'Yönetim', inMenu: true, render: (el, c, s) => renderEntityGalleryScreen(el, galleryDeps(c, s), { kind: 'CUSTOMER', listHref: '#/musteriler-liste', listLabel: 'Kişiler · şartlar · teslimat (liste)' }) },
+    { path: '/musteriler-liste', label: 'Müşteriler (kişiler · şartlar · teslimat)', group: 'Yönetim', inMenu: false, render: (el, c, s) => renderCustomersScreen(el, createCustomersApi(c, s)) },
+    { path: '/makineler', label: 'Makineler (kartlar)', group: 'Saha', inMenu: true, render: (el, c, s) => renderEntityGalleryScreen(el, galleryDeps(c, s, true), { kind: 'MACHINE' }) },
+    { path: '/tedarikciler', label: 'Tedarikçiler (kartlar)', group: 'Yönetim', inMenu: true, render: (el, c, s) => renderEntityGalleryScreen(el, galleryDeps(c, s), { kind: 'SUPPLIER', listHref: '#/katalog', listLabel: 'Katalog (liste)' }) },
+    { path: '/takim-kartlari', label: 'Takım kartları', group: 'Saha', inMenu: true, render: (el, c, s) => renderEntityGalleryScreen(el, galleryDeps(c, s), { kind: 'TOOL', listHref: '#/takimhane', listLabel: 'Takım Odası (işlemler)' }) },
+    { path: '/olcum-ekipmani', label: 'Ölçüm ekipmanı (kartlar)', group: 'Saha', inMenu: true, render: (el, c, s) => renderEntityGalleryScreen(el, galleryDeps(c, s), { kind: 'MEASUREMENT', listHref: '#/kalite', listLabel: 'Kalite / Metroloji' }) },
     { path: '/siparis-komuta', label: 'Sipariş Komuta Merkezi', group: 'Yönetim', inMenu: true, render: (el, c, s) => renderOrderCommandScreen(el, createOrderCommandApi(c, s)) },
     { path: '/siparisler', label: 'Siparişler', group: 'Yönetim', inMenu: true, render: (el, c, s) => renderOrdersScreen(el, createOrdersApi(c, s)) },
     { path: '/pdf-siparis', label: 'PDF’ten Sipariş', group: 'Yönetim', inMenu: true, render: (el, c, s, q) => renderOrderImportScreen(el, createOrderImportApi(c, s), { id: q.get('id') }) },
@@ -362,11 +375,14 @@ export const ROUTES = [
     { path: '/pasaport-calisma', label: 'Pasaport çalışma alanı', group: 'Yönetim', inMenu: false, needs: ['tur', 'id'], render: (el, c, s, q) => renderPassportWorkspaceScreen(el, createPassportCardsApi(c, s), { type: q.get('tur'), id: q.get('id') }) },
     { path: '/urun-calisma', label: 'Ürün Çalışma Alanı (rota & operasyon)', group: 'Yönetim', inMenu: true, render: (el, c, s, q) => renderProductWorkspaceScreen(el, createProductWorkspaceApi(c, s), { product: q.get('urun'), rev: q.get('rev') }) },
     { path: '/is-karti', label: 'İş kartı (operasyon belgeleri)', group: 'Saha', inMenu: false, render: (el, c, s, q) => renderJobCardScreen(el, { load: (wo) => jobCardFor(c, s, wo), scan: (input, wo) => scanCheck(c, s, input, wo) }, q.get('is')) },
-    { path: '/urun-master', label: 'Ürün Master / Digital DNA', group: 'Yönetim', inMenu: true, render: (el, c, s, q) => renderProductMasterScreen(el, createProductMasterApi(c, s), { product: q.get('urun'), tab: q.get('sekme') ?? undefined }) },
+    { path: '/urun-master', label: 'Ürün Master / Digital DNA', group: 'Yönetim', inMenu: true, render: (el, c, s, q) => (q.get('urun') ? renderProductMasterScreen(el, createProductMasterApi(c, s), { product: q.get('urun'), tab: q.get('sekme') ?? undefined })
+            : renderEntityGalleryScreen(el, galleryDeps(c, s), { kind: 'PRODUCT', listHref: '#/urun-liste', listLabel: 'Ürün Master listesi (tablo)' })) },
+    { path: '/urun-liste', label: 'Ürün Master listesi', group: 'Yönetim', inMenu: false, render: (el, c, s) => renderProductMasterScreen(el, createProductMasterApi(c, s), { product: null, tab: undefined }) },
     { path: '/muhendislik', label: 'Ürün mühendisliği (revizyon · reçete · CAM)', group: 'Yönetim', inMenu: true, render: (el, c, s) => renderEngineeringScreen(el, createEngineeringApi(c, s)) },
     { path: '/katalog', label: 'Katalog (müşteri · tedarikçi · ürün)', group: 'Yönetim', inMenu: true, render: (el, c, s) => renderCatalogScreen(el, createCatalogApi(c, s)) },
     { path: '/ana-veri-aktarim', label: 'Ana veri aktarımı (eski KMI)', group: 'Yönetim', inMenu: true, render: (el, c, s) => renderMasterImportScreen(el, createMasterImportApi(c, s)) },
-    { path: '/personel', label: 'Personel', group: 'Yönetim', inMenu: true, render: (el, c, s) => renderPersonnelScreen(el, { api: createPersonnelApi(c, s) }) },
+    { path: '/personel', label: 'Personel (kartlar)', group: 'Yönetim', inMenu: true, render: (el, c, s) => renderEntityGalleryScreen(el, galleryDeps(c, s), { kind: 'PERSONNEL', listHref: '#/personel-liste', listLabel: 'Personel yönetimi (liste)' }) },
+    { path: '/personel-liste', label: 'Personel yönetimi', group: 'Yönetim', inMenu: false, render: (el, c, s) => renderPersonnelScreen(el, { api: createPersonnelApi(c, s) }) },
     { path: '/puantaj', label: 'Puantaj & Prim Havuzu', group: 'Yönetim', inMenu: true, render: (el, c, s) => renderPuantajScreen(el, createPuantajApi(c, s)) },
     { path: '/zirvedekiler', label: 'Zirvedekiler', group: 'Yönetim', inMenu: true, render: (el, c, s, _q, a) => renderZirvedekilerScreen(el, { facts: createPuantajApi(c, s).facts, badges: createBadgesApi(c, s), view: a.roles.some((r) => r === 'ADMIN' || r === 'MANAGEMENT') || a.actions.includes('PUANTAJ_MANAGE') ? 'MANAGEMENT' : 'EMPLOYEE' }) },
     { path: '/personel-yetki', label: 'Personel erişimi (hesap · vardiya · çoklu makine)', group: 'Yönetim', inMenu: true, render: (el, c, s) => renderPersonnelAccessScreen(el, createPersonnelAccessApi(c, s)) },

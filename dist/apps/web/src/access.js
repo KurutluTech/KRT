@@ -18,8 +18,18 @@ export const OPEN_RULES = {
     '/siparis-komuta': { any: ['ORDER_CREATE', 'ORDER_CONFIRM', 'WORK_ORDER_CREATE', 'COMMERCIAL_RELEASE', 'MANAGEMENT_RELEASE'] },
     '/siparisler': { any: ['ORDER_CREATE', 'ORDER_CONFIRM', 'WORK_ORDER_CREATE', 'COMMERCIAL_RELEASE', 'MANAGEMENT_RELEASE'] },
     '/musteriler': { any: ['CUSTOMER_MANAGE', 'CUSTOMER_CONTACT_VIEW'] },
+    '/fizibilite': { any: ['RFQ_FEASIBILITY', 'QUOTE_TECH'] }, // 0115: technical feasibility only (no customer / price)
     '/teklifler': { any: ['QUOTE_VIEW', 'QUOTE_PREPARE', 'QUOTE_TECH', 'QUOTE_APPROVE'] },
+    // 0116 cards: the server decides (supplier = commercial floor; tool = any non-operator-only user); these rules only keep the entries off unrelated menus.
+    '/tedarikciler': { any: ['PURCHASE_ORDER_MANAGE', 'PURCHASING_APPROVE', 'ACCOUNTING_MUTATION', 'MANAGEMENT_RELEASE'], roles: ['ADMIN', 'MANAGEMENT', 'PURCHASING', 'ACCOUNTING'] },
+    '/takim-kartlari': { roles: ['ADMIN', 'MANAGEMENT', 'CAM', 'MAINTENANCE', 'QUALITY'], any: ['ROUTING_MANAGE'] },
+    '/olcum-ekipmani': { roles: ['ADMIN', 'MANAGEMENT', 'QUALITY', 'MAINTENANCE'], any: ['MACHINE_PASSPORT_EDIT', 'OPERATION_QC_RECORD'] },
     '/personel': { any: ['PERSONNEL_MANAGE'] },
+    '/personel-liste': { any: ['PERSONNEL_MANAGE'] },
+    '/musteriler-liste': { any: ['CUSTOMER_MANAGE', 'CUSTOMER_CONTACT_VIEW'] },
+    // KMI-CARD-COMPLETION-001: these two were reachable by direct URL / menu for every signed-in user (a CAM operator saw them). Navigation only — the RPCs stay the security boundary.
+    '/yetki-yonetimi': { owner: true },
+    '/pdf-siparis': { any: ['ORDER_CREATE'] },
     '/personel-yetki': { any: ['PERSONNEL_LOGIN_LINK', 'WORK_ORDER_ASSIGN_MACHINE', 'WORK_ORDER_MULTI_MACHINE_ASSIGN'] },
     // PUANTAJ_MANAGE is defined by migration 0073; until it is installed no one holds it, so ADMIN/MANAGEMENT (the roles 0073 grants it to) keep the entry
     // visible and the screen itself says "Kurulum bekleniyor". The server (puantaj_month_facts) remains the only authority.
@@ -41,6 +51,8 @@ export function canOpen(path, a) {
     const r = OPEN_RULES[path];
     if (!r)
         return true;
+    if (r.owner && a.owner)
+        return true;
     if (r.economics && a.economics)
         return true;
     if ((r.roles ?? []).some((x) => a.roles.includes(x)))
@@ -52,7 +64,7 @@ export const ROLE_HOME = {
     OPERATOR: ['/operator', '/gorevler', '/terminal', '/tara', '/giris-cikislarim', '/rozetlerim', '/zirvedekiler'],
     QUALITY: ['/kalite', '/is-emirleri', '/gorevler', '/dokumanlar', '/tara'],
     MAINTENANCE: ['/bakim', '/gorevler', '/takimhane', '/terminal'],
-    CAM: ['/muhendislik', '/rota', '/takimhane', '/dokumanlar', '/gorevler'],
+    CAM: ['/muhendislik', '/fizibilite', '/rota', '/takimhane', '/dokumanlar', '/gorevler'],
     PURCHASING: ['/talepler', '/satinalma', '/depo', '/tedarikci-fatura', '/gorevler'],
     ACCOUNTING: ['/muhasebe', '/onay-kuyrugu', '/alacaklar', '/tedarikci-fatura', '/gorevler'],
     SHIPPING: ['/sevkiyat', '/depo', '/is-emirleri', '/tara', '/gorevler'],
