@@ -1,8 +1,8 @@
 {
   "product": "KMI NEXT",
-  "commit": "758d185ea5afe48291b36e3ac5347adf3ef44320",
+  "commit": "72d1bfa550306db12c9ecd08da1f63faeea39ea2",
   "builtFrom": "clean git tree",
-  "fileCount": 339,
+  "fileCount": 344,
   "migrationsInRepo": 73,
   "lastMigration": "0073_kmi_next_puantaj_month.sql",
   "note": "Release candidate. Publishing to https://flow.kurutlu.com is a manual owner action; this file is not a publication permit.",
@@ -64,8 +64,8 @@
     },
     {
       "path": "dist/apps/web/src/access.js",
-      "bytes": 7173,
-      "sha256": "bc77f06bbb2a0f7124237c11a0d4bc477cfff6bce414dd91e6ff9092a49ce91d"
+      "bytes": 7638,
+      "sha256": "da3c529da4b7055242737d729c6f98f6b04f435812b1039e750b699aad2c1309"
     },
     {
       "path": "dist/apps/web/src/accountingApi.js",
@@ -79,8 +79,8 @@
     },
     {
       "path": "dist/apps/web/src/app.js",
-      "bytes": 90519,
-      "sha256": "b53daf75097c25882ef3e4e6ab025756eb389230cd4da0e7fa2fa78144a9c6db"
+      "bytes": 91828,
+      "sha256": "ebc271ea0109834d603640dd2451ba1d8b8723757c604297719c3805631f2d2d"
     },
     {
       "path": "dist/apps/web/src/approvalsInboxApi.js",
@@ -279,8 +279,8 @@
     },
     {
       "path": "dist/apps/web/src/nav.js",
-      "bytes": 17595,
-      "sha256": "252e156d445e66f8c378b280eb989b0c44c753790399b11a41e610946fedf757"
+      "bytes": 17765,
+      "sha256": "35cd446f1bba201d4bc401bffcf632f37697b5579806fd0a0a554189fc80034f"
     },
     {
       "path": "dist/apps/web/src/objectCard.js",
@@ -461,6 +461,11 @@
       "path": "dist/apps/web/src/personnelImportApi.js",
       "bytes": 772,
       "sha256": "fe87b3f6595d6c63ef1c36155a37fe1381c929e5c856bd8348a4c73ccdec4f2d"
+    },
+    {
+      "path": "dist/apps/web/src/planCockpitApi.js",
+      "bytes": 3941,
+      "sha256": "ea68ab8c1a049e2fac4d5c03a07382aa75f593dd2ebc744eadeaf7b6a2f6fbec"
     },
     {
       "path": "dist/apps/web/src/planningApi.js",
@@ -803,6 +808,11 @@
       "sha256": "6671cab9c350806237931cf36b88bdf7a91a9ad15094e8a5cbe47e4ca50e8e3a"
     },
     {
+      "path": "dist/apps/web/src/screens/PlanCockpitScreen.js",
+      "bytes": 11749,
+      "sha256": "9fe88b368af1c27c4bc1159ab92cee91326cd71c04842030eb769a51a1c6ca09"
+    },
+    {
       "path": "dist/apps/web/src/screens/PlanningScreen.js",
       "bytes": 14495,
       "sha256": "f48fafe1842ceaa3dc0eee3f48985974a3f51a014cc288fa9cdb9289094c8604"
@@ -876,6 +886,11 @@
       "path": "dist/apps/web/src/screens/SearchScreen.js",
       "bytes": 13995,
       "sha256": "193a20b1926001f03b345979a636233bc1e595211813a831f450f29afd5e47be"
+    },
+    {
+      "path": "dist/apps/web/src/screens/ShiftPlannerScreen.js",
+      "bytes": 34876,
+      "sha256": "326c9b677e66df9a3875b411bef508f1b801728eaa6f7c452c682e7a7c5f6881"
     },
     {
       "path": "dist/apps/web/src/screens/ShipmentScreen.js",
@@ -981,6 +996,11 @@
       "path": "dist/apps/web/src/screens/management/kit.js",
       "bytes": 6401,
       "sha256": "530ee53313a527e704a17bea6d9a7ad20cd3c3ee5b4f3f7acf79a2caf7c1f7df"
+    },
+    {
+      "path": "dist/apps/web/src/screens/planCockpitKit.js",
+      "bytes": 6789,
+      "sha256": "79e183be38b86b129f6ae65b08b5e727c6de370bef1f88a11a934e0168f3e05d"
     },
     {
       "path": "dist/apps/web/src/screens/readinessPanel.js",
@@ -1506,6 +1526,11 @@
       "path": "dist/packages/domain/src/personnelImport.js",
       "bytes": 2180,
       "sha256": "d682c6331983ff99f2ac1166cd2989afad2976c19e681ac21f29d277eba63998"
+    },
+    {
+      "path": "dist/packages/domain/src/planCockpit.js",
+      "bytes": 11062,
+      "sha256": "37c4f4f785825b413a941c2669eb4f8d0894a2b2a502faaafdb688296df4dc58"
     },
     {
       "path": "dist/packages/domain/src/planning.js",

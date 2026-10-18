@@ -30,6 +30,9 @@ export const OPEN_RULES = {
     // KMI-CARD-COMPLETION-001: these two were reachable by direct URL / menu for every signed-in user (a CAM operator saw them). Navigation only — the RPCs stay the security boundary.
     '/yetki-yonetimi': { owner: true },
     '/pdf-siparis': { any: ['ORDER_CREATE'] },
+    // KMI-012: planner screens. Navigation only — plan_blocks / plan_slot_capacity / plan_operator_load / scenarios gate on the server (operator-only users get their own work orders only, no customer, no other operator names).
+    '/planlama-kokpit': { any: ['WORK_ORDER_ASSIGN_MACHINE'], roles: ['ADMIN', 'MANAGEMENT'] },
+    '/vardiya-planlayici': { any: ['WORK_ORDER_ASSIGN_MACHINE'], roles: ['ADMIN', 'MANAGEMENT'] },
     '/personel-yetki': { any: ['PERSONNEL_LOGIN_LINK', 'WORK_ORDER_ASSIGN_MACHINE', 'WORK_ORDER_MULTI_MACHINE_ASSIGN'] },
     // PUANTAJ_MANAGE is defined by migration 0073; until it is installed no one holds it, so ADMIN/MANAGEMENT (the roles 0073 grants it to) keep the entry
     // visible and the screen itself says "Kurulum bekleniyor". The server (puantaj_month_facts) remains the only authority.
@@ -68,8 +71,8 @@ export const ROLE_HOME = {
     PURCHASING: ['/talepler', '/satinalma', '/depo', '/tedarikci-fatura', '/gorevler'],
     ACCOUNTING: ['/muhasebe', '/onay-kuyrugu', '/alacaklar', '/tedarikci-fatura', '/gorevler'],
     SHIPPING: ['/sevkiyat', '/depo', '/is-emirleri', '/tara', '/gorevler'],
-    MANAGEMENT: ['/komuta', '/is-emirleri', '/planlama', '/siparis-komuta', '/siparisler', '/puantaj', '/zirvedekiler', '/muhendislik', '/oee', '/gorevler'],
-    ADMIN: ['/komuta', '/is-emirleri', '/planlama', '/siparis-komuta', '/siparisler', '/puantaj', '/zirvedekiler', '/personel-yetki', '/personel', '/gorevler'],
+    MANAGEMENT: ['/komuta', '/is-emirleri', '/planlama-kokpit', '/planlama', '/siparis-komuta', '/siparisler', '/puantaj', '/zirvedekiler', '/muhendislik', '/oee', '/gorevler'],
+    ADMIN: ['/komuta', '/is-emirleri', '/planlama-kokpit', '/planlama', '/siparis-komuta', '/siparisler', '/puantaj', '/zirvedekiler', '/personel-yetki', '/personel', '/gorevler'],
 };
 /** Operator-only users land directly on their own work screen. */
 export function landingPath(a) {
