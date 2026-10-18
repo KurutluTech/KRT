@@ -21,6 +21,6 @@ export function createProductionDeskApi(c, s) {
                 }
             }));
         },
-        start: (id) => t.start(id), declare: (id, g, sc, rid) => t.declare(id, g, sc, rid), hold: (m, r, cat) => t.hold(m, r, cat), resume: (m, r) => t.resume(m, r), reportFault: (m, r) => t.reportFault(m, r), requestFirstPiece: (id) => t.requestFirstPiece(id),
+        start: (id) => t.start(id, `pd-start-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`), declare: (id, g, sc, rid) => t.declare(id, g, sc, rid), hold: (m, r, cat) => t.hold(m, r, cat), resume: (m, r) => t.resume(m, r), reportFault: (m, r) => t.reportFault(m, r), requestFirstPiece: (id) => t.requestFirstPiece(id),
     };
 }

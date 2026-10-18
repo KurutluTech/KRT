@@ -2,6 +2,12 @@ import { NA, dt, day, nf, link, pill, orNA, inList, kv, table, note, tabTopic, o
 import { h } from '../../../../../packages/ui/src/h.js';
 import { sectionNode } from '../sections.js';
 import { errorText } from '../../errorText.js';
+import { machineState, DATA_SOURCE_TR, HEADLINE_TR, STALE_TR, displayKey } from '../../../../../packages/domain/src/machineState.js';
+import { spindleForState } from '../../spindle.js';
+const EVENT_TR = { CREATED: 'İş emri açıldı', MACHINE_ASSIGNED: 'Makine atandı', PLAN_CHANGED: 'Plan / atama değişti', START: 'START — üretim başladı', RESUME: 'Devam (HOLD kalktı)', CONTINUE_AFTER_FIRST_PIECE: 'İlk parça sonrası devam',
+    HOLD: 'HOLD / duruş', FIRST_PIECE_REQUESTED: 'İlk parça kaliteye gönderildi', FIRST_PIECE_APPROVED: 'İlk parça onaylandı', FINISH: 'FINISH — üretim bitti', FINAL_RELEASE: 'Nihai onay', CANCELLED: 'İptal', PRODUCTION_DECLARED: 'Üretim beyanı', CORRECTION: 'Düzeltme (bağlantılı kayıt)', STATUS_CHANGE: 'Durum değişti' };
+const ROLE_TR = { OPERATOR: 'Operatör', QUALITY: 'Kalite', PLANNER: 'Planlama', MANAGEMENT: 'Yönetim', NONE: '—' };
+const dur = (m) => (m === null || m === undefined ? NA : m >= 60 ? `${Math.floor(m / 60)} sa ${Math.round(m % 60)} dk` : `${Math.round(m)} dk`);
 export const loadWoPassport = (ctx) => ctx.rpc('work_order_passport', { p_work_order_id: ctx.id });
 const planner = (ctx) => ctx.access.owner || ctx.access.roles.some((r) => r === 'ADMIN' || r === 'MANAGEMENT') || ctx.access.actions.includes('WORK_ORDER_ASSIGN_MACHINE') || ctx.access.actions.includes('MANAGEMENT_RELEASE');
 export function workOrderTopics(ctx, w) {
@@ -16,6 +22,48 @@ export function workOrderTopics(ctx, w) {
                 ['Planlanan adet', nf(wo.qtyPlanned)], ['İyi (üretilen)', nf(wo.qtyProduced)], ['Fire', nf(wo.qtyScrap)], ['Makine', link('MACHINE', w.machine?.id, w.machine ? `${w.machine.code} · ${w.machine.name}` : null)], ['Operatör', link('PERSONNEL', w.operator?.id, w.operator?.name)],
                 ['Plan', wo.plannedDate ? `${day(wo.plannedDate)}${wo.plannedShiftCode ? ` · ${wo.plannedShiftCode}` : ''}` : NA], ['Termin', w.order?.dueDate ? day(w.order.dueDate) : NA], ['Açılış', dt(wo.createdAt)]])
         ]),
+        { ...T('akis', 'Canlı İş Akışı / İstasyon Geçmişi', 'clock', 'Üretim', { summary: 'Nerede? Neyi bekliyor?' }), render: async (host) => {
+                let f;
+                let t = null;
+                try {
+                    f = await ctx.rpc('work_order_flow', { p_work_order_id: ctx.id });
+                }
+                catch (e) {
+                    host.replaceChildren(h('div', { class: 'ps-banner', 'data-testid': isDenied(e) ? 'ps-denied' : 'flow-pending' }, isDenied(e) ? 'Bu bölümü görme yetkiniz yok (sunucu reddetti).' : `Canlı iş akışı altyapısı (0121) bu veritabanında henüz kurulu değil: ${errorText(e)}`));
+                    return;
+                }
+                try {
+                    t = await ctx.rpc('wo_time_breakdown', { p_work_order_id: ctx.id });
+                }
+                catch {
+                    t = null;
+                }
+                // machine state through the SAME engine + spindle as every other machine surface (only when the live board is readable for this user)
+                let mNode = null;
+                if (w.machine) {
+                    try {
+                        const b = await ctx.rpc('live_board', { p_profile: 'OFFICE' });
+                        const m = b.machines.find((x) => x.code === w.machine.code);
+                        if (m) {
+                            const ms = machineState({ status: m.status, active: m.active });
+                            mNode = h('div', { class: 'ps-mstate', 'data-testid': 'flow-machine-state', 'data-state': displayKey(ms), style: 'display:flex;align-items:center;gap:10px;margin:8px 0' }, spindleForState(ms, 44), h('div', {}, h('b', {}, `${w.machine.code} · ${ms.stale ? STALE_TR : HEADLINE_TR[ms.headline]}`), h('div', { class: 'ps-note' }, `Veri kaynağı: ${DATA_SOURCE_TR[ms.dataSource]} · fiziksel çalışma doğrulanmadı`)));
+                        }
+                    }
+                    catch {
+                        mNode = null;
+                    }
+                }
+                const head = kv('Şu an', [['İstasyon', pill(f.stationTr, f.onHold ? 'warn' : f.status === 'PRODUCTION_DONE' ? 'info' : 'ok')], ['Ne zamandır burada', f.since ? `${dt(f.since)} (${dur(f.minutesHere)})` : NA], ['Neyi bekliyor', f.waitingFor],
+                    ['Kimden işlem bekleniyor', `${ROLE_TR[f.waitingOnRole] ?? f.waitingOnRole}${f.waitingOnPerson ? ` · ${f.waitingOnPerson}` : ''}`], ['Son işlem', `${EVENT_TR[f.lastAction.type] ?? f.lastAction.type} · ${orNA(f.lastAction.by)} · ${dt(f.lastAction.at)}`],
+                    ['Sonraki istasyon', f.nextStationTr], ['HOLD', f.onHold ? pill('HOLD', 'warn') : 'Yok'], ['Gecikme', f.late === null ? 'BİLİNMİYOR (ticari termin bu role açık değil)' : f.late ? pill('Gecikti', 'bad') : 'Yok'],
+                    ...(f.tashihReviewPending ? [['Tashih', pill('Kalite incelemesi bekleniyor', 'warn')]] : [])], 'Kaynak: değiştirilemez iş emri olay günlüğü · saatler Türkiye saati');
+                const times = t ? kv('Süreler (beyan esaslı)', [['Beyan edilen çalışma', dur(t.declaredRunMinutes)], ['Beyan edilen duruş (HOLD)', dur(t.declaredStopMinutes)], ['İlk parça onay bekleme', dur(t.firstPieceWaitMinutes)], ['İstasyon bekleme (makine süresine EKLENMEZ)', dur(t.stationWaitMinutes)],
+                    ['Bilinmeyen süre (bayat oturum — üretim sayılmaz)', dur(t.unknownMinutes)], ['Planlanan', dur(t.plannedMinutes)], ['Planlanan – beyan farkı', t.plannedVsDeclaredMinutes === null ? NA : `${t.plannedVsDeclaredMinutes > 0 ? '+' : ''}${t.plannedVsDeclaredMinutes} dk`],
+                    ['Veri kaynağı / güvenilirlik', `${DATA_SOURCE_TR[t.dataSource] ?? t.dataSource} · beyan, doğrulanmadı`], ['OEE / fiziksel kullanım', 'ÖLÇÜLMEDİ (spindle / kesme süresi doğrulanmadı)']], t.note) : null;
+                const hist = table('İstasyon geçmişi (en yeni üstte)', ['Zaman', 'Olay', 'Önce → Sonra', 'İstasyon', 'Makine', 'Kim', 'Miktar', 'Bekleme nedeni / not'], f.history.map((e) => [dt(e.at), `${EVENT_TR[e.eventType] ?? e.eventType}${e.correctionOf ? ` (#${e.correctionOf} için)` : ''}`, `${e.fromStatus ? (WO_TR[e.fromStatus] ?? e.fromStatus) : '—'} → ${e.toStatus ? (WO_TR[e.toStatus] ?? e.toStatus) : '—'}`, orNA(e.department),
+                    orNA(e.machineCode), orNA(e.actor), e.qtyGood !== null || e.qtyScrap !== null || e.qtyTashih !== null ? `sağlam ${e.qtyGood ?? 0} · fire ${e.qtyScrap ?? 0}${e.qtyTashih ? ` · tashih ${e.qtyTashih}` : ''}` : NA, orNA([e.waitReason, e.note].filter(Boolean).join(' · ') || null)]), 'Olay yok');
+                host.replaceChildren(h('div', { class: 'ps-page', 'data-testid': 'flow' }, mNode, sectionNode(head, ctx.hrefOf), times ? sectionNode(times, ctx.hrefOf) : null, sectionNode(hist, ctx.hrefOf)));
+            } },
         tabTopic(ctx, T('urun', 'Ürün ve teknik revizyon', 'box', 'Teknik', { summary: w.revision ? `Rev ${w.revision.revision}` : 'Revizyon bağlı değil' }), 'genel'),
         tabTopic(ctx, T('rota', 'Operasyon ve rota', 'factory', 'Teknik', { summary: 'Operasyonlar' }), 'operasyonlar'),
         { ...T('kunye', 'Kaynak planlama künyesi', 'layers', 'Kaynak', { summary: 'Planın dayanağı (sürümlü)' }), render: async (host) => {

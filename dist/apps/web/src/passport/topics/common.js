@@ -25,7 +25,7 @@ export const nf = (n, unit = '') => (n === null || n === undefined || Number.isN
 export const link = (kind, id, label) => (id ? { kind, id, label: label || id.slice(0, 8) } : null);
 export const pill = (text, tone = '') => ({ pill: text, tone });
 export const orNA = (v) => (v === null || v === undefined || v === '' ? NA : v);
-export const WO_TR = { PLANNED: 'Planlandı', MACHINE_ASSIGNED: 'Makine atandı', IN_PROGRESS: 'Üretimde', FIRST_PIECE_PENDING: 'İlk parça bekliyor', FIRST_PIECE_APPROVED: 'İlk parça onaylı', COMPLETED: 'Tamamlandı', ON_HOLD: 'Bekletmede', CANCELLED: 'İptal', CLOSED: 'Kapandı', DRAFT: 'Taslak' };
+export const WO_TR = { PLANNED: 'Plana alındı', MACHINE_ASSIGNED: 'Makine atandı', PRODUCTION_DONE: 'Üretim bitti · onay bekliyor', IN_PROGRESS: 'Üretimde', FIRST_PIECE_PENDING: 'İlk parça bekliyor', FIRST_PIECE_APPROVED: 'İlk parça onaylı', COMPLETED: 'Tamamlandı', ON_HOLD: 'Bekletmede', CANCELLED: 'İptal', CLOSED: 'Kapandı', DRAFT: 'Taslak' };
 export const MACHINE_TR = { UP: 'Kullanıma hazır', DOWN: 'Arıza / DOWN', MAINTENANCE: 'Bakımda', HOLD: 'Bekletmede' };
 export const MACHINE_TONE = { UP: 'ok', DOWN: 'bad', MAINTENANCE: 'info', HOLD: 'warn' };
 export const TASK_TR = { OPEN: 'Açık', IN_PROGRESS: 'Sürüyor', DONE: 'Tamamlandı', COMPLETED: 'Tamamlandı', APPROVED: 'Onaylandı', REJECTED: 'Reddedildi', CANCELLED: 'İptal', PENDING_APPROVAL: 'Onay bekliyor', WAITING_APPROVAL: 'Onay bekliyor' };

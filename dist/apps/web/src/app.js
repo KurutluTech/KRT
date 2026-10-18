@@ -127,6 +127,7 @@ import { renderMasterImportScreen } from './screens/MasterImportScreen.js';
 import { createAssetApi } from './assetApi.js';
 import { renderAssetCenterScreen } from './screens/AssetCenterScreen.js';
 import { createPlanCockpitApi } from './planCockpitApi.js';
+import { loadMachineStates } from './machineStateLoader.js';
 import { renderPlanCockpit } from './screens/PlanCockpitScreen.js';
 import { renderShiftPlanner } from './screens/ShiftPlannerScreen.js';
 import { renderAssetPassportScreen } from './screens/AssetPassportScreen.js';
@@ -334,10 +335,10 @@ export const ROUTES = [
     { path: '/takimhane', label: 'Takımhane', group: 'Saha', inMenu: true, render: (el, c, s) => renderToolroomScreen(el, { api: createToolroomApi(c, s) }) },
     { path: '/komuta', label: 'Performance Center', group: 'Yönetim', inMenu: true, render: (el, c, s, q) => renderPerformanceCenter(el, createPerformanceCenterSources(c, s), { today: istanbulToday(), dept: q.get('birim'), refreshMs: 60_000 }) },
     { path: '/rota', label: 'Rota / Operasyonlar', group: 'Yönetim', inMenu: true, render: (el, c, s) => renderRoutingScreen(el, createRoutingApi(c, s)) },
-    { path: '/planlama-kokpit', label: 'Planlama Kokpiti', group: 'Yönetim', inMenu: true, render: (el, c, s, q, a) => renderPlanCockpit(el, { api: createPlanCockpitApi(c, s), today: istanbulToday(), canPlan: a.actions.includes('WORK_ORDER_ASSIGN_MACHINE') }) },
+    { path: '/planlama-kokpit', label: 'Planlama Kokpiti', group: 'Yönetim', inMenu: true, render: (el, c, s, q, a) => renderPlanCockpit(el, { api: createPlanCockpitApi(c, s), machineStates: () => loadMachineStates(createLiveApi(c, s)), today: istanbulToday(), canPlan: a.actions.includes('WORK_ORDER_ASSIGN_MACHINE') }) },
     { path: '/vardiya-planlayici', label: 'Shift Planner', group: 'Yönetim', inMenu: true, render: (el, c, s, q, a) => {
             const num = (k) => { const v = Number(q.get(k)); return Number.isFinite(v) && v > 0 ? v : undefined; };
-            return renderShiftPlanner(el, { api: createPlanCockpitApi(c, s), today: istanbulToday(), canPlan: a.actions.includes('WORK_ORDER_ASSIGN_MACHINE'), narrow: window.innerWidth < 760, remember: (hash) => { try {
+            return renderShiftPlanner(el, { api: createPlanCockpitApi(c, s), machineStates: () => loadMachineStates(createLiveApi(c, s)), today: istanbulToday(), canPlan: a.actions.includes('WORK_ORDER_ASSIGN_MACHINE'), narrow: window.innerWidth < 760, remember: (hash) => { try {
                     history.replaceState(null, '', hash);
                 }
                 catch { /* ignore */ } } }, { s: q.get('s') ?? undefined, days: num('days'), m: q.get('m') ?? '', v: q.get('v') ?? '', c: q.get('c') ?? '', w: q.get('w') ?? '', r: q.get('r') ?? '', wo: q.get('wo') ?? '', sc: q.get('sc') ?? '', view: q.get('view') === 'list' ? 'list' : undefined });

@@ -1,6 +1,6 @@
 // Universal object passport adapter (KMI-RECOVERY-004). Reads ONLY canonical tables / existing RPCs through RLS; writes ONLY through existing canonical RPCs.
 // It creates no table, no cache, no second audit: the timeline is kmi_next.audit_log + the existing per-object event tables.
-import { machineState } from '../../../packages/domain/src/machineState.js';
+import { machineState, displayKey } from '../../../packages/domain/src/machineState.js';
 import { auditToEvent, formatStamp } from '../../../packages/domain/src/temporal.js';
 import { errorText, isSetupPending } from './errorText.js';
 import { KINDS, canOpenPassport } from './passport/registry.js';
@@ -12,7 +12,7 @@ const pill = (text, tone = '') => ({ pill: text, tone });
 const num = (n) => (n === null || n === undefined ? '—' : new Intl.NumberFormat('tr-TR').format(n));
 const MACHINE_STATUS_TR = { UP: ['Kullanıma hazır', 'ok'], DOWN: ['ARIZA / DOWN', 'bad'], MAINTENANCE: ['Bakımda', 'info'], HOLD: ['Bekletmede', 'warn'] };
 const TICKET_TR = { OPEN: 'Açık', IN_PROGRESS: 'Müdahale sürüyor', TEST_PENDING: 'Test bekliyor', RETURNED_TO_SERVICE: 'Servise döndü', CLOSED: 'Kapandı' };
-const WO_TR = { PLANNED: 'Planlandı', MACHINE_ASSIGNED: 'Makine atandı', IN_PROGRESS: 'Üretimde', FIRST_PIECE_PENDING: 'İlk parça bekliyor', FIRST_PIECE_APPROVED: 'İlk parça onaylı', COMPLETED: 'Tamamlandı', ON_HOLD: 'Bekletmede', CANCELLED: 'İptal' };
+const WO_TR = { PLANNED: 'Plana alındı', MACHINE_ASSIGNED: 'Makine atandı', PRODUCTION_DONE: 'Üretim bitti · onay bekliyor', IN_PROGRESS: 'Üretimde', FIRST_PIECE_PENDING: 'İlk parça bekliyor', FIRST_PIECE_APPROVED: 'İlk parça onaylı', COMPLETED: 'Tamamlandı', ON_HOLD: 'Bekletmede', CANCELLED: 'İptal' };
 const ACTIVE_WO = ['IN_PROGRESS', 'FIRST_PIECE_PENDING', 'FIRST_PIECE_APPROVED'];
 const LOC_TR = { CABINET: 'Takım dolabında', MOUNTED: 'Makinede takılı', ISSUED: 'Personele zimmetli', SCRAP: 'Hurda' };
 const NOT_FOUND = 'KAYIT_BULUNAMADI';
@@ -69,8 +69,25 @@ export function createObjectPassportApi(client, session, access, myUserId = sess
                     sel('work_orders', 'id,status,operator_id', { machine_id: `eq.${id}`, status: inList(ACTIVE_WO) }),
                     sel('maintenance_tickets', 'id', { machine_id: `eq.${id}`, status: 'in.(OPEN,IN_PROGRESS,TEST_PENDING)' }),
                 ]);
+                // KMI-013: a session with no journal activity for 12 h+ is STALE (never shown as running). Journal missing (0121 not installed) ⇒ nothing is flagged.
+                const staleIds = new Set();
+                if (wos.length) {
+                    try {
+                        const evs = await sel('work_order_events', 'work_order_id,at', { work_order_id: inList(wos.map((w) => w.id)) }, 'at.desc', 500);
+                        const last = new Map();
+                        for (const e of evs)
+                            if (!last.has(e.workOrderId))
+                                last.set(e.workOrderId, Date.parse(e.at));
+                        for (const w of wos) {
+                            const l = last.get(w.id);
+                            if (l !== undefined && Date.now() - l > 12 * 3600_000)
+                                staleIds.add(w.id);
+                        }
+                    }
+                    catch { /* journal not installed yet */ }
+                }
                 const [st, tone] = MACHINE_STATUS_TR[m.status] ?? [m.status, ''];
-                return { kind, id, title: `${m.code} · ${m.name}`, subtitle: m.category ?? 'Kategori belirtilmemiş', status: pill(st, tone), createdAt: m.createdAt, links: [], machineHeadline: machineState({ status: m.status, active: wos.map((w) => ({ runStatus: w.status })) }).headline,
+                return { kind, id, title: `${m.code} · ${m.name}`, subtitle: m.category ?? 'Kategori belirtilmemiş', status: pill(st, tone), createdAt: m.createdAt, links: [], machineHeadline: (() => { const ms = machineState({ status: m.status, active: wos.map((w) => ({ runStatus: w.status, stale: staleIds.has(w.id) })) }); return displayKey(ms); })(),
                     kpis: [{ label: 'Aktif iş emri', value: String(wos.length) }, { label: 'Açık bakım/arıza', value: String(tickets.length) }, { label: 'Toplam duruş', value: m.totalDownMinutes === null ? 'BİLİNMİYOR' : `${num(m.totalDownMinutes)} dk` },
                         { label: m.status === 'DOWN' ? 'DOWN başlangıcı' : 'Fiziksel durum', value: m.status === 'DOWN' ? ts(m.downSince) : 'BİLİNMİYOR (CNC bağlantısı yok)' }] };
             }

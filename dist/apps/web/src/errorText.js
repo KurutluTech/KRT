@@ -63,6 +63,19 @@ export const ACTION_TR = {
 };
 // cross-cutting business refusals introduced with the release hardening (screen-specific texts stay in the screens)
 const BUSINESS_TR = [
+    // KMI-013 (START / FINISH / zaman mühürlü iş akışı)
+    [/^FORBIDDEN: START_RUN/, 'Bu iş emrini yalnız atanmış operatör veya planlamacı başlatabilir. İş emri başlamadı.'],
+    [/^FORBIDDEN: FINISH_RUN/, 'Bu iş emrini yalnız atanmış operatör veya planlamacı bitirebilir. Kayıt yapılmadı.'],
+    [/^ALREADY_RUNNING/, 'Bu iş emri zaten çalışıyor; ikinci bir oturum açılmadı.'],
+    [/^ALREADY_FINISHED/, 'Bu iş emrinin üretimi zaten bitirildi; ikinci bir bitirme kaydı açılmadı.'],
+    [/^FIRST_PIECE_NOT_APPROVED/, 'İlk parça onayı verilmeden iş bitirilemez. Önce kaliteden ilk parça onayı alın.'],
+    [/^NOTHING_DECLARED/, 'Bitirmek için en az bir sağlam parça beyanı gerekir; beyan girilmedi, iş açık kaldı.'],
+    [/^NOT_FINISHABLE_IN_STATUS/, 'İş emri bu durumda bitirilemez (yalnız üretimde olan iş bitirilebilir).'],
+    [/^USE_FINISH_RUN/, 'Üretim bitişi beyanla birlikte "İŞİ BİTİR" düğmesinden verilir.'],
+    [/^TASHIH_REVIEW_PENDING/, 'Beyan edilen tashih için kalitenin incelemesi (tahsis kaydı) bekleniyor; nihai onay verilemez.'],
+    [/^CLIENT_REQUEST_ID_REQUIRED/, 'İşlem numarası eksik; sayfayı yenileyip tekrar deneyin. Kayıt yapılmadı.'],
+    [/^CORRECTION_NOTE_REQUIRED/, 'Düzeltme için bir açıklama yazmalısınız.'],
+    [/^APPEND_ONLY/, 'Geçmiş kayıtlar değiştirilemez; düzeltme yeni bir bağlantılı kayıt olarak eklenir.'],
     // KMI-ASSET-001 (asset registry / two-party custody)
     [/^NOT_THE_RECEIVER/, 'Bu teslimi yalnız alıcı, KENDİ hesabıyla giriş yaparak kabul veya reddedebilir. Başkası adına işlem yapılamaz; zimmet değişmedi.'],
     [/^TARGET_HAS_NO_LOGIN/, 'Seçilen kişinin (veya birimin) giriş hesabı bağlı değil; iki taraflı onay verilemez. Önce personel hesabı bağlanmalı. Zimmet değişmedi.'],

@@ -132,7 +132,7 @@ export function renderHomeShow(host, i) {
                 const cls = mi?.machineClass && mi.machineClass in MACHINE_CLASS_TR ? MACHINE_CLASS_TR[mi.machineClass] : null;
                 const alert = m.openHolds > 0 ? `${m.openHolds} kalite bekletmesi açık` : m.openMaintenance > 0 ? `${m.openMaintenance} açık bakım kaydı` : null;
                 return machineIdentityCard({
-                    code: m.code, name: mi?.name ?? null, classTr: cls, headline: ms.headline, sinceLabel: sinceText(m.since, b.generatedAt) ? `${sinceText(m.since, b.generatedAt)} süredir` : null,
+                    code: m.code, name: mi?.name ?? null, classTr: cls, headline: ms.headline, stale: ms.stale, sinceLabel: sinceText(m.since, b.generatedAt) ? `${sinceText(m.since, b.generatedAt)} süredir` : null,
                     conflictNote: ms.conflict ? `Kayıt: ${AVAILABILITY_TR[ms.availability]} — ama aktif iş emri var` : null, shift: b.shift,
                     wo: a ? { no: a.wo, product: a.productCode, operator: a.operator !== undefined ? a.operator : d ? d.operatorName : undefined, planned: d ? d.qtyPlanned : null, produced: d ? d.qtyProduced : null, scrap: d ? d.qtyScrap : null } : null,
                     woCount: m.active.length, alert, passportHref: mi?.id ? passportHref('MACHINE', mi.id) : null, size: 'compact', fresh: !stale

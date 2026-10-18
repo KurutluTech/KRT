@@ -28,7 +28,8 @@ export function sinceText(sinceIso, nowIso) {
     return `${Math.floor(hh / 24)} gün`;
 }
 export function machineIdentityCard(i) {
-    const v = visualFor(i.headline);
+    const vk = i.stale ? 'STALE' : i.headline;
+    const v = visualFor(vk);
     const compact = i.size === 'compact';
     const pct = i.wo ? progressPct(i.wo.produced, i.wo.planned) : null;
     const fact = (label, value, cls = '') => h('div', { class: `mc-f ${cls}` }, h('span', { class: 'mc-fl' }, label), h('span', { class: 'mc-fv' }, value));
@@ -37,7 +38,7 @@ export function machineIdentityCard(i) {
         // 1) STATE first: one pill (icon + text) + since
         h('div', { class: 'mc-st', style: `color:${v.color}`, 'data-testid': 'mc-state', 'data-headline': i.headline }, h('b', { class: 'mc-pill', style: `border-color:${v.color};background:${v.soft}` }, v.label), i.sinceLabel || !compact ? h('span', { class: 'mc-since' }, i.sinceLabel ?? 'süre bilinmiyor') : null),
         // 2) then identity
-        h('div', { class: 'mc-top' }, h('span', { class: 'mc-ico', ...(i.photo ? { 'data-testid': 'mc-photo' } : {}) }, i.photo ?? spindleIcon(i.headline, compact ? 40 : 80, i.fresh === false)), h('div', { class: 'mc-id' }, h('div', { class: 'mc-code', 'data-testid': 'mc-code' }, i.code), i.name ? h('div', { class: 'mc-name' }, i.name) : null, compact ? null : h('div', { class: 'mc-sub' }, i.brandModel ?? 'Marka/model kaydı yok', i.classTr ? ` · ${i.classTr}` : ''))),
+        h('div', { class: 'mc-top' }, h('span', { class: 'mc-ico', ...(i.photo ? { 'data-testid': 'mc-photo' } : {}) }, i.photo ?? spindleIcon(vk, compact ? 40 : 80, i.fresh === false)), h('div', { class: 'mc-id' }, h('div', { class: 'mc-code', 'data-testid': 'mc-code' }, i.code), i.name ? h('div', { class: 'mc-name' }, i.name) : null, compact ? null : h('div', { class: 'mc-sub' }, i.brandModel ?? 'Marka/model kaydı yok', i.classTr ? ` · ${i.classTr}` : ''))),
         i.conflictNote ? h('div', { class: 'mc-warn', 'data-testid': 'mc-conflict' }, i.conflictNote) : null,
         i.wo ? h('div', { class: 'mc-wo', 'data-testid': 'mc-wo' }, h('div', { class: 'mc-job' }, h('b', {}, i.wo.product ?? 'Ürün: BİLİNMİYOR'), h('span', {}, ` · İE ${i.wo.no}`, i.woCount && i.woCount > 1 ? ` (+${i.woCount - 1} iş daha)` : '')), h('div', { class: 'mc-facts' }, fact('Operatör', `${opTxt}`), i.shift ? fact('Vardiya', i.shift) : null, i.wo.scrap ? fact('Hurda', NUM.format(i.wo.scrap), 'warn') : null), pct === null
             ? h('div', { class: 'mc-prog unk', 'data-testid': 'mc-progress', 'data-known': 'false', title: 'Plan veya üretim kaydı okunamadı' }, compact ? 'İlerleme: BİLİNMİYOR' : 'İlerleme: BİLİNMİYOR (plan/üretim kaydı okunamadı)')
