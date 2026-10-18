@@ -54,7 +54,9 @@ const DEFAULT_ROLE_MATRIX = {
     CUSTOMER_CONTACT_VIEW: ['ADMIN', 'MANAGEMENT', 'ACCOUNTING', 'SHIPPING'],
     // Draft 0103 (KMI-007): quotes are commercial; cost/margin additionally need economic access (not a role). CAM/QUALITY do the technical (feasibility, operations) part only.
     QUOTE_PREPARE: ['ADMIN', 'MANAGEMENT', 'ACCOUNTING'],
-    QUOTE_TECH: ['ADMIN', 'MANAGEMENT', 'CAM', 'QUALITY'],
+    QUOTE_TECH: ['ADMIN', 'MANAGEMENT'], // 0114/0115: the full RFQ screen (customer, references) is management only
+    MACHINE_PASSPORT_EDIT: ['ADMIN', 'MAINTENANCE', 'MANAGEMENT'], // 0109: machine passport attributes (already live; the code matrix had drifted)
+    RFQ_FEASIBILITY: ['ADMIN', 'MANAGEMENT', 'QUALITY', 'CAM'], // 0115: technical feasibility queue + verdict only — no customer, no price
     QUOTE_VIEW: ['ADMIN', 'MANAGEMENT', 'ACCOUNTING'],
     QUOTE_APPROVE: ['ADMIN', 'MANAGEMENT'],
     PRODUCT_REV_APPROVE: ['ADMIN', 'MANAGEMENT', 'QUALITY'],
