@@ -1,6 +1,6 @@
 {
   "product": "KMI NEXT",
-  "commit": "43cb3f54211dc904288260c021cff96e52036fe0",
+  "commit": "1a9517cb984b47e718ec2a41378b97e9b767e317",
   "builtFrom": "clean git tree",
   "fileCount": 336,
   "migrationsInRepo": 73,
@@ -79,8 +79,8 @@
     },
     {
       "path": "dist/apps/web/src/app.js",
-      "bytes": 87967,
-      "sha256": "5b7003df84753694f06ea971880014e24dd4aa171df457285f29423aed4c5252"
+      "bytes": 88049,
+      "sha256": "e5b4ba2f2eef2a189744e62cb2f240d662a1725ea9d7b08d9ca8674c8d03a598"
     },
     {
       "path": "dist/apps/web/src/approvalsInboxApi.js",
@@ -734,8 +734,8 @@
     },
     {
       "path": "dist/apps/web/src/screens/OrderImportScreen.js",
-      "bytes": 19975,
-      "sha256": "ccaad71699559d5b0fa73de4de49fe9d17993f45455fa72fb72b3af1b9daeddf"
+      "bytes": 24192,
+      "sha256": "0dde2a8141ae5faedfe3a16f0d39e11749fbb099573fcee2d27bd89778a64317"
     },
     {
       "path": "dist/apps/web/src/screens/OrdersScreen.js",

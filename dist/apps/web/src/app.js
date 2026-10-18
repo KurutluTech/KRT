@@ -278,7 +278,8 @@ export const ROUTES = [
     {
         // operator-safe work-order card (no commercial fields); non-assigned work orders are simply not returned by RLS
         path: '/is-karti', label: 'İş Emri Kartı (operatör)', group: 'Saha', inMenu: false,
-        render: (el, c, s, q) => renderOperatorWoCardScreen(el, { api: createOperatorWoCardApi(c, s), openTerminal: (machineId) => { rememberMachine(machineId); location.hash = '#/terminal'; }, go: (hash) => { location.hash = hash; } }, q.get('wo')),
+        // /is-karti serves two screens: ?is=<work order> = the KMI-011 job card (operation documents + scan check), otherwise (?wo=) the operator work-order card. One path, no shadowed route.
+        render: (el, c, s, q) => q.has('is') ? renderJobCardScreen(el, { load: (wo) => jobCardFor(c, s, wo), scan: (input, wo) => scanCheck(c, s, input, wo) }, q.get('is')) : renderOperatorWoCardScreen(el, { api: createOperatorWoCardApi(c, s), openTerminal: (machineId) => { rememberMachine(machineId); location.hash = '#/terminal'; }, go: (hash) => { location.hash = hash; } }, q.get('wo')),
     },
     { path: '/terminal', label: 'Makine Terminali', group: 'Saha', inMenu: true, render: (el, c, s) => renderTerminalScreen(el, createTerminalApi(c, s), { machineId: rememberedMachine() }, { icon: (n, z) => icon(n, z) }) },
     {
@@ -395,7 +396,6 @@ export const ROUTES = [
     { path: '/yetki-yonetimi', label: 'Yetki Yönetimi (sahipler · izinler)', group: 'Yönetim', inMenu: true, render: (el, c, s) => renderPermissionAdminScreen(el, createPermissionAdminApi(c, s)) },
     { path: '/pasaport-calisma', label: 'Pasaport çalışma alanı', group: 'Yönetim', inMenu: false, needs: ['tur', 'id'], render: (el, c, s, q) => renderPassportWorkspaceScreen(el, createPassportCardsApi(c, s), { type: q.get('tur'), id: q.get('id') }) },
     { path: '/urun-calisma', label: 'Ürün Çalışma Alanı (rota & operasyon)', group: 'Yönetim', inMenu: true, render: (el, c, s, q) => renderProductWorkspaceScreen(el, createProductWorkspaceApi(c, s), { product: q.get('urun'), rev: q.get('rev') }) },
-    { path: '/is-karti', label: 'İş kartı (operasyon belgeleri)', group: 'Saha', inMenu: false, render: (el, c, s, q) => renderJobCardScreen(el, { load: (wo) => jobCardFor(c, s, wo), scan: (input, wo) => scanCheck(c, s, input, wo) }, q.get('is')) },
     { path: '/urun-master', label: 'Ürün Master / Digital DNA', group: 'Yönetim', inMenu: true, render: (el, c, s, q) => (q.get('urun') ? renderProductMasterScreen(el, createProductMasterApi(c, s), { product: q.get('urun'), tab: q.get('sekme') ?? undefined })
             : renderEntityGalleryScreen(el, galleryDeps(c, s), { kind: 'PRODUCT', listHref: '#/urun-liste', listLabel: 'Ürün Master listesi (tablo)' })) },
     { path: '/urun-liste', label: 'Ürün Master listesi', group: 'Yönetim', inMenu: false, render: (el, c, s) => renderProductMasterScreen(el, createProductMasterApi(c, s), { product: null, tab: undefined }) },
