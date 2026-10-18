@@ -1,3 +1,8 @@
+// KMI-MANAGEMENT-001 Onaylar adapter. NO new data source and NO new writer: it READS the canonical tables (commercial_approvals, purchase_requests,
+// purchase_orders, tasks) under their existing RLS and CALLS the existing canonical RPCs (grant_management_release / decide_commercial_approval /
+// decide_purchase_request / approve_purchase_order / transition_purchase_order_status / approve_task / reopen_task). Each RPC re-checks the permission,
+// the state and writes the audit row, so approving twice, approving without rights, or skipping the management release is refused by the server.
+import { passportHref } from './passport/registry.js';
 import { isSetupPending } from './errorText.js';
 import { buildHistory, buildInbox, rpcCall } from '../../../packages/domain/src/approvalsInbox.js';
 export const HISTORY_DAYS = 30;
@@ -111,7 +116,7 @@ export function createApprovalsInboxApi(client, session, opts = {}) {
             const lotOfApproval = new Map([...commercial.map((c) => [c.id, c.stockLotId]), ...decidedC.map((c) => [c.id, c.stockLotId])]);
             const poSupplier = new Map([...purchaseOrders.map((o) => [o.id, o.supplierId]), ...decidedPO.map((o) => [o.id, o.supplierId])]);
             const reqWo = new Map([...purchaseRequests, ...decidedR].map((r) => [r.id, r.sourceWorkOrderId ?? null]));
-            const pp = (kind, id) => `#/nesne?t=${kind}&id=${encodeURIComponent(id)}`;
+            const pp = (kind, id) => passportHref(kind, id);
             const chain = (woId) => { const out = []; if (woId) {
                 out.push({ label: 'İş emri', href: pp('WORK_ORDER', woId) });
                 const o = woOrder.get(woId);

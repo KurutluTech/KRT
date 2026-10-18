@@ -1,0 +1,143 @@
+import { NA, dt, day, nf, link, pill, orNA, inList, kv, table, note, tabTopic, opt, renderSections, WO_TR, TASK_TR, isDenied, floorTasks } from './common.js';
+import { h } from '../../../../../packages/ui/src/h.js';
+import { sectionNode } from '../sections.js';
+import { errorText } from '../../errorText.js';
+export const loadWoPassport = (ctx) => ctx.rpc('work_order_passport', { p_work_order_id: ctx.id });
+const planner = (ctx) => ctx.access.owner || ctx.access.roles.some((r) => r === 'ADMIN' || r === 'MANAGEMENT') || ctx.access.actions.includes('WORK_ORDER_ASSIGN_MACHINE') || ctx.access.actions.includes('MANAGEMENT_RELEASE');
+export function workOrderTopics(ctx, w) {
+    const T = (id, title, icon, group, extra = {}) => ({ id, title, icon, group, ...extra });
+    const R = (id, title, icon, group, summary, load, extra = {}) => ({ ...T(id, title, icon, group, { summary, ...extra }), render: (host) => renderSections(ctx, host, load) });
+    const wo = w.workOrder;
+    const snaps = () => ctx.sel('work_order_resource_snapshots', 'id,version_no,captured_at,captured_by,capture_kind,reason,basis', { work_order_id: `eq.${ctx.id}` }, 'version_no.desc', 50);
+    const ops = () => ctx.sel('work_order_operations', 'id,op_no,name,status,machine_id,operator_id,qty_in,qty_good,qty_scrap,started_at,first_piece_at,run_finished_at,qc_result,completed_at,cycle_seconds_target,setup_minutes_target,routing_version_no,cam_program_id,first_piece_required', { work_order_id: `eq.${ctx.id}` }, 'op_no', 80);
+    return [
+        R('genel', 'Genel bakış', 'clipboard', 'Genel', `${WO_TR[wo.status] ?? wo.status}`, async () => [
+            kv('İş emri', [['Durum', pill(WO_TR[wo.status] ?? wo.status, wo.status === 'ON_HOLD' ? 'warn' : wo.status === 'COMPLETED' ? 'ok' : 'info')], ['Ürün', link('PRODUCT', w.product?.id, w.product ? `${w.product.code} · ${w.product.name}` : null)], ['Revizyon', w.revision ? `${w.revision.revision} (${w.revision.status})` : NA],
+                ['Planlanan adet', nf(wo.qtyPlanned)], ['İyi (üretilen)', nf(wo.qtyProduced)], ['Fire', nf(wo.qtyScrap)], ['Makine', link('MACHINE', w.machine?.id, w.machine ? `${w.machine.code} · ${w.machine.name}` : null)], ['Operatör', link('PERSONNEL', w.operator?.id, w.operator?.name)],
+                ['Plan', wo.plannedDate ? `${day(wo.plannedDate)}${wo.plannedShiftCode ? ` · ${wo.plannedShiftCode}` : ''}` : NA], ['Termin', w.order?.dueDate ? day(w.order.dueDate) : NA], ['Açılış', dt(wo.createdAt)]])
+        ]),
+        tabTopic(ctx, T('urun', 'Ürün ve teknik revizyon', 'box', 'Teknik', { summary: w.revision ? `Rev ${w.revision.revision}` : 'Revizyon bağlı değil' }), 'genel'),
+        tabTopic(ctx, T('rota', 'Operasyon ve rota', 'factory', 'Teknik', { summary: 'Operasyonlar' }), 'operasyonlar'),
+        { ...T('kunye', 'Kaynak planlama künyesi', 'layers', 'Kaynak', { summary: 'Planın dayanağı (sürümlü)' }), render: async (host) => {
+                const draw = async (banner) => {
+                    let list = [];
+                    try {
+                        list = await snaps();
+                    }
+                    catch (e) {
+                        if (isDenied(e)) {
+                            host.replaceChildren(h('div', { class: 'ps-banner', 'data-testid': 'ps-denied' }, 'Bu bölümü görme yetkiniz yok (sunucu reddetti).'));
+                            return;
+                        }
+                        host.replaceChildren(h('div', { class: 'ps-banner', 'data-testid': 'kunye-pending' }, `Künye altyapısı (0117) bu veritabanında henüz kurulu değil: ${errorText(e)}`));
+                        return;
+                    }
+                    const cur = list[0];
+                    const prev = list[1];
+                    const secs = list.length ? [
+                        kv(`Güncel künye · sürüm ${cur.versionNo}`, [['Kaydedilme', dt(cur.capturedAt)], ['Kaynak', cur.captureKind === 'PLAN_DECISION' ? 'Plan kararı (otomatik)' : 'Elle kayıt'], ['Gerekçe', orNA(cur.reason)], ...basisRows(cur.basis)]),
+                        ...(prev ? [kv(`Önceki sürüm ${prev.versionNo} ile fark`, diffRows(prev.basis, cur.basis), 'Önceki sürümler silinmez ve değişmez.')] : []),
+                        table('Tüm sürümler', ['Sürüm', 'Zaman', 'Tür', 'Makine', 'Operatör', 'Vardiya', 'CAM'], list.map((s) => [`v${s.versionNo}`, dt(s.capturedAt), s.captureKind === 'PLAN_DECISION' ? 'Plan kararı' : 'Elle', orNA(s.basis.machine?.code), orNA(s.basis.operator?.name), orNA(s.basis.shift?.code ?? s.basis.planned?.shiftCode), s.basis.camProgram ? `${s.basis.camProgram.programNo} r${s.basis.camProgram.revision}` : NA]), 'Künye yok')
+                    ] : [note('Künye yok', 'Bu iş emri için henüz künye kaydedilmedi. Plan kararı verildiğinde otomatik, ya da yetkili kişi elle kaydeder. Eksik künye 0 veya tahmin ile doldurulmaz.')];
+                    const box = h('div', { class: 'ps-page', 'data-testid': 'kunye' }, banner ? h('div', { class: 'ps-banner ok', 'data-testid': 'kunye-banner' }, banner) : null, ...secs.map((s) => sectionNode(s, ctx.hrefOf)));
+                    if (planner(ctx)) {
+                        const reason = h('input', { 'data-testid': 'kunye-reason', placeholder: 'Gerekçe (en az 5 karakter)', maxlength: 300 });
+                        const msg = h('div', { class: 'ps-note', 'data-testid': 'kunye-msg' });
+                        const go = h('button', { type: 'button', class: 'btn primary sm', 'data-testid': 'kunye-capture', onClick: () => {
+                                if (reason.value.trim().length < 5) {
+                                    msg.textContent = 'Gerekçe en az 5 karakter olmalı';
+                                    return;
+                                }
+                                void ctx.rpc('wo_resource_snapshot_capture', { p_wo: ctx.id, p_reason: reason.value.trim() }).then(() => draw('Yeni künye sürümü kaydedildi; önceki sürümler korundu.')).catch((e) => { msg.textContent = errorText(e); });
+                            } }, 'Şu anki planı künyeye kaydet');
+                        box.append(h('section', { class: 'ps-panel' }, h('div', { class: 'ps-panel-h' }, h('h2', {}, 'Elle künye kaydı')), reason, go, msg));
+                    }
+                    host.replaceChildren(box);
+                };
+                await draw();
+            } },
+        R('hammadde', 'Hammadde ve stok tahsisi', 'cart', 'Kaynak', 'Gereken / tahsis / sarf', async () => {
+            const [ms, passport] = await Promise.all([ctx.rpc('work_order_material_status', { p_work_order_id: ctx.id }), opt(ctx.sel('material_movements', 'stock_lot_id,kind,qty,at', { work_order_id: `eq.${ctx.id}` }, 'at.desc', 80))]);
+            return [table('Malzeme durumu (work_order_material_status)', ['Malzeme', 'Gereken', 'Rezerve', 'Verilen', 'Sarf', 'Karşılanan', 'Eksik'], ms.map((m) => [m.materialCode, nf(m.required), nf(m.reserved), nf(m.issued), nf(m.consumed), nf(m.covered), m.shortage > 0 ? pill(nf(m.shortage), 'bad') : nf(m.shortage)]), 'Malzeme gereksinimi tanımlı değil (BOM yok ya da iş emri adedi yok)'),
+                table('Parti hareketleri', ['Zaman', 'Tür', 'Parti', 'Adet'], (passport ?? []).map((x) => [dt(x.at), x.kind, link('STOCK_LOT', x.stockLotId, x.stockLotId.slice(0, 8)), nf(x.qty)]), 'Bu iş emrine parti hareketi yok')];
+        }),
+        R('makine', 'Makine atamaları', 'cnc', 'Kaynak', w.machine ? `${w.machine.code}` : 'Atanmamış', async () => {
+            const dec = await opt(ctx.sel('work_order_plan_decisions', 'machine_id,planned_date,planned_shift_code,planned_minutes,reason,decided_at', { work_order_id: `eq.${ctx.id}` }, 'decided_at.desc', 30));
+            const ids = [...new Set((dec ?? []).map((d) => d.machineId).filter((x) => !!x))];
+            const ms = ids.length ? await opt(ctx.sel('machines', 'id,code,name', { id: inList(ids) })) : [];
+            const mm = new Map((ms ?? []).map((m) => [m.id, m]));
+            return [kv('Şu anki makine', [['Makine', link('MACHINE', w.machine?.id, w.machine ? `${w.machine.code} · ${w.machine.name}` : null)]]),
+                table('Plan kararları', ['Zaman', 'Makine', 'Gün / vardiya', 'Planlı dk', 'Gerekçe'], (dec ?? []).map((d) => [dt(d.decidedAt), link('MACHINE', d.machineId, d.machineId ? mm.get(d.machineId)?.code : null), `${d.plannedDate ? day(d.plannedDate) : NA}${d.plannedShiftCode ? ` · ${d.plannedShiftCode}` : ''}`, d.plannedMinutes === null ? NA : nf(d.plannedMinutes), orNA(d.reason)]), 'Plan kararı yok'),
+                note('Kural', 'Bir makinede aynı anda tek aktif üretim oturumu olur; bir operatör birden çok makineyi yönetebilir.')];
+        }),
+        R('personel', 'Personel ve vardiya atamaları', 'users', 'Kaynak', w.operator?.name ?? 'Atanmamış', async () => {
+            const dec = await opt(ctx.sel('work_order_plan_decisions', 'operator_id,planned_shift_code,followed_suggestion,warnings,decided_at', { work_order_id: `eq.${ctx.id}` }, 'decided_at.desc', 30));
+            const o = await ops();
+            const ids = [...new Set([...(dec ?? []).map((d) => d.operatorId), ...o.map((x) => x.operatorId)].filter((x) => !!x))];
+            const ps = ids.length ? await opt(ctx.sel('personnel', 'id,name', { id: inList(ids) })) : [];
+            const pm = new Map((ps ?? []).map((p) => [p.id, p.name]));
+            return [kv('Şu anki operatör', [['Operatör', link('PERSONNEL', w.operator?.id, w.operator?.name)], ['Vardiya', orNA(wo.plannedShiftCode)]]),
+                table('Operasyon bazlı operatörler', ['Op', 'Operatör', 'Makine'], o.map((x) => [`OP${x.opNo}`, link('PERSONNEL', x.operatorId, x.operatorId ? pm.get(x.operatorId) : null), link('MACHINE', x.machineId, x.machineId ? 'Makine' : null)]), 'Operasyon yok'),
+                table('Atama kararları', ['Zaman', 'Operatör', 'Vardiya', 'Öneriye uyuldu mu'], (dec ?? []).map((d) => [dt(d.decidedAt), link('PERSONNEL', d.operatorId, d.operatorId ? pm.get(d.operatorId) : null), orNA(d.plannedShiftCode), d.followedSuggestion === null ? NA : d.followedSuggestion ? 'Evet' : 'Hayır']), 'Atama kararı yok')];
+        }),
+        R('cam', 'CAM programı ve revizyonu', 'chip', 'Teknik', w.camProgram ? `${w.camProgram.programNo} r${w.camProgram.revision}` : 'Bağlı değil', async () => {
+            const tl = w.camProgram ? await opt(ctx.sel('cam_program_tools', 'tool_type,qty', { cam_program_id: `eq.${w.camProgram.id}` }, 'tool_type', 100)) : [];
+            return [kv('CAM programı', w.camProgram ? [['Program', w.camProgram.programNo], ['Revizyon', w.camProgram.revision], ['Durum', w.camProgram.status], ['İdeal çevrim', w.camProgram.idealCycleSeconds === null ? NA : nf(w.camProgram.idealCycleSeconds, 'sn')], ['Ürün', link('PRODUCT', w.product?.id, w.product?.code)]] : [['Durum', 'Bu iş emrine CAM programı bağlı değil']]),
+                table('Programın takım türleri', ['Takım türü', 'Adet'], (tl ?? []).map((t) => [t.toolType, nf(t.qty)]), 'Takım listesi yok')];
+        }),
+        R('takim', 'Takım listesi ve revizyonu', 'wrench', 'Teknik', 'Hazırlık ve hareket', async () => {
+            const ts = await opt(ctx.rpc('work_order_tool_status', { p_work_order_id: ctx.id }));
+            return [table('Takım hazırlığı (work_order_tool_status)', ['Takım türü', 'Gereken', 'Hazır (makinede)', 'Durum'], (ts ?? []).map((t) => [t.toolType, nf(t.required), nf(t.mountedUsable), t.ready ? pill('Hazır', 'ok') : pill('Eksik', 'warn')]), 'Takım gereksinimi yok'),
+                table('Bu iş emrinde takım hareketleri', ['Zaman', 'Takım', 'Nereden', 'Nereye'], w.tools.map((t) => [dt(t.at), t.code, orNA(t.from), orNA(t.to)]), 'Takım hareketi yok')];
+        }),
+        R('sureler', 'Planlanan çevrim ve hazırlık süreleri', 'clock', 'Teknik', 'Rota hedefleri', async () => {
+            const o = await ops();
+            return [table('Operasyon hedefleri (iş emri anındaki rota sürümü)', ['Op', 'Ad', 'Rota sürümü', 'Çevrim (sn)', 'Hazırlık (dk)'], o.map((x) => [`OP${x.opNo}`, x.name, orNA(x.routingVersionNo), x.cycleSecondsTarget === null ? NA : nf(x.cycleSecondsTarget), x.setupMinutesTarget === null ? NA : nf(x.setupMinutesTarget)]), 'Operasyon yok')];
+        }),
+        R('uretim', 'Gerçekleşen üretim', 'factory', 'Üretim', `${nf(wo.qtyProduced)} / ${nf(wo.qtyPlanned)}`, async () => {
+            const o = await ops();
+            return [kv('Toplam', [['İyi (beyan)', nf(w.declarations.good)], ['Fire (beyan)', nf(w.declarations.scrap)], ['Beyan sayısı', nf(w.declarations.count)], ['İlk parça', w.declarations.firstPieceAt ? dt(w.declarations.firstPieceAt) : NA]], 'Kaynak: production_declarations (yalnız beyan; düzeltmeler ayrı satırda).'),
+                table('Operasyon bazlı', ['Op', 'Giren', 'İyi', 'Fire', 'Durum'], o.map((x) => [`OP${x.opNo} ${x.name}`, x.qtyIn === null ? NA : nf(x.qtyIn), x.qtyGood === null ? NA : nf(x.qtyGood), x.qtyScrap === null ? NA : nf(x.qtyScrap), x.status]), 'Operasyon yok'),
+                table('Düzeltmeler', ['Zaman', 'İyi Δ', 'Fire Δ', 'Gerekçe'], w.corrections.map((c) => [dt(c.at), nf(c.goodDelta), nf(c.scrapDelta), c.reason]), 'Düzeltme yok')];
+        }),
+        R('durus', 'Duruşlar ve kayıp nedenleri', 'stop', 'Üretim', 'Durum ve makine olayları', async () => {
+            const ev = w.machine ? await opt(ctx.sel('machine_state_events', 'from_status,to_status,at,category', { machine_id: `eq.${w.machine.id}`, at: `gte.${wo.createdAt}` }, 'at.desc', 60)) : [];
+            return [table('İş emri durum geçişleri', ['Zaman', 'Önce', 'Sonra', 'Makine', 'Operatör'], w.timeline.map((t) => [dt(t.at), orNA(t.from), WO_TR[t.to] ?? t.to, orNA(t.machineCode), orNA(t.operatorName)]), 'Durum geçişi yok'),
+                table('Makine durum olayları (iş emri açılışından beri)', ['Zaman', 'Önce', 'Sonra', 'Kategori'], (ev ?? []).map((e) => [dt(e.at), orNA(e.fromStatus), e.toStatus, orNA(e.category)]), w.machine ? 'Makine durum olayı yok' : 'Makine atanmamış'), note('Kayıp nedenleri', 'Kayıp dakikaları makine pasaportundaki "Duruşlar" sayfasında oee_rollup ile hesaplanır; burada ayrı hesap yapılmaz.')];
+        }),
+        tabTopic(ctx, T('kalite', 'Kalite ve ilk parça', 'shield', 'Kalite', { summary: `${w.ncrs.length} NCR · ${w.qualityHolds.filter((x) => x.status === 'OPEN').length} açık HOLD`, tone: w.qualityHolds.some((x) => x.status === 'OPEN') ? 'bad' : undefined }), 'kalite'),
+        tabTopic(ctx, T('belgeler', 'Belgeler ve kanıtlar', 'file', 'Evrak', { summary: 'İş emri belgeleri' }), 'belgeler'),
+        R('gorevler', 'Görevler ve onaylar', 'tasks', 'Evrak', 'Bu iş emrine bağlı görevler', async () => {
+            const all = await floorTasks(ctx);
+            if (all === null)
+                return [note('Görevler', 'Görev listesi okunamadı (Görev Zemini RPC).')];
+            const ts = all.filter((t) => t.sourceType === 'WORK_ORDER' && t.sourceId === ctx.id);
+            return [table('Bağlı görevler', ['Görev', 'Durum', 'Hedef bitiş', 'Gecikme'], ts.map((t) => [link('TASK', t.id, t.title), TASK_TR[t.status] ?? t.status, dt(t.dueAt), t.dueAt ? (t.isLate ? pill('Gecikti', 'bad') : pill('Zamanında', 'ok')) : NA]), 'Bu iş emrine bağlı (sizin görebildiğiniz) görev yok')];
+        }),
+        R('karsilastirma', 'Planlanan / gerçekleşen karşılaştırma', 'chart', 'Üretim', 'Adet ve süre', async () => {
+            const o = await ops();
+            const planned = o.reduce((a, x) => a + (x.cycleSecondsTarget !== null ? (x.cycleSecondsTarget * wo.qtyPlanned) / 60 : 0) + (x.setupMinutesTarget ?? 0), 0);
+            const allTargets = o.length > 0 && o.every((x) => x.cycleSecondsTarget !== null);
+            const real = o.filter((x) => x.startedAt && x.runFinishedAt).reduce((a, x) => a + (Date.parse(x.runFinishedAt) - Date.parse(x.startedAt)) / 60000, 0);
+            const doneAll = o.length > 0 && o.every((x) => x.startedAt && x.runFinishedAt);
+            return [kv('Adet', [['Planlanan', nf(wo.qtyPlanned)], ['Gerçekleşen iyi', nf(wo.qtyProduced)], ['Tamamlanma', wo.qtyPlanned > 0 ? `% ${nf((wo.qtyProduced / wo.qtyPlanned) * 100)}` : NA]]),
+                kv('Süre (dakika)', [['Hedef (rota: çevrim × adet + hazırlık)', allTargets ? nf(planned) : NA], ['Gerçekleşen (başla→bitir)', doneAll ? nf(real) : NA]], 'Hedef yalnız TÜM operasyonların çevrim süresi tanımlıysa hesaplanır; gerçek süre yalnız tüm operasyonlar başlayıp bittiyse. Aksi halde BİLİNMİYOR.')];
+        }),
+        tabTopic(ctx, T('olaylar', 'Olay ve değişiklik geçmişi', 'layers', 'Geçmiş', { summary: 'Zaman çizelgesi' }), 'zaman'),
+    ];
+}
+const KEYS = [
+    ['Makine', (b) => (b.machine ? `${b.machine.code} · ${b.machine.name}` : NA)], ['Operatör', (b) => b.operator?.name ?? NA], ['Vardiya', (b) => (b.shift ? `${b.shift.code} · ${b.shift.label}` : (b.planned?.shiftCode ?? NA))],
+    ['Plan günü', (b) => (b.planned?.date ? day(b.planned.date) : NA)], ['Planlı dk', (b) => (b.planned?.minutes == null ? NA : nf(b.planned.minutes))],
+    ['Ürün / revizyon', (b) => (b.productRevision ? `${b.productRevision.productCode} rev ${b.productRevision.revision} (${b.productRevision.status})` : NA)],
+    ['CAM programı', (b) => (b.camProgram ? `${b.camProgram.programNo} r${b.camProgram.revision} (${b.camProgram.status})` : NA)],
+    ['Takım listesi', (b) => (b.camProgram?.toolList?.length ? b.camProgram.toolList.map((t) => `${t.toolType}×${t.qty}`).join(', ') : NA)],
+    ['Operasyonlar', (b) => (b.operations?.length ? b.operations.map((o) => `OP${o.opNo} (rota v${o.routingVersionNo ?? '?'} · ${o.cycleSecondsTarget ?? '?'} sn · hazırlık ${o.setupMinutesTarget ?? '?'} dk)`).join(' · ') : NA)],
+    ['Hammadde', (b) => (b.materials?.length ? b.materials.map((m) => `${m.materialCode}: gereken ${m.required}, rezerve ${m.reserved}`).join(' · ') : NA)],
+    ['Parti sayısı', (b) => String(b.materialLots?.length ?? 0)],
+];
+const basisRows = (b) => KEYS.map(([k, f]) => [k, f(b)]);
+const diffRows = (a, b) => {
+    const rows = KEYS.map(([k, f]) => [k, f(a), f(b)]).filter(([, x, y]) => x !== y).map(([k, x, y]) => [k, `${x}  →  ${y}`]);
+    return rows.length ? rows : [['Fark', 'Önceki sürümle aynı dayanak']];
+};

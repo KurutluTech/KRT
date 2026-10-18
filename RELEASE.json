@@ -1,8 +1,8 @@
 {
   "product": "KMI NEXT",
-  "commit": "9ffc9f2796df8b5477fdd6e7f31c5ca569c82340",
+  "commit": "bfd13ada5ed65255a9e813de39733586973a1141",
   "builtFrom": "clean git tree",
-  "fileCount": 292,
+  "fileCount": 305,
   "migrationsInRepo": 73,
   "lastMigration": "0073_kmi_next_puantaj_month.sql",
   "note": "Release candidate. Publishing to https://flow.kurutlu.com is a manual owner action; this file is not a publication permit.",
@@ -79,13 +79,13 @@
     },
     {
       "path": "dist/apps/web/src/app.js",
-      "bytes": 86280,
-      "sha256": "c91f86b7315bdf79f0121f61fda29814a65644ace4fee96df64945ad6f0ceb05"
+      "bytes": 87340,
+      "sha256": "db74ead094b259d2f8e0699abb3481a95d6fc310b0897065324bc8fb73de4121"
     },
     {
       "path": "dist/apps/web/src/approvalsInboxApi.js",
-      "bytes": 11454,
-      "sha256": "7cccd9f96bb573e72d6f94384e809929a9d5e910f5c9df630557f6fb702348f4"
+      "bytes": 12078,
+      "sha256": "b8fb8c38c08190ad33b4b023e89431242f276fe375a3a4fb64791c0579907e4a"
     },
     {
       "path": "dist/apps/web/src/badgesApi.js",
@@ -94,8 +94,8 @@
     },
     {
       "path": "dist/apps/web/src/cardKit.js",
-      "bytes": 7433,
-      "sha256": "97c59761de3684b18985bedb4d0cf9e091fb9d45e4c7411cb826a99b0d0eeeab"
+      "bytes": 7454,
+      "sha256": "d1a1921c2eab6f68cd9136488eb3cf81d135d288c9c9dae99797a0ec4c8721b5"
     },
     {
       "path": "dist/apps/web/src/charts.js",
@@ -274,8 +274,8 @@
     },
     {
       "path": "dist/apps/web/src/nav.js",
-      "bytes": 17402,
-      "sha256": "18f7fe7eda00520b2397efedf89c8e312bd6f00d50cadc479749c7c38ef84d43"
+      "bytes": 17449,
+      "sha256": "c83a7016c5fbec84d05e25eb1f57d08fa6145c95ca59bd6ff0c44269dde5dc6f"
     },
     {
       "path": "dist/apps/web/src/objectCard.js",
@@ -328,6 +328,11 @@
       "sha256": "b3324adf6db3979cf6ea2548f3064e0a3e0414bf513e6a9ea79470011e0b674e"
     },
     {
+      "path": "dist/apps/web/src/passport/kit.js",
+      "bytes": 11414,
+      "sha256": "543b220c2f3dd5b599c240099e7ba4cab7faf2b919115ecea35820f8e201d718"
+    },
+    {
       "path": "dist/apps/web/src/passport/model.js",
       "bytes": 162,
       "sha256": "a85eb368434ca0fc886e8ba840d132e5ac9986ca140a33ea9f99fa05b61909cc"
@@ -339,8 +344,63 @@
     },
     {
       "path": "dist/apps/web/src/passport/registry.js",
-      "bytes": 6634,
-      "sha256": "077273e6d53131464c81896f7fba297eb958afac6a21cfaccfb04d56c7daa876"
+      "bytes": 7335,
+      "sha256": "0a5b852f5f524c88fbfb12e38578d14ac291f0d6697320fcedf5d35ef5fc758c"
+    },
+    {
+      "path": "dist/apps/web/src/passport/sections.js",
+      "bytes": 4265,
+      "sha256": "1e944f61efa24ff46bbd66e816b9ed1f22e6dd3aa1ff6fbac3743f5393f16356"
+    },
+    {
+      "path": "dist/apps/web/src/passport/shell.js",
+      "bytes": 10503,
+      "sha256": "dc7a2f1cc4f019bcf87455a9bc3d8486e200f68c10b68385eaad38e4d7d32971"
+    },
+    {
+      "path": "dist/apps/web/src/passport/storePanels.js",
+      "bytes": 15021,
+      "sha256": "53d0509c2775ed12b21f5684ea3d33f4867fb6536b819bd05d52d3facec4ebe8"
+    },
+    {
+      "path": "dist/apps/web/src/passport/topics/common.js",
+      "bytes": 7042,
+      "sha256": "6806908453cb52109a14fc70280905adf1b1a6477d3aebfe34b47708fff01417"
+    },
+    {
+      "path": "dist/apps/web/src/passport/topics/generic.js",
+      "bytes": 5273,
+      "sha256": "aad7df95e223c70d0946ea2fd2f3ecab143ca537389437cf262ba373510d7fb0"
+    },
+    {
+      "path": "dist/apps/web/src/passport/topics/machine.js",
+      "bytes": 11699,
+      "sha256": "1b4424178688787046d123f128003d9088b7232bfb5c5ee778534428c2320066"
+    },
+    {
+      "path": "dist/apps/web/src/passport/topics/personnel.js",
+      "bytes": 17535,
+      "sha256": "c66178a9a67a542a45ac86808264aa03b9b43757715052b0825a4021e7b2a126"
+    },
+    {
+      "path": "dist/apps/web/src/passport/topics/product.js",
+      "bytes": 8369,
+      "sha256": "2a39604821c04a42d481701a4044d01f6cd7b320be1f8656309c60145771e0d8"
+    },
+    {
+      "path": "dist/apps/web/src/passport/topics/task.js",
+      "bytes": 6565,
+      "sha256": "1f3fa51d6d809d75f76c41603434c85d7d4b2bb03c8a6bd3a668881745ddc12c"
+    },
+    {
+      "path": "dist/apps/web/src/passport/topics/util.js",
+      "bytes": 201,
+      "sha256": "183c871a8f14467d64df2604cc90cada1c213d0596f4a31ba2e00371afb73655"
+    },
+    {
+      "path": "dist/apps/web/src/passport/topics/workOrder.js",
+      "bytes": 18400,
+      "sha256": "eaa46b29f2c60ab4dbda628ed85591b48f0fe0dfe82f3ca510e0b48dce7b2041"
     },
     {
       "path": "dist/apps/web/src/passport/traceTab.js",
@@ -514,8 +574,8 @@
     },
     {
       "path": "dist/apps/web/src/screens/CustomersScreen.js",
-      "bytes": 14506,
-      "sha256": "22dd6191f9f813909576d29294b60def5f0fd6aa9b6ac77c2c425aabb893a6c4"
+      "bytes": 14492,
+      "sha256": "2e1e41d29466eb64b38029ccfbdd470cbc6ad637fda9d90a622b5ddc79b19dc0"
     },
     {
       "path": "dist/apps/web/src/screens/DemandPanel.js",
@@ -564,8 +624,8 @@
     },
     {
       "path": "dist/apps/web/src/screens/EntityGalleryScreen.js",
-      "bytes": 16370,
-      "sha256": "7f9ca602d46117f3a2c51874a3d1ebbacde0242b29b9084d104db9eccd3003bb"
+      "bytes": 16756,
+      "sha256": "d564452fdaa4a377b32044ddf2f9bcbb13ee3b1b960ff754b994796835447d97"
     },
     {
       "path": "dist/apps/web/src/screens/FeasibilityScreen.js",
@@ -634,8 +694,8 @@
     },
     {
       "path": "dist/apps/web/src/screens/ObjectPassportScreen.js",
-      "bytes": 21373,
-      "sha256": "1ed6c6847016ea1f927938d5dec3decb5d5bad13a0adb2a59a7c3202c3b5b2f9"
+      "bytes": 20580,
+      "sha256": "068fe48d8477affddf6965fa701a2b6ccc3e8379540db935eef8a82ffe008a62"
     },
     {
       "path": "dist/apps/web/src/screens/OeeScreen.js",
@@ -666,6 +726,11 @@
       "path": "dist/apps/web/src/screens/OwnerApplicationScreen.js",
       "bytes": 5887,
       "sha256": "736e9a15603d69fd823df6a458a726029da0f6023a464f29e04ff27c673ba1fa"
+    },
+    {
+      "path": "dist/apps/web/src/screens/PassportHubScreen.js",
+      "bytes": 18334,
+      "sha256": "7cd9f2137f7df7883d573025bdc36b70a62281a029ae6f19a0fac83efeb73534"
     },
     {
       "path": "dist/apps/web/src/screens/PassportScreen.js",
@@ -699,8 +764,8 @@
     },
     {
       "path": "dist/apps/web/src/screens/PersonnelScreen.js",
-      "bytes": 13544,
-      "sha256": "6f934c18507066a57a3f4f6cd83d43ccea275736c0e40560fa353dbe4ec74f31"
+      "bytes": 13530,
+      "sha256": "aae2045790daffaef831d13e6975fb913ffd69d6edf5a69e38ad15f2ae532d94"
     },
     {
       "path": "dist/apps/web/src/screens/PlanningScreen.js",
@@ -714,13 +779,13 @@
     },
     {
       "path": "dist/apps/web/src/screens/ProductWorkspaceScreen.js",
-      "bytes": 59767,
-      "sha256": "a8b83995774b9be2317e36883579d3f2773a5588f52a024f7ba614027e5d9050"
+      "bytes": 60545,
+      "sha256": "ea49e2630910ff715355db87a7a02f6e904eba40b72ce741d0c023a2694475ea"
     },
     {
       "path": "dist/apps/web/src/screens/ProductionDeskScreen.js",
-      "bytes": 11625,
-      "sha256": "b9afa1205d4cb22eeb99b199fae9a1b927c9cac64119aa8ac107411fa8488471"
+      "bytes": 11660,
+      "sha256": "d21ec2ceb00f91f6227be507b5ef4c82daccf5c2af63c30f06f072805dee0d9b"
     },
     {
       "path": "dist/apps/web/src/screens/ProductionScreen.js",
@@ -744,8 +809,8 @@
     },
     {
       "path": "dist/apps/web/src/screens/QualityDeskScreen.js",
-      "bytes": 14065,
-      "sha256": "0f9a28cd6d7dbe2b28742cced1b8f51f5c28067f2f18ce4a9012ab7e7f1055ba"
+      "bytes": 14100,
+      "sha256": "3be7d1bdfae51b333ba1ff40b2e2b310dc73f2ae0a8ad436ff82f4557d81f1f1"
     },
     {
       "path": "dist/apps/web/src/screens/QuotesScreen.js",
@@ -799,8 +864,8 @@
     },
     {
       "path": "dist/apps/web/src/screens/TaskFloorScreen.js",
-      "bytes": 51678,
-      "sha256": "e53340845420cfa09ae6a242e128b451aaa70adf33cc217d040e1dcee5551475"
+      "bytes": 51877,
+      "sha256": "d82acfbf51ad842a599ee7d4daa669c8368d2887dcad37acde3263161882d8d4"
     },
     {
       "path": "dist/apps/web/src/screens/TerminalScreen.js",
@@ -1059,8 +1124,8 @@
     },
     {
       "path": "dist/packages/domain/src/departmentCockpit.js",
-      "bytes": 26398,
-      "sha256": "5257707ac76ba6a35f26e5452ea4163a5cff13cec67de77749d6d707d8eaa7ce"
+      "bytes": 26394,
+      "sha256": "eb6249976e39ec5e53d33527ba3c0979b860e59703039a82673f19b8f9bf6964"
     },
     {
       "path": "dist/packages/domain/src/departmentFunctions.js",
@@ -1069,8 +1134,8 @@
     },
     {
       "path": "dist/packages/domain/src/departmentHome.js",
-      "bytes": 15641,
-      "sha256": "e5162098b75ec9b98ba57a492150ad910ae09079938d9b01a4e1ac3c8cb5eaea"
+      "bytes": 15640,
+      "sha256": "ff903bdf56ca994abfb9bb52b934d2b9b438ef58841acd1449803493d3ad5e0b"
     },
     {
       "path": "dist/packages/domain/src/departmentIdentity.js",
@@ -1259,8 +1324,8 @@
     },
     {
       "path": "dist/packages/domain/src/performanceCenter.js",
-      "bytes": 14249,
-      "sha256": "c9220157e75a79ba5d10d27399af846edf33db7fa885ce9c36a3c33e97dcf5fc"
+      "bytes": 14246,
+      "sha256": "6bfd0a6c6940d422304ae77041fe62762572f019f8b852357012dc1fad26bc2b"
     },
     {
       "path": "dist/packages/domain/src/personnel.js",

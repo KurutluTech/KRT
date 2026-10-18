@@ -214,7 +214,7 @@ export function trTitle(t) {
 }
 /** Detail / helper routes that are not menu entries still get a location line, so no screen is without a "where am I". ws = '' means directly under Ana Sayfa. */
 export const DETAIL_CRUMBS = {
-    '/pasaport-calisma': { ws: '', page: 'Dijital pasaport' }, '/urun-calisma': { ws: 'cam', page: 'Ürün Çalışma Alanı' }, '/is-karti': { ws: 'prod', page: 'İş kartı' },
+    '/pasaport-calisma': { ws: '', page: 'Dijital pasaport' }, '/kart': { ws: '', page: 'Dijital pasaport' }, '/urun-calisma': { ws: 'cam', page: 'Ürün Çalışma Alanı' }, '/is-karti': { ws: 'prod', page: 'İş kartı' },
     '/musteriler-liste': { ws: 'order', page: 'Müşteriler (liste)' }, '/personel-liste': { ws: 'hr', page: 'Personel yönetimi (liste)' }, '/urun-liste': { ws: 'cam', page: 'Ürün Master listesi' },
     '/ara': { ws: '', page: 'Arama' }, '/nesne': { ws: '', page: 'Nesne pasaportu' },
     '/muhasebe': { ws: 'fin', page: 'Muhasebe / Fatura (kalem)' }, '/tedarikci-fatura': { ws: 'buy', page: 'Tedarikçi Faturası' },

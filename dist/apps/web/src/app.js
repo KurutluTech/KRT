@@ -110,6 +110,7 @@ import { renderOrderImportScreen } from './screens/OrderImportScreen.js';
 import { createOrderImportApi } from './orderImportApi.js';
 import { renderEntityGalleryScreen } from './screens/EntityGalleryScreen.js';
 import { renderPassportWorkspaceScreen } from './screens/PassportWorkspaceScreen.js';
+import { renderPassportHubScreen } from './screens/PassportHubScreen.js';
 import { createPassportCardsApi } from './passportCardsApi.js';
 import { createOrdersApi } from './ordersApi.js';
 import { renderPurchasingScreen } from './screens/PurchasingScreen.js';
@@ -229,9 +230,22 @@ function downloadText(name, text) {
 }
 function galleryDeps(c, s, withBoard = false) {
     const pc = createPassportCardsApi(c, s);
-    return { faces: (t) => pc.faces(t), content: (v) => pc.content(v), ...(withBoard ? { board: () => createLiveApi(c, s).board('OFFICE') } : {}) };
+    const activeWork = async () => {
+        const rows = await c.select('work_orders', { columns: 'operator_id', filters: { status: 'in.(IN_PROGRESS,FIRST_PIECE_PENDING,FIRST_PIECE_APPROVED)' }, limit: 1000 }, s);
+        const m = {};
+        for (const r of rows)
+            if (r.operatorId)
+                m[r.operatorId] = (m[r.operatorId] ?? 0) + 1;
+        return m;
+    };
+    return { faces: (t) => pc.faces(t), content: (v) => pc.content(v), activeWork, ...(withBoard ? { board: () => createLiveApi(c, s).board('OFFICE') } : {}) };
 }
 export const ROUTES = [
+    {
+        // KMI-CARD-004: the ONE digital-passport hub for every card family (?t=<KIND>&id=<id>&s=<topic>). /nesne (classic object page) and /pasaport-calisma (classic store page) stay reachable.
+        path: '/kart', label: 'Dijital pasaport', group: 'Saha', inMenu: false, needs: ['t', 'id'],
+        render: (el, c, s, q, access) => renderPassportHubScreen(el, { client: c, session: s, access, myUserId: s?.user.id ?? null, trace: createTraceMounter(createPassportApi(c, s), (href) => { location.hash = href; }) }, { kind: q.get('t'), id: q.get('id'), topic: q.get('s') }),
+    },
     {
         path: '/nesne', label: 'Nesne pasaportu', group: 'Saha', inMenu: false, needs: ['t', 'id'],
         // ?t=<MACHINE|WORK_ORDER|…>&id=<uuid>&tab=<tab> — one canonical object, one digital passport

@@ -56,7 +56,12 @@ export function canOpenPassport(kind, a, ownPersonnel = false) {
 }
 /** Where an old /pasaport target lives now (the traceability tab of the canonical passport). */
 export const canonicalHref = (legacyKind, id, tab = TRACE_TAB.key) => passportHref(LEGACY_TO_CANONICAL[legacyKind], id, tab);
-export const passportHref = (kind, id, tab) => `#/nesne?t=${kind}&id=${encodeURIComponent(id)}${tab ? `&tab=${tab}` : ''}`;
+/** KMI-CARD-004: families that open in the passport hub (/kart). NCR and maintenance tickets are event records and keep their own /nesne page. */
+export const HUB_KIND_LIST = ['PERSONNEL', 'MACHINE', 'PRODUCT', 'WORK_ORDER', 'TASK', 'CUSTOMER', 'SUPPLIER', 'TOOL', 'STOCK_LOT', 'ORDER', 'SHIPMENT'];
+/** classic single-object page (/nesne): used with an explicit tab (traceability chain …) and by event records */
+export const objectHref = (kind, id, tab) => `#/nesne?t=${kind}&id=${encodeURIComponent(id)}${tab ? `&tab=${tab}` : ''}`;
+/** THE link to a card's passport: the hub for card families, the classic page for an explicit tab or an event record */
+export const passportHref = (kind, id, tab) => (!tab && HUB_KIND_LIST.includes(kind) ? `#/kart?t=${kind}&id=${encodeURIComponent(id)}` : objectHref(kind, id, tab));
 /** Map a universal-search / board record type to a passport kind (types without a passport stay on their own screen). */
 export const SEARCH_TYPE_TO_KIND = { MACHINE: 'MACHINE', WORK_ORDER: 'WORK_ORDER', PRODUCT: 'PRODUCT', CUSTOMER: 'CUSTOMER', ORDER: 'ORDER', SHIPMENT: 'SHIPMENT', SUPPLIER: 'SUPPLIER', QUALITY_NCR: 'QUALITY_NCR', TASK: 'TASK', MAINTENANCE_TICKET: 'MAINTENANCE_TICKET', STOCK_LOT: 'STOCK_LOT', TOOL: 'TOOL' };
 export { canOpen };
