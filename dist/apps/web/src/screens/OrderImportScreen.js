@@ -5,6 +5,7 @@ import { h, mount } from '../../../../packages/ui/src/h.js';
 import { extractOrder, EXTRACT_BANNER } from '../orderImportExtract.js';
 import { errorText } from '../errorText.js';
 import { KX_CSS, card, chip, emptyState, field, fmt, fromBase64, invalid, showFile, toBase64, val, when } from '../kx.js';
+const gens = new WeakMap(); // render generation per container: async results of an older render are ignored
 const OI_CSS = `
 .oi .split{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.15fr);gap:12px;align-items:start}
 @media (max-width:1000px){.oi .split{grid-template-columns:1fr}}
@@ -24,6 +25,8 @@ const wrapVal = (x) => { if (x && typeof x === 'object' && 'value' in x)
     return String(x.value ?? ''); return x === null || x === undefined ? '' : String(x); };
 const conf = (x) => (x && typeof x === 'object' && 'confidence' in x ? Number(x.confidence) : null);
 export async function renderOrderImportScreen(container, api, state = {}) {
+    const myGen = (gens.get(container) ?? 0) + 1;
+    gens.set(container, myGen);
     const go = (s) => renderOrderImportScreen(container, api, s);
     const shell = (...kids) => mount(container, h('div', { class: 'kx oi', 'data-testid': 'oi-root' }, h('style', {}, KX_CSS + OI_CSS), ...kids));
     const banner = () => (state.banner ? E('div', { class: `banner ${state.banner.kind === 'error' ? 'bad' : state.banner.kind === 'ok' ? 'ok' : ''}`, 'data-testid': 'oi-banner', 'data-kind': state.banner.kind, role: state.banner.kind === 'error' ? 'alert' : 'status' }, state.banner.text) : null);
@@ -47,7 +50,38 @@ export async function renderOrderImportScreen(container, api, state = {}) {
         }
         const file = h('input', { type: 'file', accept: 'application/pdf,.pdf', 'data-testid': 'oi-file' });
         const status = E('div', { class: 'mut', 'data-testid': 'oi-status' });
+        // ---- upload / remove. A removal (or navigating away) invalidates the run: a late OCR result can never fill the form again.
+        let runSeq = 0;
+        let pendingImport = null;
+        let running = false;
+        const isOld = () => gens.get(container) !== myGen;
+        const startBtn = btn('primary', 'oi-start', 'Yükle ve oku', () => void run());
+        const removeBtn = btn('ghost', 'oi-remove-pending', 'Dosyayı kaldır', () => void removePending());
+        const sync = () => { removeBtn.style.display = running || file.files?.length ? '' : 'none'; startBtn.disabled = running; };
+        file.addEventListener('change', sync);
+        const removePending = async () => {
+            runSeq++;
+            const imp = pendingImport;
+            pendingImport = null;
+            running = false;
+            file.value = '';
+            status.textContent = '';
+            sync(); // clear the selection + progress first: a new PDF can be chosen right away
+            if (imp) {
+                try {
+                    await api.cancel(imp, 'PDF kaldırıldı (yanlış dosya) — kullanıcı talebi, sipariş oluşturulmadı');
+                    status.textContent = 'Dosya kaldırıldı. Yeni PDF seçebilirsiniz.';
+                }
+                catch (e) {
+                    fail(e);
+                }
+            }
+            else
+                status.textContent = 'Dosya kaldırıldı. Yeni PDF seçebilirsiniz.';
+        };
         const run = async () => {
+            if (running)
+                return;
             const f = file.files?.[0];
             if (!f) {
                 fail(new Error('Önce bir PDF seçin'));
@@ -61,24 +95,55 @@ export async function renderOrderImportScreen(container, api, state = {}) {
                 fail(new Error('Dosya 8 MB sınırını aşıyor'));
                 return;
             }
+            const mySeq = ++runSeq;
+            const stale = () => mySeq !== runSeq || isOld();
+            running = true;
+            sync();
             try {
                 status.textContent = 'Yükleniyor…';
                 const bytes = new Uint8Array(await f.arrayBuffer());
+                if (stale())
+                    return;
                 const imp = await api.start();
+                if (stale()) {
+                    if (mySeq !== runSeq)
+                        await api.cancel(imp.import_id, 'PDF kaldırıldı (yanlış dosya) — kullanıcı talebi, sipariş oluşturulmadı').catch(() => undefined);
+                    return;
+                }
+                pendingImport = imp.import_id;
                 const up = await api.uploadPdf(imp.import_id, f.name, toBase64(bytes), null);
-                status.textContent = 'Veri çıkarılıyor…';
+                if (stale())
+                    return;
                 status.textContent = 'Veri çıkarılıyor… (taranmış PDF’lerde OCR 10–60 sn sürebilir)';
-                const out = await extractOrder(bytes, { onProgress: (p) => { status.textContent = p.phase === 'TEXT' ? 'Metin katmanı okunuyor…' : `Sayfa ${p.page}/${p.pages} ${p.phase === 'RENDER' ? 'görüntüye çevriliyor' : 'OCR ile okunuyor'}…`; } });
+                const out = await extractOrder(bytes, { onProgress: (p) => { if (stale())
+                        return; status.textContent = p.phase === 'TEXT' ? 'Metin katmanı okunuyor…' : `Sayfa ${p.page}/${p.pages} ${p.phase === 'RENDER' ? 'görüntüye çevriliyor' : 'OCR ile okunuyor'}…`; } });
+                if (stale())
+                    return; // removed / replaced while OCR was running: the late result is dropped
                 const ex = out.extraction;
                 await api.attach(imp.import_id, up.versionId, ex);
+                if (stale())
+                    return;
+                running = false;
+                pendingImport = null;
                 await go({ id: imp.import_id, banner: EXTRACT_BANNER[out.mode] });
             }
             catch (e) {
+                if (mySeq !== runSeq)
+                    return;
+                running = false;
+                sync();
                 status.textContent = '';
                 fail(e);
             }
+            finally {
+                if (mySeq === runSeq) {
+                    running = false;
+                    sync();
+                }
+            }
         };
-        shell(E('div', { class: 'page-head' }, E('div', { class: 'ttl' }, h('h1', {}, 'PDF’ten Sipariş'), E('div', { class: 'mut' }, 'Müşteri siparişi PDF’ini yükleyin; veriler çıkarılır, siz doğrularsınız, taslak sipariş oluşur.'))), banner(), card({ title: 'Yeni PDF sipariş', span: 12 }, E('div', { class: 'row' }, E('div', { class: 'grow' }, file), btn('primary', 'oi-start', 'Yükle ve oku', () => void run())), status), card({ title: 'Önceki içe aktarmalar', span: 12 }, rows.length ? E('div', { class: 'rows' }, ...rows.map((r) => E('div', { class: 'r', 'data-testid': 'oi-row' }, E('div', {}, E('b', {}, r.import_no), ` · ${r.po_number ?? 'PO yok'} · ${r.customer ?? 'müşteri seçilmedi'}`), E('div', {}, chip(STATUS_TR[r.status]?.[0] ?? r.status, STATUS_TR[r.status]?.[1] ?? ''), r.pending_diff ? chip('Fark onayı bekliyor', 'warn') : null, ` ${r.versions} sürüm · ${when(r.created_at)} `), btn('ghost sm', 'oi-open', 'Aç', () => void go({ id: r.import_id }))))) : emptyState('Henüz içe aktarma yok', 'Yukarıdan bir PDF yükleyin.', 'oi-empty')));
+        sync();
+        shell(E('div', { class: 'page-head' }, E('div', { class: 'ttl' }, h('h1', {}, 'PDF’ten Sipariş'), E('div', { class: 'mut' }, 'Müşteri siparişi PDF’ini yükleyin; veriler çıkarılır, siz doğrularsınız, taslak sipariş oluşur.'))), banner(), card({ title: 'Yeni PDF sipariş', span: 12 }, E('div', { class: 'row' }, E('div', { class: 'grow' }, file), startBtn, removeBtn), status), card({ title: 'Önceki içe aktarmalar', span: 12 }, rows.length ? E('div', { class: 'rows' }, ...rows.map((r) => E('div', { class: 'r', 'data-testid': 'oi-row' }, E('div', {}, E('b', {}, r.import_no), ` · ${r.po_number ?? 'PO yok'} · ${r.customer ?? 'müşteri seçilmedi'}`), E('div', {}, chip(STATUS_TR[r.status]?.[0] ?? r.status, STATUS_TR[r.status]?.[1] ?? ''), r.pending_diff ? chip('Fark onayı bekliyor', 'warn') : null, ` ${r.versions} sürüm · ${when(r.created_at)} `), btn('ghost sm', 'oi-open', 'Aç', () => void go({ id: r.import_id }))))) : emptyState('Henüz içe aktarma yok', 'Yukarıdan bir PDF yükleyin.', 'oi-empty')));
     }
     async function detail(id) {
         let d;
@@ -104,7 +169,8 @@ export async function renderOrderImportScreen(container, api, state = {}) {
         const locked = d.status === 'CANCELLED' || cur.state === 'APPLIED' || !d.can_write;
         // ---- left: the original PDF (never modified)
         const pdfHost = E('div', { class: 'pdfhost', 'data-testid': 'oi-pdf' }, E('div', { class: 'mut', style: 'padding:12px' }, 'Belge yükleniyor…'));
-        void api.content(cur.document_version_id).then((c) => { pdfHost.replaceChildren(); showFile(pdfHost, { bytes: fromBase64(c.contentBase64), mime: c.mimeType, fileName: c.fileName, download: false, testids: { frame: 'oi-pdf-frame', link: 'oi-pdf-link', none: 'oi-pdf-none' } }); }).catch((e) => fail(e));
+        void api.content(cur.document_version_id).then((c) => { if (gens.get(container) !== myGen)
+            return; pdfHost.replaceChildren(); showFile(pdfHost, { bytes: fromBase64(c.contentBase64), mime: c.mimeType, fileName: c.fileName, download: false, testids: { frame: 'oi-pdf-frame', link: 'oi-pdf-link', none: 'oi-pdf-none' } }); }).catch((e) => fail(e));
         // ---- right: verifier
         const v = cur.verified;
         const customerSel = h('select', { 'data-testid': 'oi-customer' }, E('option', { value: '' }, '— müşteri seçin —'), ...customers.map((c) => E('option', { value: c.id, ...((v?.header?.customer_id ?? d.customer_id ?? sug.customers[0]?.id) === c.id ? { selected: 'selected' } : {}) }, `${c.name} (${c.code})`)));
@@ -188,15 +254,33 @@ export async function renderOrderImportScreen(container, api, state = {}) {
                 const bytes = new Uint8Array(await f.arrayBuffer());
                 const up = await api.uploadPdf(id, f.name, toBase64(bytes), 'Yeni sürüm');
                 const out = await extractOrder(bytes);
+                if (gens.get(container) !== myGen)
+                    return;
                 await api.attach(id, up.versionId, out.extraction);
+                if (gens.get(container) !== myGen)
+                    return;
                 await go({ id, banner: { kind: 'info', text: 'Yeni sürüm eklendi; siparişi sessizce değiştirmez, fark onayı gerekir.' + (out.mode === 'OCR' ? ' (OCR ile okundu: doğrulanmış sayılmaz.)' : '') } });
             }
             catch (e) {
                 fail(e);
             }
         };
+        // wrong PDF, order not created yet: cancel this import (authority-checked + audited by the existing RPC; the stored document is kept as a record, nothing is removed). Two-step, no browser dialog.
+        const removeCtl = E('span', { 'data-testid': 'oi-remove-wrap' });
+        const removeFile = async () => {
+            try {
+                await api.cancel(id, 'PDF kaldırıldı (yanlış dosya) — kullanıcı talebi, sipariş oluşturulmadı');
+                await go({ banner: { kind: 'ok', text: 'PDF kaldırıldı; sipariş oluşturulmadı. Yeni bir PDF yükleyebilirsiniz.' } });
+            }
+            catch (e) {
+                fail(e);
+            }
+        };
+        const askRemove = () => { removeCtl.replaceChildren(E('span', { class: 'mut' }, 'Bu PDF kaldırılsın mı? Sipariş oluşturulmaz. '), btn('primary sm', 'oi-remove-yes', 'Evet, kaldır', () => void removeFile()), ' ', btn('ghost sm', 'oi-remove-no', 'Vazgeç', () => removeCtl.replaceChildren(btn('ghost sm', 'oi-remove', 'Dosyayı kaldır', askRemove)))); };
+        if (!locked && !d.order_id)
+            removeCtl.append(btn('ghost sm', 'oi-remove', 'Dosyayı kaldır', askRemove));
         const st = STATUS_TR[d.status] ?? [d.status, ''];
-        shell(E('div', { class: 'page-head' }, E('div', { class: 'ttl' }, h('h1', {}, `${d.import_no} · PDF sipariş`), E('div', { class: 'mut' }, `${cur.file_name} · sürüm ${cur.version_no} · ${cur.extractor} · ${cur.sha256.slice(0, 12)}…`)), E('div', {}, chip(st[0], st[1], { 'data-testid': 'oi-status-chip' }), ' ', btn('ghost sm', 'oi-back', '← Liste', () => void go({})))), banner(), sug.duplicate_po.length ? E('div', { class: 'banner bad', role: 'alert', 'data-testid': 'oi-dup' }, `Bu PO numarasıyla açık sipariş zaten var: ${sug.duplicate_po.map((x) => `${x.customer_po} (${x.status})`).join(', ')}. Kayıt engellenir.`) : null, warnings.length ? E('div', { class: 'warn-list', 'data-testid': 'oi-warnings' }, ...warnings.map((w) => chip(warnText(w), w === 'NO_TEXT_LAYER' ? 'bad' : 'warn'))) : null, diffPanel, E('div', { class: 'split' }, card({ title: 'Orijinal belge', span: 12 }, pdfHost), card({ title: 'Çıkarılan / doğrulanan veri', span: 12, chip: chip(`${rows.length} kalem`) }, headerBlock, E('h2', { style: 'margin-top:12px' }, 'Kalemler'), linesHost, locked ? null : E('div', { class: 'row', style: 'margin-top:8px' }, btn('ghost sm', 'oi-add-line', '+ Kalem ekle', () => addRow(null, rows.length))), field('Doğrulama notu', note), locked ? emptyState(d.can_write ? 'Bu içe aktarma kapalı' : 'Düzenleme yetkiniz yok', undefined, 'oi-locked') : E('div', { class: 'row' }, btn('primary', 'oi-verify', 'Doğrula', () => void verify()), btn('primary', 'oi-create', 'Taslak sipariş oluştur', () => void api.createOrder(id).then((r) => go({ id, banner: { kind: 'ok', text: `Taslak sipariş oluşturuldu (${r.order_id.slice(0, 8)}…). Onay için mevcut sipariş akışını kullanın.` } })).catch(fail)), btn('ghost', 'oi-cancel', 'İptal et (gerekçeyi nota yazın)', () => { void api.cancel(id, val(note)).then(() => go({ banner: { kind: 'info', text: 'İptal edildi.' } })).catch(fail); })))), d.can_write && d.status !== 'CANCELLED' ? card({ title: 'PDF değişti mi?', span: 12 }, E('div', { class: 'mut' }, 'Yeni sürümü yükleyin; farklar gösterilir, onayınız olmadan sipariş değişmez.'), E('div', { class: 'row' }, E('div', { class: 'grow' }, newFile), btn('ghost', 'oi-newver', 'Yeni sürüm ekle', () => void newVer()))) : null, card({ title: 'Sürüm geçmişi', span: 12 }, E('div', { class: 'rows' }, ...d.versions.map((x) => E('div', { class: 'r', 'data-testid': 'oi-version' }, E('div', {}, E('b', {}, `v${x.version_no}`), ` · ${x.file_name} · ${x.sha256.slice(0, 10)}… · ${when(x.created_at)}`), E('div', {}, chip(STATUS_TR[x.state]?.[0] ?? x.state, STATUS_TR[x.state]?.[1] ?? ''), x.diff_decision ? chip(`Fark: ${x.diff_decision}`, 'info') : null))))));
+        shell(E('div', { class: 'page-head' }, E('div', { class: 'ttl' }, h('h1', {}, `${d.import_no} · PDF sipariş`), E('div', { class: 'mut' }, `${cur.file_name} · sürüm ${cur.version_no} · ${cur.extractor} · ${cur.sha256.slice(0, 12)}…`)), E('div', {}, chip(st[0], st[1], { 'data-testid': 'oi-status-chip' }), ' ', btn('ghost sm', 'oi-back', '← Liste', () => void go({})), ' ', removeCtl)), banner(), sug.duplicate_po.length ? E('div', { class: 'banner bad', role: 'alert', 'data-testid': 'oi-dup' }, `Bu PO numarasıyla açık sipariş zaten var: ${sug.duplicate_po.map((x) => `${x.customer_po} (${x.status})`).join(', ')}. Kayıt engellenir.`) : null, warnings.length ? E('div', { class: 'warn-list', 'data-testid': 'oi-warnings' }, ...warnings.map((w) => chip(warnText(w), w === 'NO_TEXT_LAYER' ? 'bad' : 'warn'))) : null, diffPanel, E('div', { class: 'split' }, card({ title: 'Orijinal belge', span: 12 }, pdfHost), card({ title: 'Çıkarılan / doğrulanan veri', span: 12, chip: chip(`${rows.length} kalem`) }, headerBlock, E('h2', { style: 'margin-top:12px' }, 'Kalemler'), linesHost, locked ? null : E('div', { class: 'row', style: 'margin-top:8px' }, btn('ghost sm', 'oi-add-line', '+ Kalem ekle', () => addRow(null, rows.length))), field('Doğrulama notu', note), locked ? emptyState(d.can_write ? 'Bu içe aktarma kapalı' : 'Düzenleme yetkiniz yok', undefined, 'oi-locked') : E('div', { class: 'row' }, btn('primary', 'oi-verify', 'Doğrula', () => void verify()), btn('primary', 'oi-create', 'Taslak sipariş oluştur', () => void api.createOrder(id).then((r) => go({ id, banner: { kind: 'ok', text: `Taslak sipariş oluşturuldu (${r.order_id.slice(0, 8)}…). Onay için mevcut sipariş akışını kullanın.` } })).catch(fail)), btn('ghost', 'oi-cancel', 'İptal et (gerekçeyi nota yazın)', () => { void api.cancel(id, val(note)).then(() => go({ banner: { kind: 'info', text: 'İptal edildi.' } })).catch(fail); })))), d.can_write && d.status !== 'CANCELLED' ? card({ title: 'PDF değişti mi?', span: 12 }, E('div', { class: 'mut' }, 'Yeni sürümü yükleyin; farklar gösterilir, onayınız olmadan sipariş değişmez.'), E('div', { class: 'row' }, E('div', { class: 'grow' }, newFile), btn('ghost', 'oi-newver', 'Yeni sürüm ekle', () => void newVer()))) : null, card({ title: 'Sürüm geçmişi', span: 12 }, E('div', { class: 'rows' }, ...d.versions.map((x) => E('div', { class: 'r', 'data-testid': 'oi-version' }, E('div', {}, E('b', {}, `v${x.version_no}`), ` · ${x.file_name} · ${x.sha256.slice(0, 10)}… · ${when(x.created_at)}`), E('div', {}, chip(STATUS_TR[x.state]?.[0] ?? x.state, STATUS_TR[x.state]?.[1] ?? ''), x.diff_decision ? chip(`Fark: ${x.diff_decision}`, 'info') : null))))));
         void fmt;
     }
 }
