@@ -4,9 +4,9 @@ import { h, mount } from '../../../../packages/ui/src/h.js';
 import { TIME_PRESETS, UNVERIFIABLE_TR, actionTr, filterEvents, formatStamp, lateReportMinutes, parseIstanbulLocal, resolveRange, stateAsOf } from '../../../../packages/domain/src/temporal.js';
 import { DS_CSS, pill } from '../ds.js';
 import { errorText } from '../errorText.js';
-import { isLink, isPill } from '../passport/model.js';
-import { KINDS, canOpenPassport, isKind, passportHref } from '../passport/registry.js';
+import { KINDS, canOpenPassport, isKind, objectHref } from '../passport/registry.js';
 import { passportHeader, PASSPORT_HEADER_CSS } from '../passport/passportHeader.js';
+import { sectionNode } from '../passport/sections.js';
 const CSS = DS_CSS + PASSPORT_HEADER_CSS + `
 .kd .pp-head{display:flex;flex-direction:column;gap:10px}
 .kd .pp-kind{font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:#67e8f9;font-weight:800}
@@ -32,24 +32,12 @@ const CSS = DS_CSS + PASSPORT_HEADER_CSS + `
 .kd textarea{min-height:70px;font-size:16px;border-radius:10px;border:1px solid #334155;background:#0f172a;color:#fff;padding:8px;box-sizing:border-box;width:100%}
 .kd .pp-form{display:flex;flex-direction:column;gap:8px;margin-top:8px}`;
 const SOURCE_TR = { AUDIT: 'Denetim kaydı', STATE: 'Durum kaydı', WORK_ORDER: 'İş emri kaydı', TASK: 'Görev kaydı', QUALITY: 'Kalite kaydı', TOOL: 'Takım kaydı', STOCK: 'Stok kaydı', OTHER: 'Kayıt' };
-function cell(c) {
-    if (c === null || c === undefined || c === '')
-        return '—';
-    if (isLink(c))
-        return h('a', { class: 'pp-link', href: passportHref(c.kind, c.id), 'data-testid': 'pp-rel', 'data-kind': c.kind, 'data-id': c.id }, c.label);
-    if (isPill(c))
-        return pill(c.pill, c.tone);
-    return String(c);
-}
-function sectionNode(s) {
-    return h('div', { class: 'panel', 'data-testid': 'pp-section' }, h('h2', {}, s.title), s.kv ? h('dl', { class: 'pp-kv' }, ...s.kv.flatMap(([k, v]) => [h('dt', {}, k), h('dd', {}, cell(v))])) : null, s.table ? (s.table.rows.length ? h('div', { class: 'pp-wrap' }, h('table', { class: 'pp-t' }, h('thead', {}, h('tr', {}, ...s.table.columns.map((c) => h('th', {}, c)))), h('tbody', {}, ...s.table.rows.map((r) => h('tr', { 'data-testid': 'pp-row' }, ...r.map((c) => h('td', {}, cell(c)))))))) : h('div', { class: 'empty', 'data-testid': 'pp-empty' }, s.table.empty)) : null, s.note ? h('div', { class: 'pp-note', 'data-testid': 'pp-note' }, s.note) : null);
-}
 export async function renderObjectPassportScreen(container, api, state, ctx) {
     const def = KINDS[state.kind];
     const now = () => (ctx.nowIso ? ctx.nowIso() : new Date().toISOString());
     const go = (patch) => { const next = { ...state, ...patch }; if (ctx.replaceUrl !== false) {
         try {
-            history.replaceState(null, '', passportHref(next.kind, next.id, next.tab));
+            history.replaceState(null, '', objectHref(next.kind, next.id, next.tab));
         }
         catch { /* fixture */ }
     } void renderObjectPassportScreen(container, api, next, ctx); };
@@ -75,7 +63,12 @@ export async function renderObjectPassportScreen(container, api, state, ctx) {
     const tabs = h('div', { class: 'tabs', role: 'tablist' }, ...def.tabs.map((t) => h('button', { type: 'button', role: 'tab', class: t.key === tabKey ? 'on' : '', 'aria-selected': String(t.key === tabKey), 'data-testid': `pp-tab-${t.key}`, onClick: () => go({ tab: t.key }) }, t.label)));
     const body = h('div', { 'data-testid': 'pp-body', style: 'display:flex;flex-direction:column;gap:12px' });
     const actions = actionsPanel();
-    shell(h('div', { class: 'head' }, h('a', { class: 'btn ghost', href: '#/ara', 'data-testid': 'pp-search' }, '← Arama'), ['MACHINE', 'PRODUCT', 'PERSONNEL', 'CUSTOMER'].includes(state.kind) ? h('a', { class: 'btn ghost', href: `#/pasaport-calisma?tur=${state.kind}&id=${state.id}`, 'data-testid': 'pp-card-link' }, 'Dijital kart: belgeler, fotoğraf, veri') : null), head, tabs, h('div', { class: `pp-cols${actions ? ' has-actions' : ''}` }, body, actions));
+    if (ctx.embed)
+        shell(h('div', { class: `pp-cols${ctx.embed === 'actions' && actions ? ' has-actions' : ''}` }, ctx.embed === 'actions' ? actions : body));
+    else
+        shell(h('div', { class: 'head' }, h('a', { class: 'btn ghost', href: '#/ara', 'data-testid': 'pp-search' }, '← Arama'), ['MACHINE', 'PRODUCT', 'PERSONNEL', 'CUSTOMER'].includes(state.kind) ? h('a', { class: 'btn ghost', href: `#/pasaport-calisma?tur=${state.kind}&id=${state.id}`, 'data-testid': 'pp-card-link' }, 'Dijital kart: belgeler, fotoğraf, veri') : null), head, tabs, h('div', { class: `pp-cols${actions ? ' has-actions' : ''}` }, body, actions));
+    if (ctx.embed === 'actions')
+        return;
     if (tabKey === 'zaman')
         await renderTimeline(body);
     else if (tabKey === 'iz') {
@@ -103,7 +96,7 @@ export async function renderObjectPassportScreen(container, api, state, ctx) {
         }
         if ('sections' in res)
             for (const s of res.sections)
-                body.appendChild(sectionNode(s));
+                body.appendChild(sectionNode(s, ctx.hrefOf));
         else if ('pending' in res)
             body.appendChild(h('div', { class: 'panel', 'data-testid': 'setup-pending', style: 'border-left:4px solid #d97706' }, h('h2', {}, 'Kurulum bekleniyor'), h('div', { class: 'mut' }, res.pending)));
         else if (res.denied)

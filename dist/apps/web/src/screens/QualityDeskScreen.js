@@ -1,6 +1,7 @@
 // KMI Quality Desk (/kalite) — the quality department's working screen: ONE queue of decisions (HOLD release, first piece, incoming QC, NCR/TAHSİS steps,
 // in-process QC, final release), each with the right contextual action and a mandatory written reason where the decision needs one. Every action goes
 // through the existing canonical RPCs; the server authorises and audits it. A source that failed is shown as VERİ YOK, never as an empty queue.
+import { passportHref } from '../passport/registry.js';
 import { h, mount } from '../../../../packages/ui/src/h.js';
 import { buildQualityDesk, QKIND_TR, QKIND_ACTION, NCR_MOVE_TR, reasonOk, QD_MIN_REASON } from '../../../../packages/domain/src/qualityDesk.js';
 import { waitLabel } from '../../../../packages/domain/src/approvalsInbox.js';
@@ -48,7 +49,7 @@ export async function renderQualityDesk(container, api, o) {
         const allowed = o.can(QKIND_ACTION[kind]);
         return h('button', { type: 'button', class: `b ${cls}`, disabled: !allowed || !enabled, title: allowed ? '' : NOACT, 'data-testid': testid, onClick: fn }, label);
     };
-    const wolink = (id, text) => (id ? h('a', { href: `#/nesne?t=WORK_ORDER&id=${encodeURIComponent(id)}`, 'data-testid': 'qd-passport' }, text) : text);
+    const wolink = (id, text) => (id ? h('a', { href: passportHref('WORK_ORDER', id), 'data-testid': 'qd-passport' }, text) : text);
     const actions = (it) => {
         const note = h('input', { type: 'text', placeholder: `Gerekçe / not (en az ${QD_MIN_REASON} karakter gerekirse zorunlu)`, 'aria-label': 'Gerekçe', 'data-testid': 'qd-note' });
         const n = () => note.value.trim();

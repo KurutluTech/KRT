@@ -37,6 +37,15 @@ export async function renderEntityGalleryScreen(container, deps, opts) {
         mount(container, h('div', { class: 'kx eg', 'data-testid': 'eg-root', 'data-kind': kind }, h('h1', { class: 'eg-h1' }, title), h('div', { class: denied ? 'banner' : 'banner bad', role: 'alert', 'data-testid': 'eg-error', 'data-denied': String(denied) }, msg)));
         return;
     }
+    let activeWork = null;
+    if (kind === 'PERSONNEL' && deps.activeWork) {
+        try {
+            activeWork = await deps.activeWork();
+        }
+        catch {
+            activeWork = null;
+        }
+    }
     if (kind === 'MACHINE' && deps.board) {
         try {
             board = await deps.board();
@@ -46,7 +55,7 @@ export async function renderEntityGalleryScreen(container, deps, opts) {
         }
     }
     const nowIso = board?.generatedAt ?? new Date().toISOString();
-    const hrefOf = (f) => (kind === 'PRODUCT' ? `#/urun-calisma?urun=${f.id}` : `#/pasaport-calisma?tur=${dataKind}&id=${f.id}`);
+    const hrefOf = (f) => `#/kart?t=${dataKind}&id=${f.id}`;
     const build = (f) => {
         const x = f.extra;
         let node;
@@ -77,8 +86,9 @@ export async function renderEntityGalleryScreen(container, deps, opts) {
             const skills = arr(x.skills);
             const roles = arr(x.roles);
             const facts = [{ label: 'BÖLÜM', value: str(x.department) ? DEPT_TR[x.department] ?? x.department : null }, { label: 'GÖREV / ROL', value: roles.length ? roles.map((r) => ROLE_TR[r] ?? r).join(', ') : null }, { label: 'VARDİYA', value: str(x.shift_code) },
-                { label: 'YETKİNLİK', value: skills.length ? `${skills.length} kayıtlı` : null }];
-            node = entityCard({ kind, id: f.id, href: hrefOf(f), title: f.title, subtitle: faceVal(f, 'JOB_TITLE'), code: f.code, initials: initialsOf(f.title), shape: 'round', badge: f.active ? { text: 'AKTİF', tone: 'ok' } : { text: 'PASİF', tone: 'mut' },
+                { label: 'YETKİNLİK', value: skills.length ? `${skills.length} kayıtlı` : null },
+                { label: 'AKTİF İŞ EMRİ', value: activeWork === null ? null : (activeWork[f.id] ?? 0), tone: activeWork && (activeWork[f.id] ?? 0) > 0 ? 'ok' : undefined }];
+            node = entityCard({ kind, id: f.id, href: hrefOf(f), title: f.title, subtitle: faceVal(f, 'JOB_TITLE'), subtitleUnknown: 'İş unvanı doğrulanmamış (veri eksik)', code: f.code, initials: initialsOf(f.title), shape: 'round', badge: f.active ? { text: 'AKTİF', tone: 'ok' } : { text: 'PASİF', tone: 'mut' },
                 facts, chips: skills.slice(0, 3), updated: dateTr(x.updated_at), testid: 'eg-card' }, ph);
         }
         else if (kind === 'PRODUCT') {
