@@ -248,7 +248,9 @@ export function parseOcrText(text, engine = 'tesseract') {
         l.confidence = Math.min(l.confidence, OCR_MAX_CONFIDENCE);
     ex.warnings.unshift('OCR_UNVERIFIED');
     const gl = normalizeOcrText(text).find((l) => /GENEL\s*TOPLAM|GRAND\s*TOTAL/.test(fold(l)));
-    const gt = gl ? parseNumber((gl.match(/[\d.,]+\s*$/)?.[0] ?? '').trim()) : null;
+    const gt = gl ? parseNumber((gl.match(/([\d.,]+)\s*(?:TRY|TL|EUR|USD|€|\$|₺)?\s*$/i)?.[1] ?? '').trim()) : null;
+    if (gl && gt === null)
+        ex.warnings.push('GRAND_TOTAL_UNREADABLE');
     if (gt !== null) {
         const sum = ex.lines.reduce((a, l) => a + (l.line_total ?? 0), 0);
         if (Math.abs(sum - gt) > Math.max(0.05, gt * 0.001))

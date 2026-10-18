@@ -1,0 +1,9 @@
+b40930bbcf80744c86c46a12bc9da056641d722716c378f5659b9e555ef833e1  ./LICENSE-tesseract.js.txt
+8f04aa0cc81e7bde33f80e92fa01a7a665f0b4884d098acf5de9c7104a11dfaa  ./core/tesseract-core-lstm.wasm.js
+ce20eda9533cbed1e6c2b4276fbae1e0adc61b6754b5513084be601787b457cf  ./core/tesseract-core-simd-lstm.wasm.js
+63f232c4f7a97b04e52eb940202700b2c6239783a75d0ff0553274fac530cd5c  ./core/tesseract-core-simd.wasm.js
+2b8c8c92b8788807061fb4bb16c5acdf000c149e100255f879f78d2c58ca9969  ./core/tesseract-core.wasm.js
+2a66ec904bc0e7657b27e200a874c01e1bc8a58b756cbbaa9afbae736fa50edc  ./lang/eng.traineddata.gz
+644d2c99a79ffc78e9faa052012f219a29b86960e4f4905a5f4dee1771e34dc9  ./lang/tur.traineddata.gz
+a8e29918d098b2b06e1012bdaeffb4aec0445c5d5654709023e0bd1f442a80e8  ./tesseract.min.js
+aca1229639fc9907d86f96e825955a2b7c5716d17f3bc3acd71f9c7ab66181fc  ./worker.min.js

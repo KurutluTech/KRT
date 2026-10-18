@@ -36,6 +36,7 @@ export function createWorkOrderHubApi(client, session) {
             }
             return { revisionId: wo.productRevisionId, camProgramId: wo.camProgramId, revisions, programs, exemptions, startRefusal };
         },
+        async readinessRows(id) { return client.rpc('work_order_readiness', { p_work_order_id: id }, session); },
         async setRevision(id, rev) { await client.rpc('set_work_order_revision', { p_work_order_id: id, p_revision_id: rev }, session); },
         async setCamProgram(id, prog) { await client.rpc('set_work_order_cam_program', { p_work_order_id: id, p_program_id: prog }, session); },
         async revokeExemption(id, reason) { await client.rpc('revoke_readiness_exemption', { p_exemption_id: id, p_reason: reason }, session); },
