@@ -11,7 +11,7 @@
 // migration 0020), which also logs the scan append-only. Camera decoding on a physical phone is
 // NOT_VERIFIED in this sandbox; the contract below is what the camera, a USB/Bluetooth
 // keyboard-wedge scanner and manual entry all feed into.
-export const SCAN_TYPES = ['WO', 'LOT', 'TOOL', 'MACHINE', 'SHIP', 'PO'];
+export const SCAN_TYPES = ['WO', 'LOT', 'TOOL', 'MACHINE', 'SHIP', 'PO', 'ASSET'];
 export function encodeKmiQr(type, ref) {
     if (!ref || ref.trim().length === 0)
         throw new Error('REF_REQUIRED');
