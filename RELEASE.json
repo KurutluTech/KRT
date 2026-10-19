@@ -1,6 +1,6 @@
 {
   "product": "KMI NEXT",
-  "commit": "022a2507091f7c48c5ac8b02c073273d4b926191",
+  "commit": "34009a8aa5908f0de29125efbcb217c376e7855c",
   "builtFrom": "clean git tree",
   "fileCount": 345,
   "migrationsInRepo": 73,
@@ -294,8 +294,8 @@
     },
     {
       "path": "dist/apps/web/src/objectPassportApi.js",
-      "bytes": 55292,
-      "sha256": "babe3c9e961e0389c743d1585d8e6ff0a1cf5d11f7d6356c015a7c8ff0a37d11"
+      "bytes": 55895,
+      "sha256": "a5d7cca687eb0d5df0224a88ad435de8235000dcbdca9a3def6795bc58d0a557"
     },
     {
       "path": "dist/apps/web/src/oeeApi.js",
@@ -734,8 +734,8 @@
     },
     {
       "path": "dist/apps/web/src/screens/ObjectPassportScreen.js",
-      "bytes": 20580,
-      "sha256": "068fe48d8477affddf6965fa701a2b6ccc3e8379540db935eef8a82ffe008a62"
+      "bytes": 24909,
+      "sha256": "0ffc7dadddaa0b0119b6699040749080218d188ecdb38ba66577c41d4a525d41"
     },
     {
       "path": "dist/apps/web/src/screens/OeeScreen.js",

@@ -3,6 +3,7 @@
 import { h, mount } from '../../../../packages/ui/src/h.js';
 import { TIME_PRESETS, UNVERIFIABLE_TR, actionTr, filterEvents, formatStamp, lateReportMinutes, parseIstanbulLocal, resolveRange, stateAsOf } from '../../../../packages/domain/src/temporal.js';
 import { DS_CSS, pill } from '../ds.js';
+import { actionState, nextStepText, reasonError } from '../../../../packages/domain/src/approvalsInbox.js';
 import { errorText } from '../errorText.js';
 import { KINDS, canOpenPassport, isKind, objectHref } from '../passport/registry.js';
 import { passportHeader, PASSPORT_HEADER_CSS } from '../passport/passportHeader.js';
@@ -162,6 +163,67 @@ export async function renderObjectPassportScreen(container, api, state, ctx) {
         }
         return h('div', { class: 'panel', 'data-testid': 'pp-asof' }, h('h2', {}, 'Geçmiş tarihteki durum (as-of)'), h('div', { class: 'pp-filters' }, input, h('button', { type: 'button', class: 'primary', 'data-testid': 'pp-asof-go', onClick: () => go({ asOf: input.value || undefined }) }, 'Durumu göster')), h('div', { class: 'mut', style: 'margin-top:6px' }, 'Yalnızca o ana kadar kaydedilmiş olaylardan hesaplanır; kayıt yoksa durum uydurulmaz.'), out);
     }
+    /** KMI-HOTFIX-109: "Testi Tamamla" / "Üretime Geri Al" — the same ApprovalItem, rpcCall and actionState as Onaylarım (one record, one authority check). */
+    function decisionPanel() {
+        const box = h('div', { 'data-testid': 'pp-decision' });
+        const held = new Set(ctx.access.actions);
+        let busy = false;
+        const draw = async (msg) => {
+            let item = null;
+            try {
+                item = await api.ticketDecision(state.id);
+            }
+            catch (e) {
+                mount(box, h('div', { class: 'banner error', 'data-testid': 'pp-decision-error' }, `Test durumu okunamadı: ${errorText(e)}`));
+                return;
+            }
+            const out = [];
+            if (msg)
+                out.push(h('div', { class: `banner ${msg.ok ? 'info' : 'error'}`, 'data-testid': 'pp-decision-msg', 'aria-live': 'polite' }, msg.text));
+            if (!item) {
+                if (!msg)
+                    out.push(h('div', { class: 'mut', 'data-testid': 'pp-decision-none' }, 'Bu kayıtta açık bir test / üretime dönüş kararı yok.'));
+                mount(box, h('div', {}, ...out));
+                return;
+            }
+            const isTest = item.kind === 'MAINTENANCE_TEST';
+            const reason = h('textarea', { placeholder: isTest ? 'Test açıklaması (zorunlu, en az 5 karakter)' : 'Üretime dönüş gerekçesi (zorunlu, en az 5 karakter)', 'data-testid': 'pp-decision-reason' });
+            let choice = 'APPROVE';
+            const approveSt = actionState(item, 'APPROVE', held);
+            const rejectSt = actionState(item, 'REJECT', held);
+            const go2 = h('button', { type: 'button', class: 'primary', 'data-testid': 'pp-decision-go', disabled: true }, isTest ? 'Test sonucunu kaydet' : 'Üretime Geri Al');
+            const next = h('div', { class: 'mut', 'data-testid': 'pp-decision-next' });
+            const sync = () => {
+                const st = choice === 'APPROVE' ? approveSt : rejectSt;
+                go2.disabled = busy || !st.enabled || reasonError(reason.value) !== null;
+                next.textContent = st.enabled ? nextStepText(item, choice) : (st.why ?? '');
+            };
+            const radios = isTest ? h('div', { class: 'pp-form', role: 'radiogroup', 'aria-label': 'Test sonucu' }, ...[['APPROVE', 'GEÇTİ', approveSt], ['REJECT', 'KALDI', rejectSt]].map(([v, label, st]) => h('label', { style: 'display:inline-flex;gap:6px;align-items:center;min-height:44px' }, h('input', { type: 'radio', name: 'pp-test-result', value: v, ...(v === 'APPROVE' ? { checked: true } : {}), ...(st.enabled ? {} : { disabled: true }), 'data-testid': `pp-decision-${v === 'APPROVE' ? 'pass' : 'fail'}`, onChange: () => { choice = v; sync(); } }), label))) : null;
+            reason.addEventListener('input', sync);
+            go2.addEventListener('click', async () => {
+                if (busy || go2.disabled)
+                    return;
+                busy = true;
+                sync();
+                const label = choice === 'APPROVE' ? (isTest ? 'GEÇTİ' : 'Üretime döndü') : 'KALDI';
+                try {
+                    await api.decideTicket(item, choice, reason.value);
+                    busy = false;
+                    await draw({ ok: true, text: isTest ? (choice === 'APPROVE' ? 'Test GEÇTİ kaydedildi. Makine henüz üretime dönmedi: aşağıdan “Üretime Geri Al” onayını verin.' : 'Test KALDI kaydedildi. Bakım kaydı onarıma döndü; makine bakımda kalır.') : `Makine servise döndü (${label}). Durum: Üretimde / Hazır.` });
+                    setTimeout(() => go({}), 1500);
+                }
+                catch (e) {
+                    busy = false;
+                    await draw({ ok: false, text: errorText(e) });
+                }
+            });
+            out.push(h('h2', {}, isTest ? 'Testi Tamamla' : 'Üretime Geri Al'), h('div', { class: 'mut' }, item.record), radios, reason, next, go2);
+            mount(box, h('div', { class: 'pp-form' }, ...out));
+            sync();
+        };
+        void draw();
+        return box;
+    }
     function actionsPanel() {
         const items = [];
         const note = (txt) => h('div', { class: 'mut', style: 'margin-top:8px' }, txt);
@@ -196,7 +258,8 @@ export async function renderObjectPassportScreen(container, api, state, ctx) {
             items.push(h('div', {}, h('h2', {}, 'Arıza işlemleri'), h('div', { class: 'pp-form' }, reason, sev, h('button', { type: 'button', class: 'warnb', 'data-testid': 'pp-fault-report', onClick: run(() => api.reportMachineFault(state.id, reason.value, sev.value), 'Arıza bildirimi kaydedildi.') }, 'Arıza bildir'), ctx.access.actions.includes('MAINTENANCE_TEST_RELEASE') ? h('button', { type: 'button', class: 'danger', 'data-testid': 'pp-set-down', onClick: run(() => api.setMachineDown(state.id, reason.value, sev.value), 'Makine DOWN yapıldı; bakım kaydı açıldı.') }, 'Makineyi DOWN yap (yetkili)') : null, h('div', { class: 'mut' }, 'DOWN yalnız yetkili yönetim/bakım personelinde görünür; yetkiyi sunucu denetler.'))));
         }
         if (state.kind === 'MAINTENANCE_TICKET' && ctx.access.actions.includes('MAINTENANCE_TEST_RELEASE')) {
-            items.push(h('div', {}, h('h2', {}, 'Bakım adımı'), h('div', { class: 'pp-form' }, ...[['IN_PROGRESS', 'Müdahaleye başla'], ['TEST_PENDING', 'Teste gönder']].map(([to, label]) => h('button', { type: 'button', class: 'ghost', 'data-testid': `pp-ticket-${to}`, onClick: run(() => api.transitionTicket(state.id, to), 'Bakım kaydı ilerledi.') }, label)), h('div', { class: 'mut' }, 'Servise dönüş test sonucu ve yetkili onayla Bakım ekranından yapılır (kapı atlanmaz).'))));
+            items.push(h('div', {}, h('h2', {}, 'Bakım adımı'), h('div', { class: 'pp-form' }, ...[['IN_PROGRESS', 'Müdahaleye başla'], ['TEST_PENDING', 'Teste gönder']].map(([to, label]) => h('button', { type: 'button', class: 'ghost', 'data-testid': `pp-ticket-${to}`, onClick: run(() => api.transitionTicket(state.id, to), 'Bakım kaydı ilerledi.') }, label)), h('div', { class: 'mut' }, 'Test sonucu ve üretime dönüş aşağıdaki “Testi Tamamla” bölümünden (veya Onaylarım’dan) verilir; aynı kayıt, aynı yetki denetimi.'))));
+            items.push(decisionPanel());
         }
         if (def.docEntity)
             items.push(h('div', {}, h('h2', {}, 'Belge'), h('a', { class: 'btn ghost', href: `#/dokumanlar?tip=${def.docEntity}&id=${encodeURIComponent(state.id)}`, 'data-testid': 'pp-doc-add' }, 'Belge ekle / incele')));

@@ -3,6 +3,8 @@
 import { machineState, displayKey } from '../../../packages/domain/src/machineState.js';
 import { auditToEvent, formatStamp } from '../../../packages/domain/src/temporal.js';
 import { errorText, isSetupPending } from './errorText.js';
+import { loadMaintenanceTests } from './approvalsInboxApi.js';
+import { buildInbox, rpcCall } from '../../../packages/domain/src/approvalsInbox.js';
 import { KINDS, canOpenPassport } from './passport/registry.js';
 const inList = (ids) => `in.(${ids.join(',')})`;
 const uniq = (a) => [...new Set(a.filter((x) => !!x))];
@@ -505,6 +507,11 @@ export function createObjectPassportApi(client, session, access, myUserId = sess
         },
         async reportMachineFault(machineId, reason, severity) { await client.rpc('report_machine_fault', { p_machine_id: machineId, p_reason: reason, p_severity: severity }, session); },
         async setMachineDown(machineId, reason, severity) { await client.rpc('set_machine_down', { p_machine_id: machineId, p_reason: reason, p_ticket_severity: severity }, session); },
+        async ticketDecision(ticketId) {
+            const rows = (await loadMaintenanceTests(client, session)).filter((r) => r.id === ticketId);
+            return buildInbox({ commercial: [], purchaseRequests: [], purchaseOrders: [], tasks: [], maintenance: rows }, Date.now())[0] ?? null;
+        },
+        async decideTicket(item, decision, reason) { const call = rpcCall(item, decision, reason); await client.rpc(call.fn, call.params, session); },
         async transitionTicket(ticketId, toStatus) { await client.rpc('transition_maintenance_ticket', { p_ticket_id: ticketId, p_to_status: toStatus }, session); },
     };
 }
