@@ -4,9 +4,19 @@ import { sectionNode } from '../sections.js';
 import { errorText } from '../../errorText.js';
 import { machineState, DATA_SOURCE_TR, HEADLINE_TR, STALE_TR, displayKey } from '../../../../../packages/domain/src/machineState.js';
 import { spindleForState } from '../../spindle.js';
+import { describeBlocker } from '../../woReadiness.js';
 const EVENT_TR = { CREATED: 'İş emri açıldı', MACHINE_ASSIGNED: 'Makine atandı', PLAN_CHANGED: 'Plan / atama değişti', START: 'START — üretim başladı', RESUME: 'Devam (HOLD kalktı)', CONTINUE_AFTER_FIRST_PIECE: 'İlk parça sonrası devam',
-    HOLD: 'HOLD / duruş', FIRST_PIECE_REQUESTED: 'İlk parça kaliteye gönderildi', FIRST_PIECE_APPROVED: 'İlk parça onaylandı', FINISH: 'FINISH — üretim bitti', FINAL_RELEASE: 'Nihai onay', CANCELLED: 'İptal', PRODUCTION_DECLARED: 'Üretim beyanı', CORRECTION: 'Düzeltme (bağlantılı kayıt)', STATUS_CHANGE: 'Durum değişti' };
-const ROLE_TR = { OPERATOR: 'Operatör', QUALITY: 'Kalite', PLANNER: 'Planlama', MANAGEMENT: 'Yönetim', NONE: '—' };
+    HOLD: 'HOLD / duruş', FIRST_PIECE_REQUESTED: 'İlk parça kaliteye gönderildi', FIRST_PIECE_APPROVED: 'İlk parça onaylandı', FINISH: 'FINISH — üretim bitti', FINAL_RELEASE: 'Nihai onay', CANCELLED: 'İptal', PRODUCTION_DECLARED: 'Üretim beyanı', CORRECTION: 'Düzeltme (bağlantılı kayıt)', STATUS_CHANGE: 'Durum değişti',
+    OP_STARTED: 'Operasyon başladı', OP_FIRST_PIECE_APPROVED: 'Operasyon ilk parça onayı', OP_FIRST_PIECE_REJECTED: 'Operasyon ilk parça reddi', OP_OUTPUT_DECLARED: 'Operasyon beyanı', OP_RUN_FINISHED: 'Operasyon üretimi bitti', OP_QC_PASSED: 'Operasyon kalite GEÇTİ', OP_QC_FAILED: 'Operasyon kalite KALDI',
+    OP_HELD: 'Operasyon duraklatıldı (iş emri HOLD)', OP_RESUMED: 'Operasyon devam etti', STOCK_LOT_CREATED: 'Stok lotu oluştu', STOCK_HOLD: 'Lot beklemeye alındı', STOCK_SCRAP: 'Lot hurdaya çıktı', STOCK_SHIPPED: 'Lot sevk edildi',
+    COMMERCIAL_APPROVAL_REQUESTED: 'Ticari onay istendi', MANAGEMENT_RELEASE_GRANTED: 'Yönetim serbest bıraktı', COMMERCIAL_APPROVAL_APPROVED: 'Ticari onay verildi', COMMERCIAL_APPROVAL_REJECTED: 'Ticari onay reddedildi',
+    SHIPMENT_CREATED: 'Sevkiyat açıldı', SHIPMENT_DISPATCHED: 'Sevk edildi', SHIPMENT_DELIVERED: 'Teslim edildi', SHIPMENT_CANCELLED: 'Sevkiyat iptal', INVOICE_CREATED: 'Fatura kesildi', INVOICE_PAID: 'Fatura tahsil edildi', PAYMENT_RECORDED: 'Tahsilat kaydı',
+    NCR_OPENED: 'Uygunsuzluk (NCR) açıldı', NCR_REWORK: 'NCR: tashih', NCR_RECHECK_PENDING: 'NCR: tekrar kontrol', NCR_ACCEPTED: 'NCR: kabul', NCR_SCRAPPED: 'NCR: hurda', QUALITY_HOLD_OPENED: 'Kalite HOLD açıldı', QUALITY_HOLD_RELEASED: 'Kalite HOLD kalktı' };
+const ROLE_TR = { OPERATOR: 'Operatör', QUALITY: 'Kalite', PLANNER: 'Planlama', MANAGEMENT: 'Yönetim', WAREHOUSE: 'Depo', SHIPPING: 'Sevkiyat', ACCOUNTING: 'Muhasebe', NONE: '—' };
+const SCOPE_TR = { WORK_ORDER: 'İş emri', OPERATION: 'Operasyon', LOT: 'Stok lotu', SHIPMENT: 'Sevkiyat', INVOICE: 'Fatura', QUALITY: 'Kalite', ORDER_ITEM: 'Sipariş kalemi' };
+const STOP_TR = { SETUP: 'Ayar / kurulum', TOOL: 'Takım', MATERIAL_WAIT: 'Malzeme bekleme', OTHER: 'Diğer', QUALITY_WAIT: 'Kalite bekleme', OPERATOR_CAUSED: 'Operatör kaynaklı', PLANNED_STOP: 'Planlı duruş', FAULT: 'Arıza', MAINTENANCE: 'Bakım', UNSPECIFIED: 'Neden belirtilmedi' };
+const STALE_REASON_TR = { NO_ACTIVITY: 'Oturum için hiç hareket kaydı yok', INACTIVITY: 'Eşik süreden uzun süredir hareket yok', SHIFT_HANDOVER: 'Vardiya devrinden sonra hareket yok' };
+const OP_TR = { PENDING: 'Bekliyor', FIRST_PIECE_PENDING: 'İlk parça onayı bekliyor', RUNNING: 'Üretimde', QC_PENDING: 'Kalite kontrol bekliyor', DONE: 'Bitti' };
 const dur = (m) => (m === null || m === undefined ? NA : m >= 60 ? `${Math.floor(m / 60)} sa ${Math.round(m % 60)} dk` : `${Math.round(m)} dk`);
 export const loadWoPassport = (ctx) => ctx.rpc('work_order_passport', { p_work_order_id: ctx.id });
 const planner = (ctx) => ctx.access.owner || ctx.access.roles.some((r) => r === 'ADMIN' || r === 'MANAGEMENT') || ctx.access.actions.includes('WORK_ORDER_ASSIGN_MACHINE') || ctx.access.actions.includes('MANAGEMENT_RELEASE');
@@ -29,7 +39,7 @@ export function workOrderTopics(ctx, w) {
                     f = await ctx.rpc('work_order_flow', { p_work_order_id: ctx.id });
                 }
                 catch (e) {
-                    host.replaceChildren(h('div', { class: 'ps-banner', 'data-testid': isDenied(e) ? 'ps-denied' : 'flow-pending' }, isDenied(e) ? 'Bu bölümü görme yetkiniz yok (sunucu reddetti).' : `Canlı iş akışı altyapısı (0121) bu veritabanında henüz kurulu değil: ${errorText(e)}`));
+                    host.replaceChildren(h('div', { class: 'ps-banner', 'data-testid': isDenied(e) ? 'ps-denied' : 'flow-pending' }, isDenied(e) ? 'Bu bölümü görme yetkiniz yok (sunucu reddetti).' : `Canlı iş akışı altyapısı (0121/0122) bu veritabanında henüz kurulu değil: ${errorText(e)}`));
                     return;
                 }
                 try {
@@ -53,16 +63,39 @@ export function workOrderTopics(ctx, w) {
                         mNode = null;
                     }
                 }
-                const head = kv('Şu an', [['İstasyon', pill(f.stationTr, f.onHold ? 'warn' : f.status === 'PRODUCTION_DONE' ? 'info' : 'ok')], ['Ne zamandır burada', f.since ? `${dt(f.since)} (${dur(f.minutesHere)})` : NA], ['Neyi bekliyor', f.waitingFor],
-                    ['Kimden işlem bekleniyor', `${ROLE_TR[f.waitingOnRole] ?? f.waitingOnRole}${f.waitingOnPerson ? ` · ${f.waitingOnPerson}` : ''}`], ['Son işlem', `${EVENT_TR[f.lastAction.type] ?? f.lastAction.type} · ${orNA(f.lastAction.by)} · ${dt(f.lastAction.at)}`],
-                    ['Sonraki istasyon', f.nextStationTr], ['HOLD', f.onHold ? pill('HOLD', 'warn') : 'Yok'], ['Gecikme', f.late === null ? 'BİLİNMİYOR (ticari termin bu role açık değil)' : f.late ? pill('Gecikti', 'bad') : 'Yok'],
-                    ...(f.tashihReviewPending ? [['Tashih', pill('Kalite incelemesi bekleniyor', 'warn')]] : [])], 'Kaynak: değiştirilemez iş emri olay günlüğü · saatler Türkiye saati');
-                const times = t ? kv('Süreler (beyan esaslı)', [['Beyan edilen çalışma', dur(t.declaredRunMinutes)], ['Beyan edilen duruş (HOLD)', dur(t.declaredStopMinutes)], ['İlk parça onay bekleme', dur(t.firstPieceWaitMinutes)], ['İstasyon bekleme (makine süresine EKLENMEZ)', dur(t.stationWaitMinutes)],
-                    ['Bilinmeyen süre (bayat oturum — üretim sayılmaz)', dur(t.unknownMinutes)], ['Planlanan', dur(t.plannedMinutes)], ['Planlanan – beyan farkı', t.plannedVsDeclaredMinutes === null ? NA : `${t.plannedVsDeclaredMinutes > 0 ? '+' : ''}${t.plannedVsDeclaredMinutes} dk`],
+                const tone = f.onHold ? 'warn' : f.status === 'PRODUCTION_DONE' ? 'info' : f.stageLabel === 'Hazırlık eksik' ? 'bad' : 'ok';
+                const waiting = f.waitingFor ?? NA;
+                const head = kv('Şu an', [['Aşama', pill(f.stageLabel, tone)], ['İstasyon', pill(f.stationTr, f.onHold ? 'warn' : f.status === 'PRODUCTION_DONE' ? 'info' : 'ok')], ['Ne zamandır burada', f.since ? `${dt(f.since)} (${dur(f.minutesHere)})` : NA], ['Neyi bekliyor', waiting],
+                    ['Kimden işlem bekleniyor', f.waitingOnRole ? `${ROLE_TR[f.waitingOnRole] ?? f.waitingOnRole}${f.waitingOnPerson ? ` · ${f.waitingOnPerson}` : ''}` : NA], ['Son işlem', `${EVENT_TR[f.lastAction.type] ?? f.lastAction.type ?? NA} · ${orNA(f.lastAction.by)} · ${dt(f.lastAction.at)}`],
+                    ['Sonraki istasyon', orNA(f.nextStationTr)], ['HOLD', f.onHold ? pill(f.holdKind === 'FAULT' ? 'Arıza' : f.holdKind === 'MAINTENANCE' ? 'Bakım' : f.holdKind === 'QUALITY' ? 'Kalite HOLD' : 'HOLD', 'warn') : 'Yok'],
+                    ['Gecikme', f.late === null ? 'BİLİNMİYOR (ticari termin bu role açık değil)' : f.late ? pill('Gecikti', 'bad') : 'Yok'],
+                    ...(f.explain ? [['Not', f.explain]] : []),
+                    ...(f.staleReason ? [['Oturum', pill(`BAYAT · ${STALE_REASON_TR[f.staleReason] ?? f.staleReason}`, 'warn')]] : []),
+                    ...(f.tashihReviewPending ? [['Tashih', pill('Kalite incelemesi bekleniyor', 'warn')]] : [])], 'Kaynak: değiştirilemez iş emri olay günlüğü · saatler Türkiye saati · bayat oturum asla otomatik bitirilmez');
+                const gaps = [...f.blockers.map((c) => describeBlocker(c, ctx.id)), ...f.planGaps.map((c) => describeBlocker(c, ctx.id))];
+                const prep = gaps.length ? table(`Hazırlık eksikleri (${f.blockers.length} engel${f.planGaps.length ? ` · ${f.planGaps.length} plan boşluğu` : ''})`, ['Eksik', 'Ayrıntı', 'Nerede düzeltilir'], gaps.map((g) => [g.title, orNA(g.detail), g.fix && g.fix.type === 'link' ? `${g.fixLabel ?? 'Git'} → ${g.fix.href.replace(/^#\//, '')}` : orNA(g.fixLabel)]), 'Sunucunun kanonik hazırlık kuralı (work_order_readiness / start önizlemesi) — burada ikinci bir kural yok') : null;
+                const ops = f.operations.length ? table('Operasyonlar', ['Op', 'Ad', 'Durum', 'Makine', 'Operatör', 'Giren', 'Sağlam', 'Fire', 'Tashih / vakada', 'Başladı', 'İlk parça', 'Üretim bitti', 'Kalite', 'Tamamlandı'], f.operations.map((o) => [`${o.opNo}`, o.name, `${OP_TR[o.status] ?? o.status}${o.held ? ' · HOLD (iş emri bekletmede)' : ''}`, orNA(o.machineCode), orNA(o.operator), nf(o.qtyIn), nf(o.qtyGood), nf(o.qtyScrap), o.qtyTashih === undefined ? NA : `${nf(o.qtyTashih)} / ${nf(o.ncrOpen ?? 0)}`, o.startedAt ? dt(o.startedAt) : NA,
+                    o.firstPieceAt ? dt(o.firstPieceAt) : NA, o.runFinishedAt ? dt(o.runFinishedAt) : NA, o.qcResult ? `${o.qcResult === 'PASS' ? 'Geçti' : 'Kaldı'} · ${o.qcAt ? dt(o.qcAt) : ''}` : NA, o.completedAt ? dt(o.completedAt) : NA]), 'Rotalı iş emri: START / beyan / FINISH operasyon düzeyindedir') : null;
+                const q = f.quantities;
+                const qty = kv('Miktarlar (ayrı kovalar — hiçbiri iki kez sayılmaz)', [['Planlanan', nf(q.planned)], ['Sağlam (iyi)', nf(q.good)], ['Fire (hurda)', nf(q.scrap)], ['Tashih beyanı (hurda DEĞİL)', nf(q.tashihDeclared)],
+                    ['NCR: açık / tashihte / tekrar kontrol', `${nf(q.ncr.open)} / ${nf(q.ncr.rework)} / ${nf(q.ncr.recheckPending)}`], ['NCR: kabul / hurda', `${nf(q.ncr.accepted)} / ${nf(q.ncr.scrapped)}`], ['Kontrol bekleyen', q.pendingControl > 0 ? pill(`${nf(q.pendingControl)} adet`, 'warn') : '0'],
+                    ['Hedefe kalan', nf(q.remainingToTarget)], ...(q.reworkAccountingReview ? [['Uyarı', pill('Kabul edilen tashihin iyi adede yansıması Kalite tarafından doğrulanmalı', 'warn')]] : [])], q.note);
+                const dsn = f.downstream ? kv('Depo · ticari · sevkiyat · muhasebe', [['Aşama', pill(f.downstream.stationTr, f.downstream.stage === 'DONE' ? 'ok' : 'info')], ['Departman', f.downstream.department], ['Neyi bekliyor', orNA(f.downstream.waitingFor)],
+                    ['Kimden', f.downstream.waitingOnRole ? ROLE_TR[f.downstream.waitingOnRole] ?? f.downstream.waitingOnRole : NA], ['Sonraki', orNA(f.downstream.nextStationTr)], ['Kayıt kapsamı', f.downstream.scopeNote]], f.commercialHidden ? 'Ticari aşamalar bu role genel "Ticari süreç" olarak gösterilir.' : undefined) : null;
+                const times = t ? kv('Süreler (beyan esaslı — fiziksel kesme süresi DEĞİL)', [['Beyan edilen çalışma', dur(t.declaredRunMinutes)], ['Beyan edilen duruş (HOLD)', dur(t.declaredStopMinutes)],
+                    ...Object.entries(t.stopMinutesByReason ?? {}).map(([c, m]) => [`  · ${STOP_TR[c] ?? c}`, dur(m)]),
+                    ['Ayar (kurulum + ilk parça bekleme, beyan)', dur(t.setupMinutesDeclared)], ['İlk parça onay bekleme', dur(t.firstPieceWaitMinutes)], ['Kalite kontrol bekleme', dur(t.qcWaitMinutes)],
+                    ['İstasyon bekleme (makine süresine EKLENMEZ)', dur(t.stationWaitMinutes)], ...(t.routed ? [['  · operasyonlar arası bekleme', dur(t.betweenOperationsMinutes)]] : []),
+                    ['Bilinmeyen süre (bayat oturum — üretim sayılmaz)', dur(t.unknownMinutes)],
+                    ...Object.entries(t.runMinutesByShift ?? {}).map(([c, m]) => [`Vardiya dağılımı · ${c === 'OUT_OF_SHIFT' ? 'Vardiya dışı' : c}`, dur(m)]),
+                    ...(t.operations ?? []).map((o) => [`Operasyon ${o.opNo}`, `çalışma ${dur(o.runMinutes)} · ilk parça ${dur(o.firstPieceWaitMinutes)} · kalite ${dur(o.qcWaitMinutes)}${o.unknownMinutes ? ` · bilinmeyen ${dur(o.unknownMinutes)}` : ''}`]),
+                    ['Planlanan', dur(t.plannedMinutes)], ['Planlanan – beyan farkı', t.plannedVsDeclaredMinutes === null ? NA : `${t.plannedVsDeclaredMinutes > 0 ? '+' : ''}${t.plannedVsDeclaredMinutes} dk`],
+                    ...(t.operatorLoad ? [['Operatörün şu an açık oturumu', `${t.operatorLoad.activeSessions} / ${t.operatorLoad.cap}${t.operatorLoad.atCap ? ' (sınırda)' : ''}`]] : []),
                     ['Veri kaynağı / güvenilirlik', `${DATA_SOURCE_TR[t.dataSource] ?? t.dataSource} · beyan, doğrulanmadı`], ['OEE / fiziksel kullanım', 'ÖLÇÜLMEDİ (spindle / kesme süresi doğrulanmadı)']], t.note) : null;
-                const hist = table('İstasyon geçmişi (en yeni üstte)', ['Zaman', 'Olay', 'Önce → Sonra', 'İstasyon', 'Makine', 'Kim', 'Miktar', 'Bekleme nedeni / not'], f.history.map((e) => [dt(e.at), `${EVENT_TR[e.eventType] ?? e.eventType}${e.correctionOf ? ` (#${e.correctionOf} için)` : ''}`, `${e.fromStatus ? (WO_TR[e.fromStatus] ?? e.fromStatus) : '—'} → ${e.toStatus ? (WO_TR[e.toStatus] ?? e.toStatus) : '—'}`, orNA(e.department),
-                    orNA(e.machineCode), orNA(e.actor), e.qtyGood !== null || e.qtyScrap !== null || e.qtyTashih !== null ? `sağlam ${e.qtyGood ?? 0} · fire ${e.qtyScrap ?? 0}${e.qtyTashih ? ` · tashih ${e.qtyTashih}` : ''}` : NA, orNA([e.waitReason, e.note].filter(Boolean).join(' · ') || null)]), 'Olay yok');
-                host.replaceChildren(h('div', { class: 'ps-page', 'data-testid': 'flow' }, mNode, sectionNode(head, ctx.hrefOf), times ? sectionNode(times, ctx.hrefOf) : null, sectionNode(hist, ctx.hrefOf)));
+                const hist = table('İstasyon geçmişi (en yeni üstte)', ['Zaman', 'Kapsam', 'Olay', 'Önce → Sonra', 'İstasyon', 'Makine', 'Kim', 'Miktar', 'Bekleme nedeni / not'], f.history.map((e) => [dt(e.at), `${SCOPE_TR[e.scope] ?? e.scope}${e.opNo ? ` ${e.opNo}` : ''}`, `${EVENT_TR[e.eventType] ?? e.eventType}${e.correctionOf ? ` (#${e.correctionOf} için)` : ''}`, e.toStatus ? `${e.fromStatus ? (WO_TR[e.fromStatus] ?? OP_TR[e.fromStatus] ?? e.fromStatus) : '—'} → ${WO_TR[e.toStatus] ?? OP_TR[e.toStatus] ?? e.toStatus}` : NA, orNA(e.department),
+                    orNA(e.machineCode), orNA(e.actor), e.qtyGood !== null || e.qtyScrap !== null || e.qtyTashih !== null ? `sağlam ${e.qtyGood ?? 0} · fire ${e.qtyScrap ?? 0}${e.qtyTashih ? ` · tashih ${e.qtyTashih}` : ''}` : NA,
+                    orNA([e.reasonCode ? STOP_TR[e.reasonCode] ?? e.reasonCode : null, e.waitReason, e.note].filter(Boolean).join(' · ') || null)]), 'Olay yok');
+                host.replaceChildren(h('div', { class: 'ps-page', 'data-testid': 'flow' }, mNode, sectionNode(head, ctx.hrefOf), prep ? sectionNode(prep, ctx.hrefOf) : null, ops ? sectionNode(ops, ctx.hrefOf) : null, sectionNode(qty, ctx.hrefOf), dsn ? sectionNode(dsn, ctx.hrefOf) : null, times ? sectionNode(times, ctx.hrefOf) : null, sectionNode(hist, ctx.hrefOf)));
             } },
         tabTopic(ctx, T('urun', 'Ürün ve teknik revizyon', 'box', 'Teknik', { summary: w.revision ? `Rev ${w.revision.revision}` : 'Revizyon bağlı değil' }), 'genel'),
         tabTopic(ctx, T('rota', 'Operasyon ve rota', 'factory', 'Teknik', { summary: 'Operasyonlar' }), 'operasyonlar'),
@@ -142,6 +175,23 @@ export function workOrderTopics(ctx, w) {
             const o = await ops();
             return [table('Operasyon hedefleri (iş emri anındaki rota sürümü)', ['Op', 'Ad', 'Rota sürümü', 'Çevrim (sn)', 'Hazırlık (dk)'], o.map((x) => [`OP${x.opNo}`, x.name, orNA(x.routingVersionNo), x.cycleSecondsTarget === null ? NA : nf(x.cycleSecondsTarget), x.setupMinutesTarget === null ? NA : nf(x.setupMinutesTarget)]), 'Operasyon yok')];
         }),
+        // KMI-013: operation job card traceability at passport level — one row per operation with its trace code, QR identity (NOT an authority), routing version, who/where, quantities, and a direct link to that operation on the job card.
+        (() => {
+            const base = R('izlenebilirlik', 'İş kartı ve operasyon izlenebilirliği', 'clipboard', 'Üretim', 'Her operasyonun iz kodu ve iş kartı', async () => {
+                const o = await ops();
+                return [table('Operasyon izi', ['Op', 'Ad', 'İz kodu', 'QR kimliği', 'Rota sürümü', 'Durum', 'Makine', 'Operatör', 'Giren', 'İyi', 'Fire'], o.map((x) => [`OP${x.opNo}`, x.name, `${ctx.id.slice(0, 8)}/OP${x.opNo}`, `KMI:OP:${x.id}`, orNA(x.routingVersionNo), x.status, link('MACHINE', x.machineId, x.machineId ? 'Makine' : null), link('PERSONNEL', x.operatorId, x.operatorId ? 'Operatör' : null), x.qtyIn === null ? NA : nf(x.qtyIn), x.qtyGood === null ? NA : nf(x.qtyGood), x.qtyScrap === null ? NA : nf(x.qtyScrap)]), 'Bu iş emrinde rota operasyonu yok (tek adımlı iş emri).'),
+                    note('QR hakkında', 'Operasyon QR’ı yalnızca kimliktir: taramak işlem başlatmaz ve yetki vermez. İşlem için oturum açmış, yetkili bir kullanıcı gerekir; her tarama merkezi tarama kaydına yazılır.')];
+            });
+            return { ...base, render: async (host) => {
+                    await base.render(host);
+                    let o = [];
+                    try {
+                        o = await ops();
+                    }
+                    catch { /* the table above already reported it */ }
+                    host.append(h('section', { class: 'ps-panel', 'data-testid': 'ps-opcard-links' }, h('div', { class: 'ps-panel-h' }, h('h2', {}, 'İş kartında aç')), h('a', { class: 'ps-trow', href: `#/is-karti?is=${ctx.id}`, 'data-testid': 'ps-jobcard-link' }, h('span', {}), h('span', {}, h('div', { class: 'ps-tt' }, 'İş kartının tamamı'))), ...o.map((x) => h('a', { class: 'ps-trow', href: `#/is-karti?is=${ctx.id}&op=${x.id}`, 'data-testid': 'ps-opcard-link', 'data-op': `OP${x.opNo}` }, h('span', {}), h('span', {}, h('div', { class: 'ps-tt' }, `OP${x.opNo} ${x.name}`), h('div', { class: 'ps-ts' }, `${ctx.id.slice(0, 8)}/OP${x.opNo}`))))));
+                } };
+        })(),
         R('uretim', 'Gerçekleşen üretim', 'factory', 'Üretim', `${nf(wo.qtyProduced)} / ${nf(wo.qtyPlanned)}`, async () => {
             const o = await ops();
             return [kv('Toplam', [['İyi (beyan)', nf(w.declarations.good)], ['Fire (beyan)', nf(w.declarations.scrap)], ['Beyan sayısı', nf(w.declarations.count)], ['İlk parça', w.declarations.firstPieceAt ? dt(w.declarations.firstPieceAt) : NA]], 'Kaynak: production_declarations (yalnız beyan; düzeltmeler ayrı satırda).'),

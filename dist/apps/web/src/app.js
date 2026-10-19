@@ -16,7 +16,7 @@ import { renderProductMasterScreen } from './screens/ProductMasterScreen.js';
 import { createProductMasterApi } from './productMasterApi.js';
 import { adoptSiblingRefresh, expiryAppliesTo } from './sessionSync.js';
 import { renderProductWorkspaceScreen } from './screens/ProductWorkspaceScreen.js';
-import { createProductWorkspaceApi, jobCardFor, scanCheck } from './productWorkspaceApi.js';
+import { createProductWorkspaceApi, jobCardFor, scanCheckLogged } from './productWorkspaceApi.js';
 import { renderJobCardScreen } from './screens/JobCardScreen.js';
 import { renderDocumentControlScreen } from './screens/DocumentControlScreen.js';
 import { createDocumentControlApi } from './documentControlApi.js';
@@ -279,20 +279,20 @@ export const ROUTES = [
     {
         path: '/operator', label: 'Benim İşlerim (operatör)', group: 'Saha', inMenu: true,
         render: (el, c, s) => renderOperatorHomeScreen(el, createOperatorHomeApi(c, s), {
-            openTerminal: (machineId) => { rememberMachine(machineId); location.hash = '#/terminal'; }, goTasks: () => { location.hash = '#/gorevler'; }
+            openTerminal: (machineId) => { rememberMachine(machineId); location.hash = '#/terminal'; }, goTasks: () => { location.hash = '#/gorevler'; }, machineStates: () => loadMachineStates(createLiveApi(c, s), 'PUBLIC')
         }),
     },
     {
         // operator-safe work-order card (no commercial fields); non-assigned work orders are simply not returned by RLS
         path: '/is-karti', label: 'İş Emri Kartı (operatör)', group: 'Saha', inMenu: false,
         // /is-karti serves two screens: ?is=<work order> = the KMI-011 job card (operation documents + scan check), otherwise (?wo=) the operator work-order card. One path, no shadowed route.
-        render: (el, c, s, q) => q.has('is') ? renderJobCardScreen(el, { load: (wo) => jobCardFor(c, s, wo), scan: (input, wo) => scanCheck(c, s, input, wo) }, q.get('is')) : renderOperatorWoCardScreen(el, { api: createOperatorWoCardApi(c, s), openTerminal: (machineId) => { rememberMachine(machineId); location.hash = '#/terminal'; }, go: (hash) => { location.hash = hash; } }, q.get('wo')),
+        render: (el, c, s, q) => q.has('is') ? renderJobCardScreen(el, { load: (wo) => jobCardFor(c, s, wo), scan: (input, wo) => scanCheckLogged(c, s, input, wo, `jc-scan-${Date.now()}`) }, q.get('is'), q.get('op')) : renderOperatorWoCardScreen(el, { api: createOperatorWoCardApi(c, s), openTerminal: (machineId) => { rememberMachine(machineId); location.hash = '#/terminal'; }, go: (hash) => { location.hash = hash; } }, q.get('wo')),
     },
     { path: '/terminal', label: 'Makine Terminali', group: 'Saha', inMenu: true, render: (el, c, s) => renderTerminalScreen(el, createTerminalApi(c, s), { machineId: rememberedMachine() }, { icon: (n, z) => icon(n, z) }) },
     {
         path: '/is-emirleri', label: 'İş Emirleri (üretim · kalite · stok · sevkiyat)', group: 'Saha', inMenu: true,
         render: (el, c, s, q) => renderWorkOrderHubScreen(el, { hub: createWorkOrderHubApi(c, s), workOrders: createWorkOrdersApi(c, s), production: createProductionApi(c, s),
-            stock: createStockApi(c, s), shipment: createShipmentApi(c, s), commercial: createCommercialApprovalApi(c, s) }, { wo: q.get('wo'), lot: q.get('lot') }),
+            stock: createStockApi(c, s), shipment: createShipmentApi(c, s), commercial: createCommercialApprovalApi(c, s), machineStates: () => loadMachineStates(createLiveApi(c, s)) }, { wo: q.get('wo'), lot: q.get('lot') }),
     },
     { path: '/muhasebe', label: 'Muhasebe / Fatura (kalem)', group: 'Yönetim', inMenu: false, needs: ['kalem'], render: (el, c, s, q) => renderAccountingScreen(el, q.get('kalem') ?? '', createAccountingApi(c, s)) },
     { path: '/tara', label: 'QR / Barkod Okut', group: 'Saha', inMenu: true, render: (el, c, s, q, a) => renderScanScreen(el, createScanApi(c, s), undefined, { code: q.get('kod'), access: a }) },

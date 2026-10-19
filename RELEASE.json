@@ -1,8 +1,8 @@
 {
   "product": "KMI NEXT",
-  "commit": "34009a8aa5908f0de29125efbcb217c376e7855c",
+  "commit": "afd5e9c6b42a9650cad840592c03103af1ce0d70",
   "builtFrom": "clean git tree",
-  "fileCount": 345,
+  "fileCount": 348,
   "migrationsInRepo": 73,
   "lastMigration": "0073_kmi_next_puantaj_month.sql",
   "note": "Release candidate. Publishing to https://flow.kurutlu.com is a manual owner action; this file is not a publication permit.",
@@ -79,8 +79,8 @@
     },
     {
       "path": "dist/apps/web/src/app.js",
-      "bytes": 92041,
-      "sha256": "9cfa5f205d06588c0c0fb984d9bd895fa13d10ff935847e816a77eac0128a140"
+      "bytes": 92223,
+      "sha256": "494e5a8bcb4c6ee61c86568fe3dc8f568ae2c3cfbdc5081120efc4ce971aef76"
     },
     {
       "path": "dist/apps/web/src/approvalsInboxApi.js",
@@ -169,8 +169,8 @@
     },
     {
       "path": "dist/apps/web/src/errorText.js",
-      "bytes": 24257,
-      "sha256": "ea46f22408c3b32060d73beb3d8374544500fba366297a5b1d176b6428f28d75"
+      "bytes": 25578,
+      "sha256": "0183ccecd0f578ee7df9dd5e41e04fd77ead04daf62d6089668f7118a046c5b1"
     },
     {
       "path": "dist/apps/web/src/feasibilityApi.js",
@@ -233,6 +233,11 @@
       "sha256": "53487e40817df3150cfc47851432f113dc367ffc89b07ad3781db1d50c3e466a"
     },
     {
+      "path": "dist/apps/web/src/jobTraveler.js",
+      "bytes": 2085,
+      "sha256": "1a22a3489e134e0fdc895bfee3f4718228a273fb6d9d16b544c8581e802189c9"
+    },
+    {
       "path": "dist/apps/web/src/kx.js",
       "bytes": 15560,
       "sha256": "acfe852d19cd7281185ece97696ed79536a04bbe2183e6498517774fb8865659"
@@ -259,8 +264,8 @@
     },
     {
       "path": "dist/apps/web/src/machineStateLoader.js",
-      "bytes": 1300,
-      "sha256": "43c90df4e527ab95bc72c7a6fb1d3e9d7ca1f949edf3db3779dd4dac0829def5"
+      "bytes": 1319,
+      "sha256": "30be605687395e96f6aa2ca5aee7e81a20e5ff48b3bbe3f2f997dd9a67b2fa55"
     },
     {
       "path": "dist/apps/web/src/maintenanceApi.js",
@@ -419,8 +424,8 @@
     },
     {
       "path": "dist/apps/web/src/passport/topics/workOrder.js",
-      "bytes": 24330,
-      "sha256": "88442d4c9a66f45b34880ba36f6e6b44d1e957bab60562fa5607c7462a0d443f"
+      "bytes": 33920,
+      "sha256": "493317a6fc50d380a58bd66e3e3b8281f951aade331f52e40d1c09ff32d89de2"
     },
     {
       "path": "dist/apps/web/src/passport/traceTab.js",
@@ -484,8 +489,8 @@
     },
     {
       "path": "dist/apps/web/src/productWorkspaceApi.js",
-      "bytes": 3825,
-      "sha256": "6cc1a432c622add0cffedbf5f180840634bb7aa79a85a2b6d8684b09c52426ca"
+      "bytes": 5051,
+      "sha256": "5270e4c301b1066693dc3d6d3e677796defc2a93169c852a6a79e2b9dedf4f84"
     },
     {
       "path": "dist/apps/web/src/productionApi.js",
@@ -514,8 +519,8 @@
     },
     {
       "path": "dist/apps/web/src/qualityDeskApi.js",
-      "bytes": 3067,
-      "sha256": "bb6882f391922c241ca666e3514629061547beebb205ff1d9772141df1d89f86"
+      "bytes": 3840,
+      "sha256": "74d56553b223b172bb7d99901014670157e71b9dccfef94e03fb1d4bbd1239d3"
     },
     {
       "path": "dist/apps/web/src/quotesApi.js",
@@ -544,8 +549,8 @@
     },
     {
       "path": "dist/apps/web/src/scanApi.js",
-      "bytes": 309,
-      "sha256": "229c33abf2df1c54adbfef951d2527fbb91e83026a80c4b56ba8a8afbec669cf"
+      "bytes": 528,
+      "sha256": "9cfee8418917d968706fc386c876487cd42a0185b755c659b83b12380bb70e17"
     },
     {
       "path": "dist/apps/web/src/screens/AcademyScreen.js",
@@ -684,13 +689,13 @@
     },
     {
       "path": "dist/apps/web/src/screens/IntelligenceScreen.js",
-      "bytes": 9391,
-      "sha256": "1bb6ece7aa1c845b6fa7bf5f1e8c3f9dc731b5ea8a0623bc42b70b55a8c8b18b"
+      "bytes": 9519,
+      "sha256": "6c97358a3db07c09d8c0b267fdaa2a5de344a4834e7887956d1ad7e1ac6fe782"
     },
     {
       "path": "dist/apps/web/src/screens/JobCardScreen.js",
-      "bytes": 3774,
-      "sha256": "586b40ccfe63b8252752833a43ca41d55c2a89538c37bf6831d3a8e26b7972a7"
+      "bytes": 7674,
+      "sha256": "05478c695d7611437248c816bfe10a25b88c2f522c51d5473614303f6f7e0dcb"
     },
     {
       "path": "dist/apps/web/src/screens/LabelScreen.js",
@@ -744,8 +749,8 @@
     },
     {
       "path": "dist/apps/web/src/screens/OperatorHomeScreen.js",
-      "bytes": 14971,
-      "sha256": "36f318e3e765c60fbd2f17cb9a555d828eed10c4b5a8de5212e833ca95bd26fa"
+      "bytes": 15372,
+      "sha256": "d08150b075ea336294df2879fbf063d2910ed7e120ee58c7e3bf2b2848908348"
     },
     {
       "path": "dist/apps/web/src/screens/OperatorWoCardScreen.js",
@@ -819,8 +824,8 @@
     },
     {
       "path": "dist/apps/web/src/screens/PlanningScreen.js",
-      "bytes": 14495,
-      "sha256": "f48fafe1842ceaa3dc0eee3f48985974a3f51a014cc288fa9cdb9289094c8604"
+      "bytes": 14599,
+      "sha256": "ccc7fa4d8a7b3c84cfdd002c7fe7b0f8d46ca3d68d346d4054fd8fa1bf5c9313"
     },
     {
       "path": "dist/apps/web/src/screens/ProductMasterScreen.js",
@@ -829,8 +834,8 @@
     },
     {
       "path": "dist/apps/web/src/screens/ProductWorkspaceScreen.js",
-      "bytes": 60545,
-      "sha256": "ea49e2630910ff715355db87a7a02f6e904eba40b72ce741d0c023a2694475ea"
+      "bytes": 60781,
+      "sha256": "e06fba2ec41d4eca68adbb5cc476a72a34a2ae6988f83d5ce8ae633a6752e30c"
     },
     {
       "path": "dist/apps/web/src/screens/ProductionDeskScreen.js",
@@ -859,8 +864,8 @@
     },
     {
       "path": "dist/apps/web/src/screens/QualityDeskScreen.js",
-      "bytes": 14100,
-      "sha256": "3be7d1bdfae51b333ba1ff40b2e2b310dc73f2ae0a8ad436ff82f4557d81f1f1"
+      "bytes": 17836,
+      "sha256": "5a67ad3027838a10bb060d525ecd4d9bbb05def0803d02cab526f5eaef0ab2f7"
     },
     {
       "path": "dist/apps/web/src/screens/QuotesScreen.js",
@@ -884,8 +889,8 @@
     },
     {
       "path": "dist/apps/web/src/screens/ScanScreen.js",
-      "bytes": 4489,
-      "sha256": "f0f90b7043f249f5bd3569ef72ef86542d728538d097cc31c96159e7b80e9ebb"
+      "bytes": 6293,
+      "sha256": "6ca477896ad375f1babbba4fc812ac7ac4303664c111b5fc7131c58b87fcba69"
     },
     {
       "path": "dist/apps/web/src/screens/SearchScreen.js",
@@ -894,8 +899,8 @@
     },
     {
       "path": "dist/apps/web/src/screens/ShiftPlannerScreen.js",
-      "bytes": 35304,
-      "sha256": "c6bd82da06b230315a2c56ce8b3d33795dae5d13e6a12ace909916c9d847472a"
+      "bytes": 35850,
+      "sha256": "93b06d0935b2f5181779cc844bdd4f6d9c7994d5bce9ceed8f028875481b77a9"
     },
     {
       "path": "dist/apps/web/src/screens/ShipmentScreen.js",
@@ -924,8 +929,8 @@
     },
     {
       "path": "dist/apps/web/src/screens/TerminalScreen.js",
-      "bytes": 19510,
-      "sha256": "a418eb35399fe48924b2f1ebf5d0e3155d439587aa94561fc1235ed1501384f9"
+      "bytes": 26473,
+      "sha256": "e83ed0c2f67e6b2a21c3302ffe9b8a2b3eec3e46b07672071bb4d6025897871a"
     },
     {
       "path": "dist/apps/web/src/screens/ToolReadinessScreen.js",
@@ -939,8 +944,8 @@
     },
     {
       "path": "dist/apps/web/src/screens/WorkOrderHubScreen.js",
-      "bytes": 22784,
-      "sha256": "b1ef7f027661bc4bbd58d660ade724b61dbe2e6df255b8f73fdf7fe28840d188"
+      "bytes": 23518,
+      "sha256": "ca86acabe5502975494813cb7a011acc0ef73bce16f164e7dfe5b23aa619ddc5"
     },
     {
       "path": "dist/apps/web/src/screens/WorkOrdersScreen.js",
@@ -1048,6 +1053,11 @@
       "sha256": "3869b8eafddc72d007f56011d5c3fc52f633c762b8b6c99510c1f0979183ec0b"
     },
     {
+      "path": "dist/apps/web/src/tashihCauseForm.js",
+      "bytes": 4518,
+      "sha256": "b736368d46b43cfcbd86ea15b11c1d24085c873afd6bb4d7eb51c6221859dfa3"
+    },
+    {
       "path": "dist/apps/web/src/tashihPanel.js",
       "bytes": 8558,
       "sha256": "ff512d878db061f3bd3ec1bc270f4de7ce3001c7b9e155c1fa9b1b78b00d7390"
@@ -1059,8 +1069,8 @@
     },
     {
       "path": "dist/apps/web/src/terminalApi.js",
-      "bytes": 2214,
-      "sha256": "fcf7fa3391e223e2e92598407fc3f77213f5a3405a2270d115d16a1f3ccf4e3e"
+      "bytes": 3890,
+      "sha256": "980057a56af68df5e88125d783741e5daa8b3f5b11cc3c3173e4aae88d7f83d8"
     },
     {
       "path": "dist/apps/web/src/theme.js",
@@ -1079,8 +1089,8 @@
     },
     {
       "path": "dist/apps/web/src/woReadiness.js",
-      "bytes": 4213,
-      "sha256": "2b2824e60e75626704442c40478ef6e41e462fc6be228bf00e6ef5daacd384e0"
+      "bytes": 5271,
+      "sha256": "301ed1de2b2344e7616d37aba1688e3bebee783ffd6fec90975d468e7484e3f2"
     },
     {
       "path": "dist/apps/web/src/workOrderHubApi.js",
@@ -1574,8 +1584,8 @@
     },
     {
       "path": "dist/packages/domain/src/qualityDesk.js",
-      "bytes": 6550,
-      "sha256": "be393c836fa84a59387b3cf65844aef063e1bef8d9f715236954c458e22c900f"
+      "bytes": 6721,
+      "sha256": "5b98cdf463432f3ad072c0eaa45fb68d6f4b97bd564a9cf87c9105a825eba93e"
     },
     {
       "path": "dist/packages/domain/src/qualityHold.js",
@@ -1604,8 +1614,8 @@
     },
     {
       "path": "dist/packages/domain/src/scan.js",
-      "bytes": 2400,
-      "sha256": "2a074ca4cc0fd20cc104cf93b87097e0027c72cbed1826a11c548f203362ddf8"
+      "bytes": 2406,
+      "sha256": "0a07e18ec7d38e9325faf882e7ba554de75c107a06e34b7fd7491a672cc6ba7e"
     },
     {
       "path": "dist/packages/domain/src/semanticColors.js",
@@ -1631,6 +1641,11 @@
       "path": "dist/packages/domain/src/stock.js",
       "bytes": 2588,
       "sha256": "267f2ecf4e30db36cc9f6c14b9c029a76ab677c68e1317335294287283f00678"
+    },
+    {
+      "path": "dist/packages/domain/src/tashihCause.js",
+      "bytes": 2509,
+      "sha256": "171af7c7c754b70d87a50680a8e39add287f18983fd49be44e604611fc58ecaf"
     },
     {
       "path": "dist/packages/domain/src/tashihDeclaration.js",

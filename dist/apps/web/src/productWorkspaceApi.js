@@ -35,4 +35,20 @@ export function createProductWorkspaceApi(client, session) {
     };
 }
 export const jobCardFor = (client, session, wo) => client.rpc('job_card', { p_wo: wo }, session);
+/** KMI-013 (0124): operation QR through the central scan log (operation_scan). Until 0124 is applied the old non-logging check answers instead — the screen never breaks. Refusals come back as ok:false answers. */
+export async function scanCheckLogged(client, session, input, wo, requestId) {
+    try {
+        const r = await client.rpc('operation_scan', { p_input: input, p_work_order: wo, p_source: 'MANUAL', p_client_request_id: requestId }, session);
+        if (!r.ok)
+            throw new Error(`${r.code ?? 'OPERATION_SCAN_UNKNOWN'}: ${r.message ?? ''}`);
+        return { ok: true, operationId: r.operationId ?? '', workOrderId: r.workOrderId ?? '', opCode: r.opCode ?? '', name: r.name ?? '', status: r.status ?? '', routingVersionNo: r.routingVersionNo ?? null, logged: true };
+    }
+    catch (e) {
+        if (/PGRST202|42883|Could not find the function|does not exist|schema cache/i.test(String(e instanceof Error ? e.message : e)) && /operation_scan/i.test(String(e instanceof Error ? e.message : e)) && !/OPERATION_SCAN_|OPERATION_NOT_FOUND/.test(String(e))) {
+            const o = await scanCheck(client, session, input, wo);
+            return { ...o, logged: false };
+        }
+        throw e;
+    }
+}
 export const scanCheck = (client, session, input, wo) => client.rpc('operation_scan_check', { p_input: input, p_work_order: wo }, session);
