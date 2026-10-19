@@ -20,9 +20,26 @@ export async function loadTasks(client, session) {
         return floor.manual.filter((t) => t.status === 'COMPLETED').map((t) => ({ id: t.id, title: t.title, status: t.status, completedAt: null, dueAt: t.dueAt, ownerLabel: t.ownerLabel, completedByMe: !!t.completedByMe }));
     }
 }
+/** KMI-HOTFIX-109: tickets waiting in TEST_PENDING + the newest authorised test result recorded after they entered TEST_PENDING (the same rule return_machine_to_service uses). A source that cannot be read is reported, never shown as "nothing pending". */
+export async function loadMaintenanceTests(client, session) {
+    const tickets = await client.select('maintenance_tickets', { columns: 'id,machine_id,kind,reason,status,created_at,updated_at', filters: { status: 'eq.TEST_PENDING' }, order: 'updated_at.asc', limit: 200 }, session);
+    if (!tickets.length)
+        return [];
+    const ids = tickets.map((t) => t.id);
+    const mids = [...new Set(tickets.map((t) => t.machineId))];
+    const [machines, results] = await Promise.all([
+        client.select('machines', { columns: 'id,code,status', filters: { id: inList(mids) } }, session),
+        client.select('maintenance_test_results', { columns: 'ticket_id,result,tested_at,seq', filters: { ticket_id: inList(ids) }, order: 'seq.desc', limit: 1000 }, session),
+    ]);
+    const mById = new Map(machines.map((m) => [m.id, m]));
+    return tickets.map((t) => {
+        const last = results.find((r) => r.ticketId === t.id && (!t.updatedAt || r.testedAt > t.updatedAt));
+        return { ...t, machineCode: mById.get(t.machineId)?.code ?? null, machineStatus: mById.get(t.machineId)?.status ?? null, lastResult: last ? last.result : null };
+    });
+}
 const msg = (e) => (e instanceof Error ? e.message : String(e));
 export function createApprovalsInboxApi(client, session, opts = {}) {
-    const on = { commercial: opts.sources?.commercial ?? true, requests: opts.sources?.requests ?? true, orders: opts.sources?.orders ?? true, hist: !opts.light };
+    const on = { commercial: opts.sources?.commercial ?? true, requests: opts.sources?.requests ?? true, orders: opts.sources?.orders ?? true, maintenance: opts.sources?.maintenance ?? true, hist: !opts.light };
     const now = opts.now ?? (() => Date.now());
     const includeTasks = opts.includeTasks ?? true;
     return {
@@ -36,11 +53,12 @@ export function createApprovalsInboxApi(client, session, opts = {}) {
                 return [];
             } };
             const sinceIso = new Date(now() - HISTORY_DAYS * 86_400_000).toISOString();
-            const [commercial, purchaseRequests, purchaseOrders, tasks, decidedC, decidedR, approvedPO, rejectedPO] = await Promise.all([
+            const [commercial, purchaseRequests, purchaseOrders, tasks, maintenance, decidedC, decidedR, approvedPO, rejectedPO] = await Promise.all([
                 on.commercial ? safe('COMMERCIAL_DECISION', client.select('commercial_approvals', { columns: 'id,stock_lot_id,status,requested_by,requested_at,management_released_at', filters: { status: 'eq.PENDING' }, order: 'requested_at.asc', limit: 500 }, session)) : Promise.resolve([]),
                 on.requests ? safe('PURCHASE_REQUEST', client.select('purchase_requests', { columns: 'id,material_code,qty,needed_by,reason,status,requested_by,requested_at,source_work_order_id', filters: { status: 'eq.SUBMITTED' }, order: 'requested_at.asc', limit: 500 }, session)) : Promise.resolve([]),
                 on.orders ? safe('PURCHASE_ORDER', client.select('purchase_orders', { columns: 'id,supplier_id,status,created_by,created_at,updated_at', filters: { status: 'eq.SUBMITTED' }, order: 'created_at.asc', limit: 500 }, session)) : Promise.resolve([]),
                 safe('TASK_COMPLETION', includeTasks ? loadTasks(client, session) : Promise.resolve([])),
+                on.maintenance ? safe('MAINTENANCE_TEST', loadMaintenanceTests(client, session)) : Promise.resolve([]),
                 on.hist && on.commercial ? safe('HISTORY', client.select('commercial_approvals', { columns: 'id,stock_lot_id,status,decided_at,decided_by,decision_reason', filters: { status: 'in.(APPROVED,REJECTED)', decided_at: `gte.${sinceIso}` }, order: 'decided_at.desc', limit: 100 }, session)) : Promise.resolve([]),
                 on.hist && on.requests ? safe('HISTORY', client.select('purchase_requests', { columns: 'id,material_code,qty,status,decided_at,decided_by,decision_reason,source_work_order_id', filters: { status: 'in.(APPROVED,REJECTED)', decided_at: `gte.${sinceIso}` }, order: 'decided_at.desc', limit: 100 }, session)) : Promise.resolve([]),
                 on.hist && on.orders ? safe('HISTORY', client.select('purchase_orders', { columns: 'id,supplier_id,status,updated_at', filters: { status: 'eq.APPROVED', updated_at: `gte.${sinceIso}` }, order: 'updated_at.desc', limit: 100 }, session)) : Promise.resolve([]),
@@ -48,12 +66,12 @@ export function createApprovalsInboxApi(client, session, opts = {}) {
                 on.hist && on.orders ? client.select('purchase_orders', { columns: 'id,supplier_id,status,updated_at,rejection_reason,rejected_by,rejected_at', filters: { status: 'eq.CANCELLED', rejection_reason: 'not.is.null', rejected_at: `gte.${sinceIso}` }, order: 'rejected_at.desc', limit: 100 }, session).catch(() => []) : Promise.resolve([]),
             ]);
             // Every canonical source failed (typically: connection lost / server unreachable). That is NOT "nothing pending": fail the load so the screen shows one clear error with a retry.
-            const coreKinds = [...(on.commercial ? ['COMMERCIAL_DECISION'] : []), ...(on.requests ? ['PURCHASE_REQUEST'] : []), ...(on.orders ? ['PURCHASE_ORDER'] : []), ...(includeTasks ? ['TASK_COMPLETION'] : [])];
+            const coreKinds = [...(on.commercial ? ['COMMERCIAL_DECISION'] : []), ...(on.requests ? ['PURCHASE_REQUEST'] : []), ...(on.orders ? ['PURCHASE_ORDER'] : []), ...(includeTasks ? ['TASK_COMPLETION'] : []), ...(on.maintenance ? ['MAINTENANCE_TEST'] : [])];
             if (coreKinds.length && coreKinds.every((k) => errors[k] !== undefined))
                 throw new Error(errors[coreKinds[0]]);
             if (opts.light) { // count only (Home): same sources, same buildInbox rule, no label / link hops, no history
                 const none = () => null;
-                return { items: buildInbox({ commercial, purchaseRequests, purchaseOrders, tasks, lotLabel: none, supplierLabel: none, userLabel: none, relatedLinks: () => [] }, now()), history: [], historyDays: HISTORY_DAYS, sourceErrors: errors, asOf: new Date(now()).toISOString() };
+                return { items: buildInbox({ commercial, purchaseRequests, purchaseOrders, tasks, maintenance, lotLabel: none, supplierLabel: none, userLabel: none, relatedLinks: () => [] }, now()), history: [], historyDays: HISTORY_DAYS, sourceErrors: errors, asOf: new Date(now()).toISOString() };
             }
             const decidedPO = [...approvedPO, ...rejectedPO];
             const lotIds = [...new Set([...commercial.map((c) => c.stockLotId), ...decidedC.map((c) => c.stockLotId)])];
@@ -138,7 +156,7 @@ export function createApprovalsInboxApi(client, session, opts = {}) {
             };
             const common = { lotLabel: (id) => lotLabels.get(id) ?? null, supplierLabel: (id) => supplierNames.get(id) ?? null, userLabel: (id) => userNames.get(id) ?? null, relatedLinks };
             return {
-                items: buildInbox({ commercial, purchaseRequests, purchaseOrders, tasks, ...common }, now()),
+                items: buildInbox({ commercial, purchaseRequests, purchaseOrders, tasks, maintenance, ...common }, now()),
                 history: buildHistory({ commercial: decidedC, purchaseRequests: decidedR, purchaseOrders: decidedPO, ...common }),
                 historyDays: HISTORY_DAYS, sourceErrors: errors, asOf: new Date(now()).toISOString(),
             };

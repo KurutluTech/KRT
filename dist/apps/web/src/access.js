@@ -7,7 +7,7 @@ export const OPEN_RULES = {
     '/alacaklar': { any: ['ACCOUNTING_MUTATION'], economics: true },
     '/uretim': { any: ['WORK_ORDER_ASSIGN_MACHINE', 'WORK_ORDER_MULTI_MACHINE_ASSIGN', 'MANAGEMENT_RELEASE'], roles: ['ADMIN', 'MANAGEMENT'] },
     // KMI-004: a quality user sees HIS OWN gates (first piece, HOLD release) here — decided at their own screen; commercial / purchasing / task sources are loaded only for holders of those actions (sourcesFor).
-    '/onaylar': { any: ['MANAGEMENT_RELEASE', 'COMMERCIAL_RELEASE', 'PURCHASING_APPROVE', 'TASK_MANAGE', 'FIRST_PIECE_APPROVE', 'QUALITY_HOLD_RELEASE'], roles: ['ADMIN', 'MANAGEMENT'] },
+    '/onaylar': { any: ['MANAGEMENT_RELEASE', 'COMMERCIAL_RELEASE', 'PURCHASING_APPROVE', 'TASK_MANAGE', 'FIRST_PIECE_APPROVE', 'QUALITY_HOLD_RELEASE', 'MAINTENANCE_TEST_RELEASE'], roles: ['ADMIN', 'MANAGEMENT'] },
     '/yonetim': { any: ['MANAGEMENT_RELEASE', 'COMMERCIAL_RELEASE', 'PURCHASING_APPROVE', 'TASK_MANAGE'], roles: ['ADMIN', 'MANAGEMENT'] },
     '/onay-kuyrugu': { any: ['COMMERCIAL_RELEASE', 'MANAGEMENT_RELEASE', 'ACCOUNTING_MUTATION', 'SHIPMENT_MANAGE'] },
     '/muhasebe': { any: ['ACCOUNTING_MUTATION'], economics: true },

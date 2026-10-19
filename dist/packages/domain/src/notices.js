@@ -19,13 +19,13 @@ const WHY_ACTION = {
     INCOMING_QC_WAITING: { why: 'Giriş kalite kararı bekleyen mal depoya alınamaz.', action: 'Giriş kalite kararını ver.' },
     PURCHASE_REQUEST_WAITING: { why: 'Onay bekleyen talep malzeme tedarikini geciktirir.', action: 'Talebi onayla veya reddet.' },
 };
-const DECIDER_OF_KIND = { COMMERCIAL_MGMT_RELEASE: 'Yönetim', COMMERCIAL_DECISION: 'Muhasebe / Ticari onay', PURCHASE_REQUEST: 'Satınalma onayı', PURCHASE_ORDER: 'Satınalma onayı', TASK_COMPLETION: 'Görevi atayan yönetici' };
+const DECIDER_OF_KIND = { COMMERCIAL_MGMT_RELEASE: 'Yönetim', COMMERCIAL_DECISION: 'Muhasebe / Ticari onay', PURCHASE_REQUEST: 'Satınalma onayı', PURCHASE_ORDER: 'Satınalma onayı', TASK_COMPLETION: 'Görevi atayan yönetici', MAINTENANCE_TEST: 'Bakım (yetkili test)', MAINTENANCE_RELEASE: 'Bakım (yetkili test)' };
 /** One canonical object name across the sources: lower-case, singular, no table prefix. */
 export function objectKeyOf(type, id) {
     const t = type.toLowerCase().replace(/^kmi_next\./, '').replace(/ies$/, 'y').replace(/s$/, '').replace(/[\s-]+/g, '_');
     return `${t}:${id ?? 'none'}`;
 }
-const APPROVAL_OBJECT = { COMMERCIAL_MGMT_RELEASE: 'commercial_approval', COMMERCIAL_DECISION: 'commercial_approval', PURCHASE_REQUEST: 'purchase_request', PURCHASE_ORDER: 'purchase_order', TASK_COMPLETION: 'task' };
+const APPROVAL_OBJECT = { COMMERCIAL_MGMT_RELEASE: 'commercial_approval', COMMERCIAL_DECISION: 'commercial_approval', PURCHASE_REQUEST: 'purchase_request', PURCHASE_ORDER: 'purchase_order', TASK_COMPLETION: 'task', MAINTENANCE_TEST: 'maintenance_ticket', MAINTENANCE_RELEASE: 'maintenance_ticket' };
 export function noticesFromAlerts(alerts) {
     return alerts.map((a) => {
         const meta = ALERT_KINDS[a.kind];

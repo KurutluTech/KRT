@@ -4,6 +4,8 @@ export const KIND_LABEL = {
     PURCHASE_REQUEST: 'Satınalma talebi',
     PURCHASE_ORDER: 'Satınalma siparişi',
     TASK_COMPLETION: 'Görev tamamlama onayı',
+    MAINTENANCE_TEST: 'Bakım · yetkili test sonucu',
+    MAINTENANCE_RELEASE: 'Bakım · üretime dönüş (serbest bırakma)',
 };
 /** Which critical action the SERVER checks for each step (display + pre-check only; the RPC is the authority). */
 export const KIND_ACTION = {
@@ -12,6 +14,8 @@ export const KIND_ACTION = {
     PURCHASE_REQUEST: 'PURCHASING_APPROVE',
     PURCHASE_ORDER: 'PURCHASING_APPROVE',
     TASK_COMPLETION: 'TASK_MANAGE',
+    MAINTENANCE_TEST: 'MAINTENANCE_TEST_RELEASE',
+    MAINTENANCE_RELEASE: 'MAINTENANCE_TEST_RELEASE',
 };
 /** Canonical RPC per kind+decision. `null` = that decision does not exist in the canonical workflow (the button is not offered). */
 export const KIND_RPC = {
@@ -20,9 +24,12 @@ export const KIND_RPC = {
     PURCHASE_REQUEST: { APPROVE: 'decide_purchase_request', REJECT: 'decide_purchase_request' },
     PURCHASE_ORDER: { APPROVE: 'approve_purchase_order', REJECT: 'reject_purchase_order' }, // reject = the decision door of draft 0092 (reason required on the server); the generic cancel is closed for SUBMITTED orders
     TASK_COMPLETION: { APPROVE: 'approve_task', REJECT: 'reopen_task' },
+    // KMI-HOTFIX-109: the maintenance test is decided by the EXISTING canonical RPCs (they re-check MAINTENANCE_TEST_RELEASE, TEST_PENDING and write the audit row).
+    MAINTENANCE_TEST: { APPROVE: 'record_maintenance_test_result', REJECT: 'record_maintenance_test_result' },
+    MAINTENANCE_RELEASE: { APPROVE: 'return_machine_to_service', REJECT: null },
 };
 export const REJECT_LABEL = {
-    COMMERCIAL_MGMT_RELEASE: 'Reddet', COMMERCIAL_DECISION: 'Reddet', PURCHASE_REQUEST: 'Reddet', PURCHASE_ORDER: 'Reddet (iptal)', TASK_COMPLETION: 'Geri aç',
+    COMMERCIAL_MGMT_RELEASE: 'Reddet', COMMERCIAL_DECISION: 'Reddet', PURCHASE_REQUEST: 'Reddet', PURCHASE_ORDER: 'Reddet (iptal)', TASK_COMPLETION: 'Geri aç', MAINTENANCE_TEST: 'Test KALDI', MAINTENANCE_RELEASE: 'Reddet',
 };
 export const PRIORITY_RANK = { KRITIK: 0, YUKSEK: 1, NORMAL: 2, BILINMIYOR: 3 };
 export const PRIORITY_LABEL = { KRITIK: 'KRİTİK', YUKSEK: 'YÜKSEK', NORMAL: 'NORMAL', BILINMIYOR: 'BİLİNMİYOR' };
@@ -93,6 +100,15 @@ export function buildInbox(src, nowMs) {
         out.push({ ...build('TASK_COMPLETION', t.id, t.title, null, t.ownerLabel, t.completedAt, t.dueAt ? t.dueAt.slice(0, 10) : null, t.completedByMe, `#/gorevler`, nowMs, src.userLabel),
             facts: [...(t.completedByLabel ? [{ label: 'Tamamlayan', value: t.completedByLabel }] : []), ...(t.completionNote ? [{ label: 'Tamamlama notu', value: t.completionNote }] : [])] });
     }
+    for (const m of src.maintenance ?? []) {
+        if (m.status !== 'TEST_PENDING')
+            continue;
+        const mc = m.machineCode ? `Makine ${m.machineCode}` : `Makine ${shortId(m.machineId)}`;
+        const passed = m.lastResult === 'PASS';
+        // one ticket is exactly ONE open step: no PASS yet -> the test decision; PASS recorded -> the release (never both, never twice)
+        out.push({ ...build(passed ? 'MAINTENANCE_RELEASE' : 'MAINTENANCE_TEST', m.id, `${mc} · ${m.reason}`, null, null, m.updatedAt ?? m.createdAt, null, false, `#/bakim`, nowMs, src.userLabel, src.relatedLinks?.(passed ? 'MAINTENANCE_RELEASE' : 'MAINTENANCE_TEST', m.id) ?? []), machineId: m.machineId,
+            facts: [{ label: 'Makine', value: mc }, { label: 'Bakım kaydı', value: `${shortId(m.id)} · ${m.kind === 'FAULT' ? 'Arıza' : m.kind === 'PLANNED' ? 'Planlı bakım' : m.kind}` }, { label: 'Neden', value: m.reason }, { label: 'Adım', value: passed ? 'Test GEÇTİ · makineyi üretime döndür' : 'Yetkili test sonucu bekleniyor (GEÇTİ / KALDI)' }, ...(m.machineStatus ? [{ label: 'Makine durumu', value: m.machineStatus }] : [])] });
+    }
     return out.sort((a, b) => PRIORITY_RANK[a.priority] - PRIORITY_RANK[b.priority] || (b.waitingHours ?? -1) - (a.waitingHours ?? -1) || a.key.localeCompare(b.key));
 }
 /** Pre-check for the buttons. The server re-checks everything; this only avoids offering an action that is certain to be refused. */
@@ -124,6 +140,8 @@ export function rpcCall(item, decision, reason) {
         case 'PURCHASE_REQUEST': return { fn, params: { p_request_id: item.recordId, p_decision: decision === 'APPROVE' ? 'APPROVED' : 'REJECTED', p_reason: r } };
         case 'PURCHASE_ORDER': return decision === 'APPROVE' ? { fn, params: { p_purchase_order_id: item.recordId } } : { fn, params: { p_purchase_order_id: item.recordId, p_reason: r } };
         case 'TASK_COMPLETION': return decision === 'APPROVE' ? { fn, params: { p_task_id: item.recordId, p_note: r } } : { fn, params: { p_task_id: item.recordId, p_reason: r } };
+        case 'MAINTENANCE_TEST': return { fn, params: { p_ticket_id: item.recordId, p_result: decision === 'APPROVE' ? 'PASS' : 'FAIL', p_notes: r } };
+        case 'MAINTENANCE_RELEASE': return { fn, params: { p_machine_id: item.machineId ?? '', p_reason: r } };
     }
 }
 /** Turkish summary of what the canonical process does NEXT after this step (shown to the approver before they click). */
@@ -134,6 +152,8 @@ export function nextStepText(item, decision) {
         case 'PURCHASE_REQUEST': return decision === 'APPROVE' ? 'Talep ONAYLANIR; satınalma bunu fiyatlı siparişe çevirebilir.' : 'Talep REDDEDİLİR; siparişe çevrilemez.';
         case 'PURCHASE_ORDER': return decision === 'APPROVE' ? 'Sipariş ONAYLANIR; tedarikçiye gönderilebilir.' : 'Sipariş İPTAL edilir (CANCELLED).';
         case 'TASK_COMPLETION': return decision === 'APPROVE' ? 'Görev ONAYLANIR ve kapanır.' : 'Görev yeniden açılır (devam ediyor); tamamlayan kişiye döner.';
+        case 'MAINTENANCE_TEST': return decision === 'APPROVE' ? 'Test GEÇTİ olarak kaydedilir. Makine HENÜZ üretime dönmez; bir sonraki adım olarak “üretime dönüş” onayı açılır.' : 'Test KALDI olarak kaydedilir; bakım kaydı onarıma geri döner, makine üretime dönemez.';
+        case 'MAINTENANCE_RELEASE': return 'Makine SERVİSE DÖNER (kullanılabilir); bakım kaydı “servise döndü” olur. Üretim bundan sonra normal kurallarla başlar.';
     }
 }
 export const OUTCOME_LABEL = { APPROVED: 'ONAYLANDI', REJECTED: 'REDDEDİLDİ' };

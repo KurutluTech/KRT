@@ -104,6 +104,7 @@ const BUSINESS_TR = [
     [/^MANAGEMENT_RELEASE_ALREADY_GIVEN$/, 'Yönetim serbest bırakması bu talep için zaten verilmiş.'],
     [/^SELF_APPROVAL_FORBIDDEN$/, 'Kendi tamamladığınız görevi kendiniz onaylayamazsınız.'],
     [/^(?:REASON_REQUIRED|NOTE_REQUIRED|REJECT_REASON_REQUIRED|TEST_NOTES_REQUIRED)$/, 'Gerekçe zorunludur (en az 5 karakter; boşluk ve görünmez karakterler sayılmaz). Hiçbir kayıt değişmedi.'],
+    [/^TEST_ALREADY_PASSED$/, 'Bu bakım kaydının testi zaten GEÇTİ olarak kaydedildi; sıradaki adım makineyi üretime döndürmektir. Hiçbir kayıt değişmedi.'],
     [/^ILLEGAL_TRANSITION|^ILLEGAL_TASK_TRANSITION|^APPROVAL_REQUIRES_SUBMITTED_STATUS/, 'Kaydın durumu bu işleme uygun değil (başka biri değiştirmiş olabilir). Liste yenilendi.'],
     [/^SHIPPING_STATUS_IS_DERIVED$/, 'Sevkiyat durumu elle değiştirilmez; sevk edilen partilerden otomatik belirlenir.'],
     [/^OVER_SHIPMENT/, 'Sipariş miktarından fazla sevk edilemez.'],

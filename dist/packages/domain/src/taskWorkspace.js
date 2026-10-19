@@ -36,12 +36,12 @@ export function derivedToItem(d, nowMs) {
     const tier = derivedTaskTier(d, nowMs);
     const sla = evaluateSla({ status: 'OPEN', dueAt: d.due, createdAt: null, nowMs });
     const mineToDecide = d.role !== 'OPERATOR'; // an operator waits for the first-piece decision; the quality role takes it
-    const decision = !mineToDecide ? null : d.status === 'FIRST_PIECE_PENDING' ? 'İlk parça onayı kararı' : d.status === 'PENDING' ? 'Onay kararı' : null;
+    const decision = !mineToDecide ? null : d.status === 'FIRST_PIECE_PENDING' ? 'İlk parça onayı kararı' : d.status === 'PENDING' ? 'Onay kararı' : d.sourceType === 'MAINTENANCE_TICKET' && d.status === 'TEST_PENDING' ? 'Yetkili test sonucu kararı' : null;
     const blocked = d.status === 'ON_HOLD';
     const state = decision ? 'AWAITING_DECISION' : blocked ? 'BLOCKED' : d.status === 'IN_PROGRESS' ? 'IN_PROGRESS' : 'OPEN';
     const route = d.route.startsWith('#') ? d.route : `#${d.route}`;
     return {
-        id: `rec:${d.sourceType}:${d.sourceId}`, origin: 'RECORD', taskId: null, title: d.title, description: null, type: d.sourceType, typeLabel: 'Kayıttan gelen iş',
+        id: `rec:${d.sourceType}:${d.sourceId}`, origin: 'RECORD', taskId: null, title: d.sourceType === 'MAINTENANCE_TICKET' && d.status === 'TEST_PENDING' ? `Yetkili test onayı bekliyor — ${d.title.replace(/^Bakım:\s*/, '')}` : d.title, description: null, type: d.sourceType, typeLabel: 'Kayıttan gelen iş',
         source: { type: d.sourceType, id: d.sourceId, label: srcLabel(d.sourceType, d.sourceId) }, sourceRoute: route,
         assigneeLabel: roleTr(d.role), assigneeRole: d.role, mine: true, ownerLabel: null, department: DEPT_OF_ROLE[d.role] ?? DEPT_OF_SOURCE[d.sourceType] ?? null,
         tier, tierLabel: TIER_LABEL_TR[tier], actionable: true, state, stateLabel: derivedStatusTr(d.status), late: sla.state === 'OVERDUE', dueIso: d.due, createdIso: null, startsIso: null, waitingMin: null,

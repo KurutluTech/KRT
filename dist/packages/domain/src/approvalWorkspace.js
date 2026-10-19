@@ -2,7 +2,7 @@ import { actionState, KIND_ACTION, KIND_LABEL, nextStepText, OUTCOME_LABEL, prio
 export const GATE_ACTION = { FIRST_PIECE_APPROVAL: 'FIRST_PIECE_APPROVE', QUALITY_HOLD_RELEASE: 'QUALITY_HOLD_RELEASE' };
 export const ROW_KIND_LABEL = { ...KIND_LABEL, FIRST_PIECE_APPROVAL: 'Kalite · ilk parça onayı', QUALITY_HOLD_RELEASE: 'Kalite · HOLD kaldırma' };
 export const DEPT_OF = {
-    COMMERCIAL_MGMT_RELEASE: 'Yönetim', COMMERCIAL_DECISION: 'Muhasebe', PURCHASE_REQUEST: 'Satınalma', PURCHASE_ORDER: 'Satınalma', TASK_COMPLETION: 'Yönetim', FIRST_PIECE_APPROVAL: 'Kalite', QUALITY_HOLD_RELEASE: 'Kalite',
+    COMMERCIAL_MGMT_RELEASE: 'Yönetim', COMMERCIAL_DECISION: 'Muhasebe', PURCHASE_REQUEST: 'Satınalma', PURCHASE_ORDER: 'Satınalma', TASK_COMPLETION: 'Yönetim', MAINTENANCE_TEST: 'Bakım', MAINTENANCE_RELEASE: 'Bakım', FIRST_PIECE_APPROVAL: 'Kalite', QUALITY_HOLD_RELEASE: 'Kalite',
 };
 /** Q3 "why is a decision needed" — the workflow rule behind the gate, in the words of the floor. */
 export const WHY = {
@@ -11,6 +11,8 @@ export const WHY = {
     PURCHASE_REQUEST: 'Malzeme talebi, satınalma onayı olmadan siparişe çevrilemez.',
     PURCHASE_ORDER: 'Sipariş, tedarikçiye gönderilmeden önce satınalma onayı ister.',
     TASK_COMPLETION: 'Tamamlayan kişi kendi işini onaylayamaz (dört göz); işin kapanması için ikinci bir yetkili gerekir.',
+    MAINTENANCE_TEST: 'Bakım bitti; makine yetkili test sonucu olmadan üretime dönemez (GEÇTİ / KALDI kaydı gerekir).',
+    MAINTENANCE_RELEASE: 'Test GEÇTİ; makinenin üretime dönmesi ayrı bir serbest bırakma kararıdır.',
     FIRST_PIECE_APPROVAL: 'Seri üretime geçmeden önce ilk parçanın kalite onayı gerekir.',
     QUALITY_HOLD_RELEASE: 'Kalite HOLD açık; kaldırmak ayrı yetki ve gerekçe ister (Kalite PASS, HOLD kaldırmanın yerine geçmez).',
 };
@@ -21,6 +23,8 @@ export const IF_WAITING = {
     PURCHASE_REQUEST: 'Malzeme tedariki başlamaz; ilgili iş emri malzeme bekleyebilir.',
     PURCHASE_ORDER: 'Sipariş tedarikçiye gönderilemez; teslim tarihi kayar.',
     TASK_COMPLETION: 'Görev "onay bekliyor" durumunda kalır, kapanmaz.',
+    MAINTENANCE_TEST: 'Makine bakımda kalır; üretime dönemez, ilgili iş emirleri bekler.',
+    MAINTENANCE_RELEASE: 'Makine test geçmesine rağmen bakımda kalır; üretime dönemez.',
     FIRST_PIECE_APPROVAL: 'İş emri ilk parça beklemesinde kalır; seri üretim ve sonraki serbest bırakma kapıları açılmaz.',
     QUALITY_HOLD_RELEASE: 'Parti / iş emri HOLD’da kalır; sonraki kapılar (üretim, sevkiyat) açılmaz.',
 };
@@ -116,5 +120,5 @@ export function facetsAp(rows) {
 /** Which sources a person may read for decisions (Onaylarım shows only the person's own decisions — no commercial / management data for someone who cannot decide on it). */
 export function sourcesFor(held) {
     const has = (k) => held.has(KIND_ACTION[k]);
-    return { commercial: has('COMMERCIAL_MGMT_RELEASE') || has('COMMERCIAL_DECISION') || held.has('COMMERCIAL_RELEASE'), requests: has('PURCHASE_REQUEST'), orders: has('PURCHASE_ORDER'), tasks: has('TASK_COMPLETION') };
+    return { commercial: has('COMMERCIAL_MGMT_RELEASE') || has('COMMERCIAL_DECISION') || held.has('COMMERCIAL_RELEASE'), requests: has('PURCHASE_REQUEST'), orders: has('PURCHASE_ORDER'), tasks: has('TASK_COMPLETION'), maintenance: has('MAINTENANCE_TEST') };
 }

@@ -385,7 +385,7 @@ export const ROUTES = [
             const hasGate = held.includes('FIRST_PIECE_APPROVE') || held.includes('QUALITY_HOLD_RELEASE');
             const view = ['PENDING', 'CRITICAL', 'OVERDUE', 'DONE'].find((v) => v === q.get('v'));
             return renderApprovalsScreen(el, {
-                api: createApprovalsInboxApi(c, s, { includeTasks: src.tasks, sources: { commercial: src.commercial, requests: src.requests, orders: src.orders } }), held,
+                api: createApprovalsInboxApi(c, s, { includeTasks: src.tasks, sources: { commercial: src.commercial, requests: src.requests, orders: src.orders, maintenance: src.maintenance } }), held,
                 ...(hasGate ? { gates: async () => (await tf.floor('MINE')).derived.map((d) => ({ sourceType: d.sourceType, sourceId: d.sourceId, title: d.title, status: d.status, due: d.due ?? null, route: d.route ?? null })) } : {}),
                 ...(src.tasks ? { taskDetail: { history: (id) => tf.history(id), evidence: (id) => tf.evidence(id), content: (v) => tf.evidenceContent(v) } } : {}),
             }, { ...(q.get('k') ? { focus: q.get('k') } : {}), ...(view ? { view } : {}) });
