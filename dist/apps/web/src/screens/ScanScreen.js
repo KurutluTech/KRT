@@ -9,6 +9,7 @@ import { canOpenPassport, passportHref } from '../passport/registry.js';
 /** scan type → passport kind. PO has no passport (KMI-081 owns that); TASK labels open the task itself. */
 const SCAN_TO_KIND = { WO: 'WORK_ORDER', LOT: 'STOCK_LOT', TOOL: 'TOOL', MACHINE: 'MACHINE', SHIP: 'SHIPMENT' };
 const LABEL = {
+    OP: 'Operasyon',
     WO: 'İş emri',
     LOT: 'Stok lotu',
     TOOL: 'Takım',
@@ -17,6 +18,8 @@ const LABEL = {
     PO: 'Satınalma siparişi',
     ASSET: 'Varlık',
 };
+let lastOpRaw = '';
+let lastOpAt = 0;
 export function renderScanScreen(container, api, last, opts = {}) {
     const input = h('input', { type: 'text', 'data-testid': 'scan-input', placeholder: 'QR / barkod okutun veya yazın' });
     const cameraSupported = typeof globalThis.BarcodeDetector === 'function';
@@ -34,6 +37,19 @@ export function renderScanScreen(container, api, last, opts = {}) {
             return;
         }
         try {
+            // KMI-013 (0124): an operation QR goes through operation_scan (central log, visibility rule, no authority). The same raw value within 3 s is not processed twice.
+            if (parsed.kind === 'KMI' && parsed.type === 'OP' && api.operation) {
+                const now = Date.now();
+                if (raw.trim() === lastOpRaw && now - lastOpAt < 3000) {
+                    renderScanScreen(container, api, { error: 'Aynı kod az önce okutuldu — tekrar işlenmedi.' }, { access: opts.access });
+                    return;
+                }
+                lastOpRaw = raw.trim();
+                lastOpAt = now;
+                const op = await api.operation(raw.trim(), source, `ui-scan-${now}`);
+                renderScanScreen(container, api, { op }, { access: opts.access });
+                return;
+            }
             const result = await api.record(raw.trim(), parsed.kind === 'KMI' ? parsed.type : null, parsed.kind === 'KMI' ? parsed.ref : null, source, `ui-scan-${Date.now()}`);
             renderScanScreen(container, api, { result }, { access: opts.access });
         }
@@ -46,7 +62,13 @@ export function renderScanScreen(container, api, last, opts = {}) {
             void submit('SCANNER');
     });
     let resultNode = null;
-    if (last?.error)
+    if (last?.op) {
+        const o = last.op;
+        resultNode = o.ok
+            ? h('div', {}, h('div', { 'data-testid': 'scan-result', 'data-resolution': 'RESOLVED', 'data-scan-type': 'OP' }, `Operasyon bulundu: ${o.opCode} ${o.name} · ${o.status}`), h('div', { class: 'mut', 'data-testid': 'scan-op-note' }, 'QR yalnızca kimliktir — işlem başlatmaz. Başlatmak için iş kartından/terminalden açık, yetkili işlem yapın.'), h('a', { href: `#/is-karti?is=${o.workOrderId}&op=${o.operationId}`, 'data-testid': 'scan-open-opcard', style: 'display:inline-flex;align-items:center;min-height:44px;margin-top:8px;padding:0 14px;border:1px solid #1d4ed8;border-radius:10px;color:#1d4ed8;font-weight:700;text-decoration:none' }, 'İş kartında aç →'))
+            : h('div', { 'data-testid': 'scan-error', 'data-code': o.code ?? '' }, o.message ?? 'Operasyon kodu doğrulanamadı');
+    }
+    else if (last?.error)
         resultNode = h('div', { 'data-testid': 'scan-error' }, last.error);
     else if (last?.result) {
         const r = last.result;

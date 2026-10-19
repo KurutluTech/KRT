@@ -62,7 +62,7 @@ export async function renderQualityDesk(container, api, o) {
             case 'QC': return [note, btn('Kalite uygun', 'ok', 'QC', () => void act(() => api.qc(it.ref.opId, 'PASS', n()), 'Kalite kontrol: uygun.'), 'qd-qc-pass'),
                 btn('Uygun değil (HOLD açılır)', 'bad', 'QC', () => { if (!reasonOk(n()))
                     return refuse(`Uygunsuzluk gerekçesi en az ${QD_MIN_REASON} karakter olmalı.`); void act(() => api.qc(it.ref.opId, 'FAIL', n()), 'Kalite kontrol: uygun değil — bekletme açıldı.'); }, 'qd-qc-fail')];
-            case 'NCR': return [note, ...(it.ncrNext ?? []).map((to) => btn(NCR_MOVE_TR[to], to === 'SCRAPPED' ? 'bad' : to === 'ACCEPTED' ? 'ok' : '', 'NCR', () => { if (!reasonOk(n()))
+            case 'NCR': return [note, ...(it.canSplit ? splitControl(it, n, note) : []), ...(it.ncrNext ?? []).map((to) => btn(NCR_MOVE_TR[to], to === 'SCRAPPED' ? 'bad' : to === 'ACCEPTED' ? 'ok' : '', 'NCR', () => { if (!reasonOk(n()))
                     return refuse(`Karar gerekçesi en az ${QD_MIN_REASON} karakter olmalı.`); void act(() => api.moveNcr(it.ref.ncrId, to, n()), `NCR: ${NCR_MOVE_TR[to].toLowerCase()}.`); }, `qd-ncr-${to}`))];
             case 'INCOMING': return [note, btn('Kabul (stoğa al)', 'ok', 'INCOMING', () => void act(() => api.incomingDecision(it.ref.stockLotId, 'ACCEPT', n()), 'Giriş kalite: kabul edildi — lot kullanılabilir.'), 'qd-in-accept'),
                 h('button', { type: 'button', class: 'b bad', disabled: !o.can('QUALITY_REJECT'), title: o.can('QUALITY_REJECT') ? '' : NOACT, 'data-testid': 'qd-in-reject', onClick: () => { if (!reasonOk(n()))
@@ -76,6 +76,41 @@ export async function renderQualityDesk(container, api, o) {
                     void act(() => api.finalRelease(it.workOrderId, n() || 'Final kalite serbest bırakma'), 'İş emri tamamlandı (final üretim serbest bırakma).');
                 }, 'qd-final')];
         }
+    };
+    // partial decision: split pieces off the case, then decide each part on its own (accept / scrap / rework). The server checks QUALITY_REJECT, the reason, and 0 < part < case.
+    const splitControl = (it, n, _note) => {
+        const q = h('input', { type: 'number', min: '1', max: String((it.qty ?? 2) - 1), step: '1', placeholder: 'ayrılacak adet', 'aria-label': 'Ayrılacak adet', style: 'width:8em', 'data-testid': 'qd-split-qty' });
+        const allowed = o.can('QUALITY_REJECT');
+        return [q, h('button', { type: 'button', class: 'b', disabled: !allowed, title: allowed ? '' : NOACT, 'data-testid': 'qd-split', onClick: () => {
+                    const k = Number(q.value);
+                    if (!Number.isInteger(k) || k < 1 || k >= (it.qty ?? 0))
+                        return refuse(`Ayrılacak adet 1 ile ${(it.qty ?? 1) - 1} arasında tam sayı olmalı.`);
+                    if (!reasonOk(n()))
+                        return refuse(`Bölme gerekçesi en az ${QD_MIN_REASON} karakter olmalı.`);
+                    void act(() => api.splitNcr(it.ref.ncrId, k, n()), `Vaka bölündü: ${k} adetlik yeni parça ayrıldı — her parça ayrı karar alır.`);
+                } }, 'Böl (kısmi karar)')];
+    };
+    // operation tashih queue (0125): unresolved tashih per operation — Quality opens the case; a missing queue (SQL not installed) is said, not hidden.
+    const opCases = () => {
+        if (!data)
+            return null;
+        if (data.opTashih === null)
+            return h('div', { class: 'unk', 'data-testid': 'qd-optashih-unknown' }, 'Operasyon tashih kuyruğu okunamadı (veri yok) — bu "bekleyen tashih yok" demek değildir.');
+        if (!data.opTashih.length)
+            return null;
+        return h('section', { class: 'card', 'data-testid': 'qd-optashih' }, h('h2', {}, 'Operasyon tashih kuyruğu'), ...data.opTashih.map((r) => {
+            const qty = h('input', { type: 'number', min: '1', max: String(r.qtyTashih), step: '1', value: String(r.qtyTashih), 'aria-label': 'Adet', style: 'width:6em', 'data-testid': 'qd-opcase-qty' });
+            const why = h('input', { type: 'text', placeholder: 'Vaka gerekçesi', 'aria-label': 'Vaka gerekçesi', 'data-testid': 'qd-opcase-reason' });
+            const allowed = o.can('QUALITY_REJECT');
+            return h('div', { class: 'item amber', 'data-testid': 'qd-optashih-row', 'data-op': r.operationId }, h('div', { class: 't' }, wolink(r.workOrderId, `${r.productCode ?? ''} · OP ${r.opNo} ${r.opName}`)), h('div', { class: 'd' }, `${r.qtyTashih} adet tashih bekliyor · makine ${r.machineCode ?? '—'} · operatör ${r.operator ?? '—'} · iyi ${r.qtyGood} · hurda ${r.qtyScrap}`, r.causes.length ? ` · neden: ${r.causes.map((c) => `${c.characteristicCode ?? c.kind}${c.feature ? ' ' + c.feature : ''} (${c.qty})`).join(', ')}` : ' · neden bildirilmemiş'), h('div', { class: 'act' }, qty, why, h('button', { type: 'button', class: 'b bad', disabled: !allowed, title: allowed ? '' : NOACT, 'data-testid': 'qd-opcase', onClick: () => {
+                    const k = Number(qty.value);
+                    if (!Number.isInteger(k) || k < 1 || k > r.qtyTashih)
+                        return refuse(`Adet 1 ile ${r.qtyTashih} arasında tam sayı olmalı.`);
+                    if (!reasonOk(why.value))
+                        return refuse(`Vaka gerekçesi en az ${QD_MIN_REASON} karakter olmalı.`);
+                    void act(() => api.openOperationCase(r.operationId, k, why.value.trim(), 'OPERATOR_SELF_DECLARED'), 'Operasyon vakası açıldı (iş emri kalite bekletmesinde).');
+                } }, 'Vaka aç')));
+        }));
     };
     const itemEl = (it) => h('article', { class: `item ${it.tone}`, 'data-testid': 'qd-item', 'data-kind': it.kind, 'data-key': it.key }, h('div', { class: 'k' }, QKIND_TR[it.kind], it.ageHours !== null ? h('span', { class: 'age', 'data-testid': 'qd-age' }, ` · bekleme ${waitLabel(it.ageHours)}`) : null), h('div', { class: 't' }, wolink(it.workOrderId, it.title)), h('div', { class: 'd' }, it.detail), h('div', { class: 'act' }, ...actions(it)));
     const woOptions = () => (data?.workOrders ?? []).filter((w) => w.status !== 'COMPLETED' && w.status !== 'CANCELLED');
@@ -108,6 +143,7 @@ export async function renderQualityDesk(container, api, o) {
             h('input', { type: 'search', placeholder: 'Karar kuyruğunda ara (ürün, müşteri PO, neden…)', 'aria-label': 'Ara', value: q, 'data-testid': 'qd-search', onInput: (e) => { q = e.target.value.trim().toLocaleLowerCase('tr-TR'); draw(); } }),
             (list.length ? h('div', { style: 'display:flex;flex-direction:column;gap:10px', 'data-testid': 'qd-list' }, ...list.map(itemEl))
                 : h('div', { class: 'card mu', 'data-testid': 'qd-empty' }, desk.unknown.length ? 'Gösterilecek kayıt yok (bazı kaynaklar okunamadı).' : 'Kayıtlara göre karar bekleyen kalite işi yok. (Bu, her şeyin yolunda olduğunun kanıtı değildir.)')),
+            opCases(),
             newForms(),
             h('section', { class: 'card', 'data-testid': 'qd-history' }, h('h2', {}, 'Son kararlar (geçmiş)'), desk.history.length ? h('div', { class: 'hist' }, ...desk.history.map((x) => h('div', {}, x.text, x.at ? h('span', { class: 'mu' }, ` · ${x.at.slice(0, 10)}`) : null))) : h('div', { class: 'mu' }, 'Kapanmış HOLD / NCR kaydı yok.')),
             h('div', { class: 'mu' }, 'Bağlantılar: ', h('a', { href: '#/tahsis', style: 'color:#5cc8e6' }, 'TAHSİS'), ' · ', h('a', { href: '#/rota', style: 'color:#5cc8e6' }, 'Rota / Operasyonlar'), ' · ', h('a', { href: '#/sevkiyat', style: 'color:#5cc8e6' }, 'Sevkiyat'), ' · ', h('a', { href: '#/gecmis', style: 'color:#5cc8e6' }, 'Olay geçmişi'))];

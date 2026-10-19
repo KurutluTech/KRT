@@ -20,7 +20,7 @@ const PW_CSS = `
 @media (max-width:1100px){.pw .oph{display:none}.pw .opr{grid-template-columns:1fr 1fr;gap:6px 12px}.pw .opr .nm,.pw .opr .c-machine,.pw .opr .c-cam,.pw .opr .acts{grid-column:1/-1}.pw .opr .acts{justify-content:flex-start}.pw .cl{display:inline}}
 .pw .head-name{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
 .pw .bomg{grid-template-columns:minmax(0,2fr) minmax(0,1fr) minmax(0,1fr) minmax(0,1fr) auto}
-.pw .docg{grid-template-columns:minmax(0,1fr) auto}
+.pw .docg{grid-template-columns:minmax(0,1fr)}.pw .docg>*{min-width:0;max-width:100%}.pw .docg .row{flex-wrap:wrap}.pw .docg .mut,.pw .docg b,.pw .docg .stack>div{overflow-wrap:anywhere;word-break:break-word}.pw .docg .acts{display:flex;flex-wrap:wrap;gap:6px;justify-content:flex-start}
 .pw .parg{grid-template-columns:minmax(0,1.3fr) repeat(3,minmax(0,1fr)) auto}
 .pw .pcell{display:flex;flex-direction:column;gap:1px;align-items:flex-start}.pw .pcell .cl{display:none}.pw .pcell .linkbtn{min-height:24px;padding:0;font-size:12px}
 @media (max-width:900px){.pw .pcell{flex-direction:row;flex-wrap:wrap;gap:4px 10px;align-items:center}.pw .pcell .cl{display:inline;min-width:120px}}

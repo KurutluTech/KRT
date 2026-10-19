@@ -4,6 +4,7 @@
 // kaynak: machine_eligibility), malzeme/takım hazırlığı ve kalite durumu her satırda görünür.
 // Operatör önerisi sunucudan gelir (Akıllı Atama, suggest_operators — yetkinlik, aynı üründeki
 // tecrübe, geçmiş fire, yük); yöneticinin öneriye uyup uymadığını SUNUCU hesaplar ve kaydeder.
+import { machineSpindle } from '../machineStateLoader.js';
 import { h, mount } from '../../../../packages/ui/src/h.js';
 import { SHIFTS, planningWarnings, suggestPlan } from '../../../../packages/domain/src/planning.js';
 import { readinessLabel } from '../../../../packages/domain/src/readiness.js';
@@ -143,7 +144,7 @@ export async function renderPlanningScreen(container, api, opts, banner, typedMi
             ? h('button', { type: 'button', 'data-testid': 'plan-accept-btn', class: 'okb', onClick: () => void acceptSuggestion() }, 'Öneriyi Uygula (yetkili)')
             : null), h('td', {}, h('div', { style: 'display:flex;flex-wrap:wrap;gap:4px' }, minutes, machineSel, opSel, dateIn, shiftSel, reasonIn, h('button', { type: 'button', 'data-testid': 'plan-sa-btn', class: 'ghost', onClick: () => void showSmartAssignment() }, 'Akıllı Atama'), h('button', { type: 'button', 'data-testid': 'plan-commit-btn', class: 'primary', onClick: () => void commit(b, { machineId: machineSel.value, operatorId: opSel.value || null, date: dateIn.value, shift: shiftSel.value, minutes: Number(minutes.value), followed: false, reason: reasonIn.value.trim() || null }) }, 'Planı Kaydet (yetkili)')), saBox));
     }
-    const capacityTable = h('table', { 'data-testid': 'plan-capacity-table' }, h('thead', {}, h('tr', {}, h('th', {}, 'Makine'), ...dates.flatMap((d) => PRODUCTION_SHIFTS.map((s) => h('th', {}, `${d.slice(5)} ${s.label.replace('. Vardiya', 'V')}`))))), h('tbody', {}, ...machines.map((m) => h('tr', { 'data-testid': 'plan-capacity-row', 'data-machine': m.code }, h('td', {}, `${m.code} — ${m.label}`), ...dates.flatMap((d) => PRODUCTION_SHIFTS.map((s) => {
+    const capacityTable = h('table', { 'data-testid': 'plan-capacity-table' }, h('thead', {}, h('tr', {}, h('th', {}, 'Makine'), ...dates.flatMap((d) => PRODUCTION_SHIFTS.map((s) => h('th', {}, `${d.slice(5)} ${s.label.replace('. Vardiya', 'V')}`))))), h('tbody', {}, ...machines.map((m) => h('tr', { 'data-testid': 'plan-capacity-row', 'data-machine': m.code }, h('td', {}, machineSpindle(null, m.code, m.status, 16), ` ${m.code} — ${m.label}`), ...dates.flatMap((d) => PRODUCTION_SHIFTS.map((s) => {
         const used = load.find((l) => l.machineId === m.machineId && l.plannedDate === d && l.plannedShiftCode === s.code)?.plannedMinutes ?? 0;
         const full = used >= s.minutes;
         return h('td', { 'data-testid': 'plan-capacity-cell', 'data-slot': `${d}|${s.code}`, class: !m.eligible && m.label !== 'BEKLEME' ? 'cap bad' : full ? 'cap warn' : 'cap ok' }, `${used}/${s.minutes}`);
