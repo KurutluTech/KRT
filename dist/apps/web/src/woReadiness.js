@@ -1,5 +1,10 @@
 const tail = (code) => code.includes(':') ? code.slice(code.indexOf(':') + 1) : '';
 const RULES = [
+    [/^MACHINE_NOT_ASSIGNED/, () => ({ title: 'Makine atanmadı', detail: 'Üretim için bir makine seçilmeli.', fix: { type: 'focus', id: 'machine' }, fixLabel: 'Makine ata' })],
+    [/^OPERATOR_NOT_ASSIGNED/, () => ({ title: 'Operatör atanmadı', detail: 'Üretimi yapacak operatör planlanmalı.', fix: { type: 'focus', id: 'operator' }, fixLabel: 'Operatör ata' })],
+    [/^SHIFT_NOT_PLANNED/, () => ({ title: 'Vardiya planlanmadı', detail: 'İşin hangi vardiyada yapılacağı belli değil.', fix: { type: 'link', href: '#/planlama' }, fixLabel: 'Planlamaya git' })],
+    [/^DATE_NOT_PLANNED/, () => ({ title: 'Plan tarihi yok', detail: 'İş henüz bir güne planlanmadı.', fix: { type: 'link', href: '#/planlama' }, fixLabel: 'Planlamaya git' })],
+    [/^MACHINE_SKILL_REQUIREMENTS_UNKNOWN/, () => ({ title: 'Makinenin beceri gereksinimi tanımlı değil', detail: 'Eğitim/Akademi tarafında bu makine için gereksinim girilmeli ya da "gerekmiyor" diye işaretlenmeli.', fix: { type: 'link', href: '#/akademi' }, fixLabel: 'Akademiye git' })],
     [/^MACHINE_NOT_PRODUCTION_ELIGIBLE/, () => ({ title: 'Makine atanmadı ya da üretime uygun değil', detail: 'Makine yok, bakımda/arızalı ya da üretim için onaylı değil.', fix: { type: 'focus', id: 'machine' }, fixLabel: 'Makine ata' })],
     [/^MACHINE_BUSY/, () => ({ title: 'Makinede çalışan başka bir iş emri var', detail: 'Önce o iş emri tamamlanmalı, durdurulmalı ya da başka makine seçilmeli.', fix: { type: 'focus', id: 'machine' }, fixLabel: 'Makineyi değiştir' })],
     [/^MATERIAL_REQUIREMENT_UNKNOWN:NO_REVISION/, (_c, id) => ({ title: 'Ürün revizyonu bağlı değil', detail: 'Malzeme ihtiyacı revizyonun malzeme listesinden (BOM) hesaplanır.', fix: { type: 'focus', id: 'revision' }, fixLabel: 'Revizyon bağla' })],
