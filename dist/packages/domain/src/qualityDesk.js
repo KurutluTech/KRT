@@ -53,7 +53,7 @@ export function buildQualityDesk(i) {
         const open = i.ncrs.filter((n) => isNcrOpen(n.status));
         counts.NCR = open.length;
         for (const n of open)
-            items.push({ key: `NCR:${n.id}`, kind: 'NCR', workOrderId: n.workOrderId, title: label(n.workOrderId), detail: `${n.qty} adet · ${n.reason} · ${NCR_STEP_TR[n.status]}`, since: n.openedAt, ageHours: hoursSince(n.openedAt, i.nowIso), tone: n.status === 'OPEN' ? 'red' : 'amber', ref: { ncrId: n.id }, ncrStatus: n.status, ncrNext: ['REWORK', 'RECHECK_PENDING', 'ACCEPTED', 'SCRAPPED'].filter((to) => canTransitionNcr(n.status, to).ok), qty: n.qty });
+            items.push({ key: `NCR:${n.id}`, kind: 'NCR', workOrderId: n.workOrderId, title: label(n.workOrderId), detail: `${n.qty} adet · ${n.reason} · ${NCR_STEP_TR[n.status]}${n.operationId ? ' · operasyon vakası' : ''}${n.parentNcrId ? ' · bölünmüş parça' : ''}`, since: n.openedAt, ageHours: hoursSince(n.openedAt, i.nowIso), tone: n.status === 'OPEN' ? 'red' : 'amber', ref: { ncrId: n.id }, ncrStatus: n.status, ncrNext: ['REWORK', 'RECHECK_PENDING', 'ACCEPTED', 'SCRAPPED'].filter((to) => canTransitionNcr(n.status, to).ok), qty: n.qty, canSplit: n.qty > 1 && n.status !== 'ACCEPTED' && n.status !== 'SCRAPPED' });
     }
     if (i.incoming) {
         const w = i.incoming.filter((r) => r.lotState === 'HOLD');
