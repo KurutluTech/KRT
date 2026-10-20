@@ -8,6 +8,7 @@ import { h, mount } from '../../../../packages/ui/src/h.js';
 import { FRESHNESS_TR } from '../../../../packages/domain/src/live.js';
 import { machineState, HEADLINE_TR, AVAILABILITY_TR, PHYSICAL_TR, DATA_SOURCE_TR, STALE_TR, MACHINE_CLASS_TR, MACHINE_CLASS_UNKNOWN_TR } from '../../../../packages/domain/src/machineState.js';
 import { spindleForState } from '../spindle.js';
+import { cncDisplay, cncNotes, CNC_TONE_CSS } from '../../../../packages/domain/src/cncTelemetry.js';
 import { percentLabel } from '../../../../packages/domain/src/oee.js';
 import { sumPeriods, distinctActiveWorkOrders, rankMachines, deadlineRisk, scrapShare, meanOee } from '../../../../packages/domain/src/liveKpi.js';
 import { passportHref } from '../passport/registry.js';
@@ -126,6 +127,16 @@ export async function renderLiveScreen(container, api, state) {
             details = null; /* UNKNOWN on the cards, never invented */
         }
     }
+    // KMI-HAAS-MTCONNECT-001: CNC signal per machine (bound devices only). Failure / not authorized / not deployed ⇒ no block; nothing is invented.
+    const cncByCode = new Map();
+    if (state.mode === 'APP' && profile === 'OFFICE' && api.cncStates) {
+        try {
+            for (const r of await api.cncStates())
+                if (r.machineCode)
+                    cncByCode.set(r.machineCode, r);
+        }
+        catch { /* CNC block simply absent */ }
+    }
     const go = (patch) => void renderLiveScreen(container, api, { ...state, message: null, error: null, newToken: null, ...patch });
     const elapsed = (from, to) => {
         if (!from)
@@ -134,12 +145,22 @@ export async function renderLiveScreen(container, api, state) {
         return mins >= 60 ? `${Math.floor(mins / 60)} sa ${mins % 60} dk` : `${mins} dk`;
     };
     const detailFor = (code, product) => details?.find((d) => d.machineCode === code && (d.productCode ?? null) === (product ?? null)) ?? null;
+    const cncBlock = (code, ms) => {
+        const row = cncByCode.get(code);
+        if (!row)
+            return null;
+        const d = cncDisplay(row);
+        const col = CNC_TONE_CSS[d.tone];
+        const notes = cncNotes(ms, d);
+        const when = d.lastDataAt ? fmt(d.lastDataAt) : 'hiç';
+        return h('div', { class: 'cnc', 'data-testid': 'live-cnc', 'data-link': d.link, 'data-state': d.state, 'data-tone': d.tone, style: `border-left:3px solid ${col};padding:4px 8px;margin:6px 0;background:rgba(2,6,23,.35)` }, h('div', { class: 'small', 'data-testid': 'live-cnc-source' }, 'CNC (otomatik sinyal) · Kaynak: CNC — operatör beyanı değil · "çalışıyor" = program koşuyor, talaş kaldırma süresi DEĞİL'), h('div', { 'data-testid': 'live-cnc-link', style: `font-size:12px;font-weight:800;color:${d.link === 'UP' ? '#34d399' : '#fbbf24'}` }, d.linkTr), h('div', { 'data-testid': 'live-cnc-state', style: `font-weight:800;color:${col}` }, `Gerçek durum: ${d.stateTr}`), h('div', { class: 'small', 'data-testid': 'live-cnc-fields' }, d.link === 'UP' ? `Mil: ${d.spindleRpm === null ? 'BİLİNMİYOR' : `${NUM.format(d.spindleRpm)} dev/dk`} · Program: ${d.program ?? 'BİLİNMİYOR'} · Son çevrim: ${d.lastCycleS === null ? 'BİLİNMİYOR' : `${NUM.format(d.lastCycleS)} sn`}` : 'Mil / program / çevrim: güncel değil — gösterilmiyor'), d.link === 'UP' ? h('div', { class: 'small', 'data-testid': 'live-cnc-safety', 'data-alarm-known': String(d.alarmKnown), 'data-estop': d.estop }, d.safetyLine) : null, h('div', { class: 'small', 'data-testid': 'live-cnc-when' }, `Son veri: ${when}`), d.staleWarning ? h('div', { class: 'conflict', 'data-testid': 'live-cnc-stale' }, d.staleWarning) : null, ...notes.map((n) => h('div', { class: 'conflict', 'data-testid': 'live-cnc-note' }, n)));
+    };
     const machineTile = (m) => {
         const ms = machineState({ status: m.status, active: m.active });
         const mi = info.get(m.code);
         const cls = mi?.machineClass ?? null;
         const clsTr = cls && cls in MACHINE_CLASS_TR ? MACHINE_CLASS_TR[cls] : MACHINE_CLASS_UNKNOWN_TR;
-        return h('div', { class: 'm', 'data-testid': 'live-machine', 'data-code': m.code, 'data-status': m.status, 'data-headline': ms.headline, 'data-class': cls ?? 'UNKNOWN' }, h('div', { class: 'mh' }, h('span', { class: 'ico' }, spindleForState(ms, 44)), h('div', { style: 'min-width:0' }, h('div', { class: m.code.length > 5 ? 'code long' : 'code' }, m.code), mi ? h('div', { class: 'small', 'data-testid': 'live-name' }, mi.name) : null), h('span', { class: 'st', 'data-testid': 'live-status', title: AVAILABILITY_TR[ms.availability] }, ms.stale ? STALE_TR : HEADLINE_TR[ms.headline])), h('div', { class: 'small', 'data-testid': 'live-datasource', 'data-source': ms.dataSource }, `Veri kaynağı: ${DATA_SOURCE_TR[ms.dataSource]}`), h('div', { class: 'small' }, h('span', { 'data-testid': 'live-class' }, clsTr), mi?.id && state.mode === 'APP' ? [' · ', h('a', { class: 'pp', href: passportHref('MACHINE', mi.id), 'data-testid': 'live-passport' }, 'Pasaport →')] : null), ms.conflict ? h('div', { class: 'conflict', 'data-testid': 'live-conflict' }, `Kayıt: ${AVAILABILITY_TR[ms.availability]} — ama aktif iş emri var`) : null, h('div', { class: 'small', 'data-testid': 'live-since' }, `Durum kaydı: ${fmt(m.since)}`), ...m.active.map((a) => {
+        return h('div', { class: 'm', 'data-testid': 'live-machine', 'data-code': m.code, 'data-status': m.status, 'data-headline': ms.headline, 'data-class': cls ?? 'UNKNOWN' }, h('div', { class: 'mh' }, h('span', { class: 'ico' }, spindleForState(ms, 44)), h('div', { style: 'min-width:0' }, h('div', { class: m.code.length > 5 ? 'code long' : 'code' }, m.code), mi ? h('div', { class: 'small', 'data-testid': 'live-name' }, mi.name) : null), h('span', { class: 'st', 'data-testid': 'live-status', title: AVAILABILITY_TR[ms.availability] }, ms.stale ? STALE_TR : HEADLINE_TR[ms.headline])), h('div', { class: 'small', 'data-testid': 'live-datasource', 'data-source': ms.dataSource }, `Veri kaynağı: ${DATA_SOURCE_TR[ms.dataSource]}`), cncBlock(m.code, ms), h('div', { class: 'small' }, h('span', { 'data-testid': 'live-class' }, clsTr), mi?.id && state.mode === 'APP' ? [' · ', h('a', { class: 'pp', href: passportHref('MACHINE', mi.id), 'data-testid': 'live-passport' }, 'Pasaport →')] : null), ms.conflict ? h('div', { class: 'conflict', 'data-testid': 'live-conflict' }, `Kayıt: ${AVAILABILITY_TR[ms.availability]} — ama aktif iş emri var`) : null, h('div', { class: 'small', 'data-testid': 'live-since' }, `Durum kaydı: ${fmt(m.since)}`), ...m.active.map((a) => {
             const d = detailFor(m.code, a.productCode);
             const opName = a.operator !== undefined ? a.operator : d?.operatorName ?? null;
             const named = a.operator !== undefined || d !== null;

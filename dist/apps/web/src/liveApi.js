@@ -24,6 +24,7 @@ export function createLiveApi(client, session) {
             return { rows, truncated: rows.length >= CAP, assigned };
         },
         workDetail: async () => (await client.rpc('command_center', {}, session)).liveWorkOrders ?? [],
+        cncStates: () => client.rpc('cnc_live_states', {}, session),
         listDisplays: () => client.rpc('list_live_displays', {}, session),
         createDisplay: (name) => client.rpc('create_live_display', { p_name: name }, session),
         revokeDisplay: async (id, reason) => { await client.rpc('revoke_live_display', { p_id: id, p_reason: reason }, session); },

@@ -1,8 +1,8 @@
 {
   "product": "KMI NEXT",
-  "commit": "536547a4a81509703df409a86bd618b4e7ea91fa",
+  "commit": "95a2b5af487cade37a981799a4c290cf0aa366f0",
   "builtFrom": "clean git tree",
-  "fileCount": 349,
+  "fileCount": 350,
   "migrationsInRepo": 73,
   "lastMigration": "0073_kmi_next_puantaj_month.sql",
   "note": "Release candidate. Publishing to https://flow.kurutlu.com is a manual owner action; this file is not a publication permit.",
@@ -169,8 +169,8 @@
     },
     {
       "path": "dist/apps/web/src/errorText.js",
-      "bytes": 25578,
-      "sha256": "0183ccecd0f578ee7df9dd5e41e04fd77ead04daf62d6089668f7118a046c5b1"
+      "bytes": 25685,
+      "sha256": "926674066e723474cac6289e32aa0626c9842c413682d2ae855e60222ccb2c66"
     },
     {
       "path": "dist/apps/web/src/feasibilityApi.js",
@@ -249,8 +249,8 @@
     },
     {
       "path": "dist/apps/web/src/liveApi.js",
-      "bytes": 2150,
-      "sha256": "cffaf666d7a5c47c8db031ebdadf5d46ab2f47eb02caa0d8fb246ddb2d1f891f"
+      "bytes": 2219,
+      "sha256": "2750eed7c00b0018fd10416ecfb10d236a85c6307b1fd62520f2801a2a346acf"
     },
     {
       "path": "dist/apps/web/src/machineCard.js",
@@ -709,8 +709,8 @@
     },
     {
       "path": "dist/apps/web/src/screens/LiveScreen.js",
-      "bytes": 31556,
-      "sha256": "214eae18bf1f76d585c7d7088219f1de44f29afccc165b1d6bb3eb7240e03f25"
+      "bytes": 33980,
+      "sha256": "5fbc56db1763c06212b1c9c127d100edd353c5c2f7949c0815261e0ea83e6951"
     },
     {
       "path": "dist/apps/web/src/screens/MaintenanceScreen.js",
@@ -1274,8 +1274,8 @@
     },
     {
       "path": "dist/packages/domain/src/authorization.js",
-      "bytes": 6781,
-      "sha256": "563f6045bfad701fb9b0566488fe4c5ef9e58ce7aab5cc23963d4daeef4b8d74"
+      "bytes": 6872,
+      "sha256": "074b118cc8eb748f6434f0dd2f36e57753e3c4a477191ba0ffec2d8f990d7fc1"
     },
     {
       "path": "dist/packages/domain/src/badges.js",
@@ -1286,6 +1286,11 @@
       "path": "dist/packages/domain/src/bom.js",
       "bytes": 4451,
       "sha256": "e70c9d93d6bad206f594a847ce14eadb54f7432e764617732679cddfc0c68329"
+    },
+    {
+      "path": "dist/packages/domain/src/cncTelemetry.js",
+      "bytes": 4284,
+      "sha256": "108c1e80b05d394259a4cd054612bafeaa5f0afb621f9f80e35a10bdde585fc0"
     },
     {
       "path": "dist/packages/domain/src/commandCenter.js",

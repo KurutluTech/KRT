@@ -32,6 +32,8 @@ export const ACTION_TR = {
     REPORT_SCHEDULE_MANAGE: 'rapor zamanlama',
     LIVE_DISPLAY_MANAGE: 'fabrika ekranı yönetimi',
     DEVICE_MANAGE: 'cihaz kaydı',
+    CNC_MANAGE: 'CNC toplayıcı / cihaz yönetimi',
+    CNC_TELEMETRY_VIEW: 'CNC canlı verisini görme',
     PERSONNEL_MANAGE: 'personel kaydı',
     CUSTOMER_MANAGE: 'müşteri kaydı',
     CUSTOMER_CONTACT_VIEW: 'müşteri kişileri',

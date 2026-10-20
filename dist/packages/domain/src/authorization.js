@@ -48,6 +48,8 @@ const DEFAULT_ROLE_MATRIX = {
     LIVE_DISPLAY_MANAGE: ['ADMIN', 'MANAGEMENT'],
     // Migration 0048: device registry (integrations stay BLOCKED — DEVICE EVIDENCE REQUIRED).
     DEVICE_MANAGE: ['ADMIN'],
+    CNC_MANAGE: ['ADMIN'],
+    CNC_TELEMETRY_VIEW: ['ADMIN', 'MANAGEMENT', 'MAINTENANCE'],
     // Migration 0051: write-authorization closure — these writes previously checked only "signed in".
     PERSONNEL_MANAGE: ['ADMIN', 'MANAGEMENT'],
     // Draft 0096 (KMI-006): customer contacts / terms are commercial + personal data.
