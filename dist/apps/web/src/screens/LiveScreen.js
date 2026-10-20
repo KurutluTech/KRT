@@ -6,7 +6,7 @@
 // Kiosk: giriş yok, yalnız ekran anahtarı (#/ekran?t=...) — PUBLIC.
 import { h, mount } from '../../../../packages/ui/src/h.js';
 import { FRESHNESS_TR } from '../../../../packages/domain/src/live.js';
-import { machineState, HEADLINE_TR, AVAILABILITY_TR, PHYSICAL_TR, DATA_SOURCE_TR, STALE_TR, MACHINE_CLASS_TR, MACHINE_CLASS_UNKNOWN_TR } from '../../../../packages/domain/src/machineState.js';
+import { machineStateOf, HEADLINE_TR, AVAILABILITY_TR, PHYSICAL_TR, DATA_SOURCE_TR, STALE_TR, MACHINE_CLASS_TR, MACHINE_CLASS_UNKNOWN_TR } from '../../../../packages/domain/src/machineState.js';
 import { spindleForState } from '../spindle.js';
 import { cncDisplay, cncNotes, CNC_TONE_CSS } from '../../../../packages/domain/src/cncTelemetry.js';
 import { percentLabel } from '../../../../packages/domain/src/oee.js';
@@ -19,10 +19,10 @@ import { STATE_VISUAL } from '../spindle.js';
 const liveDist = (b) => {
     const cnt = {};
     for (const m of b.machines) {
-        const k = machineState({ status: m.status, active: m.active }).headline;
+        const k = machineStateOf(m).headline;
         cnt[k] = (cnt[k] ?? 0) + 1;
     }
-    return distributionBar({ title: 'Durum dağılımı', unit: 'makine', period: 'şu an (elle girilen kayıt)', source: 'Canlı pano · makine durum kaydı' }, Object.keys(cnt).map((k) => ({ label: STATE_VISUAL[k].label, value: cnt[k], meaning: 'info', color: STATE_VISUAL[k].color, icon: '●' })));
+    return distributionBar({ title: 'Durum dağılımı', unit: 'makine', period: 'şu an (CNC bağlı makinelerde kontrol sinyali, diğerlerinde elle girilen kayıt)', source: 'Canlı pano · makine durum kaydı + CNC canlı veri' }, Object.keys(cnt).map((k) => ({ label: STATE_VISUAL[k].label, value: cnt[k], meaning: 'info', color: STATE_VISUAL[k].color, icon: '●' })));
 };
 const CSS = CHART_CSS + `
 .live{--card:#111c2e;--card2:#0f172a;--line:#1e293b;--line2:#334155;--txt:#e6edf7;--mut:#94a3b8;--red:#ef4444;--amber:#f59e0b;--green:#22c55e;--cyan:#22d3ee;--violet:#a78bfa;
@@ -128,15 +128,12 @@ export async function renderLiveScreen(container, api, state) {
         }
     }
     // KMI-HAAS-MTCONNECT-001: CNC signal per machine (bound devices only). Failure / not authorized / not deployed ⇒ no block; nothing is invented.
+    // The CNC row rides on the board machine (attached once in createLiveApi().board) - the same fact every other screen reads.
     const cncByCode = new Map();
-    if (state.mode === 'APP' && profile === 'OFFICE' && api.cncStates) {
-        try {
-            for (const r of await api.cncStates())
-                if (r.machineCode)
-                    cncByCode.set(r.machineCode, r);
-        }
-        catch { /* CNC block simply absent */ }
-    }
+    if (state.mode === 'APP' && profile === 'OFFICE')
+        for (const m of board?.machines ?? [])
+            if (m.cnc)
+                cncByCode.set(m.code, m.cnc);
     const go = (patch) => void renderLiveScreen(container, api, { ...state, message: null, error: null, newToken: null, ...patch });
     const elapsed = (from, to) => {
         if (!from)
@@ -156,7 +153,7 @@ export async function renderLiveScreen(container, api, state) {
         return h('div', { class: 'cnc', 'data-testid': 'live-cnc', 'data-link': d.link, 'data-state': d.state, 'data-tone': d.tone, style: `border-left:3px solid ${col};padding:4px 8px;margin:6px 0;background:rgba(2,6,23,.35)` }, h('div', { class: 'small', 'data-testid': 'live-cnc-source' }, 'CNC (otomatik sinyal) · Kaynak: CNC — operatör beyanı değil · "çalışıyor" = program koşuyor, talaş kaldırma süresi DEĞİL'), h('div', { 'data-testid': 'live-cnc-link', style: `font-size:12px;font-weight:800;color:${d.link === 'UP' ? '#34d399' : '#fbbf24'}` }, d.linkTr), h('div', { 'data-testid': 'live-cnc-state', style: `font-weight:800;color:${col}` }, `Gerçek durum: ${d.stateTr}`), h('div', { class: 'small', 'data-testid': 'live-cnc-fields' }, d.link === 'UP' ? `Mil: ${d.spindleRpm === null ? 'BİLİNMİYOR' : `${NUM.format(d.spindleRpm)} dev/dk`} · Program: ${d.program ?? 'BİLİNMİYOR'} · Son çevrim: ${d.lastCycleS === null ? 'BİLİNMİYOR' : `${NUM.format(d.lastCycleS)} sn`}` : 'Mil / program / çevrim: güncel değil — gösterilmiyor'), d.link === 'UP' ? h('div', { class: 'small', 'data-testid': 'live-cnc-safety', 'data-alarm-known': String(d.alarmKnown), 'data-estop': d.estop }, d.safetyLine) : null, h('div', { class: 'small', 'data-testid': 'live-cnc-when' }, `Son veri: ${when}`), d.staleWarning ? h('div', { class: 'conflict', 'data-testid': 'live-cnc-stale' }, d.staleWarning) : null, ...notes.map((n) => h('div', { class: 'conflict', 'data-testid': 'live-cnc-note' }, n)));
     };
     const machineTile = (m) => {
-        const ms = machineState({ status: m.status, active: m.active });
+        const ms = machineStateOf(m);
         const mi = info.get(m.code);
         const cls = mi?.machineClass ?? null;
         const clsTr = cls && cls in MACHINE_CLASS_TR ? MACHINE_CLASS_TR[cls] : MACHINE_CLASS_UNKNOWN_TR;
@@ -186,12 +183,13 @@ export async function renderLiveScreen(container, api, state) {
         } };
         return h('details', { 'data-testid': 'live-displays', class: 'panel' }, h('summary', { style: 'font-weight:700;cursor:pointer' }, `Fabrika ekranları (${rows.filter((r) => !r.revokedAt).length} aktif)`), h('p', { class: 'small' }, 'Ekran anahtarıyla açılan sayfa girişsiz çalışır ve yalnız ekran görünümünü (kişi adı, müşteri ve para yok) gösterir. Girişsiz erişim sahip onayıyla açılır; o zamana kadar anahtar çalışmaz.'), ...rows.map((r) => h('div', { 'data-testid': 'live-display-row', style: 'font-size:12px;border-top:1px solid #1e293b;padding:4px 0;display:flex;gap:6px;flex-wrap:wrap;align-items:center' }, h('b', {}, r.name), r.revokedAt ? ' · iptal edildi' : ` · son görülme: ${r.lastSeenAt ? fmt(r.lastSeenAt) : 'hiç'}`, r.revokedAt ? null : h('button', { type: 'button', 'data-testid': 'live-display-revoke', onClick: () => void revoke(r.id) }, 'İptal et'))), h('div', { style: 'display:flex;gap:6px;flex-wrap:wrap;margin-top:6px' }, name, h('button', { type: 'button', 'data-testid': 'live-display-create', onClick: () => void create() }, 'Ekran ekle')));
     };
-    const states = (bd) => bd.machines.map((m) => machineState({ status: m.status, active: m.active }));
+    const states = (bd) => bd.machines.map((m) => machineStateOf(m));
     const kpiStrip = (bd) => {
         const st = states(bd);
         const n = (f) => st.filter(f).length;
+        const cncN = n((x) => !!x.cnc);
         const k = (v, label, cls = '', tid) => h('div', { class: `kpi ${cls}`, ...(tid ? { 'data-testid': tid } : {}) }, h('b', {}, String(v)), h('span', {}, label));
-        return h('div', { class: 'kpis', 'data-testid': 'live-totals' }, k(bd.machines.length, 'kayıtlı ekipman'), k(n((x) => x.headline === 'ACTIVE_WORK_ORDER'), 'aktif iş emri olan makine'), k(n((x) => x.headline === 'READY_IDLE'), 'hazır · boşta'), k(n((x) => x.availability === 'DOWN'), 'arıza', n((x) => x.availability === 'DOWN') ? 'bad' : ''), k(n((x) => x.availability === 'MAINTENANCE' || x.availability === 'HOLD'), 'bakım / bekletme'), k(bd.totals.openHolds, 'kalite bekletmesi', bd.totals.openHolds ? 'bad' : ''), k('BİLİNMİYOR', 'fiziksel çalışma (CNC bağlantısı yok)', 'unk', 'live-physical'));
+        return h('div', { class: 'kpis', 'data-testid': 'live-totals' }, k(bd.machines.length, 'kayıtlı ekipman'), k(n((x) => x.headline === 'ACTIVE_WORK_ORDER'), 'aktif iş emri olan makine'), k(n((x) => x.headline === 'READY_IDLE'), 'hazır · boşta'), k(n((x) => x.availability === 'DOWN'), 'arıza', n((x) => x.availability === 'DOWN') ? 'bad' : ''), k(n((x) => x.availability === 'MAINTENANCE' || x.availability === 'HOLD'), 'bakım / bekletme'), k(bd.totals.openHolds, 'kalite bekletmesi', bd.totals.openHolds ? 'bad' : ''), cncN ? k(n((x) => x.cncRunning), `CNC çalışıyor (CNC bağlı ${cncN} makineden)`, '', 'live-physical') : k('BİLİNMİYOR', 'fiziksel çalışma (CNC bağlantısı yok)', 'unk', 'live-physical'));
     };
     const tonePct = (v) => (v === null ? 'VERİ YOK' : `${(v * 100).toFixed(1).replace('.', ',')} %`);
     const kpi8 = (bd) => {
@@ -202,11 +200,13 @@ export async function renderLiveScreen(container, api, state) {
         const periodNote = (x) => (x.declarations ? `${NUM.format(x.declarations)} beyan` : 'beyan kaydı yok');
         const why = state.mode === 'KIOSK' || profile === 'PUBLIC' ? 'ekran görünümünde gösterilmez' : 'kaynak okunamadı';
         const risk = deadlineRisk(bd.orders);
-        const running = bd.machines.filter((m) => machineState({ status: m.status, active: m.active }).headline === 'ACTIVE_WORK_ORDER').length;
-        return h('div', { class: 'k8', 'data-testid': 'live-kpis' }, t ? val('prod-today', 'Bugün Üretim', t.today.good, periodNote(t.today)) : unk('prod-today', 'Bugün Üretim', why), t ? val('prod-week', 'Bu Hafta', t.week.good, periodNote(t.week)) : unk('prod-week', 'Bu Hafta', why), t ? val('prod-month', 'Bu Ay', t.month.good, periodNote(t.month)) : unk('prod-month', 'Bu Ay', why), t ? val('scrap-today', 'Hurda (Bugün)', t.today.scrap, periodNote(t.today), t.today.scrap > 0 ? 'warn' : '') : unk('scrap-today', 'Hurda (Bugün)', why), val('active-wo', 'Aktif İş Emri', distinctActiveWorkOrders(bd.machines), 'makinede çalışan'), per && per.assigned !== null ? val('assigned', 'Atanmış', per.assigned, 'makineye atanmış, başlamadı') : unk('assigned', 'Atanmış', why), val('running-machines', 'Çalışan Makine', running, `${bd.machines.length} kayıtlı makineden`, running ? 'ok' : ''), val('deadline-risk', 'Termin Riski', risk, risk ? 'geciken / yaklaşan sipariş' : 'riskli satır yok', risk ? 'hot' : 'ok'));
+        const sts = bd.machines.map((m) => machineStateOf(m));
+        const cncConnected = sts.filter((x) => x.cnc).length;
+        const running = sts.filter((x) => x.cncRunning).length;
+        return h('div', { class: 'k8', 'data-testid': 'live-kpis' }, t ? val('prod-today', 'Bugün Üretim', t.today.good, periodNote(t.today)) : unk('prod-today', 'Bugün Üretim', why), t ? val('prod-week', 'Bu Hafta', t.week.good, periodNote(t.week)) : unk('prod-week', 'Bu Hafta', why), t ? val('prod-month', 'Bu Ay', t.month.good, periodNote(t.month)) : unk('prod-month', 'Bu Ay', why), t ? val('scrap-today', 'Hurda (Bugün)', t.today.scrap, periodNote(t.today), t.today.scrap > 0 ? 'warn' : '') : unk('scrap-today', 'Hurda (Bugün)', why), val('active-wo', 'Aktif İş Emri', distinctActiveWorkOrders(bd.machines), 'makinede çalışan'), per && per.assigned !== null ? val('assigned', 'Atanmış', per.assigned, 'makineye atanmış, başlamadı') : unk('assigned', 'Atanmış', why), cncConnected ? val('running-machines', 'Çalışan Makine (CNC)', running, `CNC bağlı ${cncConnected} makineden · iş emri sayısından ayrı hesaplanır`, running ? 'ok' : '') : unk('running-machines', 'Çalışan Makine (CNC)', 'CNC bağlantısı yok'), val('deadline-risk', 'Termin Riski', risk, risk ? 'geciken / yaklaşan sipariş' : 'riskli satır yok', risk ? 'hot' : 'ok'));
     };
     const opsPanels = (bd) => {
-        const st = (m) => machineState({ status: m.status, active: m.active });
+        const st = (m) => machineStateOf(m);
         const nameOf = (c) => info.get(c)?.name ?? c;
         const li = (tone, left, right) => h('li', {}, h('span', { class: `tone-${tone}` }, left), h('span', {}, right));
         const panel = (key, title, ...kids) => h('section', { class: 'panel', 'data-testid': 'live-panel', 'data-key': key }, h('h2', {}, title), ...kids);
@@ -233,7 +233,7 @@ export async function renderLiveScreen(container, api, state) {
             ? h('div', {}, h('div', {}, `${NUM.format(target.got)} / ${NUM.format(target.plan)} adet`), h('div', { class: 'meter' }, h('i', { style: `width:${Math.min(100, Math.round((target.got / target.plan) * 100))}%` })), h('div', { class: 'small' }, `%${Math.min(999, Math.round((target.got / target.plan) * 100))} · yalnız şu an çalışan iş emirleri`))
             : empty('Çalışan iş emri planı yok.')), panel('downtime', 'Duruş ve kayıplar', down.length + maint.length ? h('ul', {}, ...[...down, ...maint].map((m) => li(st(m).availability === 'DOWN' ? 'red' : 'amber', m.code, m.since ? `${AVAILABILITY_TR[st(m).availability]} · ${elapsed(m.since, bd.generatedAt)}` : `${AVAILABILITY_TR[st(m).availability]} · süre BİLİNMİYOR`))) : empty('Kayıtlı duruş yok. (Telemetri bağlı olmadığından kayıtsız duruş görünmez.)')), panel('quality', 'Kalite', h('div', {}, `${bd.totals.openHolds} açık bekletme`), todayScrap === null ? empty('Bugünkü hurda oranı: BİLİNMİYOR.') : h('div', {}, rate === null ? 'Bugünkü hurda oranı: beyan yok' : `Bugünkü hurda oranı: ${tonePct(rate)}`)), panel('oee', 'OEE', oee.value === null ? empty('VERİ YOK — OEE için yeterli kayıt olan makine yok (100 gösterilmez).') : h('div', {}, h('div', { style: 'font-size:22px;font-weight:800' }, tonePct(oee.value)), h('div', { class: 'small' }, `${oee.counted}/${oee.of} makinenin bugünkü OEE değerinin ortalaması`))), panel('shipping', 'Sevkiyat riski', shipRisk.length ? h('ul', {}, ...shipRisk.slice(0, 6).map((o) => li(o.state === 'LATE' ? 'red' : 'amber', `${o.productCode ?? '—'} · ${ORDER_TR[o.state] ?? o.state}`, `${NUM.format(o.shipped)}/${NUM.format(o.qty)} sevk · ${o.dueDate}`))) : empty('Sevki bekleyen riskli sipariş satırı yok.')));
     };
-    const GROUPS = [['ALL', 'Tümü', null], ['ACTIVE', 'Aktif iş emri', ['ACTIVE_WORK_ORDER', 'FIRST_PIECE']], ['READY', 'Hazır · boşta', ['READY_IDLE']], ['DOWN', 'Arıza', ['DOWN']], ['MAINT', 'Bakım / bekletme', ['MAINTENANCE', 'HOLD']]];
+    const GROUPS = [['ALL', 'Tümü', null], ['ACTIVE', 'Aktif iş emri', ['ACTIVE_WORK_ORDER', 'FIRST_PIECE']], ['CNC', 'CNC sinyali (iş emri yok / bekleme / bayat)', ['CNC_RUNNING', 'CNC_FEED_HOLD', 'CNC_STALE']], ['READY', 'Hazır · boşta', ['READY_IDLE']], ['DOWN', 'Arıza', ['DOWN', 'CNC_ALARM']], ['MAINT', 'Bakım / bekletme', ['MAINTENANCE', 'HOLD']]];
     const tabsRow = (bd) => {
         const st = states(bd);
         const row = h('div', { class: 'tabs', 'data-testid': 'live-tabs', role: 'group', 'aria-label': 'Makine filtresi' });

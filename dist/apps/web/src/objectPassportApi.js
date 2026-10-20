@@ -1,6 +1,6 @@
 // Universal object passport adapter (KMI-RECOVERY-004). Reads ONLY canonical tables / existing RPCs through RLS; writes ONLY through existing canonical RPCs.
 // It creates no table, no cache, no second audit: the timeline is kmi_next.audit_log + the existing per-object event tables.
-import { machineState, displayKey } from '../../../packages/domain/src/machineState.js';
+import { machineStateOf, displayKey } from '../../../packages/domain/src/machineState.js';
 import { auditToEvent, formatStamp } from '../../../packages/domain/src/temporal.js';
 import { errorText, isSetupPending } from './errorText.js';
 import { fetchPilotFlags, pilotText, selReal } from './pilotMark.js';
@@ -92,10 +92,19 @@ export function createObjectPassportApi(client, session, access, myUserId = sess
                     }
                     catch { /* journal not installed yet */ }
                 }
+                // CNC fact for THIS machine (same read model as KMI LIVE / Home); no permission / not installed / unbound => null => operator-declared model unchanged.
+                let cncRow = null;
+                try {
+                    const rows = await client.rpc('cnc_live_states', {}, session);
+                    cncRow = rows.find((r) => r.machineCode === m.code) ?? null;
+                }
+                catch {
+                    cncRow = null;
+                }
                 const [st, tone] = MACHINE_STATUS_TR[m.status] ?? [m.status, ''];
-                return { kind, id, title: `${await pilotPrefix(id)}${m.code} · ${m.name}`, subtitle: m.category ?? 'Kategori belirtilmemiş', status: pill(st, tone), createdAt: m.createdAt, links: [], machineHeadline: (() => { const ms = machineState({ status: m.status, active: wos.map((w) => ({ runStatus: w.status, stale: staleIds.has(w.id) })) }); return displayKey(ms); })(),
+                return { kind, id, title: `${await pilotPrefix(id)}${m.code} · ${m.name}`, subtitle: m.category ?? 'Kategori belirtilmemiş', status: pill(st, tone), createdAt: m.createdAt, links: [], cncConnected: cncRow !== null, machineHeadline: (() => { const ms = machineStateOf({ status: m.status, active: wos.map((w) => ({ runStatus: w.status, stale: staleIds.has(w.id) })), cnc: cncRow }); return displayKey(ms); })(),
                     kpis: [{ label: 'Aktif iş emri', value: String(wos.length) }, { label: 'Açık bakım/arıza', value: String(tickets.length) }, { label: 'Toplam duruş', value: m.totalDownMinutes === null ? 'BİLİNMİYOR' : `${num(m.totalDownMinutes)} dk` },
-                        { label: m.status === 'DOWN' ? 'DOWN başlangıcı' : 'Fiziksel durum', value: m.status === 'DOWN' ? ts(m.downSince) : 'BİLİNMİYOR (CNC bağlantısı yok)' }] };
+                        { label: m.status === 'DOWN' ? 'DOWN başlangıcı' : 'Fiziksel durum', value: m.status === 'DOWN' ? ts(m.downSince) : cncRow ? (cncRow.link === 'UP' ? `CNC: ${{ CNC_ACTIVE: 'ÇALIŞIYOR', CNC_STOPPED: 'DURUYOR', CNC_FEED_HOLD: 'FEED HOLD', CNC_INTERRUPTED: 'KESİNTİ', CNC_ALARM: 'ALARM / ACİL STOP' }[cncRow.state] ?? 'BİLİNMİYOR'}` : 'CNC verisi BAYAT') : 'BİLİNMİYOR (CNC bağlantısı yok)' }] };
             }
             case 'WORK_ORDER': {
                 const w = await one('work_orders', 'id,order_item_id,machine_id,operator_id,status,qty_planned,qty_produced,qty_scrap,created_at,updated_at,planned_date,planned_shift_code', id);

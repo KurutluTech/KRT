@@ -16,6 +16,10 @@ export const STATE_VISUAL = {
     MAINTENANCE: { key: 'MAINTENANCE', label: 'BAKIMDA', color: '#ff8a1f', soft: 'rgba(255,138,31,.16)', animated: false, meaning: 'Bakımda' },
     HOLD: { key: 'HOLD', label: 'KALİTE HOLD', color: SEMANTIC.hold.fg, soft: 'rgba(196,181,253,.14)', animated: false, meaning: 'Kalite engeli / bekletme' },
     STALE: { key: 'STALE', label: 'BAYAT OTURUM', color: '#bdb5a5', soft: 'rgba(189,181,165,.14)', animated: false, meaning: 'Açık oturum var ama uzun süredir hareket yok — çalışıyor sayılmaz' },
+    CNC_RUNNING: { key: 'CNC_RUNNING', label: 'ÇALIŞIYOR', color: SEMANTIC.ok.fg, soft: 'rgba(52,211,153,.14)', animated: true, meaning: 'CNC program koşuyor (kontrol bildiriyor) — talaş kaldırma süresi değil, iş emri kaydı olmayabilir' },
+    CNC_FEED_HOLD: { key: 'CNC_FEED_HOLD', label: 'FEED HOLD', color: SEMANTIC.warn.fg, soft: 'rgba(251,191,36,.14)', animated: false, meaning: 'CNC FEED HOLD bildiriyor — ilerleme durdu' },
+    CNC_ALARM: { key: 'CNC_ALARM', label: 'ALARM / E-STOP', color: SEMANTIC.bad.fg, soft: 'rgba(248,113,113,.16)', animated: false, meaning: 'CNC alarm veya acil stop bildiriyor' },
+    CNC_STALE: { key: 'CNC_STALE', label: 'VERİ BAYAT', color: '#bdb5a5', soft: 'rgba(189,181,165,.14)', animated: false, meaning: 'CNC verisi güncel değil — son durum geçerli sayılmaz' },
     UNKNOWN: { key: 'UNKNOWN', label: 'BİLİNMİYOR', color: SEMANTIC.unknown.fg, soft: 'rgba(100,116,139,.12)', animated: false, meaning: 'Durum kaydı yok veya okunamadı' },
 };
 // ---- ORIGINAL artwork (KMI-001 final): vertical CNC spindle head — head block with two status lamps, cone, tool-holder collar, fluted cutter, chips.
@@ -30,7 +34,7 @@ const OUT = '#0b1220';
  *  the state shows ONLY in the band, the lamp and the badge — so it can never read as a face or a cartoon. */
 const body = (v) => {
     const c = v.color;
-    const unk = v.key === 'UNKNOWN' || v.key === 'STALE';
+    const unk = v.key === 'UNKNOWN' || v.key === 'STALE' || v.key === 'CNC_STALE';
     const dash = unk ? ' stroke-dasharray="3 2.4"' : '';
     const steel = unk ? '#3a475c' : '#52617d';
     const steel2 = unk ? '#2c384b' : '#3d4b66';
@@ -60,6 +64,10 @@ const OVERLAY = {
     MAINTENANCE: (c) => BADGE(c, `<path d="M47.4 54.6l6.6-6.6M53.6 45.4a3.2 3.2 0 1 0 4 4" fill="none" stroke="${c}" stroke-width="2.2" stroke-linecap="round"/>`),
     HOLD: (c) => BADGE(c, `<path d="M52 47.4v5M52 55v.5" stroke="${c}" stroke-width="2.4" stroke-linecap="round"/>`, true),
     STALE: (c) => BADGE(c, `<circle cx="52" cy="50" r="5.2" fill="none" stroke="${c}" stroke-width="1.8"/><path d="M52 47v3.2l2.2 1.4" fill="none" stroke="${c}" stroke-width="1.8" stroke-linecap="round"/>`),
+    CNC_RUNNING: () => '',
+    CNC_FEED_HOLD: (c) => BADGE(c, `<path d="M49.4 45.6v8.8M54.6 45.6v8.8" stroke="${c}" stroke-width="2.6" stroke-linecap="round"/>`),
+    CNC_ALARM: (c) => BADGE(c, `<path d="M48 46l8 8M56 46l-8 8" stroke="${c}" stroke-width="2.6" stroke-linecap="round"/>`),
+    CNC_STALE: (c) => BADGE(c, `<circle cx="52" cy="50" r="5.2" fill="none" stroke="${c}" stroke-width="1.8"/><path d="M52 47v3.2l2.2 1.4" fill="none" stroke="${c}" stroke-width="1.8" stroke-linecap="round"/>`),
     UNKNOWN: (c) => BADGE(c, `<path d="M49.4 47.4a2.7 2.7 0 1 1 3.6 2.5c-.9.4-1.2.9-1.2 1.8M52 55v.4" fill="none" stroke="${c}" stroke-width="2" stroke-linecap="round"/>`),
 };
 export function visualFor(headline) {

@@ -289,7 +289,13 @@ export const ROUTES = [
         // /is-karti serves two screens: ?is=<work order> = the KMI-011 job card (operation documents + scan check), otherwise (?wo=) the operator work-order card. One path, no shadowed route.
         render: (el, c, s, q) => q.has('is') ? renderJobCardScreen(el, { load: (wo) => jobCardFor(c, s, wo), scan: (input, wo) => scanCheckLogged(c, s, input, wo, `jc-scan-${Date.now()}`) }, q.get('is'), q.get('op')) : renderOperatorWoCardScreen(el, { api: createOperatorWoCardApi(c, s), openTerminal: (machineId) => { rememberMachine(machineId); location.hash = '#/terminal'; }, go: (hash) => { location.hash = hash; } }, q.get('wo')),
     },
-    { path: '/terminal', label: 'Makine Terminali', group: 'Saha', inMenu: true, render: (el, c, s) => renderTerminalScreen(el, createTerminalApi(c, s), { machineId: rememberedMachine() }, { icon: (n, z) => icon(n, z) }) },
+    { path: '/terminal', label: 'Makine Terminali', group: 'Saha', inMenu: true, render: (el, c, s) => renderTerminalScreen(el, createTerminalApi(c, s), { machineId: rememberedMachine() }, { icon: (n, z) => icon(n, z), cncOf: async (code) => { try {
+                const r = (await createLiveApi(c, s).cncStates()).find((x) => x.machineCode === code);
+                return r ? { link: r.link, state: r.state } : null;
+            }
+            catch {
+                return null;
+            } } }) },
     {
         path: '/is-emirleri', label: 'İş Emirleri (üretim · kalite · stok · sevkiyat)', group: 'Saha', inMenu: true,
         render: (el, c, s, q) => renderWorkOrderHubScreen(el, { hub: createWorkOrderHubApi(c, s), workOrders: createWorkOrdersApi(c, s), production: createProductionApi(c, s),
@@ -329,7 +335,7 @@ export const ROUTES = [
     },
     { path: '/giris-cikislarim', label: 'Giriş-çıkışlarım', group: 'Saha', inMenu: true, render: (el, c, s) => renderMyAttendanceScreen(el, createGeckoApi(c, s), { today: istanbulToday() }) },
     { path: '/rozetlerim', label: 'Rozetlerim', group: 'Saha', inMenu: true, render: (el, c, s, q) => renderBadgesScreen(el, createBadgesApi(c, s), { personnelId: q.get('kisi') }) },
-    { path: '/bakim', label: 'Bakım / Makine Sağlığı', group: 'Saha', inMenu: true, render: (el, c, s) => renderMaintenanceScreen(el, { api: createMaintenanceApi(c, s) }) },
+    { path: '/bakim', label: 'Bakım / Makine Sağlığı', group: 'Saha', inMenu: true, render: (el, c, s) => renderMaintenanceScreen(el, { api: createMaintenanceApi(c, s), cncStates: () => createLiveApi(c, s).cncStates() }) },
     { path: '/kalite', label: 'Kalite Masası (karar kuyruğu)', group: 'Saha', inMenu: true, render: (el, c, s, q, a) => renderQualityDesk(el, createQualityDeskApi(c, s), { can: (x) => a.actions.includes(x), initialKind: q.get('k') }) },
     { path: '/sevkiyat', label: 'Sevkiyat / Lojistik', group: 'Saha', inMenu: true, render: (el, c, s) => renderDepartmentScreen(el, createDepartmentApi(c, s, createWorkOrderHubApi(c, s)), 'SEVKIYAT') },
     { path: '/depo', label: 'Depo / Stok / Malzeme', group: 'Satınalma / Depo', inMenu: true, render: (el, c, s) => renderDepartmentScreen(el, createDepartmentApi(c, s, createWorkOrderHubApi(c, s)), 'DEPO') },

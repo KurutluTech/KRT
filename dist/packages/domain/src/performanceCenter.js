@@ -34,10 +34,10 @@ export function buildPerformanceCenter(i) {
     let machines = [];
     let tiles = [];
     if (b) {
-        const input = b.machines.map((m) => ({ code: m.code, status: m.status, since: m.since, active: m.active, shiftGood: m.shiftGood, shiftScrap: m.shiftScrap, openHolds: m.openHolds, openMaintenance: m.openMaintenance }));
+        const input = b.machines.map((m) => ({ code: m.code, status: m.status, since: m.since, active: m.active, cnc: m.cnc ?? null, shiftGood: m.shiftGood, shiftScrap: m.shiftScrap, openHolds: m.openHolds, openMaintenance: m.openMaintenance }));
         const map = buildFactoryMap(input, i.info);
         tiles = map.groups.flatMap((g) => g.tiles);
-        const counts = Object.fromEntries(['DOWN', 'MAINTENANCE', 'HOLD', 'ACTIVE_WORK_ORDER', 'FIRST_PIECE', 'READY_IDLE', 'UNKNOWN'].map((k) => [k, tiles.filter((t) => t.headline === k).length]));
+        const counts = Object.fromEntries(['DOWN', 'MAINTENANCE', 'HOLD', 'ACTIVE_WORK_ORDER', 'FIRST_PIECE', 'READY_IDLE', 'UNKNOWN', 'CNC_RUNNING', 'CNC_FEED_HOLD', 'CNC_ALARM', 'CNC_STALE'].map((k) => [k, tiles.filter((t) => t.headline === k).length]));
         fleet = map.total > 0 ? known({ total: map.total, counts, groups: map.groups, physicalNote: 'Fiziksel çalışma BİLİNMİYOR (CNC bağlantısı yok) — durum elle girilen kayıttır', missingFromRegistry: map.missingFromRegistry }) : unknown('Makine kaydı yok');
         machines = b.machines.map((m) => ({ code: m.code, headline: tiles.find((t) => t.code === m.code)?.headline ?? 'UNKNOWN', good: Number.isFinite(m.shiftGood) ? m.shiftGood : null, scrap: Number.isFinite(m.shiftScrap) ? m.shiftScrap : null, oee: m.oeeToday }));
     }

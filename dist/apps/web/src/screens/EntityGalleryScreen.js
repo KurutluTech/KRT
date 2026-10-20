@@ -2,7 +2,7 @@
 // DEFAULT view of the screen is the card grid; every card is one link to the passport / workspace. A state filter only narrows the view — the
 // full count and "all" are always one click away, and a machine is NEVER dropped because of its status (BAKIMDA, ARIZA, BEKLETME…).
 import { h, mount } from '../../../../packages/ui/src/h.js';
-import { machineState, HEADLINE_TR, MACHINE_CLASS_TR } from '../../../../packages/domain/src/machineState.js';
+import { machineStateOf, HEADLINE_TR, MACHINE_CLASS_TR } from '../../../../packages/domain/src/machineState.js';
 import { ENTITY_CARD_CSS, dateTr, entityCard, initialsOf, photoSlot } from '../cardKit.js';
 import { MACHINE_CARD_CSS, machineIdentityCard, sinceText } from '../machineCard.js';
 import { errorText } from '../errorText.js';
@@ -65,7 +65,7 @@ export async function renderEntityGalleryScreen(container, deps, opts) {
         let stateKey = f.state;
         if (kind === 'MACHINE') {
             const live = board?.machines.find((m) => m.code === f.code);
-            const ms = machineState({ status: f.state, active: live?.active ?? [] });
+            const ms = machineStateOf({ status: f.state, active: live?.active ?? [], cnc: live?.cnc ?? null });
             stateKey = ms.headline;
             const a = live?.active[0];
             const cls = str(x.machine_class) && x.machine_class in MACHINE_CLASS_TR ? MACHINE_CLASS_TR[x.machine_class] : null;

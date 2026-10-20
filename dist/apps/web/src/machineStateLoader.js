@@ -1,13 +1,13 @@
 // KMI-013 §3 — one loader so every secondary screen (Planlama Kokpiti, Shift Planner, İE pasaportu, terminal) shows the SAME canonical machine state as KMI LIVE:
 // the live board's per-machine active sessions → machineState() (the single engine). Failure ⇒ empty map ⇒ screens show UNKNOWN for UP machines, never an invented idle/running state.
-import { machineState } from '../../../packages/domain/src/machineState.js';
+import { machineState, machineStateOf } from '../../../packages/domain/src/machineState.js';
 import { spindleForState, spindleIcon } from './spindle.js';
 export async function loadMachineStates(api, profile = 'OFFICE') {
     const out = new Map();
     try {
         const b = await api.board(profile);
         for (const m of b.machines)
-            out.set(m.code, machineState({ status: m.status, active: m.active }));
+            out.set(m.code, machineStateOf(m));
     }
     catch { /* UNKNOWN fallback below */ }
     return out;

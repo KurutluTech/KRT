@@ -3,6 +3,7 @@ import { NA, dt, day, nf, link, pill, orNA, inList, kv, table, note, tabTopic, a
 import { actorNames } from './personnel.js';
 import { pctOf } from './util.js';
 import { pilotText } from '../../pilotMark.js';
+import { cncTopics } from './cncTopics.js';
 import { h } from '../../../../../packages/ui/src/h.js';
 export const MACHINE_COLS = 'id,code,name,category,status,down_since,total_down_minutes,machine_class,updated_at';
 const ACTIVE = ['IN_PROGRESS', 'FIRST_PIECE_PENDING', 'FIRST_PIECE_APPROVED'];
@@ -31,6 +32,7 @@ export function machineTopics(ctx, m) {
         }, {}),
         A('kontrol', 'Kontrol ünitesi, eksenler, strok', 'chip', 'Kimlik', 'Kontrol, eksen, strok değerleri', ['CONTROLLER', 'AXES', 'TRAVEL_X', 'TRAVEL_Y', 'TRAVEL_Z', 'SPINDLE_RPM_MAX', 'SPINDLE_POWER_KW', 'TOOL_CAPACITY']),
         A('ekipman', 'Takılı ekipman: bölücü, prob', 'layers', 'Kimlik', 'Bölücü / prob / aksesuar', ['DIVIDER_TYPE', 'PROBE_TYPE', 'MOUNTED_EQUIPMENT_NOTE']),
+        ...cncTopics(ctx, m),
         R('aktif-is', 'Aktif iş ve iş emri kuyruğu', 'factory', 'Operasyon', 'Aktif ve bekleyen iş emirleri', async () => {
             const wos = await ctx.sel('work_orders', 'id,status,operator_id,qty_planned,qty_produced,planned_date,planned_shift_code,planned_minutes', { machine_id: `eq.${m.id}`, status: 'not.in.(COMPLETED,CANCELLED,CLOSED)' }, 'planned_date.asc.nullslast', 60);
             const ops = await opNames(ctx, wos.map((w) => w.operatorId));

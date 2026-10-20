@@ -7,6 +7,7 @@ import { errorText as sharedErrorText } from '../errorText.js';
 import { DS_CSS } from '../ds.js';
 import { formatStamp } from '../../../../packages/domain/src/temporal.js';
 import { passportHref } from '../passport/registry.js';
+import { machineStateOf, HEADLINE_TR } from '../../../../packages/domain/src/machineState.js';
 function errorText(err) {
     return sharedErrorText(err);
 }
@@ -20,6 +21,15 @@ export async function renderMaintenanceScreen(container, deps, banner) {
     }
     catch (err) {
         loadError = errorText(err);
+    }
+    const cncBy = new Map();
+    if (deps.cncStates) {
+        try {
+            for (const r of await deps.cncStates())
+                if (r.machineCode)
+                    cncBy.set(r.machineCode, r);
+        }
+        catch { /* no telemetry permission / not installed: administrative view only */ }
     }
     const reasonInputs = new Map();
     function reasonInputFor(machineId) {
@@ -165,8 +175,13 @@ export async function renderMaintenanceScreen(container, deps, banner) {
                                     " ",
                                     h("span", { class: "mut", "data-testid": "machine-name" }, m.name)),
                                 h("div", { style: "display:flex;gap:6px;flex-wrap:wrap;margin-top:6px;align-items:center" },
+                                    h("span", { class: "mut", style: "font-size:11px" }, "Kay\u0131tl\u0131 (idari) durum:"),
                                     h("span", { class: `pill ${st[1]}`, "data-testid": "machine-status", "data-code": m.status }, st[0]),
                                     h("span", { class: `pill ${el.eligible ? 'ok' : 'warn'}`, "data-testid": "machine-eligibility", "data-eligible": String(el.eligible), "data-return-path": el.returnPath }, el.label),
+                                    cncBy.has(m.code) ? h("span", { class: "mut", "data-testid": "machine-cnc", "data-cnc-headline": machineStateOf({ status: 'UP', active: [], cnc: cncBy.get(m.code) }).headline },
+                                        "Fiziksel CNC (kontrol bildiriyor): ",
+                                        h("b", null, HEADLINE_TR[machineStateOf({ status: 'UP', active: [], cnc: cncBy.get(m.code) }).headline]),
+                                        " \u2014 bak\u0131m kayd\u0131ndan ayr\u0131 bir bilgidir, bak\u0131m kap\u0131lar\u0131n\u0131 de\u011Fi\u015Ftirmez") : null,
                                     h("span", { class: "mut" },
                                         "Toplam duru\u015F: ",
                                         h("span", { "data-testid": "machine-down-minutes" }, String(m.totalDownMinutes)),

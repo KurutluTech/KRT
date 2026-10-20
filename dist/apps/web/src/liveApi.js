@@ -2,7 +2,25 @@ import { periodFetchFrom } from '../../../packages/domain/src/liveKpi.js';
 import { selReal } from './pilotMark.js';
 export function createLiveApi(client, session) {
     return {
-        board: (profile) => client.rpc('live_board', { p_profile: profile }, session),
+        board: async (profile) => {
+            const b = await client.rpc('live_board', { p_profile: profile }, session);
+            // ONE FACT -> ONE SOURCE: the CNC verdict is read once here and rides on the board, so every screen that builds a machine state sees the same CNC fact.
+            if (profile === 'OFFICE') {
+                try {
+                    const by = new Map();
+                    for (const r of await client.rpc('cnc_live_states', {}, session))
+                        if (r.machineCode)
+                            by.set(r.machineCode, r);
+                    for (const m of b.machines) {
+                        const r = by.get(m.code);
+                        if (r)
+                            m.cnc = r;
+                    }
+                }
+                catch { /* no CNC permission / not installed: operator-declared model, never an invented state */ }
+            }
+            return b;
+        },
         machineInfo: async () => {
             try {
                 return await selReal(client, 'machines', { columns: 'id,code,name,machine_class', order: 'code.asc', limit: 200 }, session);

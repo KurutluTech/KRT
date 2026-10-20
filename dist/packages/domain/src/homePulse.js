@@ -2,10 +2,19 @@
 // Nothing is invented: a missing source gives value=null ("BİLİNMİYOR"), never 0; an active work order is NOT "the CNC is running";
 // an operator assigned to a work order is NOT "on the floor" (no GEÇKO/physical presence source is consulted here).
 import { homeDomainsFor } from './homeLayout.js';
-import { machineState } from './machineState.js';
+import { machineStateOf } from './machineState.js';
 const num = (c, k) => { const v = c?.[k]; return typeof v === 'number' && Number.isFinite(v) && v >= 0 ? v : null; };
 const NUM = new Intl.NumberFormat('tr-TR');
-function headlines(b) { return b.machines.map((m) => machineState({ status: m.status, active: m.active }).headline); }
+function headlines(b) { return b.machines.map((m) => machineStateOf(m).headline); }
+/** Active work orders and "CNC running" are two different numbers (never merged). The CNC part is stated only for machines that really have a bound CNC device. */
+function cncSub(b) {
+    const st = b ? b.machines.map((m) => machineStateOf(m)).filter((x) => x.cnc) : [];
+    if (!st.length)
+        return 'kayıtlı durum · fiziksel durum BİLİNMİYOR · CNC bağlantısı BAĞLI DEĞİL';
+    const run = st.filter((x) => x.cncRunning).length;
+    const stale = st.filter((x) => x.headline === 'CNC_STALE').length;
+    return `iş emri kaydı · CNC bağlı ${st.length} makineden ${run} tanesi çalışıyor${stale ? ` · ${stale} veri bayat` : ''} · diğerlerinde fiziksel durum BİLİNMİYOR`;
+}
 export function buildPulse(i) {
     const b = i.board;
     const hl = b ? headlines(b) : null;
@@ -15,7 +24,7 @@ export function buildPulse(i) {
     if (canSeeBoard) {
         const total = b?.machines.length ?? null;
         const active = cnt('ACTIVE_WORK_ORDER') !== null ? cnt('ACTIVE_WORK_ORDER') + (cnt('FIRST_PIECE') ?? 0) : null;
-        tiles.push({ id: 'machines', label: 'Aktif iş emri olan makine', value: active !== null && total !== null ? `${active} / ${total}` : null, sub: 'kayıtlı durum · fiziksel durum BİLİNMİYOR · CNC bağlantısı BAĞLI DEĞİL', tone: active === null ? 'unknown' : 'info', href: i.canOpen('/canli') ? '#/canli' : null, domain: 'PRODUCTION' });
+        tiles.push({ id: 'machines', label: 'Aktif iş emri olan makine', value: active !== null && total !== null ? `${active} / ${total}` : null, sub: cncSub(b), tone: active === null ? 'unknown' : 'info', href: i.canOpen('/canli') ? '#/canli' : null, domain: 'PRODUCTION' });
         const wo = num(i.counters, 'workOrdersRunning');
         tiles.push({ id: 'workorders', label: 'Çalışan iş emri', value: wo !== null ? String(wo) : null, sub: 'ilk parça bekleyenler dahil', tone: wo === null ? 'unknown' : 'info', href: i.canOpen('/is-emirleri') ? '#/is-emirleri' : null, domain: 'PRODUCTION' });
         // assigned operators: only names the server delivered; "undefined" (not visible to this role) is unknown, an empty list of known names is 0
@@ -80,7 +89,7 @@ export function orderPulse(tiles, access) {
 /** Machine park ordering for a department: its own problems first (QUALITY → hold/first piece, MAINTENANCE → down/maintenance, PRODUCTION → down/active). */
 export function fleetPriority(access) {
     const d = homeDomainsFor(access);
-    const base = ['DOWN', 'HOLD', 'MAINTENANCE', 'FIRST_PIECE', 'ACTIVE_WORK_ORDER', 'READY_IDLE', 'UNKNOWN'];
+    const base = ['DOWN', 'CNC_ALARM', 'HOLD', 'MAINTENANCE', 'FIRST_PIECE', 'ACTIVE_WORK_ORDER', 'CNC_RUNNING', 'CNC_FEED_HOLD', 'READY_IDLE', 'CNC_STALE', 'UNKNOWN'];
     if (d === 'ALL')
         return base;
     const first = [];

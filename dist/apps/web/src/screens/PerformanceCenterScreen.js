@@ -60,7 +60,7 @@ const CSS = CHART_CSS + `
 .pc .mt:hover{border-color:var(--hair2)}
 .pc .mt .ico{position:relative;width:44px;height:44px;display:flex;align-items:center;justify-content:center;color:var(--mu)}
 .pc .mt .ico .ring{position:absolute;inset:0;border-radius:50%;border:2px solid var(--unk)}
-.pc .mt.ACTIVE_WORK_ORDER .ring{border-color:var(--live)}.pc .mt.FIRST_PIECE .ring{border-color:var(--gold)}.pc .mt.READY_IDLE .ring{border-color:var(--ok)}
+.pc .mt.CNC_RUNNING .ring{border-color:var(--live)}.pc .mt.CNC_FEED_HOLD .ring{border-color:var(--risk)}.pc .mt.CNC_ALARM .ring{border-color:var(--crit)}.pc .mt.CNC_STALE .ring{border-style:dashed}.pc .mt.ACTIVE_WORK_ORDER .ring{border-color:var(--live)}.pc .mt.FIRST_PIECE .ring{border-color:var(--gold)}.pc .mt.READY_IDLE .ring{border-color:var(--ok)}
 .pc .mt.HOLD .ring,.pc .mt.MAINTENANCE .ring{border-color:var(--risk)}.pc .mt.DOWN .ring{border-color:var(--crit)}.pc .mt.UNKNOWN .ring{border-style:dashed}
 .pc .mt.ACTIVE_WORK_ORDER .ico{color:var(--live)}.pc .mt.DOWN .ico{color:var(--crit)}
 .pc .mt b{font-size:14px;display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.pc .mt .st{display:block;white-space:nowrap;font-size:10.5px;letter-spacing:.08em;font-weight:700;color:var(--mu)}
@@ -101,7 +101,7 @@ const esc = (s) => s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>
 const LAMP_GLYPH = { GREEN: '✓', AMBER: '!', RED: '✕', UNKNOWN: '?', STALE: '◷' };
 const LAMP_TR = { GREEN: 'NORMAL', AMBER: 'RİSK', RED: 'KRİTİK', UNKNOWN: 'VERİ YOK', STALE: 'GECİKMİŞ' };
 const SEV_TR = { CRITICAL: 'KRİTİK', HIGH: 'YÜKSEK', MEDIUM: 'ORTA', ADVISORY: 'ÖNERİ' };
-const CLS_TONE = { DOWN: 'var(--crit)', MAINTENANCE: 'var(--risk)', HOLD: 'var(--risk)', ACTIVE_WORK_ORDER: 'var(--live)', FIRST_PIECE: 'var(--gold)', READY_IDLE: 'var(--ok)', UNKNOWN: 'var(--unk)' };
+const CLS_TONE = { DOWN: 'var(--crit)', MAINTENANCE: 'var(--risk)', HOLD: 'var(--risk)', ACTIVE_WORK_ORDER: 'var(--live)', FIRST_PIECE: 'var(--gold)', READY_IDLE: 'var(--ok)', UNKNOWN: 'var(--unk)', CNC_RUNNING: 'var(--live)', CNC_FEED_HOLD: 'var(--risk)', CNC_ALARM: 'var(--crit)', CNC_STALE: 'var(--unk)' };
 const LOSS_COLORS = ['#5cc8e6', '#c9a24a', '#f0645a', '#e8b04a', '#a98bf0', '#7d8ba3'];
 const timers = new WeakMap();
 const svgEl = (markup, label, cls = 'chart') => { const d = document.createElement('span'); d.style.display = 'block'; d.innerHTML = markup.replace('<svg ', `<svg class="${cls}" role="img" aria-label="${esc(label)}" `); return d; };

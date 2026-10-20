@@ -7,7 +7,7 @@ import { freshness, homeDomainsFor, productionShiftAt } from '../../../packages/
 import { buildPriorityQueue, buildAttention, openTaskCount, quickAccess, applyOrder, TIER_LABEL_TR } from '../../../packages/domain/src/smartHome.js';
 import { NAV_ITEM_BY_PATH } from './nav.js';
 import { WO_STATUS_TR } from './screens/WorkOrderHubScreen.js';
-import { machineState, AVAILABILITY_TR, MACHINE_CLASS_TR } from '../../../packages/domain/src/machineState.js';
+import { machineStateOf, AVAILABILITY_TR, MACHINE_CLASS_TR } from '../../../packages/domain/src/machineState.js';
 import { formatStamp } from '../../../packages/domain/src/temporal.js';
 import { machineIdentityCard, progressPct, sinceText } from './machineCard.js';
 import { bulletBar, shiftColumns, distributionBar, trendBadge, chartUnknown, CHART_CSS } from './charts.js';
@@ -116,7 +116,7 @@ export function renderHomeShow(host, i) {
         else {
             const b = i.board;
             const details = i.snapshot?.liveWorkOrders ?? [];
-            const rows = b.machines.map((m) => ({ m, ms: machineState({ status: m.status, active: m.active }) }))
+            const rows = b.machines.map((m) => ({ m, ms: machineStateOf(m) }))
                 .sort((a, c) => HEAD.indexOf(a.ms.headline) - HEAD.indexOf(c.ms.headline) || a.m.code.localeCompare(c.m.code));
             const counts = {};
             rows.forEach((r) => { counts[r.ms.headline] = (counts[r.ms.headline] ?? 0) + 1; });

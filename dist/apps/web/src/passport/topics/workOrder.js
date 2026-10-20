@@ -2,7 +2,7 @@ import { NA, dt, day, nf, link, pill, orNA, inList, kv, table, note, tabTopic, o
 import { h } from '../../../../../packages/ui/src/h.js';
 import { sectionNode } from '../sections.js';
 import { errorText } from '../../errorText.js';
-import { machineState, DATA_SOURCE_TR, HEADLINE_TR, STALE_TR, displayKey } from '../../../../../packages/domain/src/machineState.js';
+import { machineStateOf, DATA_SOURCE_TR, HEADLINE_TR, STALE_TR, displayKey } from '../../../../../packages/domain/src/machineState.js';
 import { spindleForState } from '../../spindle.js';
 import { describeBlocker } from '../../woReadiness.js';
 const EVENT_TR = { CREATED: 'İş emri açıldı', MACHINE_ASSIGNED: 'Makine atandı', PLAN_CHANGED: 'Plan / atama değişti', START: 'START — üretim başladı', RESUME: 'Devam (HOLD kalktı)', CONTINUE_AFTER_FIRST_PIECE: 'İlk parça sonrası devam',
@@ -54,8 +54,16 @@ export function workOrderTopics(ctx, w) {
                     try {
                         const b = await ctx.rpc('live_board', { p_profile: 'OFFICE' });
                         const m = b.machines.find((x) => x.code === w.machine.code);
+                        // ONE FACT -> ONE SOURCE: the same cnc_live_states verdict every other screen uses (no permission / not installed => operator-declared model)
+                        try {
+                            const rows = await ctx.rpc('cnc_live_states', {});
+                            const r = rows.find((x) => x.machineCode === w.machine.code);
+                            if (m && r)
+                                m.cnc = r;
+                        }
+                        catch { /* operator-declared model */ }
                         if (m) {
-                            const ms = machineState({ status: m.status, active: m.active });
+                            const ms = machineStateOf(m);
                             mNode = h('div', { class: 'ps-mstate', 'data-testid': 'flow-machine-state', 'data-state': displayKey(ms), style: 'display:flex;align-items:center;gap:10px;margin:8px 0' }, spindleForState(ms, 44), h('div', {}, h('b', {}, `${w.machine.code} · ${ms.stale ? STALE_TR : HEADLINE_TR[ms.headline]}`), h('div', { class: 'ps-note' }, `Veri kaynağı: ${DATA_SOURCE_TR[ms.dataSource]} · fiziksel çalışma doğrulanmadı`)));
                         }
                     }

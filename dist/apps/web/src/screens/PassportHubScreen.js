@@ -149,7 +149,7 @@ export async function renderPassportHubScreen(container, deps, state) {
                     alerts.push(`${MACHINE_TR[m.status]}${tk && tk[0] ? `: ${tk[0].reason}` : ''}`);
                 else if (tk && tk.length)
                     alerts.push(`${tk.length} açık bakım/arıza kaydı var`);
-                head.machineNote = 'Kayıtlı durum elle girilir; CNC bağlantısı olmadığı için fiziksel çalışma doğrulanmaz.';
+                head.machineNote = card.cncConnected ? 'Bu makinede CNC bağlantısı var: çalışma durumu CNC sinyalinden gelir (talaş kaldırma süresi değildir). Bakım / arıza / test yetkisi kayıtlı durumda kalır; CNC bunları değiştirmez.' : 'Kayıtlı durum elle girilir; CNC bağlantısı olmadığı için fiziksel çalışma doğrulanmaz.';
                 emblem = passportEmblem(kind, card.machineHeadline);
                 topics = machineTopics(ctx, m);
                 break;
