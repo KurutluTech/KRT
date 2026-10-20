@@ -6,6 +6,7 @@ import { h, mount } from '../../../../packages/ui/src/h.js';
 import { OPERATION_STATUS_TR, SKILL_REVIEW_TR, startRefusalText } from '../../../../packages/domain/src/routing.js';
 import { FACTOR_TR } from '../../../../packages/domain/src/assignment.js';
 import { errorText as sharedErrorText } from '../errorText.js';
+import { pilotBanner, pilotText } from '../pilotMark.js';
 const errText = (e) => sharedErrorText(e);
 const STATUS_COLOR = { PENDING: '#64748b', FIRST_PIECE_PENDING: '#b45309', RUNNING: '#1d4ed8', QC_PENDING: '#7c3aed', DONE: '#15803d' };
 const REVIEW_COLOR = { UNKNOWN: '#b45309', DEFINED: '#15803d', NONE_REQUIRED: '#0f766e' };
@@ -26,6 +27,7 @@ export async function renderRoutingScreen(container, api, state = {}) {
     let loadError = null;
     let people = [];
     let woIds = [];
+    let pf = null;
     let routing = null;
     let matrix = [];
     let suggestion = null;
@@ -36,6 +38,12 @@ export async function renderRoutingScreen(container, api, state = {}) {
         people = await api.people();
         if (tab === 'OPS') {
             woIds = await api.routedWorkOrders();
+            try {
+                pf = api.pilotFlags ? await api.pilotFlags(woIds) : null;
+            }
+            catch {
+                pf = null;
+            }
             const wid = state.workOrderId ?? woIds[0] ?? null;
             if (wid)
                 routing = await api.workOrderRouting(wid);
@@ -139,8 +147,8 @@ export async function renderRoutingScreen(container, api, state = {}) {
             + (d.requiredSkillCode ? ` · ${d.requiredSkillCode} ≥ ${d.requiredSkillLevel}` : '') + (d.firstPieceRequired ? ' · ilk parça' : '') + (d.qcRequired ? ' · kalite' : ''))), rid ? h('div', { style: 'display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:8px' }, opNo, name, skill, level, h('label', {}, fp, ' ilk parça'), h('label', {}, qc, ' kalite kontrol'), reason) : null, rid ? h('div', { 'data-testid': 'def-machines', style: 'display:flex;gap:8px;flex-wrap:wrap;margin:6px 0' }, ...boxes) : null, rid ? h('button', { type: 'button', 'data-testid': 'def-save', onClick: () => void save() }, 'Operasyonu kaydet') : null, h('div', { style: 'display:flex;gap:6px;flex-wrap:wrap;margin-top:10px' }, woIn, h('button', { type: 'button', 'data-testid': 'def-apply', onClick: () => void act(() => api.applyRouting(woIn.value.trim()), 'Rota iş emrine uygulandı') }, 'İş emrine uygula')));
     };
     mount(container, h('div', { class: 'routing-screen', style: 'padding:0 16px;box-sizing:border-box;max-width:100%' }, h('h1', { 'data-testid': 'rt-heading' }, 'Rota / Operasyonlar'), h('div', { style: 'display:flex;gap:6px;margin:6px 0' }, h('button', { type: 'button', 'data-testid': 'rt-tab-ops', 'aria-pressed': String(tab === 'OPS'), onClick: () => go({ tab: 'OPS' }) }, 'Operasyonlar'), h('button', { type: 'button', 'data-testid': 'rt-tab-def', 'aria-pressed': String(tab === 'DEF'), onClick: () => go({ tab: 'DEF' }) }, 'Rota tanımı'), h('button', { type: 'button', 'data-testid': 'rt-tab-matrix', 'aria-pressed': String(tab === 'MATRIX'), onClick: () => go({ tab: 'MATRIX' }) }, 'Makine–yetkinlik matrisi')), state.message ? h('div', { 'data-testid': 'rt-message', 'data-kind': state.message.kind, style: `padding:10px;border-radius:8px;margin:6px 0;background:${state.message.kind === 'ok' ? '#dcfce7' : '#fee2e2'}` }, state.message.text) : null, loadError ? h('div', { 'data-testid': 'rt-load-error', style: 'padding:10px;border-radius:8px;background:#fee2e2' }, `Yüklenemedi: ${loadError}`) : null, tab === 'OPS' && !loadError
-        ? h('section', {}, woIds.length
-            ? h('select', { 'data-testid': 'rt-wo', onChange: (e) => go({ tab: 'OPS', workOrderId: e.target.value }) }, ...woIds.map((id) => h('option', { value: id, ...(id === wid ? { selected: 'selected' } : {}) }, `İş emri ${id.slice(0, 8)}`)))
+        ? h('section', {}, routing && pf?.has(routing.workOrderId) ? pilotBanner(pf.retired(routing.workOrderId)) : null, woIds.length
+            ? h('select', { 'data-testid': 'rt-wo', onChange: (e) => go({ tab: 'OPS', workOrderId: e.target.value }) }, ...woIds.map((id) => h('option', { value: id, ...(id === wid ? { selected: 'selected' } : {}) }, pilotText(`İş emri ${id.slice(0, 8)}`, pf?.has(id) === true))))
             : h('div', { 'data-testid': 'rt-no-routed' }, 'Rotası uygulanmış iş emri yok.'), routing ? h('div', { 'data-testid': 'rt-final', 'data-ready': String(routing.finalReleaseReady), style: 'margin:6px 0;font-weight:700' }, routing.finalReleaseReady ? 'Tüm operasyonlar tamam — final serbest bırakma yapılabilir.' : 'Final serbest bırakma için tüm operasyonlar TAMAM olmalı.') : null, ...(routing ? routing.operations.map((o) => opCard(o, routing.workOrderId)) : []))
         : null, tab === 'DEF' && !loadError ? defForm() : null, tab === 'MATRIX' && !loadError
         ? h('section', {}, h('p', { style: 'font-size:12px;color:#555' }, 'BİLİNMİYOR = makinenin yetkinlik şartı henüz incelenmedi; bu "herkes yetkili" demek değildir. Rotalı operasyonlarda yetkili doğrulama gerekir.'), h('div', { 'data-testid': 'mx-summary' }, `İncelenmemiş makine: ${matrix.filter((m) => m.skillReview === 'UNKNOWN').length} / ${matrix.length}`), ...matrix.map(matrixRow))

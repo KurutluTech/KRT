@@ -1,5 +1,6 @@
 // KMI NEXT — İş emri takım hazırlığı: CAM programının takım listesi vs makinede bağlı, ömrü
 // kalmış takımlar; iş emri için takım bağlama. Kurallar sunucuda yeniden uygulanır (0019).
+import { pilotBanner, pilotChip } from '../pilotMark.js';
 import { h, mount } from '../../../../packages/ui/src/h.js';
 import { readinessLabel } from '../../../../packages/domain/src/readiness.js';
 import { readinessPanel } from './readinessPanel.js';
@@ -11,6 +12,13 @@ export async function renderToolReadinessScreen(container, workOrderId, machineI
     let rows = [];
     let readiness = [];
     let loadError = null;
+    let isPilot = false;
+    try {
+        isPilot = api.isPilot ? await api.isPilot(workOrderId) : false;
+    }
+    catch {
+        isPilot = false;
+    }
     try {
         [rows, readiness] = await Promise.all([api.status(workOrderId), api.readiness(workOrderId)]);
     }
@@ -37,7 +45,7 @@ export async function renderToolReadinessScreen(container, workOrderId, machineI
             await renderToolReadinessScreen(container, workOrderId, machineId, api, { kind: 'error', text: errorText(err) });
         }
     }
-    const screen = h('div', { class: 'tool-readiness-screen' }, h('h1', { 'data-testid': 'tr-heading' }, `Takım Hazırlığı (İş Emri: ${workOrderId})`), banner ? h('div', { 'data-testid': 'tr-banner', 'data-kind': banner.kind }, banner.text) : null, loadError
+    const screen = h('div', { class: 'tool-readiness-screen' }, h('h1', { 'data-testid': 'tr-heading' }, ...(isPilot ? [pilotChip()] : []), `Takım Hazırlığı (İş Emri: ${workOrderId})`), isPilot ? pilotBanner() : null, banner ? h('div', { 'data-testid': 'tr-banner', 'data-kind': banner.kind }, banner.text) : null, loadError
         ? h('div', { 'data-testid': 'tr-load-error' }, `Yüklenemedi: ${loadError}`)
         : h('div', {}, h('div', { 'data-testid': 'tr-gate', 'data-state': tool?.state ?? 'UNKNOWN' }, tool ? readinessLabel(tool) : 'UNKNOWN / VERİ GEREKLİ — TOOL_REQUIREMENT_UNKNOWN:NOT_EVALUATED'), readinessPanel('TOOL', tool, (reason) => void handleExempt(reason)), h('table', { 'data-testid': 'tr-table' }, h('tbody', {}, ...rows.map((r) => h('tr', { 'data-testid': 'tr-row', 'data-tool-type': r.toolType }, h('td', { 'data-testid': 'tr-type' }, r.toolType), h('td', { 'data-testid': 'tr-mounted' }, `${r.mountedUsable}/${r.required}`), h('td', { 'data-testid': 'tr-ready' }, r.ready ? 'HAZIR' : 'EKSİK'))))), toolInput, h('button', { type: 'button', 'data-testid': 'tr-mount-btn', onClick: handleMount }, 'İş Emri İçin Bağla (TAK)')));
     mount(container, screen);

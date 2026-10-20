@@ -1,6 +1,7 @@
 // KMI — department work queues (Kalite / Metroloji, Sevkiyat / Lojistik, Depo / Stok). Real records only: every row is a real
 // work order or stock lot from the canonical tables; nothing is inferred. An empty queue says "kayıt yok" (it does not claim
 // "all fine"). Acting on a record happens in İş emri merkezi, where the server authorises each step.
+import { pilotText } from '../pilotMark.js';
 import { h, mount } from '../../../../packages/ui/src/h.js';
 import { WO_STATUS_TR } from './WorkOrderHubScreen.js';
 import { errorText } from '../errorText.js';
@@ -28,7 +29,7 @@ export async function renderDepartmentScreen(container, api, kind) {
         err = errorText(e);
     }
     const woById = new Map(wos.map((w) => [w.id, w]));
-    const wLabel = (w) => `${w.productCode} · ${w.customerPo}`;
+    const wLabel = (w) => pilotText(`${w.productCode} · ${w.customerPo}`, w.isPilot === true);
     const woRow = (w, pill) => h('div', { class: 'row', 'data-testid': 'dept-row', 'data-id': w.id }, h('a', { href: `#/is-emirleri?wo=${w.id}` }, wLabel(w)), h('span', {}, `${w.qtyProduced}/${w.qtyPlanned} adet`), w.qtyScrap > 0 ? h('span', { class: 'pill bad' }, `hurda ${w.qtyScrap}`) : null, h('span', { class: `pill ${pill[1]}` }, pill[0]), w.dueDate ? h('span', { class: 'mut' }, `termin ${w.dueDate}`) : null);
     const lotRow = (l) => {
         const w = woById.get(l.workOrderId);

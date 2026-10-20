@@ -11,7 +11,8 @@ import { visualFor } from '../spindle.js';
 import { renderPassportShell } from '../passport/shell.js';
 import { photoSlot, UNKNOWN } from '../passport/kit.js';
 import { errorText } from '../errorText.js';
-import { STORE_KINDS, makeIo, isDenied, dt, day, nf, WO_TR, MACHINE_TR, MACHINE_TONE, TASK_TR, floorTasks, canManageTasks } from '../passport/topics/common.js';
+import { STORE_KINDS, makeIo, isDenied, dt, day, nf, WO_TR, MACHINE_TR, MACHINE_TONE, TASK_TR, floorTasks, canManageTasks, pilotIdSet } from '../passport/topics/common.js';
+import { pilotText } from '../pilotMark.js';
 import { personnelTopics, PERSON_COLS, canSeePrivate } from '../passport/topics/personnel.js';
 import { machineTopics, MACHINE_COLS } from '../passport/topics/machine.js';
 import { productTopics } from '../passport/topics/product.js';
@@ -185,7 +186,7 @@ export async function renderPassportHubScreen(container, deps, state) {
             case 'WORK_ORDER': {
                 const w = await loadWoPassport(ctx);
                 const wo = w.workOrder;
-                head.title = `İE ${wo.id.slice(0, 8).toUpperCase()}`;
+                head.title = pilotText(`İE ${wo.id.slice(0, 8).toUpperCase()}`, (await pilotIdSet(ctx, [wo.id])).has(wo.id));
                 head.code = w.product?.code ?? null;
                 head.subtitle = w.product ? `${w.product.name}${w.revision ? ` · Rev ${w.revision.revision}` : ''}` : null;
                 head.badges = [{ text: (WO_TR[wo.status] ?? wo.status).toLocaleUpperCase('tr-TR'), tone: wo.status === 'COMPLETED' ? 'ok' : wo.status === 'ON_HOLD' ? 'warn' : 'info' }];

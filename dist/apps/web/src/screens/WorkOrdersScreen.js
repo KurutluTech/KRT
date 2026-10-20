@@ -4,6 +4,7 @@
 // canAssignMachine() (packages/domain) predicts the server will allow it; the real
 // authorization/state check still happens server-side in
 // kmi_next.assign_work_order_machine() (Truth Mode: client prediction is UX only).
+import { pilotChip } from '../pilotMark.js';
 import { h, Fragment, mount } from '../../../../packages/ui/src/h.js';
 import { canTransitionWorkOrderStatus, canAssignMachine } from '../../../../packages/domain/src/workOrder.js';
 import { errorText as sharedErrorText } from '../errorText.js';
@@ -86,7 +87,9 @@ export async function renderWorkOrdersScreen(container, orderItemId, api, banner
     function workOrderRow(wo) {
         const nextOptions = TRANSITION_TARGETS.filter((to) => canTransitionWorkOrderStatus(wo.status, to).ok);
         return (h("tr", { "data-testid": "wo-row", "data-wo-id": wo.id },
-            h("td", { "data-testid": "wo-status" }, wo.status),
+            h("td", { "data-testid": "wo-status" },
+                wo.isPilot ? pilotChip() : null,
+                wo.status),
             h("td", { "data-testid": "wo-qty-planned" }, String(wo.qtyPlanned)),
             h("td", { "data-testid": "wo-machine" }, wo.machineId ?? '—'),
             h("td", { "data-testid": "wo-operator" }, wo.operatorId ?? '—'),

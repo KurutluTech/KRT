@@ -1,5 +1,5 @@
 import { createTerminalApi } from './terminalApi.js';
-const wo = (w) => ({ workOrderId: w.workOrderId, status: w.status, productCode: w.productCode, qtyPlanned: w.qtyPlanned, qtyProduced: w.qtyProduced, qtyScrap: w.qtyScrap ?? 0, operatorName: w.operatorName ?? null, plannedDate: w.plannedDate ?? null, openQualityHold: !!w.openQualityHold, startRefusal: w.startRefusal ?? null });
+const wo = (w) => ({ workOrderId: w.workOrderId, status: w.status, productCode: w.productCode, qtyPlanned: w.qtyPlanned, qtyProduced: w.qtyProduced, qtyScrap: w.qtyScrap ?? 0, operatorName: w.operatorName ?? null, plannedDate: w.plannedDate ?? null, openQualityHold: !!w.openQualityHold, startRefusal: w.startRefusal ?? null, ...(w.isPilot ? { isPilot: true } : {}) });
 export function createProductionDeskApi(c, s) {
     const t = createTerminalApi(c, s);
     return {

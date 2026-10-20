@@ -3,6 +3,7 @@ import { createProductionApi } from './productionApi.js';
 import { createPurchasingApi } from './purchasingApi.js';
 import { createWorkOrdersApi } from './workOrdersApi.js';
 import { createWorkOrderHubApi } from './workOrderHubApi.js';
+import { fetchPilotFlags } from './pilotMark.js';
 const attempt = async (f) => { try {
     return await f();
 }
@@ -32,7 +33,10 @@ export function createQualityDeskApi(c, s) {
                 const lots = await attempt(() => c.select('stock_lots', { columns: 'id,state', filters: { state: 'eq.HOLD' }, limit: 1000 }, s));
                 incoming = lots ? receipts.filter((r) => r.stockLotId).map((r) => ({ receiptId: r.id, stockLotId: r.stockLotId, qty: r.qtyReceived, receivedAt: r.receivedAt, lotState: lots.some((l) => l.id === r.stockLotId) ? 'HOLD' : 'DECIDED' })) : null;
             }
-            return { workOrders: workOrders, ops, holds, ncrs, incoming, machines: new Map((machines ?? []).map((m) => [m.id, m.code])), people: new Map((people ?? []).map((p) => [p.id, p.name])), opTashih };
+            const woIds = [...(workOrders ?? []).map((w) => w.id), ...(ops ?? []).map((o) => o.workOrderId), ...(holds ?? []).map((x) => x.workOrderId), ...(ncrs ?? []).map((x) => x.workOrderId), ...(opTashih ?? []).map((r) => r.workOrderId)];
+            const pf = await fetchPilotFlags(c, s, woIds);
+            const pilot = new Set(woIds.filter((id) => pf.has(id)));
+            return { pilot, workOrders: workOrders, ops, holds, ncrs, incoming, machines: new Map((machines ?? []).map((m) => [m.id, m.code])), people: new Map((people ?? []).map((p) => [p.id, p.name])), opTashih };
         },
         firstPiece: (op, ok, note) => routing.firstPiece(op, ok, note),
         qc: (op, r, note) => routing.qc(op, r, note),

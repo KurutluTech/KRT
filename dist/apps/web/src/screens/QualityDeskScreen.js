@@ -6,6 +6,7 @@ import { h, mount } from '../../../../packages/ui/src/h.js';
 import { buildQualityDesk, QKIND_TR, QKIND_ACTION, NCR_MOVE_TR, reasonOk, QD_MIN_REASON } from '../../../../packages/domain/src/qualityDesk.js';
 import { waitLabel } from '../../../../packages/domain/src/approvalsInbox.js';
 import { errorText } from '../errorText.js';
+import { pilotChip, PILOT_CSS, pilotText } from '../pilotMark.js';
 const CSS = `
 .qd{display:flex;flex-direction:column;gap:14px;max-width:1200px}.qd *{box-sizing:border-box}.qd h1{margin:0;font-size:22px}.qd .eb{font-size:10.5px;letter-spacing:.2em;color:#c9a24a;font-weight:700}
 .qd .chips{display:flex;gap:8px;flex-wrap:wrap}.qd .chip{min-height:44px;padding:6px 14px;border-radius:10px;border:1px solid #1a2a46;background:rgba(11,22,42,.6);color:#cbd5e1;cursor:pointer;font:inherit;font-size:13px;display:inline-flex;gap:8px;align-items:center}
@@ -49,7 +50,7 @@ export async function renderQualityDesk(container, api, o) {
         const allowed = o.can(QKIND_ACTION[kind]);
         return h('button', { type: 'button', class: `b ${cls}`, disabled: !allowed || !enabled, title: allowed ? '' : NOACT, 'data-testid': testid, onClick: fn }, label);
     };
-    const wolink = (id, text) => (id ? h('a', { href: passportHref('WORK_ORDER', id), 'data-testid': 'qd-passport' }, text) : text);
+    const wolink = (id, text) => (id ? h('span', {}, ...(data?.pilot?.has(id) ? [pilotChip()] : []), h('a', { href: passportHref('WORK_ORDER', id), 'data-testid': 'qd-passport' }, text)) : text);
     const actions = (it) => {
         const note = h('input', { type: 'text', placeholder: `Gerekçe / not (en az ${QD_MIN_REASON} karakter gerekirse zorunlu)`, 'aria-label': 'Gerekçe', 'data-testid': 'qd-note' });
         const n = () => note.value.trim();
@@ -116,7 +117,7 @@ export async function renderQualityDesk(container, api, o) {
     const woOptions = () => (data?.workOrders ?? []).filter((w) => w.status !== 'COMPLETED' && w.status !== 'CANCELLED');
     const newForms = () => {
         const wos = woOptions();
-        const sel = () => h('select', { 'aria-label': 'İş emri', 'data-testid': 'qd-wo-select' }, h('option', { value: '' }, '(iş emri seçin)'), ...wos.map((w) => h('option', { value: w.id }, `${w.productCode} · ${w.customerPo}`)));
+        const sel = () => h('select', { 'aria-label': 'İş emri', 'data-testid': 'qd-wo-select' }, h('option', { value: '' }, '(iş emri seçin)'), ...wos.map((w) => h('option', { value: w.id }, pilotText(`${w.productCode} · ${w.customerPo}`, data?.pilot?.has(w.id) === true))));
         const s1 = sel(), r1 = h('input', { type: 'text', placeholder: 'HOLD nedeni', 'aria-label': 'HOLD nedeni', 'data-testid': 'qd-newhold-reason' });
         const s2 = sel(), qty = h('input', { type: 'number', min: '1', placeholder: 'adet', 'aria-label': 'Adet', style: 'width:6em', 'data-testid': 'qd-newncr-qty' }), r2 = h('input', { type: 'text', placeholder: 'Uygunsuzluk nedeni', 'aria-label': 'Uygunsuzluk nedeni', 'data-testid': 'qd-newncr-reason' });
         return h('div', { class: 'forms' }, h('div', { class: 'card frm' }, h('h2', {}, 'Yeni kalite bekletmesi (HOLD)'), s1, r1, h('div', {}, h('button', { type: 'button', class: 'b bad', 'data-testid': 'qd-newhold', onClick: () => { if (!s1.value)
@@ -135,7 +136,7 @@ export async function renderQualityDesk(container, api, o) {
             names: { machine: (id) => (id ? data.machines.get(id) ?? id.slice(0, 8) : '—'), person: (id) => (id ? data.people.get(id) ?? id.slice(0, 8) : '—') } });
         const list = desk.items.filter((x) => (filter === 'ALL' || x.kind === filter) && (!q || `${x.title} ${x.detail}`.toLocaleLowerCase('tr-TR').includes(q)));
         const chip = (k, label, n) => h('button', { type: 'button', class: 'chip', 'aria-pressed': String(filter === k), 'data-testid': `qd-chip-${k}`, onClick: () => { filter = k; draw(); } }, label, n === null ? h('span', { class: 'u' }, 'veri yok') : h('b', {}, String(n)));
-        const parts = [h('style', {}, CSS),
+        const parts = [h('style', {}, CSS + PILOT_CSS),
             h('div', {}, h('div', { class: 'eb' }, 'KALİTE & METROLOJİ'), h('h1', { 'data-testid': 'qd-title' }, 'Kalite Masası')),
             banner ? h('div', { class: `banner ${banner.kind}`, role: banner.kind === 'error' ? 'alert' : 'status', 'data-testid': 'qd-banner', 'data-kind': banner.kind }, banner.text) : null,
             h('div', { class: 'chips', 'data-testid': 'qd-chips' }, chip('ALL', 'Tümü', desk.items.length), ...KINDS.map((k) => chip(k, QKIND_TR[k], desk.counts[k]))),

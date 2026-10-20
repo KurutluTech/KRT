@@ -1,5 +1,6 @@
 // KMI-010 — Doküman Kontrol: tek canonical doküman kimliği, değiştirilemez sürümler, taslak → inceleme → onay → yürürlük, dağıtım ve etkilenen işler,
 // geçerlilik (GEÇERLİ yalnız sunucu hesabı), kontrollü baskı + filigran, dijital doğrulama, tam denetim izi. Yetki/erişim/geçerlilik SUNUCUDA; bu ekran yalnız gösterir ve çağırır.
+import { pilotChip } from '../pilotMark.js';
 import { h, mount } from '../../../../packages/ui/src/h.js';
 import { encodeQr, qrToSvg } from '../../../../packages/ui/src/qr.js';
 import { DOCUMENT_TYPES, bytesToHex, canUploadDocument, documentType } from '../../../../packages/domain/src/documents.js';
@@ -299,7 +300,7 @@ export async function renderDocumentControlScreen(container, api, state = {}) {
         };
         const ackBox = (x) => {
             const why = h('input', { 'data-testid': 'dk-ack-reason', placeholder: 'Karar gerekçesi' });
-            return h('tr', { 'data-testid': 'dk-dist', 'data-ack': x.ackState }, h('td', {}, x.workOrderId.slice(0, 8)), h('td', {}, x.workOrderStatus), h('td', {}, `v${x.prevVersionNo ?? '—'} → v${x.versionNo ?? '—'}${x.kind === 'INVALIDATED' ? ' (geçersiz kılındı)' : ''}`), h('td', {}, kchip(ACK_TR[x.ackState] ?? x.ackState, x.ackState === 'PENDING' ? 'bad' : ''), x.ackReason ? h('div', { class: 'mut' }, `${x.ackBy ?? ''}: ${x.ackReason}`) : null), h('td', {}, x.ackState === 'PENDING' ? E('div', { class: 'row' }, E('div', { style: 'min-width:180px;flex:1' }, why), btnE('good sm', 'dk-ack-new', 'Yeni sürüme geç', () => void act(() => api.ack(x.id, 'APPLY_NEW', val(why)), 'Karar kaydedildi.')), btnE('danger sm', 'dk-ack-old', 'Eskisiyle devam (istisna)', () => void act(() => api.ack(x.id, 'CONTINUE_ACCEPTED', val(why)), 'İstisna kaydedildi.'))) : ''));
+            return h('tr', { 'data-testid': 'dk-dist', 'data-ack': x.ackState }, h('td', {}, ...(x.isPilot ? [pilotChip()] : []), x.workOrderId.slice(0, 8)), h('td', {}, x.workOrderStatus), h('td', {}, `v${x.prevVersionNo ?? '—'} → v${x.versionNo ?? '—'}${x.kind === 'INVALIDATED' ? ' (geçersiz kılındı)' : ''}`), h('td', {}, kchip(ACK_TR[x.ackState] ?? x.ackState, x.ackState === 'PENDING' ? 'bad' : ''), x.ackReason ? h('div', { class: 'mut' }, `${x.ackBy ?? ''}: ${x.ackReason}`) : null), h('td', {}, x.ackState === 'PENDING' ? E('div', { class: 'row' }, E('div', { style: 'min-width:180px;flex:1' }, why), btnE('good sm', 'dk-ack-new', 'Yeni sürüme geç', () => void act(() => api.ack(x.id, 'APPLY_NEW', val(why)), 'Karar kaydedildi.')), btnE('danger sm', 'dk-ack-old', 'Eskisiyle devam (istisna)', () => void act(() => api.ack(x.id, 'CONTINUE_ACCEPTED', val(why)), 'İstisna kaydedildi.'))) : ''));
         };
         const opNo = h('input', { 'data-testid': 'dk-op-no', type: 'number', min: '1', placeholder: 'Op no', style: 'max-width:110px' });
         const latestNo = Math.max(...lc.versions.map((v) => v.versionNo));

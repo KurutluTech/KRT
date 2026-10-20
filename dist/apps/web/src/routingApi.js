@@ -1,9 +1,12 @@
+// CNC routing + D-012 matrix adapter — migration 0039.
+import { fetchPilotFlags } from './pilotMark.js';
 export function createRoutingApi(client, session) {
     const call = async (fn, args) => { await client.rpc(fn, args, session); };
     return {
         matrix: () => client.rpc('machine_skill_matrix', {}, session),
         suggestAssignment: (op) => client.rpc('suggest_operation_assignment', { p_operation_id: op }, session),
         recordAssignment: (op, m, o, reason) => client.rpc('record_operation_assignment', { p_operation_id: op, p_machine_id: m, p_operator_id: o, p_reason: reason }, session),
+        pilotFlags: (ids) => fetchPilotFlags(client, session, ids),
         async routedWorkOrders() {
             const rows = await client.select('work_order_operations', { columns: 'work_order_id', order: 'work_order_id.asc' }, session);
             return [...new Set(rows.map((r) => r.workOrderId))];
