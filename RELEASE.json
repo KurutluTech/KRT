@@ -1,6 +1,6 @@
 {
   "product": "KMI NEXT",
-  "commit": "36da8c71db04ccd20eaa13fa9889ff52a51bf17a",
+  "commit": "028c9148b9bbc01d75a70045f5c12e183c1a984d",
   "builtFrom": "clean git tree",
   "fileCount": 352,
   "migrationsInRepo": 73,
@@ -509,8 +509,8 @@
     },
     {
       "path": "dist/apps/web/src/productionDeskApi.js",
-      "bytes": 1813,
-      "sha256": "53f5f8accfd1dc5ff580e4926c3dbf42b59421405085b96828b50016ffddb31e"
+      "bytes": 5221,
+      "sha256": "c59422192b4a58e27054c1f784eb53866c0fdb2e7479962d7d6ab73bb8c291cc"
     },
     {
       "path": "dist/apps/web/src/puantajApi.js",
@@ -849,8 +849,8 @@
     },
     {
       "path": "dist/apps/web/src/screens/ProductionDeskScreen.js",
-      "bytes": 11831,
-      "sha256": "5d2dafcb66604f19c7877dfcde678cc88cf1f9635a50408aeab5443335f2d7c9"
+      "bytes": 22046,
+      "sha256": "2d308b4c93ba9560dcd6ad44d466c463679fe9960b20ce542659085423e047b6"
     },
     {
       "path": "dist/apps/web/src/screens/ProductionScreen.js",
@@ -1584,8 +1584,8 @@
     },
     {
       "path": "dist/packages/domain/src/productionDesk.js",
-      "bytes": 2143,
-      "sha256": "75bd68f8338cd069f5efcf3e26f57a7180aafd392b43f5048f78518b7109e0a0"
+      "bytes": 7814,
+      "sha256": "f154a02319dd23a169aee2c3cfd6ffb0c69da985faea71688981cb0f58456af2"
     },
     {
       "path": "dist/packages/domain/src/puantaj.js",
