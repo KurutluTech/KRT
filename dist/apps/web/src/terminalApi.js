@@ -1,7 +1,19 @@
+import { fetchPilotFlags } from './pilotMark.js';
 export function createTerminalApi(client, session) {
     return {
-        machines: () => client.rpc('machine_eligibility', {}, session),
-        terminal: (machineId) => client.rpc('operator_terminal', { p_machine_id: machineId }, session),
+        async machines() {
+            const rows = await client.rpc('machine_eligibility', {}, session);
+            const f = await fetchPilotFlags(client, session, rows.map((r) => r.machineId));
+            return rows.map((r) => (f.has(r.machineId) ? { ...r, isPilot: true } : r));
+        },
+        async terminal(machineId) {
+            const s = await client.rpc('operator_terminal', { p_machine_id: machineId }, session);
+            const f = await fetchPilotFlags(client, session, [s.machine.id, s.active?.workOrderId, ...s.queue.map((w) => w.workOrderId), ...(s.routedActive ?? []).map((o) => o.workOrderId), ...(s.routedQueue ?? []).map((o) => o.workOrderId)]);
+            if (!f.size)
+                return s;
+            return { ...s, machine: { ...s.machine, ...(f.has(s.machine.id) ? { isPilot: true } : {}) }, active: s.active ? { ...s.active, ...(f.has(s.active.workOrderId) ? { isPilot: true } : {}) } : s.active,
+                queue: s.queue.map((w) => (f.has(w.workOrderId) ? { ...w, isPilot: true } : w)), routedActive: s.routedActive?.map((o) => (f.has(o.workOrderId) ? { ...o, isPilot: true } : o)), routedQueue: s.routedQueue?.map((o) => (f.has(o.workOrderId) ? { ...o, isPilot: true } : o)) };
+        },
         async start(id, rid) {
             await client.rpc('wo_start_run', { p_work_order_id: id, p_client_request_id: rid }, session);
         },

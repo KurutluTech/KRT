@@ -1,3 +1,4 @@
+import { fetchPilotFlags } from './pilotMark.js';
 export function createWorkOrderHubApi(client, session) {
     return {
         async list() {
@@ -9,13 +10,14 @@ export function createWorkOrderHubApi(client, session) {
                 client.select('orders', { columns: 'id,customer_po', limit: 2000 }, session),
                 client.select('products', { columns: 'id,code,name', limit: 2000 }, session),
             ]);
+            const pf = await fetchPilotFlags(client, session, wos.map((w) => w.id));
             const it = new Map(items.map((i) => [i.id, i]));
             const od = new Map(orders.map((o) => [o.id, o]));
             const pr = new Map(products.map((p) => [p.id, p]));
             return wos.map((w) => {
                 const i = it.get(w.orderItemId);
                 const p = i ? pr.get(i.productId) : undefined;
-                return { ...w, productCode: p?.code ?? '?', productName: p?.name ?? '?', customerPo: (i && od.get(i.orderId)?.customerPo) || `İE ${w.id.slice(0, 8)}`, dueDate: i?.dueDate ?? null };
+                return { ...w, productCode: p?.code ?? '?', productName: p?.name ?? '?', customerPo: (i && od.get(i.orderId)?.customerPo) || `İE ${w.id.slice(0, 8)}`, dueDate: i?.dueDate ?? null, ...(pf.has(w.id) ? { isPilot: true, pilotRetired: pf.retired(w.id) } : {}) };
             });
         },
         async readiness(id) {
@@ -40,7 +42,11 @@ export function createWorkOrderHubApi(client, session) {
         async setRevision(id, rev) { await client.rpc('set_work_order_revision', { p_work_order_id: id, p_revision_id: rev }, session); },
         async setCamProgram(id, prog) { await client.rpc('set_work_order_cam_program', { p_work_order_id: id, p_program_id: prog }, session); },
         async revokeExemption(id, reason) { await client.rpc('revoke_readiness_exemption', { p_exemption_id: id, p_reason: reason }, session); },
-        machines: () => client.select('machines', { columns: 'id,code,name', order: 'code.asc' }, session),
+        async machines() {
+            const ms = await client.select('machines', { columns: 'id,code,name', order: 'code.asc' }, session);
+            const pf = await fetchPilotFlags(client, session, ms.map((m) => m.id));
+            return ms.map((m) => (pf.has(m.id) ? { ...m, isPilot: true } : m));
+        },
         operators: () => client.select('personnel', { columns: 'id,name', filters: { active: 'eq.true' }, order: 'name.asc' }, session),
         async snapshot(id) {
             const r = await client.select('work_orders', { columns: 'id,status,qty_planned,qty_produced,qty_scrap', filters: { id: `eq.${id}` } }, session);

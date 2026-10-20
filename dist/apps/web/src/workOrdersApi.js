@@ -1,12 +1,19 @@
+// Mirrors apps/web/src/ordersApi.ts's pattern for the Golden Thread's second step. Same
+// reasoning applies: a thin interface over the data-client so the screen's Playwright test
+// can inject a stub instead of a live network call (this sandbox cannot reach Supabase's
+// REST endpoint at all — see docs/ARCHITECTURE.md).
+import { fetchPilotFlags } from './pilotMark.js';
 /** Real implementation: calls the live kmi_next work-order RPCs/table through the data-client. */
 export function createWorkOrdersApi(client, session) {
     return {
         async listForOrderItem(orderItemId) {
-            return client.select('work_orders', {
+            const rows = await client.select('work_orders', {
                 columns: 'id,order_item_id,machine_id,operator_id,status,qty_planned,qty_produced,qty_scrap,created_at',
                 filters: { order_item_id: `eq.${orderItemId}` },
                 order: 'created_at.desc',
             }, session);
+            const f = await fetchPilotFlags(client, session, rows.map((r) => r.id));
+            return f.size ? rows.map((r) => (f.has(r.id) ? { ...r, isPilot: true } : r)) : rows;
         },
         async create(orderItemId, qtyPlanned) {
             return client.rpc('create_work_order', { p_order_item_id: orderItemId, p_qty_planned: qtyPlanned }, session);
