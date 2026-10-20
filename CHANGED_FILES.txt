@@ -1,0 +1,7 @@
+sql/00_preflight_0132_readonly.sql
+sql/01_APPLY_0132_wrapper.sql
+sql/02_postcheck_0132_readonly.sql
+sql/90_ROLLBACK_0132.sql
+sql/0132_tool_list_control.sql
+frontend/PaketB-takim-listesi-delta-912d902e507a.zip (6 dosya)
+frontend/PaketB-ROLLBACK-to-PaketA-028c9148b9bb.zip (6 dosya)

@@ -1,0 +1,6 @@
+b09a529692ccfdf5bced389d078f2cf552a08f08884cbb6504de831000760819  RELEASE.json
+3b4da061683adc37db7bc9bdef21e2e790c8ad9d71cbd3a884b09b92df55b4f9  dist/apps/web/src/errorText.js
+d698dc278224aa278d1f1f0a13a03733482e2f94745ed2dec421bdfc315e6e36  dist/apps/web/src/productWorkspaceApi.js
+335d51627b4bf9c4da96463e3296645492b1082472b0cf32e7eba0cb47e43307  dist/apps/web/src/screens/DocumentsScreen.js
+a1310de10bd24ba4d7ebabe697f37a4304ea31f5bbf30443e09092412145e0f2  dist/apps/web/src/screens/ProductWorkspaceScreen.js
+1a55f694d0a4e6b8fccf976f66d3e36c3e2aaadda1d43f0748a7f7e52586aecd  dist/apps/web/src/screens/TerminalScreen.js
