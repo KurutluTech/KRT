@@ -1,8 +1,9 @@
+import { fetchPilotFlags } from './pilotMark.js';
 export function createDocumentControlApi(client, session) {
     const rpc = (fn, args) => client.rpc(fn, args, session);
     return {
         list: (q, state, all) => rpc('dc_list', { p_q: q || null, p_state: state || null, p_product: null, p_all: all, p_limit: 200 }),
-        lifecycle: (d) => rpc('document_lifecycle', { p_document: d }),
+        lifecycle: async (d) => { const lc = await rpc('document_lifecycle', { p_document: d }); const pf = await fetchPilotFlags(client, session, (lc.distributions ?? []).map((x) => x.workOrderId)); return pf.size ? { ...lc, distributions: lc.distributions.map((x) => (pf.has(x.workOrderId) ? { ...x, isPilot: true } : x)) } : lc; },
         impact: (v) => rpc('document_impact', { p_version: v }),
         async submit(v, reason, label) { await rpc('document_submit', { p_version: v, p_reason: reason, p_label: label }); },
         async review(v, ok, note) { await rpc('document_review', { p_version: v, p_ok: ok, p_note: note }); },

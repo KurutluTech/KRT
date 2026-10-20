@@ -7,7 +7,7 @@ export const TRAVELER_FOOTNOTE = 'QR yalnızca kimliktir: okutmak yetki vermez. 
 export function buildTraveler(jc, size) {
     const gate = jc.documentGate ? String(jc.documentGate.reason ?? jc.documentGate) : null;
     return {
-        size, woQr: encodeKmiQr('WO', jc.workOrderId), woRef: jc.workOrderId.slice(0, 8), qtyPlanned: jc.qtyPlanned, revision: jc.revision, status: jc.status, gate,
+        pilot: jc.isPilot === true, size, woQr: encodeKmiQr('WO', jc.workOrderId), woRef: jc.workOrderId.slice(0, 8), qtyPlanned: jc.qtyPlanned, revision: jc.revision, status: jc.status, gate,
         ops: [...jc.operations].sort((a, b) => a.opNo - b.opNo).map((o) => ({
             opNo: o.opNo, opCode: o.opCode, name: o.name, status: o.status, qtyIn: o.qtyIn, setupMinutes: o.setupMinutes, cycleSeconds: o.cycleSeconds,
             firstPieceRequired: o.firstPieceRequired, qcRequired: o.qcRequired, instructions: o.instructions, qrPayload: o.qr.operation, traceRef: o.traceRef,

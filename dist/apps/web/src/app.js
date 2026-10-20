@@ -3,6 +3,7 @@
 // data-client; authorization is decided by the server on every call, the menu only navigates.
 // Configuration comes from /config.js (window.KMI_NEXT_CONFIG = { supabaseUrl, anonKey }),
 // which is deployment-specific and NOT committed (config.example.js shows the shape).
+import { selReal, installPilotDecorator } from './pilotMark.js';
 import { h, mount } from '../../../packages/ui/src/h.js';
 import { createKmiNextClient } from '../../../packages/data-client/src/client.js';
 import { renderTerminalScreen, rememberedMachine, remember as rememberMachine } from './screens/TerminalScreen.js';
@@ -240,7 +241,7 @@ function downloadText(name, text) {
 function galleryDeps(c, s, withBoard = false) {
     const pc = createPassportCardsApi(c, s);
     const activeWork = async () => {
-        const rows = await c.select('work_orders', { columns: 'operator_id', filters: { status: 'in.(IN_PROGRESS,FIRST_PIECE_PENDING,FIRST_PIECE_APPROVED)' }, limit: 1000 }, s);
+        const rows = await selReal(c, 'work_orders', { columns: 'operator_id', filters: { status: 'in.(IN_PROGRESS,FIRST_PIECE_PENDING,FIRST_PIECE_APPROVED)' }, limit: 1000 }, s);
         const m = {};
         for (const r of rows)
             if (r.operatorId)
@@ -709,6 +710,7 @@ export async function startApp(root, opts = {}) {
             dbText.textContent = ok ? 'Veritabanı bağlantısı doğrulandı' : 'Veritabanına ulaşılamıyor — bağlantınızı kontrol edin';
         });
     };
+    let pilotOff;
     let headerDispose;
     const route = async () => {
         const routeStart = performance.now();
@@ -1067,6 +1069,8 @@ export async function startApp(root, opts = {}) {
             return;
         }
         try {
+            pilotOff?.();
+            pilotOff = installPilotDecorator(content, client, session, 150, Object.values(query ?? {}).map((v) => String(v))); // 0128: TEST/PİLOT chips on every screen that names a work order / machine
             await r.render(content, client, session, query, access);
             ux.record({ kind: 'PAGE_LOAD', route: knownHash(), ms: performance.now() - routeStart });
         }
