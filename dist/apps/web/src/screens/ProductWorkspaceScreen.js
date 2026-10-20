@@ -106,6 +106,9 @@ export async function renderProductWorkspaceScreen(container, api, state = {}) {
         const rev = ws.revision;
         const can = ws.can;
         const editable = !!rev && rev.status !== 'OBSOLETE';
+        // Ayrı nedenler: revizyon yok / revizyon kapalı / yükleme yetkisi yok / veri yok — hiçbiri "VERİ YOK" arkasına gizlenmez.
+        const whyNoUpload = !rev ? 'NO_REV' : rev.status === 'OBSOLETE' ? 'CLOSED' : !can.manageDocuments ? 'NO_PERM' : null;
+        const WHY_TR = { NO_REV: 'Bu ürün için revizyon yok — dosya eklemek için önce taslak revizyon açılmalı.', CLOSED: 'Revizyon kapalı (geçersiz) — yeni revizyon süreci kullanılmalı.', NO_PERM: 'Yükleme yetkiniz yok.' };
         let openOp = state.openOp ?? null;
         const reload = async (text, kind = 'ok', extra = {}) => {
             const y = window.scrollY;
@@ -119,8 +122,21 @@ export async function renderProductWorkspaceScreen(container, api, state = {}) {
             el?.scrollIntoView?.({ block: 'nearest', behavior: 'smooth' });
         }
         catch { /* headless */ } };
-        const revSel = h('select', { 'data-testid': 'pw-rev', 'aria-label': 'Revizyon' }, ...ws.revisions.map((r) => h('option', { value: r.id, selected: r.id === rev?.id }, `Rev ${r.revision} · ${REV_TR[r.status] ?? r.status}`)));
+        const revSel = h('select', { 'data-testid': 'pw-rev', 'aria-label': 'Revizyon', ...(ws.revisions.length ? {} : { disabled: true }) }, ...(ws.revisions.length ? [] : [h('option', { value: '' }, 'Revizyon yok')]), ...ws.revisions.map((r) => h('option', { value: r.id, selected: r.id === rev?.id }, `Rev ${r.revision} · ${REV_TR[r.status] ?? r.status}`)));
         revSel.addEventListener('change', () => void go({ product: productId, rev: val(revSel) }));
+        const noRevBox = rev ? null : (() => {
+            const nm = h('input', { 'data-testid': 'pw-newrev-name', placeholder: 'Revizyon (örn. A)', value: 'A', maxlength: 20 });
+            const mayTry = can.manageDocuments || can.editStructure;
+            return E('div', { class: 'banner', 'data-testid': 'pw-norev', role: 'status' }, E('b', {}, 'Bu ürün için revizyon yok. '), 'Teknik resim, CAD/STEP, CAM/NC, takım listesi, BOM ve rota bir revizyona bağlıdır. ', 'Ürün düzeyinde yüklenmiş belgeler “Belgeler ve sürümler” bölümünde görünür.', mayTry ? E('div', { class: 'row', style: 'margin-top:8px' }, E('div', { style: 'width:140px' }, nm), btn('primary', 'pw-newrev-go', 'İlk revizyonu aç (TASLAK)', () => void (async () => {
+                try {
+                    await api.createRevision(ws.product.id, val(nm).trim());
+                    await reload('Taslak revizyon açıldı. Onay ve üretime serbest bırakma ayrı süreçtir; dosya yüklemek serbest bırakmaz.');
+                }
+                catch (e) {
+                    fail(e);
+                }
+            })())) : E('div', { class: 'mut', style: 'margin-top:6px' }, 'Revizyon açmak için yetkiniz yok; yetkili bir yönetici açabilir.'));
+        })();
         // ---------------------------------------------------------------------------------------- doküman kartları (resim / CAD / CAM / takım): dosya yönetimi
         const docCard = (tid, title, card0, docType, multi = false, span = 6) => {
             const st = (card0?.state ?? 'MISSING');
@@ -175,7 +191,7 @@ export async function renderProductWorkspaceScreen(container, api, state = {}) {
             };
             const docRow = (d) => E('div', { class: 'r docg', 'data-testid': 'pw-doc', 'data-doc-no': d.docNo ?? '' }, E('div', { class: 'stack', style: 'gap:3px' }, E('div', { class: 'row', style: 'gap:6px' }, E('b', {}, d.docNo ?? '—'), chip(CTL_TR[d.controlState ?? ''] ?? '—', CTL_TONE[d.controlState ?? ''] ?? ''), E('span', { class: 'mut' }, `v${d.versionNo ?? '—'}${d.effectiveVersionNo ? ` · yürürlükte v${d.effectiveVersionNo}` : ''}`)), E('div', {}, d.title), E('div', { class: 'mut' }, `${DOC_TR[d.docType] ?? d.docType}${d.fileName ? ` · ${d.fileName}` : ''}${d.opNos.length ? ` · OP${d.opNos.join(', OP')}` : ''}`)), E('div', { class: 'acts' }, btn('ghost sm', 'pw-doc-open', 'Önizle', () => void view(d, false)), btn('ghost sm', 'pw-doc-dl', 'İndir', () => void view(d, true)), h('a', { class: 'btn ghost sm', href: `#/dokuman-kontrol?doc=${d.id}`, 'data-testid': 'pw-doc-history' }, 'Geçmiş'), canUpload ? btn('ghost sm', `pw-${tid}-newver-${d.docNo ?? ''}`, 'Yeni sürüm', () => openForm(d)) : null));
             const addBtn = canUpload && (docs.length === 0 || multi) ? btn(docs.length ? 'ghost sm' : 'primary sm', `pw-${tid}-open-upload`, docs.length ? '+ Yeni program' : 'Dosya yükle', () => openForm(null)) : null;
-            return card({ title, span, testid: `pw-card-${tid}`, chip: stateChip(st), attrs: { 'data-state': st }, actions: [addBtn] }, docs.length ? E('div', { class: 'rows' }, ...docs.map(docRow)) : emptyState(`${NA} — bu revizyonda ${title.toLowerCase()} yok`, canUpload ? 'İlk dosyayı “Dosya yükle” ile ekleyin.' : 'Yükleme yetkiniz yok ya da revizyon kapalı.'), formHost, viewHost);
+            return card({ title, span, testid: `pw-card-${tid}`, chip: stateChip(st), attrs: { 'data-state': st }, actions: [addBtn] }, docs.length ? E('div', { class: 'rows' }, ...docs.map(docRow)) : (whyNoUpload === 'NO_REV' ? emptyState(`Revizyon yok — ${title.toLowerCase()} eklenemez`, WHY_TR.NO_REV) : emptyState(`${NA} — bu revizyonda ${title.toLowerCase()} yok`, canUpload ? 'İlk dosyayı “Dosya yükle” ile ekleyin.' : (whyNoUpload ? WHY_TR[whyNoUpload] : ''))), formHost, viewHost);
         };
         // ---------------------------------------------------------------------------------------- rota ve operasyonlar
         const activeOps = ws.routing.filter((o) => o.active);
@@ -513,10 +529,10 @@ export async function renderProductWorkspaceScreen(container, api, state = {}) {
         if (state.only) {
             const all = { identity: idCard, drawing: docCard('drawing', 'Teknik resim', ws.cards.drawing, 'DRAWING'), cad: docCard('cad', 'CAD / STEP', ws.cards.cad, 'CAD_MODEL'), cam: docCard('cam', 'CAM / NC', ws.cards.cam, 'NC_PROGRAM', true), tools: docCard('tools', 'Takım listesi', ws.cards.tools, 'TOOL_LIST'),
                 bom: bomCard, routing: routingCard, params: paramCard, quality: qualityCard, calc: calcCard, history: histCard, ready: readyCard };
-            shell(banner, E('div', { class: 'row', style: 'margin-bottom:10px' }, E('div', { style: 'min-width:180px' }, revSel)), E('div', { class: 'kx-grid' }, ...state.only.map((k) => all[k]).filter((x) => !!x)));
+            shell(banner, noRevBox, E('div', { class: 'row', style: 'margin-bottom:10px' }, E('div', { style: 'min-width:180px' }, revSel)), E('div', { class: 'kx-grid' }, ...state.only.map((k) => all[k]).filter((x) => !!x)));
             return;
         }
-        shell(head, banner, readyCard, E('div', { style: 'height:14px' }), E('div', { class: 'kx-grid' }, idCard, docCard('drawing', 'Teknik resim', ws.cards.drawing, 'DRAWING'), docCard('cad', 'CAD / STEP', ws.cards.cad, 'CAD_MODEL'), docCard('cam', 'CAM / NC', ws.cards.cam, 'NC_PROGRAM', true), docCard('tools', 'Takım listesi', ws.cards.tools, 'TOOL_LIST'), bomCard, routingCard, paramCard, qualityCard, calcCard, histCard));
+        shell(head, banner, noRevBox, readyCard, E('div', { style: 'height:14px' }), E('div', { class: 'kx-grid' }, idCard, docCard('drawing', 'Teknik resim', ws.cards.drawing, 'DRAWING'), docCard('cad', 'CAD / STEP', ws.cards.cad, 'CAD_MODEL'), docCard('cam', 'CAM / NC', ws.cards.cam, 'NC_PROGRAM', true), docCard('tools', 'Takım listesi', ws.cards.tools, 'TOOL_LIST'), bomCard, routingCard, paramCard, qualityCard, calcCard, histCard));
         if (state.openOp && state.openOp !== 'NEW')
             scrollTo(opsHost.querySelector(`[data-op-id="${state.openOp}"]`));
     }

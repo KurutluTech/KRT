@@ -1,6 +1,6 @@
 {
   "product": "KMI NEXT",
-  "commit": "95a2b5af487cade37a981799a4c290cf0aa366f0",
+  "commit": "eb746964b5b42d54f826f58cc84f07759e247cc0",
   "builtFrom": "clean git tree",
   "fileCount": 350,
   "migrationsInRepo": 73,
@@ -169,8 +169,8 @@
     },
     {
       "path": "dist/apps/web/src/errorText.js",
-      "bytes": 25685,
-      "sha256": "926674066e723474cac6289e32aa0626c9842c413682d2ae855e60222ccb2c66"
+      "bytes": 26357,
+      "sha256": "3b4da061683adc37db7bc9bdef21e2e790c8ad9d71cbd3a884b09b92df55b4f9"
     },
     {
       "path": "dist/apps/web/src/feasibilityApi.js",
@@ -384,8 +384,8 @@
     },
     {
       "path": "dist/apps/web/src/passport/storePanels.js",
-      "bytes": 15021,
-      "sha256": "53d0509c2775ed12b21f5684ea3d33f4867fb6536b819bd05d52d3facec4ebe8"
+      "bytes": 16231,
+      "sha256": "83c832cea44a5c18a264fce9aafaa4cf222aff6bdf4b73b401f8f53459a73f84"
     },
     {
       "path": "dist/apps/web/src/passport/topics/common.js",
@@ -409,8 +409,8 @@
     },
     {
       "path": "dist/apps/web/src/passport/topics/product.js",
-      "bytes": 8369,
-      "sha256": "2a39604821c04a42d481701a4044d01f6cd7b320be1f8656309c60145771e0d8"
+      "bytes": 8561,
+      "sha256": "994f5968e89734e74d36785ab0e4044f9cd2d1e7cdcf589d16188a0891db5379"
     },
     {
       "path": "dist/apps/web/src/passport/topics/task.js",
@@ -494,8 +494,8 @@
     },
     {
       "path": "dist/apps/web/src/productWorkspaceApi.js",
-      "bytes": 5476,
-      "sha256": "694aec031753496d35d0e21a41666054247a8bac785cc9861bd877f7191f3162"
+      "bytes": 5592,
+      "sha256": "d698dc278224aa278d1f1f0a13a03733482e2f94745ed2dec421bdfc315e6e36"
     },
     {
       "path": "dist/apps/web/src/productionApi.js",
@@ -794,8 +794,8 @@
     },
     {
       "path": "dist/apps/web/src/screens/PassportWorkspaceScreen.js",
-      "bytes": 16968,
-      "sha256": "e0edfec82f352e164c3bab593aea534ff099cd0df461b1a0d50bd96484f01d09"
+      "bytes": 18037,
+      "sha256": "5cf6ae34440cc8b57c0335cd18abe8649d476565448d63c5e8b6401e6c6e868d"
     },
     {
       "path": "dist/apps/web/src/screens/PerformanceCenterScreen.js",
@@ -839,8 +839,8 @@
     },
     {
       "path": "dist/apps/web/src/screens/ProductWorkspaceScreen.js",
-      "bytes": 60781,
-      "sha256": "e06fba2ec41d4eca68adbb5cc476a72a34a2ae6988f83d5ce8ae633a6752e30c"
+      "bytes": 62810,
+      "sha256": "a1310de10bd24ba4d7ebabe697f37a4304ea31f5bbf30443e09092412145e0f2"
     },
     {
       "path": "dist/apps/web/src/screens/ProductionDeskScreen.js",

@@ -16,7 +16,7 @@ export function productTopics(ctx, p) {
     const out = [
         pc('kimlik', 'Kimlik ve revizyon', 'box', 'Kimlik', 'Revizyon, hazırlık özeti', ['ready', 'identity']),
         { ...T('gorsel', 'Teknik resim ve önizleme', 'file', 'Teknik', { summary: 'Resim ve ürün görseli' }), render: async (host) => {
-                host.replaceChildren(photoPanel(store, 'Ürün görseli'));
+                host.replaceChildren(photoPanel(store, 'Ürün görseli'), docsPanel(store, 'Ürün düzeyinde teknik resim / teknik belgeler (revizyona bağlı değil)', ['TECH_DOC'], { testid: 'ps-prod-drawing-docs', empty: 'Ürün düzeyinde teknik belge yok' }));
                 const d = document.createElement('div');
                 host.append(d);
                 if (ctx.productWs)

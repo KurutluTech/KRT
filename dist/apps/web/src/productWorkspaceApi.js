@@ -6,6 +6,7 @@ export function createProductWorkspaceApi(client, session) {
     const dc = createDocumentControlApi(client, session);
     return {
         search: (q) => rpc('product_search', { p_q: q || null, p_family: null, p_status: 'ACTIVE', p_limit: 30 }),
+        createRevision: (id, rev) => rpc('revision_create', { p_product: id, p_revision: rev, p_copy_from: null }),
         load: (p, r) => rpc('product_workspace', { p_product: p, p_revision: r }),
         machines: () => selReal(client, 'machines', { columns: 'id,code,name', order: 'code.asc' }, session),
         saveOperation: (i) => rpc('routing_op_save', { p_revision: i.revisionId, p_op_no: i.opNo, p_name: i.name, p_machine_ids: i.machineIds, p_primary: i.primaryId, p_skill_code: i.skillCode,

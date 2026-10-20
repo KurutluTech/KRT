@@ -97,7 +97,7 @@ export async function renderPassportWorkspaceScreen(container, api, state = {}) 
         const editHost = E('div', { class: 'ed', style: 'display:none' });
         const hist = E('div', { class: 'hist', 'data-testid': 'ppw-hist', style: 'display:none' });
         histHosts.set(a.code, hist);
-        host.append(E('div', { class: 'k' }, a.label), E('div', { class: `v${v ? '' : ' na'}` }, v ?? 'VERİ YOK', a.versionNo ? E('span', { class: 'mut', style: 'margin-left:8px;font-size:12px' }, `v${a.versionNo} · ${a.validFrom ?? ''}`) : null), E('div', { class: 'acts' }, btn('ghost sm', 'ppw-hist-btn', 'Geçmiş', () => {
+        host.append(E('div', { class: 'k' }, a.label), E('div', { class: `v${v ? '' : ' na'}` }, v ?? 'VERİ YOK', a.versionNo ? E('span', { class: 'mut', style: 'margin-left:8px;font-size:12px' }, `v${a.versionNo}${type === 'MACHINE' || type === 'PRODUCT' ? '' : ` · ${a.validFrom ?? ''}`}`) : null), E('div', { class: 'acts' }, btn('ghost sm', 'ppw-hist-btn', 'Geçmiş', () => {
             if (hist.style.display === 'none') {
                 void api.history(type, id, a.code).then((rows) => { hist.replaceChildren(...(rows.length ? rows.map((r) => E('div', {}, `v${r.versionNo}: ${r.value ?? '—'}${r.unit ? ` ${r.unit}` : ''} · geçerlilik ${r.validFrom} · ${r.changedBy ?? '?'} · ${when(r.changedAt)} · “${r.reason}”`)) : [E('div', {}, 'Kayıt yok')])); hist.style.display = ''; }).catch(fail);
             }
@@ -105,16 +105,28 @@ export async function renderPassportWorkspaceScreen(container, api, state = {}) 
                 hist.style.display = 'none';
         }), a.editable ? btn('ghost sm', 'ppw-edit-btn', 'Düzenle', () => { editHost.style.display = editHost.style.display === 'none' ? '' : 'none'; }) : null), editHost, hist);
         if (a.editable) {
-            const input = h('input', { 'data-testid': 'ppw-value', value: a.value ?? '', type: a.kind === 'DATE' ? 'date' : 'text', inputmode: a.kind === 'NUMBER' ? 'decimal' : undefined });
-            const from = h('input', { 'data-testid': 'ppw-valid-from', type: 'date' });
+            const input = h('input', { 'data-testid': 'ppw-value', value: a.value ?? '', type: a.kind === 'DATE' ? 'date' : 'text', inputmode: a.code === 'MODEL_YEAR' ? 'numeric' : a.kind === 'NUMBER' ? 'decimal' : undefined, ...(a.code === 'MODEL_YEAR' ? { maxlength: 4, placeholder: 'örn. 2020 — bilinmiyorsa boş bırakın' } : {}) });
+            const todayIso = new Date().toLocaleDateString('sv-SE', { timeZone: 'Europe/Istanbul' });
+            const from = h('input', { 'data-testid': 'ppw-valid-from', type: 'date', max: new Date(Date.now() + 366 * 864e5).toLocaleDateString('sv-SE', { timeZone: 'Europe/Istanbul' }) });
             const reason = h('input', { 'data-testid': 'ppw-reason', placeholder: 'Gerekçe (en az 5 karakter)', maxlength: 300 });
-            editHost.append(field(`${a.label}${a.unit ? ` (${a.unit})` : ''}`, input), field('Geçerlilik başlangıcı', from, 'Boşsa bugün. Eski tarihli hesaplar eski değerle kalır.'), field('Gerekçe', reason), E('div', { class: 'row' }, btn('primary sm', 'ppw-save', 'Kaydet', () => {
-                invalid(reason, val(reason).trim().length < 5);
-                if (val(reason).trim().length < 5) {
-                    fail(new Error('Gerekçe en az 5 karakter olmalı'));
-                    return;
+            const tech = type === 'MACHINE' || type === 'PRODUCT'; // 0130: no validity date / mandatory reason for technical identity values
+            editHost.append(field(`${a.label}${a.unit ? ` (${a.unit})` : ''}`, input), ...(tech ? [] : [field('Geçerlilik başlangıcı', from, 'Boşsa bugün. Eski tarihli hesaplar eski değerle kalır.'), field('Gerekçe', reason)]), E('div', { class: 'row' }, btn('primary sm', 'ppw-save', 'Kaydet', () => {
+                if (a.code === 'MODEL_YEAR') {
+                    const yv = val(input).trim();
+                    if (!/^[0-9]{4}$/.test(yv) || Number(yv) < 1950 || Number(yv) > Number(todayIso.slice(0, 4)) + 1) {
+                        invalid(input, true);
+                        fail(new Error('VALUE_INVALID: MODEL_YEAR'));
+                        return;
+                    }
                 }
-                void api.setValue(type, id, a.code, val(input), a.unit, val(from) || null, val(reason)).then((r) => go({ type, id, banner: { kind: 'ok', text: `${a.label} kaydedildi (v${r.versionNo}).` } })).catch(fail);
+                if (!tech) {
+                    invalid(reason, val(reason).trim().length < 5);
+                    if (val(reason).trim().length < 5) {
+                        fail(new Error('Gerekçe en az 5 karakter olmalı'));
+                        return;
+                    }
+                }
+                void api.setValue(type, id, a.code, val(input), a.unit, tech ? null : val(from) || null, tech ? null : val(reason)).then((r) => go({ type, id, banner: { kind: 'ok', text: `${a.label} kaydedildi (v${r.versionNo}).` } })).catch(fail);
             })));
         }
         return host;

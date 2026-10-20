@@ -61,6 +61,7 @@ export function photoPanel(c, title = 'Fotoğraf') {
 /** Structured values (versioned). `codes` limits the panel to one topic's attributes; null = all the entity's attributes. */
 export function attrsPanel(c, title, codes, opts = {}) {
     const attrs = (codes ? codes.map((k) => c.card.attributes.find((a) => a.code === k)).filter((a) => !!a) : c.card.attributes);
+    const tech = c.type === 'MACHINE' || c.type === 'PRODUCT'; // 0130: technical identity values carry no validity date and no mandatory reason; every save is still logged (who / when / before / after)
     const rows = E('div', { class: 'ps-rows', 'data-testid': 'ps-attr-rows' });
     const editable = attrs.filter((a) => a.editable);
     const inputs = new Map();
@@ -68,7 +69,7 @@ export function attrsPanel(c, title, codes, opts = {}) {
     const editHost = E('div', { 'data-testid': 'ps-edit-host', style: 'display:none' });
     const paintRead = () => rows.replaceChildren(...attrs.map((a) => {
         const v = showVal(a);
-        return E('div', { class: 'ps-row', 'data-testid': 'ppw-attr', 'data-code': a.code }, E('div', { class: 'ps-k' }, a.label), E('div', { class: `ps-v${v ? '' : ' na'}`, 'data-testid': 'ps-attr-value' }, v ?? 'VERİ YOK', a.versionNo ? E('span', { class: 'ps-meta' }, `v${a.versionNo}${a.validFrom ? ` · ${a.validFrom}` : ''}`) : null));
+        return E('div', { class: 'ps-row', 'data-testid': 'ppw-attr', 'data-code': a.code }, E('div', { class: 'ps-k' }, a.label), E('div', { class: `ps-v${v ? '' : ' na'}`, 'data-testid': 'ps-attr-value' }, v ?? 'VERİ YOK', a.versionNo ? E('span', { class: 'ps-meta' }, `v${a.versionNo}${a.validFrom && !tech ? ` · ${a.validFrom}` : ''}`) : null));
     }));
     paintRead();
     const openEdit = () => {
@@ -79,29 +80,39 @@ export function attrsPanel(c, title, codes, opts = {}) {
         }
         inputs.clear();
         const reason = h('input', { 'data-testid': 'ppw-reason', placeholder: 'Gerekçe (en az 5 karakter)', maxlength: 300 });
-        const from = h('input', { 'data-testid': 'ppw-valid-from', type: 'date' });
-        const fields = editable.map((a) => { const inp = h('input', { 'data-testid': 'ppw-value', 'data-code': a.code, value: a.value ?? '', type: a.kind === 'DATE' ? 'date' : 'text', inputmode: a.kind === 'NUMBER' ? 'decimal' : undefined }); inputs.set(a.code, inp); return field(`${a.label}${a.unit ? ` (${a.unit})` : ''}`, inp); });
+        const todayIso = new Date().toLocaleDateString('sv-SE', { timeZone: 'Europe/Istanbul' });
+        const from = h('input', { 'data-testid': 'ppw-valid-from', type: 'date', max: new Date(Date.now() + 366 * 864e5).toLocaleDateString('sv-SE', { timeZone: 'Europe/Istanbul' }) });
+        const fields = editable.map((a) => { const inp = h('input', { 'data-testid': 'ppw-value', 'data-code': a.code, value: a.value ?? '', type: a.kind === 'DATE' ? 'date' : 'text', inputmode: a.code === 'MODEL_YEAR' ? 'numeric' : a.kind === 'NUMBER' ? 'decimal' : undefined, ...(a.code === 'MODEL_YEAR' ? { maxlength: 4, placeholder: 'örn. 2020 — bilinmiyorsa boş bırakın' } : {}) }); inputs.set(a.code, inp); return field(`${a.label}${a.unit ? ` (${a.unit})` : ''}`, inp); });
         const save = async () => {
             const changed = editable.filter((a) => (inputs.get(a.code)?.value ?? '') !== (a.value ?? ''));
             if (!changed.length) {
                 c.notify('info', 'Değişen alan yok.');
                 return;
             }
-            if (reason.value.trim().length < 5) {
+            const my = changed.find((a) => a.code === 'MODEL_YEAR');
+            if (my) {
+                const yv = (inputs.get('MODEL_YEAR')?.value ?? '').trim();
+                if (!/^[0-9]{4}$/.test(yv) || Number(yv) < 1950 || Number(yv) > Number(todayIso.slice(0, 4)) + 1) {
+                    inputs.get('MODEL_YEAR')?.setAttribute('aria-invalid', 'true');
+                    c.notify('error', 'Model yılı dört haneli bir yıl olmalıdır (ör. 2020). Bilinmiyorsa boş bırakın; tahmin girmeyin.');
+                    return;
+                }
+            }
+            if (!tech && reason.value.trim().length < 5) {
                 reason.setAttribute('aria-invalid', 'true');
                 c.notify('error', 'Gerekçe en az 5 karakter olmalı');
                 return;
             }
             try {
                 for (const a of changed)
-                    await c.api.setValue(c.type, c.id, a.code, inputs.get(a.code).value, a.unit, from.value || null, reason.value.trim());
+                    await c.api.setValue(c.type, c.id, a.code, inputs.get(a.code).value, a.unit, tech ? null : from.value || null, tech ? null : reason.value.trim());
                 c.reload({ kind: 'ok', text: `${changed.length} alan kaydedildi.` });
             }
             catch (e) {
                 c.notify('error', errorText(e));
             }
         };
-        editHost.replaceChildren(E('div', { class: 'ps-edit' }, ...fields, field('Geçerlilik başlangıcı', from, 'Boşsa bugün. Eski tarihli hesaplar eski değerle kalır.'), field('Gerekçe', reason)), E('div', { class: 'ps-actions-row' }, btn('primary', 'ppw-save', 'Kaydet', () => void save()), btn('ghost', null, 'Vazgeç', () => openEdit())));
+        editHost.replaceChildren(E('div', { class: 'ps-edit' }, ...fields, ...(tech ? [] : [field('Geçerlilik başlangıcı', from, 'Boşsa bugün. Eski tarihli hesaplar eski değerle kalır.'), field('Gerekçe', reason)])), E('div', { class: 'ps-actions-row' }, btn('primary', 'ppw-save', 'Kaydet', () => void save()), btn('ghost', null, 'Vazgeç', () => openEdit())));
         editHost.style.display = '';
     };
     const showHistory = async () => {
@@ -112,7 +123,7 @@ export function attrsPanel(c, title, codes, opts = {}) {
         try {
             const all = await Promise.all(attrs.filter((a) => a.versionNo).map(async (a) => (await c.api.history(c.type, c.id, a.code)).map((r) => ({ a, r }))));
             const flat = all.flat().sort((x, y) => (y.r.changedAt > x.r.changedAt ? 1 : -1));
-            histHost.replaceChildren(...(flat.length ? flat.map(({ a, r }) => E('div', { 'data-testid': 'ppw-hist' }, `${a.label}: v${r.versionNo} → ${r.value ?? '—'}${r.unit ? ` ${r.unit}` : ''} · geçerlilik ${r.validFrom} · ${r.changedBy ?? '?'} · ${when(r.changedAt)} · “${r.reason}”`)) : [E('div', {}, 'Değişiklik kaydı yok')]));
+            histHost.replaceChildren(...(flat.length ? flat.map(({ a, r }) => E('div', { 'data-testid': 'ppw-hist' }, `${a.label}: v${r.versionNo} → ${r.value ?? '—'}${r.unit ? ` ${r.unit}` : ''} · ${tech ? '' : `geçerlilik ${r.validFrom} · `}${r.changedBy ?? '?'} · ${when(r.changedAt)} · “${r.reason}”`)) : [E('div', {}, 'Değişiklik kaydı yok')]));
             histHost.style.display = '';
         }
         catch (e) {
