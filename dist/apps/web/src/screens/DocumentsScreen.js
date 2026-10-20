@@ -19,7 +19,7 @@ export function guessMime(fileName, declared) {
         return declared;
     const ext = fileName.toLowerCase().split('.').pop() ?? '';
     const map = { pdf: 'application/pdf', png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', webp: 'image/webp',
-        txt: 'text/plain', csv: 'text/csv', dxf: 'application/dxf', step: 'model/step', stp: 'model/step', nc: 'text/plain', tap: 'text/plain' };
+        txt: 'text/plain', csv: 'text/csv', xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', xls: 'application/vnd.ms-excel', dxf: 'application/dxf', step: 'model/step', stp: 'model/step', nc: 'text/plain', tap: 'text/plain' };
     return map[ext] ?? 'application/octet-stream';
 }
 function toBase64(bytes) {

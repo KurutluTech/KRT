@@ -1,6 +1,6 @@
 {
   "product": "KMI NEXT",
-  "commit": "028c9148b9bbc01d75a70045f5c12e183c1a984d",
+  "commit": "912d902e507a9bdbcc2a2f70631c82bbe4af9414",
   "builtFrom": "clean git tree",
   "fileCount": 352,
   "migrationsInRepo": 73,
@@ -169,8 +169,8 @@
     },
     {
       "path": "dist/apps/web/src/errorText.js",
-      "bytes": 26357,
-      "sha256": "3b4da061683adc37db7bc9bdef21e2e790c8ad9d71cbd3a884b09b92df55b4f9"
+      "bytes": 28254,
+      "sha256": "6fc246b43517889ff5755d6300deb241f72072697ddcc69ab330f5089630714f"
     },
     {
       "path": "dist/apps/web/src/feasibilityApi.js",
@@ -499,8 +499,8 @@
     },
     {
       "path": "dist/apps/web/src/productWorkspaceApi.js",
-      "bytes": 5592,
-      "sha256": "d698dc278224aa278d1f1f0a13a03733482e2f94745ed2dec421bdfc315e6e36"
+      "bytes": 5980,
+      "sha256": "52124f2317000c31a57eb92b1bd889bd0b7d97b228c099a871aba86acf3e382a"
     },
     {
       "path": "dist/apps/web/src/productionApi.js",
@@ -664,8 +664,8 @@
     },
     {
       "path": "dist/apps/web/src/screens/DocumentsScreen.js",
-      "bytes": 19564,
-      "sha256": "335d51627b4bf9c4da96463e3296645492b1082472b0cf32e7eba0cb47e43307"
+      "bytes": 19672,
+      "sha256": "fae8599c4c8a998763279588ce15b46a43e06e6f85ded2ee46e808354caaefb4"
     },
     {
       "path": "dist/apps/web/src/screens/EconomicsScreen.js",
@@ -844,8 +844,8 @@
     },
     {
       "path": "dist/apps/web/src/screens/ProductWorkspaceScreen.js",
-      "bytes": 62810,
-      "sha256": "a1310de10bd24ba4d7ebabe697f37a4304ea31f5bbf30443e09092412145e0f2"
+      "bytes": 68408,
+      "sha256": "ebf6a31eba4a522f829618fb0a35af47448087705ee739a25f9ad0f620f3613c"
     },
     {
       "path": "dist/apps/web/src/screens/ProductionDeskScreen.js",
@@ -939,8 +939,8 @@
     },
     {
       "path": "dist/apps/web/src/screens/TerminalScreen.js",
-      "bytes": 27246,
-      "sha256": "1a55f694d0a4e6b8fccf976f66d3e36c3e2aaadda1d43f0748a7f7e52586aecd"
+      "bytes": 27405,
+      "sha256": "45bd1912edb7d179db973384411e0095eae3f945bde2de50fb0ae9395503a2f6"
     },
     {
       "path": "dist/apps/web/src/screens/ToolReadinessScreen.js",

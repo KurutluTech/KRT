@@ -69,6 +69,8 @@ const REFUSAL_TR = [
     [/^NO_INPUT_QUANTITY/, 'Operasyona girecek adet yok'],
     [/^MACHINE_SKILL_REQUIREMENTS_UNKNOWN/, 'Makinenin beceri gereksinimi tanımlı değil'],
     [/^DOCUMENT_NOT_EFFECTIVE/, 'Çizim / doküman yürürlükte değil'],
+    [/^TOOL_LIST_REQUIRED/, 'Takım listesi yürürlükte değil'],
+    [/^TOOLIST_RECHECK_PENDING/, 'Takım listesi değişti — yeniden kontrol bekliyor'],
     [/^OPERATION_NOT_PENDING/, 'Operasyon zaten başlamış'],
     [/^WORK_ORDER_ON_HOLD/, 'İş emri bekletmede'],
     [/^MACHINE_NOT_ELIGIBLE/, 'Makine üretime uygun değil'],

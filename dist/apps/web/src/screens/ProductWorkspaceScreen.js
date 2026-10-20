@@ -169,7 +169,7 @@ export async function renderProductWorkspaceScreen(container, api, state = {}) {
                         return;
                 }
                 formHost.dataset.target = target?.id ?? '';
-                const file = h('input', { type: 'file', 'data-testid': `pw-${tid}-file` });
+                const file = h('input', { type: 'file', 'data-testid': `pw-${tid}-file`, ...(docType === 'TOOL_LIST' ? { accept: '.xlsx,.xls,.csv,.pdf' } : {}) });
                 const note = h('input', { 'data-testid': `pw-${tid}-note`, placeholder: target ? 'Bu sürümde ne değişti? (isteğe bağlı)' : 'Not (isteğe bağlı)' });
                 const ttl = multi && !target ? h('input', { 'data-testid': `pw-${tid}-title`, placeholder: 'Program adı (ör. OP10 tornalama)' }) : null;
                 const upload = async () => {
@@ -189,9 +189,64 @@ export async function renderProductWorkspaceScreen(container, api, state = {}) {
                 };
                 formHost.append(E('div', { class: 'formbox' }, E('div', { class: 'mut' }, target ? `${target.docNo ?? ''} için YENİ SÜRÜM: eski sürüm silinmez ve yürürlükteki sürüm değişmez; yeni dosya TASLAK olarak eklenir.` : 'Yeni doküman TASLAK olarak eklenir; onay ve yürürlüğe alma Doküman Kontrol’dedir.'), E('div', { class: 'fgrid w2' }, ...(ttl ? [field('Program adı', ttl)] : []), field('Dosya', file), field('Not', note)), E('div', { class: 'row' }, btn('primary', `pw-${tid}-upload`, 'Yükle (TASLAK)', () => void upload()), btn('ghost', null, 'Vazgeç', () => formHost.replaceChildren()))));
             };
+            const toolHost = E('div', { 'data-testid': 'pw-tools-control', style: 'margin-top:10px' });
+            const STATUS_TR = { OK: 'DOĞRULANDI', FAIL: 'HATA', WARN: 'UYARI', NOT_VERIFIABLE: 'SİSTEM DOĞRULAYAMADI' };
+            const STATUS_TONE = { OK: 'ok', FAIL: 'bad', WARN: 'warn', NOT_VERIFIABLE: 'info' };
+            const drawTools = async () => {
+                if (docType !== 'TOOL_LIST' || !rev)
+                    return;
+                toolHost.replaceChildren();
+                let ov;
+                try {
+                    ov = await api.toolistOverview(rev.id);
+                }
+                catch {
+                    return;
+                }
+                const stTr = { DRAFT: 'Taslak', IN_REVIEW: 'Kontrolde', APPROVED: 'Onaylı (yürürlüğe alınmadı)', EFFECTIVE: 'Yürürlükte', SUPERSEDED: 'Eski sürüm', REJECTED: 'Reddedildi' };
+                const showChecks = async (vid, holder, canAttest, state, attested) => {
+                    holder.replaceChildren();
+                    try {
+                        const c = await api.toolistChecks(vid);
+                        const attItems = [['tool_numbers', 'Takım numaraları'], ['diameters', 'Çaplar'], ['lengths', 'Boylar'], ['holders', 'Tutucular'], ['offsets', 'Offset / düzeltme numaraları'], ['cam_nc_match', 'CAM/NC programı ile uyum'], ['machine_config', 'Tezgâh yapılandırması (magazin, izinli tezgâh)']];
+                        const boxes = attItems.map(([k, t]) => ({ k, t, el: h('input', { type: 'checkbox', 'data-testid': `pw-tools-att-${k}` }) }));
+                        const note = h('input', { 'data-testid': 'pw-tools-att-note', placeholder: 'Neye göre doğruladınız? (ör. takım ayar föyü, ölçüm)' });
+                        holder.append(E('div', { class: 'rows', 'data-testid': 'pw-tools-checks' }, ...c.checks.map((x) => E('div', { class: 'r', 'data-testid': 'pw-tools-check', 'data-code': x.code, 'data-status': x.status }, chip(STATUS_TR[x.status] ?? x.status, STATUS_TONE[x.status] ?? ''), E('b', {}, x.label), E('span', { class: 'mut' }, x.detail)))), E('div', { class: 'mut', style: 'margin-top:6px' }, 'Sistemin doğrulayamadığı alanlar “geçti” sayılmaz; yetkili kişinin elle doğrulaması kayıt altına alınır.'), c.fail > 0 ? E('div', { class: 'banner bad', 'data-testid': 'pw-tools-failed' }, 'Hatalı madde var: bu sürüm yürürlüğe alınamaz. Düzeltilmiş yeni sürüm yükleyin.')
+                            : attested ? E('div', { class: 'banner ok', 'data-testid': 'pw-tools-attested' }, 'Kritik alanlar yetkili kişi tarafından doğrulandı ve kaydedildi.')
+                                : (canAttest && (state === 'IN_REVIEW' || state === 'APPROVED')) ? E('div', { class: 'formbox', 'data-testid': 'pw-tools-attest-form' }, E('b', {}, 'Elle doğrulama kaydı'), ...boxes.map((b) => E('label', { class: 'row', style: 'gap:6px' }, b.el, b.t)), field('Doğrulama notu', note), btn('primary', 'pw-tools-attest', 'Doğruladım, kaydet', () => void (async () => { try {
+                                    await api.toolistAttest(vid, Object.fromEntries(boxes.map((b) => [b.k, b.el.checked])), val(note).trim());
+                                    await reload('Takım listesi doğrulaması kaydedildi. Yürürlüğe alma Doküman Kontrol’dedir.');
+                                }
+                                catch (e) {
+                                    fail(e);
+                                } })()))
+                                    : E('div', { class: 'mut' }, 'Elle doğrulama bekleniyor (kontrol ve onay sürecinden sonra yetkili kişi kaydeder).'));
+                    }
+                    catch (e) {
+                        fail(e);
+                    }
+                };
+                for (const d of ov.documents)
+                    for (const v of d.versions.slice(0, 3)) {
+                        const holder = E('div', { 'data-testid': 'pw-tools-checkhost' });
+                        toolHost.append(E('div', { class: 'r', 'data-testid': 'pw-tools-version' }, E('b', {}, `${d.docNo ?? ''} v${v.versionNo}`), E('span', { class: 'mut' }, `${v.fileName} · ${stTr[v.state] ?? v.state}${v.attested ? ' · elle doğrulandı' : ''}`), btn('ghost sm', 'pw-tools-show-checks', 'Otomatik kontroller', () => void showChecks(v.versionId, holder, ov.canAttest, v.state, v.attested))), holder);
+                    }
+                for (const r of ov.rechecksOpen) {
+                    const note = h('input', { 'data-testid': 'pw-tools-recheck-note', placeholder: 'CAM/NC ve operasyon yeni listeyle uyumlu mu? Kısa not' });
+                    toolHost.append(E('div', { class: 'banner', role: 'status', 'data-testid': 'pw-tools-recheck' }, E('b', {}, `OP${r.opNo}: takım listesi değişti — CAM/NC ve operasyon uygunluğu yeniden kontrol edilmeli. `), 'Kayıt girilene kadar bu operasyon iş emrinde başlatılamaz.', ov.canAttest ? E('div', { class: 'row', style: 'margin-top:6px' }, note, btn('primary sm', 'pw-tools-recheck-done', 'Kontrol edildi', () => void (async () => { try {
+                        await api.toolistRecheckDone(r.id, val(note).trim());
+                        await reload('Yeniden kontrol kaydedildi.');
+                    }
+                    catch (e) {
+                        fail(e);
+                    } })())) : null));
+                }
+            };
             const docRow = (d) => E('div', { class: 'r docg', 'data-testid': 'pw-doc', 'data-doc-no': d.docNo ?? '' }, E('div', { class: 'stack', style: 'gap:3px' }, E('div', { class: 'row', style: 'gap:6px' }, E('b', {}, d.docNo ?? '—'), chip(CTL_TR[d.controlState ?? ''] ?? '—', CTL_TONE[d.controlState ?? ''] ?? ''), E('span', { class: 'mut' }, `v${d.versionNo ?? '—'}${d.effectiveVersionNo ? ` · yürürlükte v${d.effectiveVersionNo}` : ''}`)), E('div', {}, d.title), E('div', { class: 'mut' }, `${DOC_TR[d.docType] ?? d.docType}${d.fileName ? ` · ${d.fileName}` : ''}${d.opNos.length ? ` · OP${d.opNos.join(', OP')}` : ''}`)), E('div', { class: 'acts' }, btn('ghost sm', 'pw-doc-open', 'Önizle', () => void view(d, false)), btn('ghost sm', 'pw-doc-dl', 'İndir', () => void view(d, true)), h('a', { class: 'btn ghost sm', href: `#/dokuman-kontrol?doc=${d.id}`, 'data-testid': 'pw-doc-history' }, 'Geçmiş'), canUpload ? btn('ghost sm', `pw-${tid}-newver-${d.docNo ?? ''}`, 'Yeni sürüm', () => openForm(d)) : null));
             const addBtn = canUpload && (docs.length === 0 || multi) ? btn(docs.length ? 'ghost sm' : 'primary sm', `pw-${tid}-open-upload`, docs.length ? '+ Yeni program' : 'Dosya yükle', () => openForm(null)) : null;
-            return card({ title, span, testid: `pw-card-${tid}`, chip: stateChip(st), attrs: { 'data-state': st }, actions: [addBtn] }, docs.length ? E('div', { class: 'rows' }, ...docs.map(docRow)) : (whyNoUpload === 'NO_REV' ? emptyState(`Revizyon yok — ${title.toLowerCase()} eklenemez`, WHY_TR.NO_REV) : emptyState(`${NA} — bu revizyonda ${title.toLowerCase()} yok`, canUpload ? 'İlk dosyayı “Dosya yükle” ile ekleyin.' : (whyNoUpload ? WHY_TR[whyNoUpload] : ''))), formHost, viewHost);
+            const cardEl = card({ title, span, testid: `pw-card-${tid}`, chip: stateChip(st), attrs: { 'data-state': st }, actions: [addBtn] }, docs.length ? E('div', { class: 'rows' }, ...docs.map(docRow)) : (whyNoUpload === 'NO_REV' ? emptyState(`Revizyon yok — ${title.toLowerCase()} eklenemez`, WHY_TR.NO_REV) : emptyState(`${NA} — bu revizyonda ${title.toLowerCase()} yok`, canUpload ? 'İlk dosyayı “Dosya yükle” ile ekleyin.' : (whyNoUpload ? WHY_TR[whyNoUpload] : ''))), formHost, viewHost, docType === 'TOOL_LIST' ? toolHost : null);
+            void drawTools();
+            return cardEl;
         };
         // ---------------------------------------------------------------------------------------- rota ve operasyonlar
         const activeOps = ws.routing.filter((o) => o.active);
