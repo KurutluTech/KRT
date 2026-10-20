@@ -5,7 +5,7 @@ import { pilotChip } from '../pilotMark.js';
 import { passportHref } from '../passport/registry.js';
 import { h, mount } from '../../../../packages/ui/src/h.js';
 import { buildProductionDesk, GROUP_TR, HOLD_CATEGORIES, DESK_FILTERS, FILTER_TR } from '../../../../packages/domain/src/productionDesk.js';
-import { HEADLINE_TR, AVAILABILITY_TR, DATA_SOURCE_TR } from '../../../../packages/domain/src/machineState.js';
+import { HEADLINE_TR, AVAILABILITY_TR, DATA_SOURCE_TR, physicalLabel, rpmTr } from '../../../../packages/domain/src/machineState.js';
 import { fmtDur } from '../../../../packages/domain/src/cncActivity.js';
 import { spindleForState, STATE_VISUAL } from '../spindle.js';
 import { displayKey } from '../../../../packages/domain/src/machineState.js';
@@ -34,6 +34,10 @@ const CSS = `
 .pd .src{font-size:11.5px;color:#8da0bd}.pd .sec{border-top:1px solid #1a2a46;padding-top:8px;margin-top:6px}.pd .sec h3{margin:0 0 6px;font-size:13px;color:#e9eef7}.pd .chips.sub .chip{min-height:36px;font-size:12px}
 `;
 const GROUPS = ['STOPPED', 'HOLD', 'FIRST_PIECE', 'RUNNING', 'READY', 'IDLE', 'UNKNOWN'];
+/** Name and content are two levels; a name match is never shown as verification. */
+export function programCheckText(r) {
+    return { name: r.nameLevel === 'PROGRAM ADI EŞLEŞTİ' ? 'PROGRAM ADI EŞLEŞTİ' : r.nameLevel === 'PROGRAM ADI FARKLI' ? 'PROGRAM ADI FARKLI' : r.nameLevel === 'KMI KAYDI YOK' ? 'KMI’DE BU PROGRAM İÇİN KAYIT YOK' : 'CNC PROGRAM ADI BİLİNMİYOR', content: r.contentLabel || 'CNC DOSYA İÇERİĞİ DOĞRULANMADI' };
+}
 export async function renderProductionDesk(container, api) {
     let machines = undefined;
     let loaded = false;
@@ -61,7 +65,7 @@ export async function renderProductionDesk(container, api) {
         const ms = c.ms, cd = c.cd, p = c.production;
         const vis = STATE_VISUAL[displayKey(ms)];
         const since = c.stateSince ? `${fmtDur((Date.now() - Date.parse(c.stateSince.from)) / 1000)}${c.stateSince.clipped ? '+' : ''} (${fmtT(c.stateSince.from)}'den beri)` : cd && cd.link === 'UP' ? 'doğrulanamadı' : 'Veri yok';
-        return h('div', { style: 'display:flex;flex-direction:column;gap:8px' }, h('div', { class: 'cd', 'data-testid': 'pd-phys', 'data-headline': ms.headline, 'data-source': ms.dataSource }, spindleForState(ms, 44), h('div', {}, h('div', { class: 'big', style: `color:${vis.color}`, 'data-testid': 'pd-phys-label' }, 'Fiziksel CNC: ', HEADLINE_TR[ms.headline]), h('div', { class: 'src', 'data-testid': 'pd-source' }, `Kaynak: ${c.sourceTr} · ${DATA_SOURCE_TR[ms.dataSource]}`), h('div', { class: 'src' }, `İdari durum: ${AVAILABILITY_TR[ms.availability]}${c.machineClass ? '' : ' · sınıf belirtilmemiş'}`))), ...c.alerts.map((a) => h('div', { class: `al ${a.sev}`, role: 'status', 'data-testid': 'pd-alert', 'data-key': a.key }, a.text)), cd ? h('div', { class: 'blk', 'data-testid': 'pd-cnc' }, h('h4', {}, 'CANLI CNC'), kv([['Bağlantı', cd.linkTr.replace('CNC bağlantısı: ', '')], ['Son veri', cd.link === 'UP' ? fmtT(cd.lastDataAt) : `${fmtT(cd.lastDataAt)} (güncel değil)`], ['Aktif program', cd.program ?? (cd.link === 'UP' ? 'BİLGİ YOK' : 'Veri yok')], ['Mil devri', cd.spindleRpm === null ? 'Veri yok' : `${cd.spindleRpm} dev/dk`],
+        return h('div', { style: 'display:flex;flex-direction:column;gap:8px' }, h('div', { class: 'cd', 'data-testid': 'pd-phys', 'data-headline': ms.headline, 'data-source': ms.dataSource }, spindleForState(ms, 44), h('div', {}, h('div', { class: 'big', style: `color:${vis.color}`, 'data-testid': 'pd-phys-label' }, physicalLabel(c.hasCnc), ': ', HEADLINE_TR[ms.headline]), h('div', { class: 'src', 'data-testid': 'pd-source' }, `Kaynak: ${c.sourceTr} · ${DATA_SOURCE_TR[ms.dataSource]}`), h('div', { class: 'src' }, `İdari durum: ${AVAILABILITY_TR[ms.availability]}${c.machineClass ? '' : ' · sınıf belirtilmemiş'}`))), ...c.alerts.map((a) => h('div', { class: `al ${a.sev}`, role: 'status', 'data-testid': 'pd-alert', 'data-key': a.key }, a.text)), cd ? h('div', { class: 'blk', 'data-testid': 'pd-cnc' }, h('h4', {}, 'CANLI CNC'), kv([['Bağlantı', cd.linkTr.replace('CNC bağlantısı: ', '')], ['Son veri', cd.link === 'UP' ? fmtT(cd.lastDataAt) : `${fmtT(cd.lastDataAt)} (güncel değil)`], ['Aktif program', cd.program ?? (cd.link === 'UP' ? 'BİLGİ YOK' : 'Veri yok')], ['Mil devri', cd.spindleRpm === null ? 'Veri yok' : `${rpmTr(cd.spindleRpm)} dev/dk`],
             ['Program durumu', cd.link === 'UP' ? cd.stateTr : 'BİLİNMİYOR'], ['Son çevrim', cd.lastCycleS === null ? 'Veri yok' : fmtDur(cd.lastCycleS)], ['Bu durumda', since]])) : null, h('div', { class: 'blk', 'data-testid': 'pd-prod' }, h('h4', {}, 'ÜRETİM · İŞ EMRİ'), p.hasWo ? kv([['İş emri', p.woId ? p.woId.slice(0, 8) : 'Veri yok'], ['Operasyon', p.opLabel ?? 'Ana iş emri'], ['Ürün', p.productCode ?? 'Veri yok'], ['Operatör', p.operator ?? 'KAYIT YOK'], ['Vardiya', p.shift ?? 'Veri yok'],
             ['Planlanan', nz(p.planned)], ['Sağlam', nz(p.good)], ['Tahsis', nz(p.tashih)], ['Hurda', nz(p.scrap)], ['Kalan', nz(p.remaining)], ['Hedef', p.pct === null ? 'Veri yok' : `%${p.pct}`]])
             : kv([['İş emri', 'ATANMAMIŞ'], ['Operatör', 'KAYIT YOK']]), p.hasWo ? null : h('div', { class: 'src' }, 'CNC verisi iş emri açmaz, sağlam adet üretmez; adetler yalnızca operatör beyanından gelir.')));
@@ -95,6 +99,19 @@ export async function renderProductionDesk(container, api) {
             }
             else
                 cncHost.replaceChildren(h('div', { class: 'mu', 'data-testid': 'pd-no-cnc' }, c.cncDenied ? 'CNC verisini görme yetkiniz yok.' : 'Bu makinede doğrulanmış CNC cihaz eşlemesi yok — durum operatör beyanıdır; CNC geçmişi, vardiya analizi ve AI değerlendirmesi oluşmaz.'));
+            // G · program: NAME against the machine's released CAM records (0136) and CONTENT as a separate, honestly unverified level
+            if (io && c.hasCnc && !c.cncDenied) {
+                const pgHost = h('div', { class: 'blk', 'data-testid': 'pd-prog-check' }, h('h4', {}, 'PROGRAM DOĞRULAMA'));
+                cncHost.append(pgHost);
+                try {
+                    const r = await io.rpc('cnc_program_check', { p_machine: c.machineId });
+                    const t = programCheckText(r);
+                    pgHost.append(kv([['CNC bildirdi', r.cncReportedProgram ?? 'BİLGİ YOK'], ['Ad doğrulaması', t.name], ['KMI kaydı', r.nameLevel === 'PROGRAM ADI EŞLEŞTİ' ? `OP${r.opNo ?? '?'} · ${r.ncDocNo ?? 'NC belgesi'}` : r.expectedPrograms ? `Beklenen: ${r.expectedPrograms}` : 'Yayınlanmış CAM kaydı yok'], ['İçerik doğrulaması', t.content]]), h('div', { class: 'src', 'data-testid': 'pd-prog-note' }, 'Denetleyici yalnız program ADINI bildirir. Tezgâhtaki dosyanın içeriği/sürümü KMI dosyasıyla karşılaştırılamadığı için “tam doğrulandı” veya “üretime hazır” denmez.'));
+                }
+                catch {
+                    pgHost.append(h('div', { class: 'mu' }, 'Program doğrulaması okunamadı (yetki veya kurulum). Doğrulanmış sayılmaz.'));
+                }
+            }
             // D
             const p = c.production;
             dHost.replaceChildren(kv([['Planlanan', nz(p.planned)], ['Sağlam', nz(p.good)], ['Tahsis (kalite kararı bekleyen)', nz(p.tashih)], ['Hurda', nz(p.scrap)], ['Kalan', nz(p.remaining)], ['Plan/hedef', p.pct === null ? 'Veri yok' : `%${p.pct}`], ['Operatör beyanı', p.operator ?? 'KAYIT YOK'],

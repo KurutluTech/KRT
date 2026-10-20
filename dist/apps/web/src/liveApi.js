@@ -6,18 +6,28 @@ export function createLiveApi(client, session) {
             const b = await client.rpc('live_board', { p_profile: profile }, session);
             // ONE FACT -> ONE SOURCE: the CNC verdict is read once here and rides on the board, so every screen that builds a machine state sees the same CNC fact.
             if (profile === 'OFFICE') {
-                try {
-                    const by = new Map();
-                    for (const r of await client.rpc('cnc_live_states', {}, session))
-                        if (r.machineCode)
-                            by.set(r.machineCode, r);
-                    for (const m of b.machines) {
-                        const r = by.get(m.code);
-                        if (r)
-                            m.cnc = r;
+                const denied = (e) => /FORBIDDEN|42501|NOT_AUTHORIZED|permission denied|CNC_TELEMETRY|does not exist|PGRST202|404/i.test(String(e?.message ?? e));
+                b.cncRead = 'FAILED';
+                for (let attempt = 0; attempt < 2 && b.cncRead === 'FAILED'; attempt++) {
+                    try {
+                        const by = new Map();
+                        for (const r of await client.rpc('cnc_live_states', {}, session))
+                            if (r.machineCode)
+                                by.set(r.machineCode, r);
+                        for (const m of b.machines) {
+                            const r = by.get(m.code);
+                            if (r)
+                                m.cnc = r;
+                        }
+                        b.cncRead = 'OK';
                     }
+                    catch (e) {
+                        if (denied(e))
+                            b.cncRead = 'DENIED';
+                        else if (attempt === 0)
+                            await new Promise((r) => setTimeout(r, 900));
+                    } // one quick retry for a transient failure; permission refusal is final
                 }
-                catch { /* no CNC permission / not installed: operator-declared model, never an invented state */ }
             }
             return b;
         },

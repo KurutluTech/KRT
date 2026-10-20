@@ -67,7 +67,7 @@ export async function renderQualityDesk(container, api, o) {
                     return refuse(`Karar gerekçesi en az ${QD_MIN_REASON} karakter olmalı.`); void act(() => api.moveNcr(it.ref.ncrId, to, n()), `NCR: ${NCR_MOVE_TR[to].toLowerCase()}.`); }, `qd-ncr-${to}`))];
             case 'INCOMING': return [note, btn('Kabul (stoğa al)', 'ok', 'INCOMING', () => void act(() => api.incomingDecision(it.ref.stockLotId, 'ACCEPT', n()), 'Giriş kalite: kabul edildi — lot kullanılabilir.'), 'qd-in-accept'),
                 h('button', { type: 'button', class: 'b bad', disabled: !o.can('QUALITY_REJECT'), title: o.can('QUALITY_REJECT') ? '' : NOACT, 'data-testid': 'qd-in-reject', onClick: () => { if (!reasonOk(n()))
-                        return refuse(`Red gerekçesi en az ${QD_MIN_REASON} karakter olmalı.`); void act(() => api.incomingDecision(it.ref.stockLotId, 'REJECT', n()), 'Giriş kalite: reddedildi — lot hurdaya ayrıldı.'); } }, 'Reddet (hurda)')];
+                        return refuse(`Red gerekçesi en az ${QD_MIN_REASON} karakter olmalı.`); void act(() => api.incomingDecision(it.ref.stockLotId, 'REJECT', n()), 'Giriş kalite: reddedildi — lot hurdaya ayrıldı.'); } }, 'Reddet (hurda)'), ...inspectControl(it, n)];
             case 'FINAL': return [note, btn(armed === it.key ? 'Emin misiniz? Onayla ve tamamla' : 'Final üretim serbest bırak', armed === it.key ? 'ok' : '', 'FINAL', () => {
                     if (armed !== it.key) {
                         armed = it.key;
@@ -77,6 +77,34 @@ export async function renderQualityDesk(container, api, o) {
                     void act(() => api.finalRelease(it.workOrderId, n() || 'Final kalite serbest bırakma'), 'İş emri tamamlandı (final üretim serbest bırakma).');
                 }, 'qd-final')];
         }
+    };
+    // 0138: incoming inspection WITH the inspected fields (bar stock). The quick Kabul / Red buttons above stay; this form records what was inspected and then makes the same decision on the server.
+    const inspDraft = new Map(); // typed values survive a redraw (a server refusal must not make the inspector retype everything)
+    const inspectControl = (it, n) => {
+        const dr = inspDraft.get(it.key) ?? {};
+        const f = (id, ph, w = '9em') => { const e = h('input', { type: 'text', placeholder: ph, 'aria-label': ph, style: `width:${w}`, 'data-testid': `qd-insp-${id}` }); if (dr[id] !== undefined)
+            e.value = dr[id]; e.addEventListener('input', () => inspDraft.set(it.key, { ...(inspDraft.get(it.key) ?? {}), [id]: e.value })); return e; };
+        const mat = f('material', 'Malzeme (ör. 4140)'), dia = f('dia', 'Çap mm', '6em'), len = f('len', 'Çubuk boyu mm', '8em'), cnt = f('count', 'Çubuk adedi', '7em'), slot = f('lot', 'Tedarikçi lot no'), cert = f('cert', 'Sertifika no'), loc = f('loc', 'Depo yeri');
+        if (dr['count'] === undefined)
+            cnt.value = String(it.qty ?? '');
+        const own = h('select', { 'aria-label': 'Malzeme sahibi', 'data-testid': 'qd-insp-owner' }, h('option', { value: 'KURUTLU' }, 'Kurutlu malzemesi'), h('option', { value: 'CUSTOMER' }, 'Müşteri malzemesi'));
+        if (dr['owner'])
+            own.value = dr['owner'];
+        own.addEventListener('change', () => inspDraft.set(it.key, { ...(inspDraft.get(it.key) ?? {}), owner: own.value }));
+        const num = (x) => Number(x.value.trim().replace(',', '.'));
+        const go = (decision) => {
+            if (![dia, len, cnt].every((x) => Number.isFinite(num(x)) && num(x) > 0) || !mat.value.trim() || !slot.value.trim())
+                return refuse('Malzeme, çap, çubuk boyu, çubuk adedi ve tedarikçi lot no zorunlu.');
+            if (decision === 'REJECT' && !reasonOk(n()))
+                return refuse(`Red gerekçesi en az ${QD_MIN_REASON} karakter olmalı.`);
+            void act(() => api.incomingInspection({ stockLotId: it.ref.stockLotId, materialType: mat.value.trim(), diaMm: num(dia), barLengthMm: num(len), barCount: Math.round(num(cnt)), supplierLotNo: slot.value.trim(), certificateNo: cert.value.trim() || null, ownership: own.value, decision, location: loc.value.trim() || null, reason: n() || null }), decision === 'ACCEPT' ? 'Giriş muayenesi kaydedildi: kabul — lot kullanılabilir.' : 'Giriş muayenesi kaydedildi: reddedildi — lot hurdaya ayrıldı.');
+        };
+        const ok = o.can('QUALITY_HOLD_RELEASE');
+        const rej = o.can('QUALITY_REJECT');
+        const det = h('details', { 'data-testid': 'qd-insp' }, h('summary', {}, 'Muayene bilgisiyle kabul / red'), h('div', { class: 'row' }, mat, dia, len, cnt, slot, cert, own, loc), h('div', { class: 'row' }, h('button', { type: 'button', class: 'b ok', disabled: !ok, title: ok ? '' : NOACT, 'data-testid': 'qd-insp-accept', onClick: () => go('ACCEPT') }, 'Muayeneyi kaydet ve kabul et'), h('button', { type: 'button', class: 'b bad', disabled: !rej, title: rej ? '' : NOACT, 'data-testid': 'qd-insp-reject', onClick: () => go('REJECT') }, 'Muayeneyi kaydet ve reddet')));
+        det.open = dr['open'] === '1';
+        det.addEventListener('toggle', () => inspDraft.set(it.key, { ...(inspDraft.get(it.key) ?? {}), open: det.open ? '1' : '0' }));
+        return [det];
     };
     // partial decision: split pieces off the case, then decide each part on its own (accept / scrap / rework). The server checks QUALITY_REJECT, the reason, and 0 < part < case.
     const splitControl = (it, n, _note) => {

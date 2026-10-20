@@ -111,6 +111,8 @@ export function renderHomeShow(host, i) {
     if (sh) {
         if (!i.board && src.board.state === 'LOADING')
             fleet = loadingBox('Canlı fabrika', 'home-fleet');
+        else if (i.board && i.board.cncRead === 'FAILED')
+            fleet = h('section', { class: 'hs-sec', 'data-testid': 'home-fleet', 'data-cnc': 'verifying', 'aria-busy': 'true' }, secHead('fleet'), h('div', { class: 'hs-skel', role: 'status', 'data-testid': 'home-fleet-verifying' }, i.board.cncGaveUp ? 'DOĞRULANAMADI — CNC durumu okunamadı. Makinelerin fiziksel durumu BİLİNMİYOR; kayıtlı durum fiziksel durum yerine geçmez. Yenile ile tekrar deneyin.' : 'DOĞRULANIYOR — CNC durumu okunuyor. Doğrulanana kadar makinelerin fiziksel durumu gösterilmez; kayıtlı durum fiziksel durum yerine geçmez.'));
         else if (!i.board)
             fleet = h('section', { class: 'hs-sec', 'data-testid': 'home-fleet' }, secHead('fleet'), h('div', { class: 'hs-unk', 'data-testid': 'home-fleet-unknown' }, `Makine parkı: BİLİNMİYOR — canlı pano ${why(src.board)}. "Makine yok" anlamına gelmez.`));
         else {

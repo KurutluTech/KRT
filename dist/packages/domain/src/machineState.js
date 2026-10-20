@@ -43,3 +43,7 @@ export function machineStateOf(m) {
 /** KMI-013: the ONE key every screen feeds to the spindle icon. A stale (silent/old) session is shown as STALE — never as running and never as plain idle. */
 export function displayKey(s) { return s.stale ? 'STALE' : s.headline; }
 export const STALE_TR = 'BAYAT OTURUM';
+/** Label for the state line. Only a machine that really delivers a controller signal may say "Fiziksel CNC"; anything else (CMM, forklift, saw, a CNC without a connection) shows its recorded state under its own name — no fake CNC wording. */
+export function physicalLabel(hasCnc) { return hasCnc ? 'Fiziksel CNC' : 'Kayıtlı durum'; }
+/** spindle speed for people: whole rpm with Turkish thousands separator (5999.6154… → "6.000"). */
+export function rpmTr(v) { return Math.round(v).toLocaleString('tr-TR', { useGrouping: true, maximumFractionDigits: 0 }).replace(/^(\d)(\d{3})$/, '$1.$2'); }

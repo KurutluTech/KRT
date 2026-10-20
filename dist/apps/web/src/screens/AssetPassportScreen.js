@@ -63,9 +63,24 @@ export async function renderAssetPassportScreen(container, id, deps) {
         const last = d.events[0];
         // header
         sections.push(E('div', {}, E('h1', { 'data-testid': 'ap-title' }, a.name ?? 'BİLİNMİYOR'), E('div', { class: 'ap-code', 'data-testid': 'ap-code' }, `${a.code} · ${CLASS_TR[a.class].full}${a.subcategory ? ` · ${a.subcategory}` : ''}`), E('div', { class: 'ap-top' }, E('span', { class: 'ap-badge', 'data-tone': tone, 'data-testid': 'ap-status' }, badgeText), E('span', {}, `Zimmet: ${holderText}`), E('span', {}, `Son olay: ${last ? `${EVENT_TR[last.type] ?? last.type} (${dateTr(last.at) ?? '—'})` : 'BİLİNMİYOR'}`)), ...(a.review_required ? [E('div', { class: 'ap-msg', 'data-kind': 'info', 'data-testid': 'ap-review' }, `Sınıf doğrulanmalı: ${a.review_note ?? 'otomatik atandı, yönetici onaylamalı.'}`)] : []), ...(a.holder_inactive ? [E('div', { class: 'ap-msg', 'data-kind': 'error', 'data-testid': 'ap-holder-inactive' }, 'Zimmet sahibi pasif personel. Zimmet otomatik devredilmez; yönetici gerekçeyle kapatmalı veya yeni talep açılmalı.')] : [])));
-        // identity
-        sections.push(E('section', { class: 'ap-sec', 'data-testid': 'ap-identity' }, E('h2', {}, 'Kimlik ve teknik bilgi'), dl([['Varlık kodu', a.code], ['Sınıf', CLASS_TR[a.class].full], ['Alt kategori', a.subcategory], ['Marka / model', a.brand_model], ['Üretici', a.manufacturer], ['Seri no', a.serial_no, 'ap-serial'],
-            ['Edinim tarihi', dateTr(a.acquired_on)], ['Devreye alma', dateTr(a.commissioned_on)], ['Kayıt kaynağı', a.source_type === 'MACHINE' ? `Makine kaydı (${a.machine_code ?? '—'})` : 'Doğrudan varlık kaydı']]), ...(a.source_type === 'MACHINE' && a.source_id ? [E('p', {}, E('a', { class: 'ap-btn sec', href: `#/kart?t=MACHINE&id=${a.source_id}`, 'data-testid': 'ap-machine-link' }, 'Makine pasaportunu aç (teknik/OEE/bakım ayrıntısı orada)'))] : [])));
+        // identity — a MACHINE asset has ONE technical identity: the Machine Passport's. The asset record's own copies are not shown for machines (no second source).
+        const isMachine = a.source_type === 'MACHINE' && !!a.source_id;
+        let tech = null;
+        let techErr = false;
+        if (isMachine && deps.machineTech) {
+            try {
+                tech = await deps.machineTech(a.source_id);
+            }
+            catch {
+                tech = null;
+            }
+            techErr = tech === null;
+        }
+        const identRows = [['Varlık kodu', a.code], ['Sınıf', CLASS_TR[a.class].full], ['Alt kategori', a.subcategory],
+            ...(isMachine ? [['Üretici', tech?.manufacturer ?? null, 'ap-tech-manufacturer'], ['Model', tech?.model ?? null, 'ap-tech-model'], ['Seri no', tech?.serialNo ?? null, 'ap-tech-serial'], ['Model yılı', tech?.modelYear ?? null, 'ap-tech-year']]
+                : [['Marka / model', a.brand_model], ['Üretici', a.manufacturer], ['Seri no', a.serial_no, 'ap-serial']]),
+            ['Edinim tarihi', dateTr(a.acquired_on)], ['Devreye alma', dateTr(a.commissioned_on)], ['Kayıt kaynağı', a.source_type === 'MACHINE' ? `Makine kaydı (${a.machine_code ?? '—'})` : 'Doğrudan varlık kaydı']];
+        sections.push(E('section', { class: 'ap-sec', 'data-testid': 'ap-identity' }, E('h2', {}, 'Kimlik ve teknik bilgi'), dl(identRows), ...(isMachine ? [E('p', { class: 'mut', 'data-testid': 'ap-tech-source' }, techErr ? 'Teknik kimlik Makine Pasaportu\'ndan okunamadı (okuma yetkisi veya bağlantı). Değer uydurulmaz; makine pasaportunu açın.' : 'Teknik kimlik tek kaynaktan, Makine Pasaportu\'ndan okunur; bu kayda kopyalanmaz.')] : []), ...(isMachine ? [E('p', {}, E('a', { class: 'ap-btn sec', href: `#/kart?t=MACHINE&id=${a.source_id}`, 'data-testid': 'ap-machine-link' }, 'Makine pasaportunu aç (teknik/OEE/bakım ayrıntısı orada)'))] : [])));
         // location & responsibility
         const locBox = E('div', {});
         sections.push(E('section', { class: 'ap-sec', 'data-testid': 'ap-location' }, E('h2', {}, 'Konum ve sorumluluk'), dl([['Fiziksel konum', a.location], ['Bağlı birim', deptTr(a.department)], ['Sorumlu birim', a.responsible_unit], ['Zimmetli', holderText], ['Zimmet başlangıcı', dateTr(a.custody_since)], ['Son konum değişimi', dateTr(a.last_moved_at)]]), E('p', { class: 'mut' }, 'Konum değişimi zimmet devri değildir; zimmet yalnız iki taraflı onayla değişir.'), locBox));
@@ -73,8 +88,8 @@ export async function renderAssetPassportScreen(container, id, deps) {
             const loc = E('input', { type: 'text', value: a.location ?? '', 'data-testid': 'ap-loc-input', maxlength: 120 });
             const dep = E('select', { 'data-testid': 'ap-loc-dept' }, E('option', { value: '' }, 'Birim yok / tanımsız'), ...DEPARTMENTS.map((x) => E('option', { value: x.code, selected: x.code === a.department }, x.tr)));
             const unit = E('input', { type: 'text', value: a.responsible_unit ?? '', 'data-testid': 'ap-loc-unit', maxlength: 120 });
-            const why = E('input', { type: 'text', placeholder: 'Gerekçe (zorunlu)', 'data-testid': 'ap-loc-reason', maxlength: 200 });
-            locBox.append(E('div', { class: 'ap-row' }, E('label', {}, 'Konum', loc), E('label', {}, 'Birim', dep), E('label', {}, 'Sorumlu birim', unit), E('label', {}, 'Gerekçe', why), E('button', { type: 'button', class: 'ap-btn', 'data-testid': 'ap-loc-save', onClick: () => void run(() => deps.api.setLocation(id, loc.value.trim(), dep.value || null, unit.value.trim(), why.value.trim()), 'Konum kaydedildi.') }, 'Konumu kaydet')));
+            const why = E('input', { type: 'text', placeholder: 'İsteğe bağlı not (boşsa sistem kaydeder)', 'data-testid': 'ap-loc-reason', maxlength: 200 });
+            locBox.append(E('div', { class: 'ap-row' }, E('label', {}, 'Konum', loc), E('label', {}, 'Birim', dep), E('label', {}, 'Sorumlu birim', unit), E('label', {}, 'Not (isteğe bağlı)', why), E('button', { type: 'button', class: 'ap-btn', 'data-testid': 'ap-loc-save', onClick: () => void run(() => deps.api.setLocation(id, loc.value.trim(), dep.value || null, unit.value.trim(), why.value.trim()), 'Konum kaydedildi.') }, 'Konumu kaydet')));
         }
         // custody + transfer
         const custody = E('section', { class: 'ap-sec', 'data-testid': 'ap-custody' }, E('h2', {}, 'Zimmet ve teslim talepleri'));
@@ -143,7 +158,7 @@ export async function renderAssetPassportScreen(container, id, deps) {
         qrBox.innerHTML = qrToSvg(encodeQr(d.qr.payload, 'M'), 40);
         sections.push(E('section', { class: 'ap-sec', 'data-testid': 'ap-qr-sec' }, E('h2', {}, 'QR kimliği'), E('div', { class: 'ap-qr' }, qrBox, E('div', {}, E('div', {}, `Etiket kodu: ${d.qr.label_code ?? 'henüz basılmadı'}`), E('div', { class: 'mut', 'data-testid': 'ap-qr-payload' }, d.qr.payload), E('p', { class: 'mut' }, 'QR yalnız sabit kimlik taşır; okutunca oturum ve yetki kontrol edilir.'), ...(deps.canLabel ? [E('a', { class: 'ap-btn sec', href: `#/etiket?tip=ASSET&id=${a.id}&baslik=${encodeURIComponent(a.name ?? a.code)}`, 'data-testid': 'ap-label-link' }, 'Etiket bas')] : [])))));
         // history
-        sections.push(E('section', { class: 'ap-sec', 'data-testid': 'ap-history' }, E('h2', {}, 'Hareket ve denetim geçmişi'), d.events.length ? E('ul', { class: 'ap-ev' }, ...d.events.map((ev) => E('li', { 'data-testid': 'ap-event', 'data-type': ev.type }, E('b', {}, EVENT_TR[ev.type] ?? ev.type), E('small', {}, `${dateTr(ev.at) ?? ''} · ${ev.actor ?? 'sistem'}${ev.reason ? ` · ${ev.reason}` : ''}`)))) : E('p', { class: 'mut' }, 'Görünür olay yok.')));
+        sections.push(E('section', { class: 'ap-sec', 'data-testid': 'ap-history' }, E('h2', {}, 'Hareket ve denetim geçmişi'), d.events.length ? E('ul', { class: 'ap-ev' }, ...d.events.map((ev) => E('li', { 'data-testid': 'ap-event', 'data-type': ev.type }, E('b', {}, EVENT_TR[ev.type] ?? ev.type), E('small', {}, `${dateTr(ev.at) ?? ''} · ${ev.actor ?? 'sistem'}${ev.reason ? ` · ${ev.reason}` : ''}${ev.after?.reason_source === 'SYSTEM' ? ' · [SİSTEM AÇIKLAMASI]' : ev.after?.reason_source === 'USER' ? ' · [KULLANICI GEREKÇESİ]' : ''}`)))) : E('p', { class: 'mut' }, 'Görünür olay yok.')));
         body.replaceChildren(...sections);
     };
     const paintMsg = () => { msg.replaceChildren(...(flash ? [E('div', { class: 'ap-msg', 'data-kind': flash.kind, 'data-testid': 'ap-message', role: flash.kind === 'error' ? 'alert' : 'status' }, flash.text)] : [])); };

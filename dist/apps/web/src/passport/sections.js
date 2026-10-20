@@ -17,7 +17,7 @@ export const SECTIONS_CSS = DS_CSS + `
 .kd a.pp-chip{display:inline-flex;align-items:center;min-height:36px;padding:0 12px;border-radius:999px;background:#0f172a;border:1px solid #334155;color:#bae6fd;text-decoration:none;font-size:13px;font-weight:700}
 .kd .pp-link{color:#7dd3fc}
 .kd .pp-wrap{overflow-x:auto;max-width:100%}.kd table.pp-t{border-collapse:collapse;width:100%;font-size:13px}.kd .pp-t th{text-align:left;color:#94a3b8;font-size:11px;text-transform:uppercase;letter-spacing:.08em;padding:6px 8px;border-bottom:1px solid #334155;white-space:nowrap}
-.kd .pp-t td{padding:7px 8px;border-top:1px solid #1e293b;vertical-align:top;overflow-wrap:anywhere}
+.kd .pp-t td{padding:7px 8px;border-top:1px solid #1e293b;vertical-align:top;overflow-wrap:break-word;word-break:normal;min-width:4.5em}.kd .pp-t td:first-child{white-space:nowrap;min-width:0}
 .kd .pp-kv{display:grid;grid-template-columns:minmax(120px,200px) 1fr;gap:6px 12px;font-size:14px}.kd .pp-kv dt{color:#94a3b8}.kd .pp-kv dd{margin:0;overflow-wrap:anywhere;color:#e2e8f0}
 .kd .pp-note{margin-top:8px;font-size:12px;color:#fbbf24;line-height:1.5}
 .kd .pp-filters{display:flex;gap:6px;flex-wrap:wrap;align-items:center}.kd .pp-filters button{min-height:36px;font-size:13px}

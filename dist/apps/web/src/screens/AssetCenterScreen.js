@@ -4,6 +4,7 @@
 import { h, mount } from '../../../../packages/ui/src/h.js';
 import { entityCard, photoSlot, initialsOf, dateTr, ENTITY_CARD_CSS } from '../cardKit.js';
 import { errorText, isSetupPending } from '../errorText.js';
+import { cncDisplay } from '../../../../packages/domain/src/cncTelemetry.js';
 import { ASSET_CLASSES, CLASS_TR, DEPARTMENTS, KIND_TR, LIFECYCLE_TR, OPS_TR, deptTr } from '../assetApi.js';
 export const ASSET_FROM_KEY = 'kmi.asset.from';
 const CSS = `
@@ -35,15 +36,26 @@ const CSS = `
 const E = (tag, props = null, ...kids) => h(tag, props, ...kids);
 const norm = (s) => s.toLocaleLowerCase('tr-TR');
 /** card facts: only what the server returned for this caller; a missing value is a stated gap */
-export function assetFacts(a) {
+export function assetFacts(a, cnc = null) {
     const holder = a.holder ? (a.holder.kind === 'DEPARTMENT' ? deptTr(a.holder.name) : a.holder.name) : a.has_holder ? 'Zimmetli' : 'Zimmetsiz';
     const facts = [
         { label: 'KONUM', value: a.location },
         { label: 'BİRİM', value: deptTr(a.department) ?? a.responsible_unit },
         { label: 'ZİMMET', value: holder, tone: a.holder_inactive ? 'bad' : undefined },
     ];
-    if (a.source_type === 'MACHINE')
-        facts.push({ label: 'MAKİNE DURUMU', value: a.ops_state ? OPS_TR[a.ops_state] ?? a.ops_state : null, tone: a.ops_state && a.ops_state !== 'UP' ? 'warn' : undefined });
+    if (a.source_type === 'MACHINE') {
+        facts.push({ label: 'İDARİ DURUM', value: a.ops_state ? OPS_TR[a.ops_state] ?? a.ops_state : null, tone: a.ops_state && a.ops_state !== 'UP' ? 'warn' : undefined });
+        // physical state: ONLY a verified controller row, ONLY for a user who may see CNC telemetry. No permission => no physical line at all (an unverified "running/idle" is never shown).
+        if (cnc) {
+            const r = a.machine_code ? cnc.get(a.machine_code) ?? null : null;
+            if (!r)
+                facts.push({ label: 'FİZİKSEL CNC', value: 'CNC bağlantısı yok — doğrulanmadı' });
+            else {
+                const d = cncDisplay(r);
+                facts.push({ label: 'FİZİKSEL CNC', value: d.link === 'UP' ? `${d.stateTr}${d.program ? ` · ${d.program}` : ''}` : `${d.linkTr} — son durum güncel sayılmaz`, tone: d.link !== 'UP' ? 'warn' : d.state === 'CNC_ACTIVE' ? undefined : undefined });
+            }
+        }
+    }
     else
         facts.push({ label: 'MARKA / MODEL', value: a.brand_model });
     if (a.calibration)
@@ -76,6 +88,7 @@ export async function renderAssetCenterScreen(container, deps, state = {}) {
     let rows = [];
     let sum = null;
     let mine = [];
+    let cncMap = null;
     let cls = state.cls ?? 'ALL';
     let q = state.q ?? '';
     let f = state.f ?? 'ACTIVE';
@@ -178,7 +191,7 @@ export async function renderAssetCenterScreen(container, deps, state = {}) {
         const list = rows.filter(matches);
         const cards = list.map((a) => {
             const slot = photoSlot(initialsOf(a.name ?? a.code), 'square', 'ec-photo');
-            return entityCard({ kind: 'ASSET', id: a.id, href: `#/varlik?id=${a.id}`, title: a.name ?? 'BİLİNMİYOR', subtitle: CLASS_TR[a.class].full, code: a.code, initials: initialsOf(a.name ?? a.code), shape: 'square', badge: badgeOf(a), facts: assetFacts(a),
+            return entityCard({ kind: 'ASSET', id: a.id, href: `#/varlik?id=${a.id}`, title: a.name ?? 'BİLİNMİYOR', subtitle: CLASS_TR[a.class].full, code: a.code, initials: initialsOf(a.name ?? a.code), shape: 'square', badge: badgeOf(a), facts: assetFacts(a, cncMap),
                 alert: assetAlert(a), updated: dateTr(a.updated_at), testid: 'ac-card' }, slot);
         });
         gridHost.replaceChildren(E('p', { class: 'eg-note', 'data-testid': 'ac-count' }, `${list.length} / ${rows.length} varlık gösteriliyor`), cards.length ? E('div', { class: 'eg-grid', 'data-testid': 'ac-grid' }, ...cards) : E('div', { class: 'eg-empty', 'data-testid': 'ac-empty' }, rows.length ? 'Bu süzgeçte varlık yok. “Tümü”ne basın.' : 'Henüz kayıtlı varlık yok.'));
@@ -231,6 +244,20 @@ export async function renderAssetCenterScreen(container, deps, state = {}) {
         sum = s.status === 'fulfilled' ? s.value : null;
         mine = m.status === 'fulfilled' ? m.value : [];
         paint();
+        // verified physical CNC state is read once, after the list is on screen; a refusal / failure => the physical line simply does not exist (never an unverified one)
+        if (deps.cncStates) {
+            try {
+                const by = new Map();
+                for (const r of await deps.cncStates())
+                    if (r.machineCode)
+                        by.set(r.machineCode, r);
+                cncMap = by;
+            }
+            catch {
+                cncMap = null;
+            }
+            paint();
+        }
     };
     mount(container, E('div', { class: 'kx ac', 'data-testid': 'ac-root' }, E('style', {}, ENTITY_CARD_CSS + CSS), E('h1', { class: 'ac-h1', 'data-testid': 'ac-heading' }, 'Dijital Varlık Merkezi'), E('p', { class: 'ac-sub' }, 'Makine · ekipman · cihaz kimlikleri, zimmet ve yaşam döngüsü — tek kayıt, yetkiye göre görünüm'), kpiRow, bannerHost, tabRow, barHost, formHost, panelHost, gridHost));
     await load();

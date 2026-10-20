@@ -7,6 +7,9 @@ import { CARD_STATE_TR, changeText } from '../../../../packages/domain/src/param
 import { bytesToHex } from '../../../../packages/domain/src/documents.js';
 import { guessMime } from './DocumentsScreen.js';
 import { errorText } from '../errorText.js';
+import { drawChainPanel, orderReadiness } from './productChainPanel.js';
+import { drawToolistMap } from './toolistMapPanel.js';
+import { drawBarStock } from './barStockPanel.js';
 import { KX_CSS, NA, card, chip, emptyState, field, fmt, fold, fromBase64, invalid, isChecked, kvItem, showFile, toBase64, val, when } from '../kx.js';
 const PW_CSS = `
 .pw .opc{border:1px solid #1e293b;border-radius:12px;background:#0b1220;margin-top:8px;min-width:0}.pw .opc.open{border-color:#1d4ed8}.pw .opc.off{opacity:.65}
@@ -229,7 +232,10 @@ export async function renderProductWorkspaceScreen(container, api, state = {}) {
                 for (const d of ov.documents)
                     for (const v of d.versions.slice(0, 3)) {
                         const holder = E('div', { 'data-testid': 'pw-tools-checkhost' });
-                        toolHost.append(E('div', { class: 'r', 'data-testid': 'pw-tools-version' }, E('b', {}, `${d.docNo ?? ''} v${v.versionNo}`), E('span', { class: 'mut' }, `${v.fileName} · ${stTr[v.state] ?? v.state}${v.attested ? ' · elle doğrulandı' : ''}`), btn('ghost sm', 'pw-tools-show-checks', 'Otomatik kontroller', () => void showChecks(v.versionId, holder, ov.canAttest, v.state, v.attested))), holder);
+                        toolHost.append(E('div', { class: 'r', 'data-testid': 'pw-tools-version' }, E('b', {}, `${d.docNo ?? ''} v${v.versionNo}`), E('span', { class: 'mut' }, `${v.fileName} · ${stTr[v.state] ?? v.state}${v.attested ? ' · elle doğrulandı' : ''}`), btn('ghost sm', 'pw-tools-show-checks', 'Otomatik kontroller', () => void showChecks(v.versionId, holder, ov.canAttest, v.state, v.attested)), (!v.attested && (v.state === 'DRAFT' || v.state === 'IN_REVIEW') && /\.(xlsx|csv)$/i.test(v.fileName)) ? btn('ghost sm', 'pw-tools-map', 'Excel’i oku ve eşle', () => void drawToolistMap(holder, api, v.versionId, v.fileName, async (msg) => { await showChecks(v.versionId, holder, ov.canAttest, v.state, v.attested); holder.prepend(E('div', { class: 'banner ok', role: 'status', 'data-testid': 'pw-map-saved' }, msg)); }, fail, async () => { const ch = await api.techChain(rev.id); const ids = [...new Set(ch.operations.map((o) => o.nc.versionId).filter((x) => !!x))]; const out = []; for (const id of ids) {
+                            const f = await api.toolistFile(id);
+                            out.push(new TextDecoder().decode(fromBase64(f.contentBase64)));
+                        } return out; })) : null), holder);
                     }
                 for (const r of ov.rechecksOpen) {
                     const note = h('input', { 'data-testid': 'pw-tools-recheck-note', placeholder: 'CAM/NC ve operasyon yeni listeyle uyumlu mu? Kısa not' });
@@ -423,6 +429,7 @@ export async function renderProductWorkspaceScreen(container, api, state = {}) {
                 fail(e);
             }
         };
+        const chainHost = E('div', { 'data-testid': 'pw-chain-host' });
         function drawOps() {
             opsHost.replaceChildren(...(ws.routing.length ? [E('div', { class: 'oph' }, E('span', {}, 'OP'), E('span', {}, 'Operasyon'), E('span', {}, 'Makine'), E('span', {}, 'Hazırlık'), E('span', {}, 'Çevrim'), E('span', {}, 'Muayene'), E('span', {}, 'CAM'), E('span', { class: 'acts' }, 'İşlem')), ...ws.routing.map(opCard)]
                 : [emptyState(`${NA} — bu revizyonda operasyon yok`, can.editStructure ? '“+ Operasyon ekle” ile ilk operasyonu tanımlayın.' : 'Operasyon tanımı için taslak revizyon gerekir.', 'pw-route-empty')]), ...(can.editStructure && openOp === 'NEW' ? [E('div', { class: 'opc open', style: 'margin-top:8px' }, E('div', { class: 'opb' }, E('b', {}, 'Yeni operasyon'), E('div', { style: 'margin-top:10px' }, opEditor(null)), E('div', { class: 'row', style: 'margin-top:8px' }, btn('ghost sm', null, 'Vazgeç', () => { openOp = null; drawOps(); }))))] : []));
@@ -430,8 +437,12 @@ export async function renderProductWorkspaceScreen(container, api, state = {}) {
         const checks = Array.isArray(ws.routingCheck) ? ws.routingCheck : ws.routingCheck?.checks ?? [];
         const addOp = () => { clearBanner(); openOp = 'NEW'; drawOps(); scrollTo(opsHost.lastElementChild); };
         const routingCard = card({ title: 'Rota ve operasyonlar', testid: 'pw-card-routing', span: 12, id: 'card-routing', chip: stateChip(ws.routing.length ? (rev?.state ?? 'MISSING') : 'MISSING'),
-            actions: [can.editStructure ? btn('primary', 'pw-op-add', '+ Operasyon ekle', addOp) : null] }, checks.length ? E('div', { class: 'row', style: 'gap:6px;margin-bottom:10px' }, ...checks.map((c) => chip(`${c.label}: ${c.detail}`, c.status === 'OK' ? 'ok' : c.status === 'NA' ? '' : 'warn', { 'data-testid': 'pw-route-check', 'data-code': c.code, 'data-status': c.status, title: c.detail, style: 'white-space:normal' }))) : null, can.editRouting && editable ? E('div', { class: 'row', style: 'margin-bottom:6px' }, E('div', { class: 'grow' }, field('Hızlı işlem gerekçesi', quickReason, 'Sırala, pasife al, bağımlılık, kaynak ve kalite noktası işlemleri bu gerekçeyi kullanır.'))) : null, opsHost, can.editRouting && rev?.status === 'RELEASED' ? E('div', { class: 'mut', style: 'margin-top:10px' }, 'Yürürlükteki revizyonda operasyon ekleme, sıralama ve pasife alma yapılmaz; makine, süre, kaynak ve talimat güncellenir (sürümlenir). Yapısal değişiklik için taslak revizyon açın.') : null);
+            actions: [can.editStructure ? btn('primary', 'pw-op-add', '+ Operasyon ekle', addOp) : null] }, checks.length ? E('div', { class: 'row', style: 'gap:6px;margin-bottom:10px' }, ...checks.map((c) => chip(`${c.label}: ${c.detail}`, c.status === 'OK' ? 'ok' : c.status === 'NA' ? '' : 'warn', { 'data-testid': 'pw-route-check', 'data-code': c.code, 'data-status': c.status, title: c.detail, style: 'white-space:normal' }))) : null, can.editRouting && editable ? E('div', { class: 'row', style: 'margin-bottom:6px' }, E('div', { class: 'grow' }, field('Hızlı işlem gerekçesi', quickReason, 'Sırala, pasife al, bağımlılık, kaynak ve kalite noktası işlemleri bu gerekçeyi kullanır.'))) : null, chainHost, opsHost, can.editRouting && rev?.status === 'RELEASED' ? E('div', { class: 'mut', style: 'margin-top:10px' }, 'Yürürlükteki revizyonda operasyon ekleme, sıralama ve pasife alma yapılmaz; makine, süre, kaynak ve talimat güncellenir (sürümlenir). Yapısal değişiklik için taslak revizyon açın.') : null);
         drawOps();
+        void drawChainPanel(chainHost, api, ws, { act: !!(can.editRouting || can.manageDocuments) && editable }, (m) => reload(m), (e) => fail(e), (c) => {
+            const o = orderReadiness(ws.readiness?.overall, c, ws.bom.length);
+            orderHost.replaceChildren(E('div', { class: `banner ${o.ready ? 'ok' : o.ready === false ? 'bad' : ''}`, 'data-testid': 'pw-order-ready', 'data-ready': String(o.ready) }, E('b', {}, o.ready ? 'Siparişe hazır' : o.ready === false ? 'Siparişe hazır değil' : 'Siparişe hazırlık doğrulanamadı'), o.reasons.length ? ` — ${o.reasons.join('; ')}` : ' — tek hazırlık cevabı ve her operasyonun teknik zinciri tamam.'));
+        });
         // ---------------------------------------------------------------------------------------- süre hesabı
         const qty = h('input', { 'data-testid': 'pw-calc-qty', type: 'number', min: 1, value: String(state.qty ?? 1), 'aria-label': 'Adet' });
         const out = E('div', { 'data-testid': 'pw-calc-out', style: 'margin-top:10px' });
@@ -488,6 +499,7 @@ export async function renderProductWorkspaceScreen(container, api, state = {}) {
         // ---------------------------------------------------------------------------------------- BOM
         const bomEditable = !!(can.manageBom && rev?.status === 'DRAFT');
         const bomHost = E('div');
+        const barHost = E('div');
         let bomMode = null;
         const bomPanel = () => {
             if (!bomMode)
@@ -550,8 +562,10 @@ export async function renderProductWorkspaceScreen(container, api, state = {}) {
                 bomPanel(), bomEditable ? null : E('div', { class: 'mut', 'data-testid': 'pw-bom-note', style: 'margin-top:10px' }, !can.manageBom ? 'BOM düzenleme yetkiniz yok.' : rev?.status === 'RELEASED' ? 'Yürürlükteki revizyonun BOM’u teknik veridir: değişiklik için yeni (taslak) revizyon açın — kaynak aynı BOM’dur, ikinci reçete oluşmaz.' : '')
             ].filter(Boolean));
         }
-        const bomCard = card({ title: 'BOM', testid: 'pw-card-bom', span: 12, id: 'card-bom', chip: stateChip(ws.bom.length ? (rev?.state ?? 'MISSING') : 'MISSING'), actions: [bomEditable && !bomMode ? btn('primary sm', 'pw-bom-open-add', '+ Satır ekle', () => { bomMode = { kind: 'add' }; drawBom(); }) : null] }, bomHost, E('div', { class: 'kx-foot' }, h('a', { href: `#/urun-master?urun=${ws.product.id}` }, 'Yeni revizyon / BOM taslağı / yayın: Ürün Master')));
+        const bomCard = card({ title: 'BOM', testid: 'pw-card-bom', span: 12, id: 'card-bom', chip: stateChip(ws.bom.length ? (rev?.state ?? 'MISSING') : 'MISSING'), actions: [bomEditable && !bomMode ? btn('primary sm', 'pw-bom-open-add', '+ Satır ekle', () => { bomMode = { kind: 'add' }; drawBom(); }) : null] }, bomHost, barHost, E('div', { class: 'kx-foot' }, h('a', { href: `#/urun-master?urun=${ws.product.id}` }, 'Yeni revizyon / BOM taslağı / yayın: Ürün Master')));
         drawBom();
+        if (rev && ws.bom.length)
+            void drawBarStock(barHost, api, rev.id, ws.bom.map((b) => b.materialCode), bomEditable, reload, fail);
         // satır ekleme düğmesi panel açıkken gizlenmez: panel kapanınca kart başlığı yeniden çizilmez; düğme her zaman çalışır
         const bomAdd = bomCard.querySelector('[data-testid="pw-bom-open-add"]');
         bomAdd?.addEventListener('click', () => scrollTo(bomHost));
@@ -579,7 +593,8 @@ export async function renderProductWorkspaceScreen(container, api, state = {}) {
             { label: 'BOM', st: ws.bom.length ? rs : 'MISSING', target: 'bom' }, { label: 'Rota', st: ws.routing.length ? rs : 'MISSING', target: 'routing' }, { label: 'Kalite planı', st: ws.quality.length ? rs : 'MISSING', target: 'quality' }
         ];
         const missingN = ready.filter((r) => r.st === 'MISSING');
-        const readyCard = card({ title: 'Hazırlık özeti', testid: 'pw-ready', span: 12, tone: missingN.length ? 'warn' : 'ok', chip: chip(missingN.length ? `${missingN.length} eksik` : 'Temel veriler tanımlı', missingN.length ? 'warn' : 'ok') }, E('div', { class: 'ready' }, ...ready.map((r) => E('button', { type: 'button', class: STATE_TONE[r.st], 'data-testid': `pw-ready-${r.target}`, 'data-state': r.st, onClick: () => scrollTo(container.querySelector(`[data-testid="pw-card-${r.target}"]`)) }, E('span', { class: 'dot' }), `${r.label}: ${CARD_STATE_TR[r.st]}`))), missingN.length ? E('div', { class: 'mut', style: 'margin-top:8px' }, `Eksik veri: ${missingN.map((m) => m.label).join(', ')}. Eksik değerler 0 sayılmaz; üretime hazırlık için tamamlanmalıdır.`) : null);
+        const orderHost = E('div', { style: 'margin-top:8px' });
+        const readyCard = card({ title: 'Hazırlık özeti', testid: 'pw-ready', span: 12, tone: missingN.length ? 'warn' : 'ok', chip: chip(missingN.length ? `${missingN.length} eksik` : 'Temel veriler tanımlı', missingN.length ? 'warn' : 'ok') }, E('div', { class: 'ready' }, ...ready.map((r) => E('button', { type: 'button', class: STATE_TONE[r.st], 'data-testid': `pw-ready-${r.target}`, 'data-state': r.st, onClick: () => scrollTo(container.querySelector(`[data-testid="pw-card-${r.target}"]`)) }, E('span', { class: 'dot' }), `${r.label}: ${CARD_STATE_TR[r.st]}`))), missingN.length ? E('div', { class: 'mut', style: 'margin-top:8px' }, `Eksik veri: ${missingN.map((m) => m.label).join(', ')}. Eksik değerler 0 sayılmaz; üretime hazırlık için tamamlanmalıdır.`) : null, orderHost);
         const head = E('div', { class: 'page-head' }, E('div', { class: 'ttl' }, E('div', { class: 'crumb' }, btn('', 'pw-back', '← Ürünler', () => void go({}))), E('h1', { title: `${ws.product.code} — ${ws.product.name}` }, E('span', { class: 'head-name' }, `${ws.product.code} — ${ws.product.name}`)), E('div', { class: 'row', style: 'gap:6px' }, rev ? stateChip(rev.state) : null, E('span', { class: 'mut' }, can.editRouting ? 'Düzenleme yetkiniz var' : 'Yalnız görüntüleme'))), E('div', { class: 'acts' }, E('div', { style: 'min-width:180px' }, revSel), h('a', { class: 'btn ghost', href: '#/dokuman-kontrol' }, 'Doküman Kontrol'), h('a', { class: 'btn ghost', href: `#/urun-master?urun=${ws.product.id}` }, 'Ürün Master'), can.editStructure ? btn('primary', 'pw-top-op-add', '+ Operasyon', () => { addOp(); scrollTo(container.querySelector('[data-testid="pw-card-routing"]')); }) : null));
         if (state.only) {
             const all = { identity: idCard, drawing: docCard('drawing', 'Teknik resim', ws.cards.drawing, 'DRAWING'), cad: docCard('cad', 'CAD / STEP', ws.cards.cad, 'CAD_MODEL'), cam: docCard('cam', 'CAM / NC', ws.cards.cam, 'NC_PROGRAM', true), tools: docCard('tools', 'Takım listesi', ws.cards.tools, 'TOOL_LIST'),

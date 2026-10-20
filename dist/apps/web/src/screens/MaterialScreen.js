@@ -32,6 +32,26 @@ export async function renderMaterialScreen(container, workOrderId, api, banner) 
     catch (err) {
         loadError = errorText(err);
     }
+    let chain = null;
+    if (!loadError && api.chain) {
+        try {
+            chain = await api.chain(workOrderId);
+        }
+        catch {
+            chain = null;
+        }
+    }
+    async function handleAutoReserve() {
+        try {
+            const r = await api.autoReserve(workOrderId);
+            const done = r.reserved.length ? `Ayrıldı: ${r.reserved.map((x) => `${x.materialCode} ${x.qty} (lot ${x.stockLotId})`).join(', ')}.` : 'Yeni ayırma gerekmedi (eksik yok).';
+            const miss = r.shortage.length ? ` ELDE YETERLİ STOK YOK, eksik: ${r.shortage.map((x) => `${x.materialCode} ${x.missing}`).join(', ')}.` : '';
+            await rerender({ kind: r.complete ? 'info' : 'error', text: done + miss });
+        }
+        catch (err) {
+            await rerender({ kind: 'error', text: errorText(err) });
+        }
+    }
     const lotInput = h('input', { type: 'text', 'data-testid': 'lot-input', placeholder: 'Hammadde lot ID' });
     const qtyInput = h('input', { type: 'number', step: '0.001', 'data-testid': 'mat-qty-input' });
     const rerender = (b) => renderMaterialScreen(container, workOrderId, api, b);
@@ -58,6 +78,8 @@ export async function renderMaterialScreen(container, workOrderId, api, banner) 
     }
     const screen = h('div', { class: 'material-screen' }, h('h1', { 'data-testid': 'mat-heading' }, ...(isPilot ? [pilotChip()] : []), `Hammadde / BOM (İş Emri: ${workOrderId})`), isPilot ? pilotBanner() : null, banner ? h('div', { 'data-testid': 'mat-banner', 'data-kind': banner.kind }, banner.text) : null, loadError
         ? h('div', { 'data-testid': 'mat-load-error' }, `Yüklenemedi: ${loadError}`)
-        : h('div', {}, h('div', { 'data-testid': 'start-gate', 'data-state': material?.state ?? 'UNKNOWN' }, material ? readinessLabel(material) : 'UNKNOWN / VERİ GEREKLİ — MATERIAL_REQUIREMENT_UNKNOWN:NOT_EVALUATED'), readinessPanel('MATERIAL', material, (reason) => void handleExempt(reason)), h('table', { 'data-testid': 'mat-table' }, h('tbody', {}, ...rows.map((r) => h('tr', { 'data-testid': 'mat-row', 'data-material': r.materialCode }, h('td', { 'data-testid': 'mat-code' }, r.materialCode), h('td', { 'data-testid': 'mat-required' }, String(r.required)), h('td', { 'data-testid': 'mat-reserved' }, String(r.reserved)), h('td', { 'data-testid': 'mat-issued' }, String(r.issued)), h('td', { 'data-testid': 'mat-consumed' }, String(r.consumed)), h('td', { 'data-testid': 'mat-shortage' }, String(r.shortage)))))), lotInput, qtyInput, ...KINDS.map((k) => h('button', { type: 'button', 'data-testid': `mat-${k.kind}`, onClick: () => handleMove(k.kind) }, k.label))));
+        : h('div', {}, h('div', { 'data-testid': 'start-gate', 'data-state': material?.state ?? 'UNKNOWN' }, material ? readinessLabel(material) : 'UNKNOWN / VERİ GEREKLİ — MATERIAL_REQUIREMENT_UNKNOWN:NOT_EVALUATED'), readinessPanel('MATERIAL', material, (reason) => void handleExempt(reason)), h('table', { 'data-testid': 'mat-table' }, h('tbody', {}, ...rows.map((r) => h('tr', { 'data-testid': 'mat-row', 'data-material': r.materialCode }, h('td', { 'data-testid': 'mat-code' }, r.materialCode), h('td', { 'data-testid': 'mat-required' }, String(r.required)), h('td', { 'data-testid': 'mat-reserved' }, String(r.reserved)), h('td', { 'data-testid': 'mat-issued' }, String(r.issued)), h('td', { 'data-testid': 'mat-consumed' }, String(r.consumed)), h('td', { 'data-testid': 'mat-shortage' }, String(r.shortage)))))), api.autoReserve ? h('button', { type: 'button', 'data-testid': 'mat-auto-reserve', onClick: () => void handleAutoReserve() }, 'Stoktan otomatik ayır') : null, chain
+            ? h('div', { 'data-testid': 'mat-chain' }, h('h2', {}, 'Malzeme zinciri'), h('div', { 'data-testid': 'mat-chain-parts' }, `Parça: planlanan ${chain.qtyPlanned} · son operasyon sağlam ${chain.qtyGoodLastOp} · tüm operasyon hurda ${chain.qtyScrapAllOps}`), ...chain.materials.map((m) => h('div', { 'data-testid': 'mat-chain-row', 'data-material': m.materialCode, 'data-exceeds': String(m.exceedsCutCapacity === true) }, `${m.materialCode}: gereken ${m.barsRequired} → rezerve ${m.barsReserved} → elde ${m.barsInHand} → kesilen ${m.barsCut}`, m.cutCapacityPieces !== null ? ` · kesilenlerden en çok ${m.cutCapacityPieces} parça çıkar` : '', m.exceedsCutCapacity === true ? ' · UYARI: beyan edilen parça sayısı kesilen çubukların verebileceğinden fazla (veri hatası)' : '')), h('div', {}, chain.note))
+            : null, lotInput, qtyInput, ...KINDS.map((k) => h('button', { type: 'button', 'data-testid': `mat-${k.kind}`, onClick: () => handleMove(k.kind) }, k.label))));
     mount(container, screen);
 }

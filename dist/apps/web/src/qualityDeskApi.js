@@ -47,6 +47,7 @@ export function createQualityDeskApi(c, s) {
         splitNcr: async (id, qty, reason) => { await c.rpc('split_quality_ncr', { p_ncr_id: id, p_split_qty: qty, p_reason: reason }, s); },
         openOperationCase: async (op, qty, reason, src) => { await c.rpc('open_operation_tahsis_ncr', { p_operation_id: op, p_qty: qty, p_reason: reason, p_detection_source: src, p_client_request_id: crypto.randomUUID() }, s); },
         incomingDecision: async (lot, d, reason) => { await pur.recordIncomingQualityDecision(lot, d, reason || undefined); },
+        incomingInspection: async (i) => { await c.rpc('record_incoming_inspection', { p_lot: i.stockLotId, p_material_type: i.materialType, p_dia: i.diaMm, p_bar_length: i.barLengthMm, p_bar_count: i.barCount, p_supplier_lot: i.supplierLotNo, p_certificate: i.certificateNo, p_ownership: i.ownership, p_decision: i.decision, p_location: i.location, p_reason: i.reason }, s); },
         finalRelease: async (wo, reason) => { await wos.transition(wo, 'COMPLETED', reason); },
     };
 }

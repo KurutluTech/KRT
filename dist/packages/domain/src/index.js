@@ -66,3 +66,4 @@ export * from './notices';
 export { evaluateMetric, validateInsight, insightDisplayable, insightActions } from './intelligenceContract';
 export * from './uxTelemetry';
 export * from './departmentFunctions';
+export { readCsvGrid, guessMapping, normalizeSheet, ncToolOffsets, csvFromRows } from './toolListSheet';

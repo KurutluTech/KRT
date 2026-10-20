@@ -2,6 +2,7 @@ const TIMEOUT = Symbol('timeout');
 export function createHomeLoader(d) {
     const now = d.now ?? (() => Date.now());
     const timeoutMs = d.timeoutMs ?? 8000;
+    let cncRetries = 0;
     let gen = 0, disposed = false, timer = null;
     const data = { snapshot: null, board: null, info: [], tasks: null, approvalsPending: null, loadedAt: null,
         sources: { snapshot: { state: 'LOADING', at: null }, board: { state: d.board ? 'LOADING' : 'NOT_APPLICABLE', at: null }, tasks: { state: d.tasks ? 'LOADING' : 'NOT_APPLICABLE', at: null }, approvals: { state: d.approvals ? 'LOADING' : 'NOT_APPLICABLE', at: null } } };
@@ -47,7 +48,21 @@ export function createHomeLoader(d) {
                 data.sources[id] = { state: 'LOADING', at: null };
         // a refresh keeps the last good value on screen while the new one is on its way
         void run(g, 'snapshot', d.snapshot, (v) => { data.snapshot = v; });
-        void run(g, 'board', d.board, (v) => { data.board = v; });
+        void run(g, 'board', d.board, (v) => {
+            data.board = v;
+            // CNC read failed (not "no permission"): never draw the fleet as if the physical state were known. Re-read a few times; after that say plainly it could not be read.
+            if (v.cncRead === 'FAILED') {
+                if (cncRetries < 3) {
+                    cncRetries += 1;
+                    setTimeout(() => { if (!disposed && g === gen)
+                        load(); }, 3000);
+                }
+                else
+                    v.cncGaveUp = true;
+            }
+            else
+                cncRetries = 0;
+        });
         if (d.info)
             void d.info().then((v) => { if (g === gen && !disposed) {
                 data.info = v;

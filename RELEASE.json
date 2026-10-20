@@ -1,8 +1,8 @@
 {
   "product": "KMI NEXT",
-  "commit": "912d902e507a9bdbcc2a2f70631c82bbe4af9414",
+  "commit": "30703ab9c23047216e9dcd1f329f97ea34740302",
   "builtFrom": "clean git tree",
-  "fileCount": 352,
+  "fileCount": 356,
   "migrationsInRepo": 73,
   "lastMigration": "0073_kmi_next_puantaj_month.sql",
   "note": "Release candidate. Publishing to https://flow.kurutlu.com is a manual owner action; this file is not a publication permit.",
@@ -79,8 +79,8 @@
     },
     {
       "path": "dist/apps/web/src/app.js",
-      "bytes": 92870,
-      "sha256": "5b51aa9bcdfd5c585daf43044804b76f8ad5f4e47fa755bfdaad2b9e86c02071"
+      "bytes": 93220,
+      "sha256": "cb5544919ae65de71231c580b8300908a15ea8a76abb6c1f6ef4325fdecf416e"
     },
     {
       "path": "dist/apps/web/src/approvalsInboxApi.js",
@@ -209,8 +209,8 @@
     },
     {
       "path": "dist/apps/web/src/homeLoader.js",
-      "bytes": 3448,
-      "sha256": "e8318cc6473d615c1ec4a68c05c90588960b7df94134bb90a88b2448bbd47339"
+      "bytes": 4038,
+      "sha256": "2bf2ee7114ab5188d99ec133f91f24abfe3ee18d01d6ce73be650dbad42b5556"
     },
     {
       "path": "dist/apps/web/src/homePrefsApi.js",
@@ -219,8 +219,8 @@
     },
     {
       "path": "dist/apps/web/src/homeShow.js",
-      "bytes": 47434,
-      "sha256": "eab93f12e734217cff1fd361cfd0384fc9f7bda202b9197f0d5286d9b27f23b4"
+      "bytes": 48060,
+      "sha256": "b364a19f2d9e798c229ded606fb7c55358e05f374c0f2514315598ce35bd73bc"
     },
     {
       "path": "dist/apps/web/src/idleGuard.js",
@@ -249,8 +249,8 @@
     },
     {
       "path": "dist/apps/web/src/liveApi.js",
-      "bytes": 3080,
-      "sha256": "320d9e2e97228bd7867019da4159821b32b4627a6604e926f5c33b9e15edb84e"
+      "bytes": 3696,
+      "sha256": "f54e841b70a54bb47f0e956de65bd5acac3ef669ab389ce9aefe18684f3609a8"
     },
     {
       "path": "dist/apps/web/src/machineCard.js",
@@ -284,8 +284,8 @@
     },
     {
       "path": "dist/apps/web/src/materialApi.js",
-      "bytes": 970,
-      "sha256": "6871ce05f7b83885a3da0d919d32b3deb8239a18b59fb7ef54eb9928317f5634"
+      "bytes": 3248,
+      "sha256": "d86c1dd532db930d26719a96022420fa6a4dff17d3d645ebb86982b4096a8650"
     },
     {
       "path": "dist/apps/web/src/nav.js",
@@ -364,8 +364,8 @@
     },
     {
       "path": "dist/apps/web/src/passport/passportHeader.js",
-      "bytes": 8041,
-      "sha256": "97f703becd3d3da241f3ef44d803f9632e359a7e28c09ba52c9254b2d09dfcb9"
+      "bytes": 8611,
+      "sha256": "170dbb6095595bef192943f90cb131791946b6895bcd5d31ac8483d066e51101"
     },
     {
       "path": "dist/apps/web/src/passport/registry.js",
@@ -374,8 +374,8 @@
     },
     {
       "path": "dist/apps/web/src/passport/sections.js",
-      "bytes": 4265,
-      "sha256": "1e944f61efa24ff46bbd66e816b9ed1f22e6dd3aa1ff6fbac3743f5393f16356"
+      "bytes": 4357,
+      "sha256": "cdef69c01441d6020b44f38d52fc7543dbe38d310bee74e55ab23a2b26ea1b38"
     },
     {
       "path": "dist/apps/web/src/passport/shell.js",
@@ -499,8 +499,8 @@
     },
     {
       "path": "dist/apps/web/src/productWorkspaceApi.js",
-      "bytes": 5980,
-      "sha256": "52124f2317000c31a57eb92b1bd889bd0b7d97b228c099a871aba86acf3e382a"
+      "bytes": 7175,
+      "sha256": "650ead780894076c67ad1a1ee29b62a3818dcf8e10f62f5da4da1926a3cf8491"
     },
     {
       "path": "dist/apps/web/src/productionApi.js",
@@ -529,8 +529,8 @@
     },
     {
       "path": "dist/apps/web/src/qualityDeskApi.js",
-      "bytes": 4269,
-      "sha256": "a555931cf2d939a67c2aaf80cee116fa2fa41338759a3e3fad482c5c1e9d38cc"
+      "bytes": 4648,
+      "sha256": "f60cfb58c0ae27a2035a043e094c829ed3d836a67b2ec740a81134f01f41216a"
     },
     {
       "path": "dist/apps/web/src/quotesApi.js",
@@ -589,13 +589,13 @@
     },
     {
       "path": "dist/apps/web/src/screens/AssetCenterScreen.js",
-      "bytes": 22061,
-      "sha256": "f527c4462f08764ca8d1f3cbd387f19a3c86a254709bd9459533780095c7cfc9"
+      "bytes": 23497,
+      "sha256": "21c1036fc88ff98f5eac12491a9a2a4e7f85e08900a0fc66919f5400a4350243"
     },
     {
       "path": "dist/apps/web/src/screens/AssetPassportScreen.js",
-      "bytes": 19210,
-      "sha256": "78946ebfa401405cbc4920fca4dc77e731c2f20cca6f965236f15ee6357605c4"
+      "bytes": 20507,
+      "sha256": "087917c8719a530d3be2a0052d859ad96821001cb1dfb4461358f12a90f5b419"
     },
     {
       "path": "dist/apps/web/src/screens/BadgesScreen.js",
@@ -734,8 +734,8 @@
     },
     {
       "path": "dist/apps/web/src/screens/MaterialScreen.js",
-      "bytes": 3979,
-      "sha256": "d766b5b0799e31d097060918459381c56e2b5217306fd56d9c1457e8316bbacc"
+      "bytes": 5850,
+      "sha256": "3f44b8a0556c823c9d1938d48ab4eb490a3af5e9533e46e1f515f300b08ca915"
     },
     {
       "path": "dist/apps/web/src/screens/MyAttendanceScreen.js",
@@ -844,13 +844,13 @@
     },
     {
       "path": "dist/apps/web/src/screens/ProductWorkspaceScreen.js",
-      "bytes": 68408,
-      "sha256": "ebf6a31eba4a522f829618fb0a35af47448087705ee739a25f9ad0f620f3613c"
+      "bytes": 70443,
+      "sha256": "6f3a2428fe78c664f5bc1207499c2fd4573b8ae9e2856ae1706b87576ea818ca"
     },
     {
       "path": "dist/apps/web/src/screens/ProductionDeskScreen.js",
-      "bytes": 22046,
-      "sha256": "2d308b4c93ba9560dcd6ad44d466c463679fe9960b20ce542659085423e047b6"
+      "bytes": 23909,
+      "sha256": "c697774bab45be583dfceff18c4d52b65f8cecf54d1781d71cc4f17a837a690c"
     },
     {
       "path": "dist/apps/web/src/screens/ProductionScreen.js",
@@ -874,8 +874,8 @@
     },
     {
       "path": "dist/apps/web/src/screens/QualityDeskScreen.js",
-      "bytes": 18022,
-      "sha256": "2bcc7ae28a6cfb1012fb0e66e904df1d45b3c30120e772b24f26f28509cbdf6a"
+      "bytes": 21465,
+      "sha256": "afeec00cc220d0510d4513c1abd92039a110b95e9859e9350e943c18fa92fadd"
     },
     {
       "path": "dist/apps/web/src/screens/QuotesScreen.js",
@@ -968,6 +968,11 @@
       "sha256": "573e94bcd1bac0b7611ce8eafd3d0546b9c701f180d35607a8f5f1963597cb1a"
     },
     {
+      "path": "dist/apps/web/src/screens/barStockPanel.js",
+      "bytes": 5043,
+      "sha256": "c6195f3b35906ea7c3cd8e4ce2e7e1c1d40de0eaf8cf397907a37c29a43624c8"
+    },
+    {
       "path": "dist/apps/web/src/screens/costCalcs.js",
       "bytes": 19386,
       "sha256": "ae97ca59d98bf2e59ef8ebc562a9f44b4c0ca0baac707ca387c26b9c6f03f7dd"
@@ -1023,9 +1028,19 @@
       "sha256": "79e183be38b86b129f6ae65b08b5e727c6de370bef1f88a11a934e0168f3e05d"
     },
     {
+      "path": "dist/apps/web/src/screens/productChainPanel.js",
+      "bytes": 7256,
+      "sha256": "138799880aeac7c6595248aeda0211c5bf23934fb1bbdcdaf75eb4497b25c943"
+    },
+    {
       "path": "dist/apps/web/src/screens/readinessPanel.js",
       "bytes": 1363,
       "sha256": "a22ab6b06c0e4c2f97add1d4bcfc362f47af749d24a751e6817c0cea1f10abf5"
+    },
+    {
+      "path": "dist/apps/web/src/screens/toolistMapPanel.js",
+      "bytes": 12439,
+      "sha256": "bea308457cf7c30aa90d9b7aaff61e2a52cdd3f398a1c260bb026bd735c66fa7"
     },
     {
       "path": "dist/apps/web/src/searchApi.js",
@@ -1409,8 +1424,8 @@
     },
     {
       "path": "dist/packages/domain/src/index.js",
-      "bytes": 2156,
-      "sha256": "c6a5809734ed5703e0f04b2467fb8f0dc356b88e1852cf6dcd4a25b6d5028d1f"
+      "bytes": 2261,
+      "sha256": "bebdbb893a0241c7ba45dd6994b636e9d63c0a4f56f7f8b8c636adbec0ae83b0"
     },
     {
       "path": "dist/packages/domain/src/intelligence.js",
@@ -1469,8 +1484,8 @@
     },
     {
       "path": "dist/packages/domain/src/machineState.js",
-      "bytes": 4960,
-      "sha256": "b852df9ac24d7742e5d1bc114f8ebe96ccddc0c85d559a1fa8e920fefbb6de3b"
+      "bytes": 5561,
+      "sha256": "632f7ab3117310f60da789fadc7d68345c1e2a377f551898838cde90648eb824"
     },
     {
       "path": "dist/packages/domain/src/maintenance.js",
@@ -1691,6 +1706,11 @@
       "path": "dist/packages/domain/src/temporal.js",
       "bytes": 13368,
       "sha256": "61b5a7a3c9c9e7335ff93af0daa940bd8e3b8b0eeeebde8bdbd830b8386fc963"
+    },
+    {
+      "path": "dist/packages/domain/src/toolListSheet.js",
+      "bytes": 6766,
+      "sha256": "f303f7a7b1ffd7d8a38c94f80dd75c94607f9f317b4d7ecfba72e8a5f59a1b31"
     },
     {
       "path": "dist/packages/domain/src/toolroom.js",

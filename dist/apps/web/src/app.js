@@ -425,12 +425,12 @@ export const ROUTES = [
     { path: '/varliklar', label: 'Dijital Varlık Merkezi', group: 'Saha', inMenu: true, render: (el, c, s, q, a) => {
             const f = q.get('f');
             const k = q.get('k');
-            return renderAssetCenterScreen(el, { api: createAssetApi(c, s), canManage: a.actions.includes('ASSET_MANAGE'), remember: (hash) => { try {
+            return renderAssetCenterScreen(el, { api: createAssetApi(c, s), canManage: a.actions.includes('ASSET_MANAGE'), cncStates: () => c.rpc('cnc_live_states', {}, s), remember: (hash) => { try {
                     history.replaceState(null, '', hash);
                 }
                 catch { /* ignore */ } } }, { cls: (k ?? 'ALL'), q: q.get('q') ?? '', f: (f === 'INACTIVE' || f === 'ARCHIVED' || f === 'ALL' ? f : 'ACTIVE'), dept: q.get('d') ?? '', panel: q.get('z') === '1' });
         } },
-    { path: '/varlik', label: 'Varlık pasaportu', group: 'Saha', inMenu: false, needs: ['id'], render: (el, c, s, q, a) => renderAssetPassportScreen(el, q.get('id') ?? '', { api: createAssetApi(c, s), canLabel: a.actions.includes('ASSET_MANAGE'), back: () => { location.hash = '#/varliklar'; } }) },
+    { path: '/varlik', label: 'Varlık pasaportu', group: 'Saha', inMenu: false, needs: ['id'], render: (el, c, s, q, a) => renderAssetPassportScreen(el, q.get('id') ?? '', { api: createAssetApi(c, s), canLabel: a.actions.includes('ASSET_MANAGE'), back: () => { location.hash = '#/varliklar'; }, machineTech: async (mid) => { const card = await createPassportCardsApi(c, s).get('MACHINE', mid); const v = (code) => card.attributes.find((x) => x.code === code)?.value ?? null; return { manufacturer: v('MANUFACTURER'), model: v('MODEL'), serialNo: v('SERIAL_NO'), modelYear: v('MODEL_YEAR') }; } }) },
     { path: '/katalog', label: 'Katalog Merkezi (müşteri · tedarikçi · ürün)', group: 'Yönetim', inMenu: true, render: (el, c, s, q, a) => {
             const tabOk = (p) => canOpen(p, a);
             const k = q.get('k');
