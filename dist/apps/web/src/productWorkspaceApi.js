@@ -1,3 +1,5 @@
+// KMI-011 Ürün Çalışma Alanı adapter — migration 0107 (draft). Sunucu karar verir (yetki, revizyon sınıfı, parametre geçerliliği, hesap durumu); bu dosya yalnız çağırır.
+import { fetchPilotFlags, selReal } from './pilotMark.js';
 import { createDocumentControlApi } from './documentControlApi.js';
 export function createProductWorkspaceApi(client, session) {
     const rpc = (fn, args) => client.rpc(fn, args, session);
@@ -5,7 +7,7 @@ export function createProductWorkspaceApi(client, session) {
     return {
         search: (q) => rpc('product_search', { p_q: q || null, p_family: null, p_status: 'ACTIVE', p_limit: 30 }),
         load: (p, r) => rpc('product_workspace', { p_product: p, p_revision: r }),
-        machines: () => client.select('machines', { columns: 'id,code,name', order: 'code.asc' }, session),
+        machines: () => selReal(client, 'machines', { columns: 'id,code,name', order: 'code.asc' }, session),
         saveOperation: (i) => rpc('routing_op_save', { p_revision: i.revisionId, p_op_no: i.opNo, p_name: i.name, p_machine_ids: i.machineIds, p_primary: i.primaryId, p_skill_code: i.skillCode,
             p_skill_level: i.skillLevel, p_cam: i.camId, p_setup: i.setup, p_cycle: i.cycle, p_first_piece: i.firstPiece, p_qc: i.qc, p_instructions: i.instructions, p_reason: i.reason }),
         async setActive(o, a, r) { await rpc('routing_op_set_active', { p_op: o, p_active: a, p_reason: r }); },
@@ -34,7 +36,11 @@ export function createProductWorkspaceApi(client, session) {
         },
     };
 }
-export const jobCardFor = (client, session, wo) => client.rpc('job_card', { p_wo: wo }, session);
+export const jobCardFor = async (client, session, wo) => {
+    const jc = await client.rpc('job_card', { p_wo: wo }, session);
+    const f = await fetchPilotFlags(client, session, [wo]);
+    return f.has(wo) ? { ...jc, isPilot: true, pilotRetired: f.retired(wo) } : jc;
+};
 /** KMI-013 (0124): operation QR through the central scan log (operation_scan). Until 0124 is applied the old non-logging check answers instead — the screen never breaks. Refusals come back as ok:false answers. */
 export async function scanCheckLogged(client, session, input, wo, requestId) {
     try {

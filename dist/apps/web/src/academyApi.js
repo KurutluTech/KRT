@@ -1,9 +1,11 @@
+// Academy & competency adapter — migration 0031.
+import { selReal } from './pilotMark.js';
 export function createAcademyApi(client, session) {
     return {
         matrix: () => client.rpc('competency_matrix', {}, session),
         skills: () => client.select('skill_catalog', { columns: 'code,name,category,active', order: 'name.asc' }, session),
         people: () => client.select('personnel', { columns: 'id,name,active', order: 'name.asc' }, session),
-        machines: () => client.select('machines', { columns: 'id,code,name', order: 'code.asc' }, session),
+        machines: () => selReal(client, 'machines', { columns: 'id,code,name', order: 'code.asc' }, session),
         requirements: () => client.select('machine_skill_requirements', { columns: 'machine_id,skill_code,min_level,reason' }, session),
         modules: () => client.select('academy_modules', { columns: 'id,code,title,skill_code,target_level,validity_months,pass_mark,content,active', order: 'code.asc' }, session),
         enrollments: () => client.select('academy_enrollments', { columns: 'id,module_id,personnel_id,trainer_personnel_id,status,enrolled_at,updated_at', order: 'enrolled_at.desc' }, session),

@@ -3,6 +3,7 @@
 import { machineState, displayKey } from '../../../packages/domain/src/machineState.js';
 import { auditToEvent, formatStamp } from '../../../packages/domain/src/temporal.js';
 import { errorText, isSetupPending } from './errorText.js';
+import { fetchPilotFlags, pilotText, selReal } from './pilotMark.js';
 import { loadMaintenanceTests } from './approvalsInboxApi.js';
 import { buildInbox, rpcCall } from '../../../packages/domain/src/approvalsInbox.js';
 import { KINDS, canOpenPassport } from './passport/registry.js';
@@ -24,6 +25,9 @@ function denied(e) {
 }
 export function createObjectPassportApi(client, session, access, myUserId = session?.user.id ?? null) {
     const sel = (table, columns, filters = {}, order, limit = 200) => client.select(table, { columns, filters, order, limit }, session);
+    /** aggregates over a PARENT (order / product / customer) count REAL work orders only; a pilot work order is shown only on its own passport, marked */
+    const selR = (table, columns, filters = {}, order, limit = 200) => selReal(client, table, { columns, filters, order, limit }, session);
+    const pilotPrefix = async (id) => ((await fetchPilotFlags(client, session, [id])).has(id) ? '[TEST / PİLOT] ' : '');
     const one = async (table, columns, id) => {
         const r = await sel(table, columns, { id: `eq.${id}` }, undefined, 1);
         if (!r[0])
@@ -89,7 +93,7 @@ export function createObjectPassportApi(client, session, access, myUserId = sess
                     catch { /* journal not installed yet */ }
                 }
                 const [st, tone] = MACHINE_STATUS_TR[m.status] ?? [m.status, ''];
-                return { kind, id, title: `${m.code} · ${m.name}`, subtitle: m.category ?? 'Kategori belirtilmemiş', status: pill(st, tone), createdAt: m.createdAt, links: [], machineHeadline: (() => { const ms = machineState({ status: m.status, active: wos.map((w) => ({ runStatus: w.status, stale: staleIds.has(w.id) })) }); return displayKey(ms); })(),
+                return { kind, id, title: `${await pilotPrefix(id)}${m.code} · ${m.name}`, subtitle: m.category ?? 'Kategori belirtilmemiş', status: pill(st, tone), createdAt: m.createdAt, links: [], machineHeadline: (() => { const ms = machineState({ status: m.status, active: wos.map((w) => ({ runStatus: w.status, stale: staleIds.has(w.id) })) }); return displayKey(ms); })(),
                     kpis: [{ label: 'Aktif iş emri', value: String(wos.length) }, { label: 'Açık bakım/arıza', value: String(tickets.length) }, { label: 'Toplam duruş', value: m.totalDownMinutes === null ? 'BİLİNMİYOR' : `${num(m.totalDownMinutes)} dk` },
                         { label: m.status === 'DOWN' ? 'DOWN başlangıcı' : 'Fiziksel durum', value: m.status === 'DOWN' ? ts(m.downSince) : 'BİLİNMİYOR (CNC bağlantısı yok)' }] };
             }
@@ -114,7 +118,7 @@ export function createObjectPassportApi(client, session, access, myUserId = sess
                     links.push({ kind: 'ORDER', id: item[0].orderId, label: 'Sipariş' });
                 const due = item[0]?.dueDate ?? null;
                 const late = due && w.status !== 'COMPLETED' && w.status !== 'CANCELLED' && due < new Date().toISOString().slice(0, 10);
-                return { kind, id, title: `İş emri ${id.slice(0, 8).toUpperCase()}`, subtitle: prod ? `${prod.code} — ${prod.name}` : 'Ürün bilinmiyor', createdAt: w.createdAt, links,
+                return { kind, id, title: `${await pilotPrefix(id)}İş emri ${id.slice(0, 8).toUpperCase()}`, subtitle: prod ? `${prod.code} — ${prod.name}` : 'Ürün bilinmiyor', createdAt: w.createdAt, links,
                     status: hold.length ? pill('KALİTE HOLD', 'bad') : pill(WO_TR[w.status] ?? w.status, w.status === 'COMPLETED' ? 'ok' : w.status === 'IN_PROGRESS' ? 'info' : w.status === 'ON_HOLD' ? 'warn' : ''),
                     kpis: [{ label: 'Planlanan', value: num(w.qtyPlanned) }, { label: 'Sağlam', value: num(w.qtyProduced) }, { label: 'Hurda', value: num(w.qtyScrap) }, { label: 'Kalan', value: num(remaining) },
                         { label: 'Termin', value: due ?? 'BİLİNMİYOR' }, { label: 'Risk', value: late ? 'GECİKMİŞ' : due ? 'Normal' : 'BİLİNMİYOR' }, { label: 'Makine', value: mach[0]?.code ?? 'atanmadı' }, { label: 'Operatör', value: op[0]?.name ?? 'atanmadı' },
@@ -125,7 +129,7 @@ export function createObjectPassportApi(client, session, access, myUserId = sess
                 const revs = await sel('product_revisions', 'id,revision,status,released_at', { product_id: `eq.${id}` }, 'created_at.desc', 50);
                 const rel = revs.find((r) => r.status === 'RELEASED');
                 const items = await sel('order_items', 'id', { product_id: `eq.${id}` }, undefined, 500);
-                const wos = items.length ? await sel('work_orders', 'status,qty_produced,qty_scrap', { order_item_id: inList(items.map((i) => i.id)) }, undefined, 1000) : [];
+                const wos = items.length ? await selR('work_orders', 'status,qty_produced,qty_scrap', { order_item_id: inList(items.map((i) => i.id)) }, undefined, 1000) : [];
                 const good = wos.reduce((a, w) => a + w.qtyProduced, 0);
                 const scrap = wos.reduce((a, w) => a + w.qtyScrap, 0);
                 return { kind, id, title: `${p.code}`, subtitle: p.name, createdAt: p.createdAt, links: [],
@@ -226,7 +230,8 @@ export function createObjectPassportApi(client, session, access, myUserId = sess
             case 'MACHINE:canli': return guard(async () => {
                 const wos = await sel('work_orders', 'id,status,operator_id,qty_planned,qty_produced,qty_scrap,updated_at', { machine_id: `eq.${id}`, status: inList(ACTIVE_WO) }, 'updated_at.desc');
                 const ops = await sel('personnel', 'id,name', wos.length ? { id: inList(uniq(wos.map((w) => w.operatorId))) } : { id: 'eq.00000000-0000-0000-0000-000000000000' });
-                return [{ title: 'Aktif iş emirleri', table: tbl(['İş emri', 'Durum', 'Operatör', 'Planlanan', 'Sağlam', 'Hurda', 'Son işlem'], wos.map((w) => [lnk('WORK_ORDER', w.id, w.id.slice(0, 8).toUpperCase()), WO_TR[w.status] ?? w.status, ops.find((o) => o.id === w.operatorId)?.name ?? 'atanmadı', num(w.qtyPlanned), num(w.qtyProduced), num(w.qtyScrap), ts(w.updatedAt)]), 'Bu makinede aktif iş emri yok.') }];
+                const pfm = await fetchPilotFlags(client, session, wos.map((w) => w.id));
+                return [{ title: 'Aktif iş emirleri', table: tbl(['İş emri', 'Durum', 'Operatör', 'Planlanan', 'Sağlam', 'Hurda', 'Son işlem'], wos.map((w) => [lnk('WORK_ORDER', w.id, pilotText(w.id.slice(0, 8).toUpperCase(), pfm.has(w.id))), WO_TR[w.status] ?? w.status, ops.find((o) => o.id === w.operatorId)?.name ?? 'atanmadı', num(w.qtyPlanned), num(w.qtyProduced), num(w.qtyScrap), ts(w.updatedAt)]), 'Bu makinede aktif iş emri yok.') }];
             });
             case 'MACHINE:ariza': return guard(async () => {
                 const t = await sel('maintenance_tickets', 'id,kind,severity,status,reason,created_at,updated_at', { machine_id: `eq.${id}` }, 'created_at.desc', 100);
@@ -284,13 +289,13 @@ export function createObjectPassportApi(client, session, access, myUserId = sess
             });
             case 'PRODUCT:uretim': return guard(async () => {
                 const items = await sel('order_items', 'id', { product_id: `eq.${id}` }, undefined, 500);
-                const wos = items.length ? await sel('work_orders', 'id,status,qty_produced,qty_scrap,machine_id,created_at', { order_item_id: inList(items.map((i) => i.id)) }, 'created_at.desc', 100) : [];
+                const wos = items.length ? await selR('work_orders', 'id,status,qty_produced,qty_scrap,machine_id,created_at', { order_item_id: inList(items.map((i) => i.id)) }, 'created_at.desc', 100) : [];
                 return [{ title: 'İş emirleri', table: tbl(['İş emri', 'Durum', 'Sağlam', 'Hurda', 'Açılış'], wos.map((w) => [lnk('WORK_ORDER', w.id, w.id.slice(0, 8).toUpperCase()), WO_TR[w.status] ?? w.status, num(w.qtyProduced), num(w.qtyScrap), ts(w.createdAt)]), 'Bu ürün için iş emri yok.') }];
             });
             case 'PRODUCT:kalite': return guard(async () => {
                 const items = await sel('order_items', 'id', { product_id: `eq.${id}` }, undefined, 500);
-                const wos = items.length ? await sel('work_orders', 'id', { order_item_id: inList(items.map((i) => i.id)) }, undefined, 1000) : [];
-                const ncrs = wos.length ? await sel('quality_ncrs', 'id,qty,reason,status,opened_at', { work_order_id: inList(wos.map((w) => w.id)) }, 'opened_at.desc', 200) : [];
+                const wos = items.length ? await selR('work_orders', 'id', { order_item_id: inList(items.map((i) => i.id)) }, undefined, 1000) : [];
+                const ncrs = wos.length ? await selR('quality_ncrs', 'id,qty,reason,status,opened_at', { work_order_id: inList(wos.map((w) => w.id)) }, 'opened_at.desc', 200) : [];
                 return [{ title: 'Geçmiş uygunsuzluklar', table: tbl(['NCR', 'Adet', 'Neden', 'Durum', 'Açılış'], ncrs.map((x) => [lnk('QUALITY_NCR', x.id, x.id.slice(0, 8).toUpperCase()), num(x.qty), x.reason, x.status, ts(x.openedAt)]), 'Bu ürün için uygunsuzluk kaydı yok.') }];
             });
             case 'PERSONNEL:genel': return guard(async () => {
@@ -381,7 +386,7 @@ export function createObjectPassportApi(client, session, access, myUserId = sess
             case 'ORDER:kalemler': return guard(async () => {
                 const it = await sel('order_items', 'id,product_id,qty,qty_produced,qty_shipped,due_date', { order_id: `eq.${id}` }, 'created_at.asc', 200);
                 const pr = it.length ? await sel('products', 'id,code', { id: inList(uniq(it.map((i) => i.productId))) }) : [];
-                const wo = it.length ? await sel('work_orders', 'id,order_item_id,status', { order_item_id: inList(it.map((i) => i.id)) }, undefined, 500) : [];
+                const wo = it.length ? await selR('work_orders', 'id,order_item_id,status', { order_item_id: inList(it.map((i) => i.id)) }, undefined, 500) : [];
                 return [{ title: 'Sipariş kalemleri', table: tbl(['Ürün', 'Adet', 'Üretilen', 'Sevk edilen', 'Kalan yükümlülük', 'Termin', 'İş emirleri'], it.map((i) => [lnk('PRODUCT', i.productId, pr.find((p) => p.id === i.productId)?.code), num(i.qty), num(i.qtyProduced), num(i.qtyShipped), num(Math.max(0, i.qty - i.qtyShipped)), i.dueDate ?? '—', wo.filter((w) => w.orderItemId === i.id).map((w) => w.id.slice(0, 8).toUpperCase()).join(', ') || 'yok']), 'Kalem yok.') }];
             });
             case 'STOCK_LOT:genel': return guard(async () => { const l = await one('stock_lots', 'qty,state,created_at,work_order_id', id); return [{ title: 'Parti', kv: [['Adet', num(l.qty)], ['Durum', l.state], ['Oluşma', ts(l.createdAt)], ['İş emri', lnk('WORK_ORDER', l.workOrderId, l.workOrderId?.slice(0, 8).toUpperCase()) ?? '—']], note: 'Etiket/izlenebilirlik zinciri: #/pasaport (kanonik parti pasaportu).' }]; });

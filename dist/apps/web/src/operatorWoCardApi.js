@@ -16,6 +16,12 @@ export function createOperatorWoCardApi(client, session) {
                 client.select('material_movements', { columns: 'kind,qty', filters: { work_order_id: `eq.${id}` } }, session).then((r) => r, () => null),
                 sel('quality_holds', 'id', { work_order_id: `eq.${id}`, status: 'eq.OPEN' }),
             ]);
+            let isPilot = false; // 0128: which ids are TEST — unknown (older database) simply means "real"
+            try {
+                const f = await client.rpc('pilot_flags', { p_ids: [id] }, session);
+                isPilot = f.some((x) => x.entityId === id);
+            }
+            catch { /* pilot_flags not installed */ }
             const prod = item[0] ? (await sel('products', 'code,name', { id: `eq.${item[0].productId}` }))[0] ?? null : null;
             let refusalKnown = false;
             let refusal = null;
@@ -49,7 +55,7 @@ export function createOperatorWoCardApi(client, session) {
             }
             return { workOrderId: wo.id, status: wo.status, qtyPlanned: wo.qtyPlanned, qtyProduced: wo.qtyProduced, qtyScrap: wo.qtyScrap, plannedDate: wo.plannedDate,
                 productCode: prod?.code ?? null, productName: prod?.name ?? null, revision: rev[0]?.revision ?? null, machine: mach[0] ?? null, operations: ops,
-                openQualityHold: hold.length > 0, refusalKnown, refusal, readinessRows: rows, reservedMaterial: reserved, docs };
+                openQualityHold: hold.length > 0, refusalKnown, refusal, readinessRows: rows, reservedMaterial: reserved, docs, ...(isPilot ? { isPilot: true } : {}) };
         },
         async openDoc(versionId) { const c = await docsApi.content(versionId); return { bytes: c.contentBase64, mime: c.mimeType, fileName: c.fileName }; },
     };

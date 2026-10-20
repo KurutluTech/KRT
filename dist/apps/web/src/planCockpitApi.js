@@ -1,3 +1,6 @@
+// KMI-012 Planlama Kokpiti adapter (migration 0120 drafts). Read models come from plan_blocks / plan_slot_capacity / plan_operator_load (server decides authority);
+// the only writes are the reasoned replan and the scenario RPCs — every real plan change goes through commit_work_order_plan on the server.
+import { selReal } from './pilotMark.js';
 const num = (v) => Number(v);
 const numOrNull = (v) => (v === null || v === undefined ? null : Number(v));
 export function createPlanCockpitApi(client, session) {
@@ -17,7 +20,7 @@ export function createPlanCockpitApi(client, session) {
             return rows.map((r) => ({ ...r, machinesPlanned: num(r.machinesPlanned), plannedMinutes: num(r.plannedMinutes), maxMachines: num(r.maxMachines) }));
         },
         async decisions(limit) {
-            const rows = await client.select('work_order_plan_decisions', { columns: 'id,work_order_id,machine_id,operator_id,planned_date,planned_shift_code,planned_minutes,followed_suggestion,warnings,reason,decided_at', order: 'decided_at.desc', limit }, session);
+            const rows = await selReal(client, 'work_order_plan_decisions', { columns: 'id,work_order_id,machine_id,operator_id,planned_date,planned_shift_code,planned_minutes,followed_suggestion,warnings,reason,decided_at', order: 'decided_at.desc', limit }, session);
             return rows.map((r) => ({ ...r, plannedMinutes: num(r.plannedMinutes), warnings: Array.isArray(r.warnings) ? r.warnings : [] }));
         },
         async replan(i) {

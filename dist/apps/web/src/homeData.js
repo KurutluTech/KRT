@@ -1,3 +1,7 @@
+// KMI-HOME-001 — read-only count loaders for cockpit cards whose canonical source is a table (not the command_center snapshot).
+// Each loader reads through the user's own session (RLS decides), asks for ids only (no amounts, no personal fields), and returns
+// null — rendered as BİLİNMİYOR — when the read fails or hit the row cap (a capped read is only a lower bound, never a count).
+import { selReal } from './pilotMark.js';
 export const COUNT_CAP = 2000;
 const day = (iso, plus = 0) => {
     const d = new Date(Date.parse(iso) + plus * 86_400_000);
@@ -7,8 +11,8 @@ export function countSpecs(nowIso) {
     const today = day(nowIso), in30 = day(nowIso, 30);
     return {
         approvalsPending: { table: 'commercial_approvals', filters: { status: 'eq.PENDING' } },
-        firstPiecePending: { table: 'work_order_operations', filters: { status: 'eq.FIRST_PIECE_PENDING' } },
-        woAssigned: { table: 'work_orders', filters: { status: 'eq.MACHINE_ASSIGNED' } },
+        firstPiecePending: { table: 'work_order_operations', real: true, filters: { status: 'eq.FIRST_PIECE_PENDING' } },
+        woAssigned: { table: 'work_orders', real: true, filters: { status: 'eq.MACHINE_ASSIGNED' } },
         lotsHold: { table: 'stock_lots', filters: { state: 'eq.HOLD' } },
         lotsAvailable: { table: 'stock_lots', filters: { state: 'eq.AVAILABLE' } },
         lotsReserved: { table: 'stock_lots', filters: { state: 'eq.RESERVED' } },
@@ -31,7 +35,8 @@ export function countSpecs(nowIso) {
 }
 export async function loadCount(client, session, spec) {
     try {
-        const rows = await client.select(spec.table, { columns: spec.columns ?? 'id', ...(spec.filters ? { filters: spec.filters } : {}), limit: COUNT_CAP }, session);
+        const opts = { columns: spec.columns ?? 'id', ...(spec.filters ? { filters: spec.filters } : {}), limit: COUNT_CAP };
+        const rows = spec.real ? await selReal(client, spec.table, opts, session) : await client.select(spec.table, opts, session);
         return rows.length >= COUNT_CAP ? null : rows.length;
     }
     catch {

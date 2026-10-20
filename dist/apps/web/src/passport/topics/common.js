@@ -102,3 +102,17 @@ export async function floorTasks(ctx) {
         return null;
     }
 }
+/** TEST/PİLOT work orders among these ids (read through the one database authority; unknown/older database = none). Used where a list shows a work order only by its short id. */
+export async function pilotIdSet(ctx, ids) {
+    const uniq = [...new Set(ids.filter((x) => typeof x === 'string' && x.length > 0))];
+    const out = new Set();
+    try {
+        for (let i = 0; i < uniq.length; i += 200)
+            for (const r of (await ctx.rpc('pilot_flags', { p_ids: uniq.slice(i, i + 200) })) ?? [])
+                out.add(r.entityId);
+    }
+    catch {
+        return new Set();
+    }
+    return out;
+}

@@ -1,7 +1,8 @@
 import { attrsPanel, docsPanel, photoPanel } from '../storePanels.js';
-import { NA, dt, day, nf, link, pill, orNA, inList, kv, table, note, tabTopic, actionsTopic, opt, renderSections, MACHINE_TR, WO_TR } from './common.js';
+import { NA, dt, day, nf, link, pill, orNA, inList, kv, table, note, tabTopic, actionsTopic, opt, renderSections, pilotIdSet, MACHINE_TR, WO_TR } from './common.js';
 import { actorNames } from './personnel.js';
 import { pctOf } from './util.js';
+import { pilotText } from '../../pilotMark.js';
 import { h } from '../../../../../packages/ui/src/h.js';
 export const MACHINE_COLS = 'id,code,name,category,status,down_since,total_down_minutes,machine_class,updated_at';
 const ACTIVE = ['IN_PROGRESS', 'FIRST_PIECE_PENDING', 'FIRST_PIECE_APPROVED'];
@@ -33,7 +34,8 @@ export function machineTopics(ctx, m) {
         R('aktif-is', 'Aktif iş ve iş emri kuyruğu', 'factory', 'Operasyon', 'Aktif ve bekleyen iş emirleri', async () => {
             const wos = await ctx.sel('work_orders', 'id,status,operator_id,qty_planned,qty_produced,planned_date,planned_shift_code,planned_minutes', { machine_id: `eq.${m.id}`, status: 'not.in.(COMPLETED,CANCELLED,CLOSED)' }, 'planned_date.asc.nullslast', 60);
             const ops = await opNames(ctx, wos.map((w) => w.operatorId));
-            const row = (w) => [link('WORK_ORDER', w.id, `İE ${w.id.slice(0, 8)}`), WO_TR[w.status] ?? w.status, link('PERSONNEL', w.operatorId, w.operatorId ? ops[w.operatorId] : null), w.plannedDate ? `${day(w.plannedDate)}${w.plannedShiftCode ? ` · ${w.plannedShiftCode}` : ''}` : NA, `${nf(w.qtyProduced)} / ${nf(w.qtyPlanned)}`];
+            const pil = await pilotIdSet(ctx, wos.map((w) => w.id));
+            const row = (w) => [link('WORK_ORDER', w.id, pilotText(`İE ${w.id.slice(0, 8)}`, pil.has(w.id))), WO_TR[w.status] ?? w.status, link('PERSONNEL', w.operatorId, w.operatorId ? ops[w.operatorId] : null), w.plannedDate ? `${day(w.plannedDate)}${w.plannedShiftCode ? ` · ${w.plannedShiftCode}` : ''}` : NA, `${nf(w.qtyProduced)} / ${nf(w.qtyPlanned)}`];
             return [table('Üretimdeki iş emirleri', ['İş emri', 'Durum', 'Operatör', 'Plan', 'Üretilen / planlanan'], wos.filter((w) => ACTIVE.includes(w.status)).map(row), 'Şu an üretimde iş emri yok'),
                 table('Planlı / bekleyen kuyruk', ['İş emri', 'Durum', 'Operatör', 'Plan', 'Üretilen / planlanan'], wos.filter((w) => !ACTIVE.includes(w.status)).map(row), 'Bekleyen iş emri yok')];
         }),

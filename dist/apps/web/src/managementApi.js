@@ -1,3 +1,6 @@
+// KMI-MANAGEMENT-001 adapter (draft migration 0081 + canonical reads). Until the DB package is applied every 0081 call fails with a missing-function error
+// and the tabs show "Kurulum bekleniyor" (never an empty "all good"). Keys arrive camelCased from the data-client.
+import { selReal } from './pilotMark.js';
 const crid = () => crypto.randomUUID();
 export function createManagementApi(client, session) {
     const rpc = (fn, args) => client.rpc(fn, args, session);
@@ -15,7 +18,7 @@ export function createManagementApi(client, session) {
                 sel('personnel_skills', 'personnel_id,skill_code,level,valid_until', undefined, 5000),
                 sel('skill_catalog', 'code,name', undefined, 500),
                 sel('machine_skill_requirements', 'machine_id,skill_code,min_level', undefined, 2000),
-                sel('machines', 'id,code', undefined, 500),
+                selReal(client, 'machines', { columns: 'id,code', limit: 500 }, session),
                 sel('academy_enrollments', 'status', undefined, 5000),
                 sel('badge_awards', 'tier', undefined, 5000),
             ]);

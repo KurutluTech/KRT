@@ -1,21 +1,22 @@
 import { periodFetchFrom } from '../../../packages/domain/src/liveKpi.js';
+import { selReal } from './pilotMark.js';
 export function createLiveApi(client, session) {
     return {
         board: (profile) => client.rpc('live_board', { p_profile: profile }, session),
         machineInfo: async () => {
             try {
-                return await client.select('machines', { columns: 'id,code,name,machine_class', order: 'code.asc', limit: 200 }, session);
+                return await selReal(client, 'machines', { columns: 'id,code,name,machine_class', order: 'code.asc', limit: 200 }, session);
             }
             catch {
-                return (await client.select('machines', { columns: 'id,code,name', order: 'code.asc', limit: 200 }, session)).map((m) => ({ ...m, machineClass: null }));
+                return (await selReal(client, 'machines', { columns: 'id,code,name', order: 'code.asc', limit: 200 }, session)).map((m) => ({ ...m, machineClass: null }));
             } // live DB may lack machine_class
         },
         periods: async (nowIso) => {
             const CAP = 5000;
-            const rows = await client.select('production_declarations', { columns: 'qty_good,qty_scrap,declared_at', filters: { declared_at: `gte.${periodFetchFrom(nowIso)}` }, order: 'declared_at.desc', limit: CAP }, session);
+            const rows = await selReal(client, 'production_declarations', { columns: 'qty_good,qty_scrap,declared_at', filters: { declared_at: `gte.${periodFetchFrom(nowIso)}` }, order: 'declared_at.desc', limit: CAP }, session);
             let assigned = null;
             try {
-                assigned = (await client.select('work_orders', { columns: 'id', filters: { status: 'eq.MACHINE_ASSIGNED' }, limit: 1000 }, session)).length;
+                assigned = (await selReal(client, 'work_orders', { columns: 'id', filters: { status: 'eq.MACHINE_ASSIGNED' }, limit: 1000 }, session)).length;
             }
             catch {
                 assigned = null;

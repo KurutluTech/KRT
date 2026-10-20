@@ -1,3 +1,5 @@
+// Document Intelligence adapter — migrations 0035 + 0042 (rule-based proposals, human verification, gate rules).
+import { selReal } from './pilotMark.js';
 export function createDocumentsApi(client, session) {
     return {
         extractions: (ids) => ids.length ? client.select('document_extractions', { columns: 'id,version_id,method,suggested_doc_type,fields,flags,status,verified_fields,note', filters: { version_id: `in.(${ids.join(',')})` }, order: 'created_at.desc' }, session) : Promise.resolve([]),
@@ -20,6 +22,6 @@ export function createDocumentsApi(client, session) {
             await client.rpc('set_document_requirement', { p_entity_type: t, p_doc_type: d, p_active: active, p_note: note }, session);
         },
         expiring: (days) => client.rpc('expiring_documents', { p_days: days }, session),
-        machines: () => client.select('machines', { columns: 'id,code,name', order: 'code.asc' }, session),
+        machines: () => selReal(client, 'machines', { columns: 'id,code,name', order: 'code.asc' }, session),
     };
 }

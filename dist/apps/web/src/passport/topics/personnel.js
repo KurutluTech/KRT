@@ -1,7 +1,8 @@
 import { attrsPanel, docsPanel, photoPanel } from '../storePanels.js';
 import { h } from '../../../../../packages/ui/src/h.js';
-import { NA, dt, day, nf, link, pill, orNA, inList, kv, table, note, tabTopic, linkTopic, opt, MACHINE_TR, WO_TR, TASK_TR, floorTasks, canManageTasks } from './common.js';
+import { NA, dt, day, nf, link, pill, orNA, inList, kv, table, note, tabTopic, linkTopic, opt, pilotIdSet, MACHINE_TR, WO_TR, TASK_TR, floorTasks, canManageTasks } from './common.js';
 import { ymNow } from './util.js';
+import { pilotText } from '../../pilotMark.js';
 export const PERSON_COLS = 'id,name,roles,department,active,skills,shift_code,auth_user_id,employee_no,created_at,updated_at';
 const ROLE_TR = { ADMIN: 'Yönetici (sistem)', MANAGEMENT: 'Yönetim', OPERATOR: 'Operatör', CAM: 'CAM', QUALITY: 'Kalite', MAINTENANCE: 'Bakım', PURCHASING: 'Satın alma', ACCOUNTING: 'Muhasebe', WAREHOUSE: 'Depo', SHIPPING: 'Sevkiyat', SALES: 'Satış' };
 /** Private personnel file: the data subject, the system OWNER, management/accounting and PERSONNEL_MANAGE holders. The server enforces the same; this only keeps the UI honest. */
@@ -51,7 +52,8 @@ export function personnelTopics(ctx, p) {
             render: (host) => renderS(ctx, host, async () => {
                 const wos = await ctx.sel('work_orders', 'id,status,machine_id,qty_planned,qty_produced,planned_date,planned_shift_code', { operator_id: `eq.${p.id}` }, 'updated_at.desc', 60);
                 const ms = await machineNames(ctx, wos.map((w) => w.machineId));
-                return [table('Bu kişiye atanmış iş emirleri', ['İş emri', 'Durum', 'Makine', 'Plan', 'Üretilen / planlanan'], wos.map((w) => [link('WORK_ORDER', w.id, `İE ${w.id.slice(0, 8)}`), WO_TR[w.status] ?? w.status, link('MACHINE', w.machineId, w.machineId ? ms[w.machineId] : null), w.plannedDate ? `${day(w.plannedDate)}${w.plannedShiftCode ? ` · ${w.plannedShiftCode}` : ''}` : NA, `${nf(w.qtyProduced)} / ${nf(w.qtyPlanned)}`]), 'Atanmış iş emri yok')];
+                const pil = await pilotIdSet(ctx, wos.map((w) => w.id));
+                return [table('Bu kişiye atanmış iş emirleri', ['İş emri', 'Durum', 'Makine', 'Plan', 'Üretilen / planlanan'], wos.map((w) => [link('WORK_ORDER', w.id, pilotText(`İE ${w.id.slice(0, 8)}`, pil.has(w.id))), WO_TR[w.status] ?? w.status, link('MACHINE', w.machineId, w.machineId ? ms[w.machineId] : null), w.plannedDate ? `${day(w.plannedDate)}${w.plannedShiftCode ? ` · ${w.plannedShiftCode}` : ''}` : NA, `${nf(w.qtyProduced)} / ${nf(w.qtyPlanned)}`]), 'Atanmış iş emri yok')];
             }) },
         { ...T('gorevler', 'Görev emirleri ve değişiklikleri', 'tasks', 'Çalışma', { summary: 'Atanmış görevler' }),
             render: (host) => renderS(ctx, host, async () => {
