@@ -30,6 +30,9 @@ export const SHELL_CSS = `
 .ps-nav-g{font-size:11px;letter-spacing:.12em;font-weight:800;color:var(--kmi-mut,#94a3b8);margin:10px 8px 2px}
 .ps-nav a{display:flex;align-items:center;gap:10px;min-height:44px;padding:0 12px;border-radius:12px;color:var(--kmi-text2,#cbd5e1);text-decoration:none;font-size:14px;font-weight:600}.ps-nav a[aria-current=page]{background:rgba(56,189,248,.16);color:#fff;border:1px solid var(--kmi-info,#38bdf8)}
 .ps-nav a:hover{background:rgba(148,163,184,.1)}
+.ps-focus-btn{display:none;align-items:center;gap:6px;min-height:36px;padding:0 12px;border-radius:10px;border:1px solid var(--kmi-line2,#334155);background:transparent;color:var(--kmi-text,#e2e8f0);font-size:13px;font-weight:700;cursor:pointer}
+@media (min-width:1024px){.ps-focus-btn{display:inline-flex}.ps-body.focus.has-nav{grid-template-columns:minmax(0,1fr)}.ps-body.focus.has-nav .ps-nav{display:none}.ps-body.focus.nav-open.has-nav{grid-template-columns:260px minmax(0,1fr)}.ps-body.focus.nav-open.has-nav .ps-nav{display:flex}}
+.ps-page-hrow{display:flex;gap:10px;align-items:center;flex-wrap:wrap;justify-content:space-between}
 .ps-groups{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:16px;align-items:start}@media (max-width:700px){.ps-groups{grid-template-columns:1fr}}
 .ps-group{border:1px solid var(--kmi-line,#1e2d4a);border-radius:16px;background:linear-gradient(180deg,var(--kmi-panel2,#14213a),var(--kmi-panel,#0f1a30));overflow:hidden}
 .ps-group h3{margin:0;padding:12px 16px 6px;font-size:12px;letter-spacing:.12em;font-weight:800;color:var(--kmi-mut,#94a3b8)}
@@ -62,10 +65,14 @@ export async function renderPassportShell(container, i) {
     if (!active) {
         content = h('div', { class: 'ps-groups', 'data-testid': 'ps-topics' }, ...groupsOf(topics).map(([g, ts]) => h('section', { class: 'ps-group', 'data-testid': 'ps-group', 'data-group': g }, h('h3', {}, g), ...ts.map(row))));
     }
-    else
-        content = h('main', { class: 'ps-page' }, h('h2', { class: 'ps-page-h', 'data-testid': 'ps-topic-title' }, active.title), topicHost);
+    else {
+        const body0 = () => document.querySelector('[data-testid="ps-root"] .ps-body');
+        const focusBtn = active.focus ? h('button', { type: 'button', class: 'ps-focus-btn', 'data-testid': 'ps-nav-toggle', 'aria-expanded': 'false', onClick: (e) => { const b = body0(); if (!b)
+                return; const open = b.classList.toggle('nav-open'); e.currentTarget.setAttribute('aria-expanded', String(open)); e.currentTarget.textContent = open ? '‹ Konu menüsünü daralt' : '☰ Konu menüsü'; } }, '☰ Konu menüsü') : null;
+        content = h('main', { class: 'ps-page' }, h('div', { class: 'ps-page-hrow' }, h('h2', { class: 'ps-page-h', 'data-testid': 'ps-topic-title' }, active.title), focusBtn), topicHost);
+    }
     const nav = h('nav', { class: 'ps-nav', 'aria-label': 'Pasaport konuları', 'data-testid': 'ps-nav' }, ...groupsOf(topics).flatMap(([g, ts]) => [h('div', { class: 'ps-nav-g' }, g), ...ts.map((t) => h('a', { href: i.hrefFor(t.id), 'data-testid': `ps-nav-${t.id}`, ...(t.id === active?.id ? { 'aria-current': 'page' } : {}) }, icon(t.icon), t.title))]));
-    mount(container, h('div', { class: 'ps', 'data-testid': 'ps-root', 'data-kind': i.kind, 'data-topic': active?.id ?? '' }, h('style', {}, KX_CSS + SECTIONS_CSS + PANEL_CSS + SMART_CSS + SHELL_CSS), crumb, back, head, banner, unknownTopic ? h('div', { class: 'ps-banner', 'data-testid': 'ps-unknown-topic' }, 'Bu konu yok ya da bu pasaport için açılamaz.') : null, h('div', { class: `ps-body${active ? ' has-nav' : ''}` }, active ? nav : null, content), ...(i.notes ?? []).map((n) => h('div', { class: 'ps-note' }, n))));
+    mount(container, h('div', { class: 'ps', 'data-testid': 'ps-root', 'data-kind': i.kind, 'data-topic': active?.id ?? '' }, h('style', {}, KX_CSS + SECTIONS_CSS + PANEL_CSS + SMART_CSS + SHELL_CSS), crumb, back, head, banner, unknownTopic ? h('div', { class: 'ps-banner', 'data-testid': 'ps-unknown-topic' }, 'Bu konu yok ya da bu pasaport için açılamaz.') : null, h('div', { class: `ps-body${active ? ' has-nav' : ''}${active?.focus ? ' focus' : ''}`, ...(active?.focus ? { 'data-focus': '1' } : {}) }, active ? nav : null, content), ...(i.notes ?? []).map((n) => h('div', { class: 'ps-note' }, n))));
     if (active) {
         try {
             await active.render(topicHost);

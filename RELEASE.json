@@ -1,8 +1,8 @@
 {
   "product": "KMI NEXT",
-  "commit": "cb6990d5e25ea370fab5f1d49ced2466bef07c5c",
+  "commit": "8b92826a3d197b6a870ef83327fad8c1bb190892",
   "builtFrom": "clean git tree",
-  "fileCount": 358,
+  "fileCount": 362,
   "migrationsInRepo": 73,
   "lastMigration": "0073_kmi_next_puantaj_month.sql",
   "note": "Release candidate. Publishing to https://flow.kurutlu.com is a manual owner action; this file is not a publication permit.",
@@ -239,8 +239,8 @@
     },
     {
       "path": "dist/apps/web/src/kx.js",
-      "bytes": 15560,
-      "sha256": "acfe852d19cd7281185ece97696ed79536a04bbe2183e6498517774fb8865659"
+      "bytes": 16229,
+      "sha256": "7f54177d51418e1b4077326a57624f5e1d8f711cf676e6566deefa835ae05f3a"
     },
     {
       "path": "dist/apps/web/src/labelApi.js",
@@ -384,8 +384,8 @@
     },
     {
       "path": "dist/apps/web/src/passport/shell.js",
-      "bytes": 10503,
-      "sha256": "dc7a2f1cc4f019bcf87455a9bc3d8486e200f68c10b68385eaad38e4d7d32971"
+      "bytes": 11816,
+      "sha256": "1d8e96f8094648224de7b1c64d906e72ca9eb812a0137db6cd35572b9e2938bb"
     },
     {
       "path": "dist/apps/web/src/passport/storePanels.js",
@@ -393,9 +393,14 @@
       "sha256": "83c832cea44a5c18a264fce9aafaa4cf222aff6bdf4b73b401f8f53459a73f84"
     },
     {
+      "path": "dist/apps/web/src/passport/topics/cncActivityCenter.js",
+      "bytes": 36089,
+      "sha256": "53c35813f35117ebe2bd0db021c6bc5ebf874aa17971a44a46205099a4e2ba52"
+    },
+    {
       "path": "dist/apps/web/src/passport/topics/cncTopics.js",
-      "bytes": 19455,
-      "sha256": "a1ba12137dca256508a5c0fa5c7cc623e4c41d121f144c39efcfa38842800c7b"
+      "bytes": 12748,
+      "sha256": "99625123cf7739124819518358795a2685d625b903b5a7820262df3750fa6ace"
     },
     {
       "path": "dist/apps/web/src/passport/topics/common.js",
@@ -504,8 +509,8 @@
     },
     {
       "path": "dist/apps/web/src/productWorkspaceApi.js",
-      "bytes": 7175,
-      "sha256": "650ead780894076c67ad1a1ee29b62a3818dcf8e10f62f5da4da1926a3cf8491"
+      "bytes": 7834,
+      "sha256": "d7e4464fa4dc2e578bc3fc024d1b7a5fd464ee77f13193b989e2adffe50272fc"
     },
     {
       "path": "dist/apps/web/src/productionApi.js",
@@ -849,8 +854,8 @@
     },
     {
       "path": "dist/apps/web/src/screens/ProductWorkspaceScreen.js",
-      "bytes": 83767,
-      "sha256": "d01328eb85753f62a59510f6e1946048c5b49d6b9bc9cff0ae1be9ddc71f3ef6"
+      "bytes": 84831,
+      "sha256": "f91f8ad2a8e7bed3f24c7c374086eb612617f52ef28734d9ee560bcb1cfc17ef"
     },
     {
       "path": "dist/apps/web/src/screens/ProductionDeskScreen.js",
@@ -1046,6 +1051,11 @@
       "path": "dist/apps/web/src/screens/toolistMapPanel.js",
       "bytes": 12834,
       "sha256": "8e6cf1c16cfcf5ecbfb10fe7d1a45889cf92118c952435b1adf7cef07f123f93"
+    },
+    {
+      "path": "dist/apps/web/src/screens/toolistWorkPanel.js",
+      "bytes": 21183,
+      "sha256": "48d70ccfa78f66f53f4301d5b30ef6a4288f1dbbfd632e1cfd45c2aa1061f122"
     },
     {
       "path": "dist/apps/web/src/searchApi.js",
@@ -1321,6 +1331,11 @@
       "path": "dist/packages/domain/src/cncActivity.js",
       "bytes": 13543,
       "sha256": "9cffc02cbc913f088b7f84f2fd542aa6a87c27a6e36e72e0e1c2039117cc080c"
+    },
+    {
+      "path": "dist/packages/domain/src/cncShiftBoard.js",
+      "bytes": 8260,
+      "sha256": "7c554ffce2d87f6eb902bc99851840addeffe55feb17157cfbcb28860153fd01"
     },
     {
       "path": "dist/packages/domain/src/cncTelemetry.js",
@@ -1716,6 +1731,11 @@
       "path": "dist/packages/domain/src/temporal.js",
       "bytes": 13368,
       "sha256": "61b5a7a3c9c9e7335ff93af0daa940bd8e3b8b0eeeebde8bdbd830b8386fc963"
+    },
+    {
+      "path": "dist/packages/domain/src/toolListDiff.js",
+      "bytes": 2906,
+      "sha256": "c71c32aa8a1405a4ae7a751ba749781106d335ba16ce04289dfd0c5327ab8723"
     },
     {
       "path": "dist/packages/domain/src/toolListSheet.js",

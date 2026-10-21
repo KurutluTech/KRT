@@ -13,6 +13,8 @@ export const KX_CSS = `
 .kx a{color:#93c5fd}
 .kx .mut{color:#94a3b8;font-size:12px;line-height:1.45}.kx .mut b{color:#cbd5e1}
 .kx .grow{flex:1 1 220px;min-width:0}
+.kx .tw-wrap{overflow-x:auto;max-width:100%;border:1px solid #334155;border-radius:8px}.kx .tw-t{border-collapse:collapse;width:100%;font-size:13px;min-width:640px}.kx .tw-t th{text-align:left;color:#94a3b8;font-size:11px;text-transform:uppercase;letter-spacing:.06em;padding:6px 8px;white-space:nowrap}
+.kx .tw-t td{padding:4px 6px;border-top:1px solid #1e293b;vertical-align:middle}.kx .tw-t input{width:100%;min-width:70px;min-height:34px;font-size:14px}.kx .tw-t input.tw-missing{border-color:#f59e0b;background:rgba(245,158,11,.10)}.kx .tw-t input.tw-bad{border-color:#ef4444}.kx .tw-desc{max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .kx .row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}.kx .row>*{min-width:0}
 .kx .stack{display:flex;flex-direction:column;gap:8px}
 .kx .nowrap{white-space:nowrap}

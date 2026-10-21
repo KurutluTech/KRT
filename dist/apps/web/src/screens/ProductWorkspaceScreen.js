@@ -9,6 +9,7 @@ import { bytesToHex } from '../../../../packages/domain/src/documents.js';
 import { guessMime } from './DocumentsScreen.js';
 import { errorText } from '../errorText.js';
 import { chainChips, chainGapText, drawChainPanel, orderReadiness } from './productChainPanel.js';
+import { drawToolistWork } from './toolistWorkPanel.js';
 import { drawToolistMap } from './toolistMapPanel.js';
 import { drawBarStock, fmtMm } from './barStockPanel.js';
 import { barPlanPreview, DEFAULT_KERF_MM, DEFAULT_STEEL_DENSITY } from '../../../../packages/domain/src/barStock.js';
@@ -247,10 +248,17 @@ export async function renderProductWorkspaceScreen(container, api, state = {}) {
                 for (const d of ov.documents)
                     for (const v of d.versions.slice(0, 3)) {
                         const holder = E('div', { 'data-testid': 'pw-tools-checkhost' });
-                        toolHost.append(E('div', { class: 'r', 'data-testid': 'pw-tools-version' }, E('b', {}, `${d.docNo ?? ''} v${v.versionNo}`), E('span', { class: 'mut' }, `${v.fileName} · ${stTr[v.state] ?? v.state}${v.attested ? ' · elle doğrulandı' : ''}`), btn('ghost sm', 'pw-tools-show-checks', 'Otomatik kontroller', () => void showChecks(v.versionId, holder, ov.canAttest, v.state, v.attested)), (!v.attested && /\.(xlsx|csv)$/i.test(v.fileName)) ? btn('ghost sm', 'pw-tools-map', (v.state === 'DRAFT' || v.state === 'IN_REVIEW') ? 'Takım tablosu / Excel’i eşle' : 'Takım tablosunu göster', () => void drawToolistMap(holder, api, v.versionId, v.fileName, async (msg) => { await showChecks(v.versionId, holder, ov.canAttest, v.state, v.attested); holder.prepend(E('div', { class: 'banner ok', role: 'status', 'data-testid': 'pw-map-saved' }, msg)); }, fail, async () => { const ch = await api.techChain(rev.id); const ids = [...new Set(ch.operations.map((o) => o.nc.versionId).filter((x) => !!x))]; const out = []; for (const id of ids) {
+                        const workHost = E('div', { 'data-testid': 'pw-tools-workhost' });
+                        const ncTexts = async () => { const ch = await api.techChain(rev.id); const ids = [...new Set(ch.operations.map((o) => o.nc.versionId).filter((x) => !!x))]; const out = []; for (const id of ids) {
                             const f = await api.toolistFile(id);
                             out.push(new TextDecoder().decode(fromBase64(f.contentBase64)));
-                        } return out; }, !(v.state === 'DRAFT' || v.state === 'IN_REVIEW'))) : null), holder);
+                        } return out; };
+                        const openWork = () => drawToolistWork(workHost, api, { versionId: v.versionId, fileName: v.fileName, versionState: v.state, ncTexts, showErr: fail,
+                            onChanged: async (m) => { await showChecks(v.versionId, holder, ov.canAttest, v.state, v.attested); await openWork(); workHost.prepend(E('div', { class: 'banner ok', role: 'status', 'data-testid': 'pw-work-saved' }, m)); } });
+                        toolHost.append(E('div', { class: 'r', 'data-testid': 'pw-tools-version' }, E('b', {}, `${d.docNo ?? ''} v${v.versionNo}`), E('span', { class: 'mut' }, `${v.fileName} · ${stTr[v.state] ?? v.state}${v.attested ? ' · elle doğrulandı' : ''}`), (ov.canAttest || canUpload) ? btn('primary sm', 'pw-tools-work', 'Takım verisi: düzenle / Excel güncelle', () => void openWork()) : null, btn('ghost sm', 'pw-tools-show-checks', 'Otomatik kontroller', () => void showChecks(v.versionId, holder, ov.canAttest, v.state, v.attested)), (!v.attested && (v.state === 'DRAFT' || v.state === 'IN_REVIEW') && /\.(xlsx|csv)$/i.test(v.fileName)) ? btn('ghost sm', 'pw-tools-map', 'Dosya eşlemesi (gelişmiş)', () => void drawToolistMap(holder, api, v.versionId, v.fileName, async (msg) => { await showChecks(v.versionId, holder, ov.canAttest, v.state, v.attested); holder.prepend(E('div', { class: 'banner ok', role: 'status', 'data-testid': 'pw-map-saved' }, msg)); }, fail, async () => { const ch = await api.techChain(rev.id); const ids = [...new Set(ch.operations.map((o) => o.nc.versionId).filter((x) => !!x))]; const out = []; for (const id of ids) {
+                            const f = await api.toolistFile(id);
+                            out.push(new TextDecoder().decode(fromBase64(f.contentBase64)));
+                        } return out; })) : null), holder, workHost);
                     }
                 for (const r of ov.rechecksOpen) {
                     const note = h('input', { 'data-testid': 'pw-tools-recheck-note', placeholder: 'CAM/NC ve operasyon yeni listeyle uyumlu mu? Kısa not' });

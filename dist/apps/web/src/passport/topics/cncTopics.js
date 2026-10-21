@@ -1,8 +1,9 @@
 import { h } from '../../../../../packages/ui/src/h.js';
 import { cncDisplay, cncNotes, CNC_TONE_CSS } from '../../../../../packages/domain/src/cncTelemetry.js';
 import { machineStateOf } from '../../../../../packages/domain/src/machineState.js';
-import { SEG_KINDS, SEG_TR, SEG_COLOR, EVENT_TR, INSUFFICIENT_TR, MIN_COVERAGE_PCT, analyseShifts, aiStatus, durationTiles, fmtDur, fmtPct, layoutTimeline, pct, } from '../../../../../packages/domain/src/cncActivity.js';
+import { SEG_KINDS, SEG_TR, SEG_COLOR, INSUFFICIENT_TR, aiStatus, fmtDur, fmtPct, layoutTimeline, pct, } from '../../../../../packages/domain/src/cncActivity.js';
 import { isDenied } from './common.js';
+import { renderActivityCenter } from './cncActivityCenter.js';
 const TR_OFFSET = '+03:00'; // Türkiye: sabit UTC+3 (yaz/kış saati yok)
 const NUM = new Intl.NumberFormat('tr-TR');
 const dtf = new Intl.DateTimeFormat('tr-TR', { timeZone: 'Europe/Istanbul', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
@@ -102,68 +103,19 @@ function aiSection(analysis) {
 }
 export function historyTopic(ctx, m) {
     return {
-        id: 'cnc-gecmis', title: 'CNC Faaliyet Geçmişi', icon: 'chart', group: 'CNC', summary: 'Zaman çizelgesi · son 5 vardiya · olaylar',
+        id: 'cnc-gecmis', title: 'CNC Faaliyet Geçmişi', icon: 'chart', group: 'CNC', summary: 'Vardiyalar · zaman çizelgesi · olaylar', focus: true,
         async render(host) {
-            const code = m.code;
-            const st = { range: rangeFor('DAY', ctx.nowIso()), custom: { f: '', t: '' } };
-            const root = h('div', { 'data-testid': 'cnc-history' });
-            host.replaceChildren(root);
-            const lv = await liveRow(ctx, code);
+            const lv = await liveRow(ctx, m.code);
             if (lv.denied) {
-                root.append(panel('CNC Faaliyet Geçmişi', 'cnc-history-denied', small('CNC verisini görme yetkiniz yok.')));
+                host.replaceChildren(h('div', { 'data-testid': 'cnc-history' }, panel('CNC Faaliyet Geçmişi', 'cnc-history-denied', small('CNC verisini görme yetkiniz yok.'))));
                 return;
             }
             if (!lv.row) {
-                root.append(panel('CNC Faaliyet Geçmişi', 'cnc-history-none', small('CNC bağlantısı kurulmadı', 'cnc-history-none-text', 'font-weight:800;color:#fbbf24'), small('Bu makinede doğrulanmış CNC cihaz eşlemesi yok; faaliyet geçmişi oluşmaz.')));
+                host.replaceChildren(h('div', { 'data-testid': 'cnc-history' }, panel('CNC Faaliyet Geçmişi', 'cnc-history-none', small('CNC bağlantısı kurulmadı', 'cnc-history-none-text', 'font-weight:800;color:#fbbf24'), small('Bu makinede doğrulanmış CNC cihaz eşlemesi yok; faaliyet geçmişi oluşmaz.'))));
                 return;
             }
             const wo = await ctx.sel('work_orders', 'id', { machine_id: `eq.${m.id}`, status: 'in.(IN_PROGRESS,FIRST_PIECE_PENDING,FIRST_PIECE_APPROVED)' }, undefined, 10).catch(() => []);
-            root.append(liveBlock(m, lv.row, false, wo.length));
-            const dyn = h('div', { 'data-testid': 'cnc-history-dyn' });
-            const shiftsHost = h('div', { 'data-testid': 'cnc-shifts-host' });
-            const eventsHost = h('div', { 'data-testid': 'cnc-events-host' });
-            const picker = h('div', { style: 'display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin:8px 0' });
-            root.append(dyn, shiftsHost, eventsHost);
-            const load = async () => {
-                const r = st.range;
-                dyn.replaceChildren(small('Yükleniyor…'));
-                const args = { p_machine_code: code, p_from: r.from, p_to: r.to };
-                try {
-                    const [segs, sum, ev] = await Promise.all([ctx.rpc('cnc_activity', args), ctx.rpc('cnc_activity_summary', args), ctx.rpc('cnc_events', { ...args, p_limit: 300 })]);
-                    const detail = h('div', { 'data-testid': 'cnc-seg-detail', style: 'margin:8px 0;padding:6px 8px;border:1px dashed #334155;border-radius:6px;font-size:13px' }, 'Ayrıntı için çizelgede bir aralığa tıklayın.');
-                    const bar = timelineBar(segs, r.from, r.to, (s, kind) => {
-                        detail.replaceChildren(kvTable([['Başlangıç', fmt(s.segStart)], ['Bitiş', fmt(s.segEnd)], ['Süre', fmtDur((Date.parse(s.segEnd) - Date.parse(s.segStart)) / 1000)], ['Durum', SEG_TR[kind]], ['Program', s.program ?? 'BİLGİ YOK'],
-                            ['Veri kaynağı', kind === 'NO_DATA' ? 'Veri yok — bağlantı kaybı veya bilinmeyen' : `CNC — cihaz ${lv.row.deviceSerial}`]]));
-                    });
-                    const tiles = durationTiles(sum);
-                    dyn.replaceChildren(panel('Günlük faaliyet özeti', 'cnc-summary', h('div', { style: 'display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:8px' }, ...tiles.map((t) => h('div', { 'data-testid': 'cnc-tile', 'data-key': t.key, style: `border:1px solid #334155;border-left:3px solid ${SEG_COLOR[t.key === 'COVERAGE' ? 'ACTIVE' : t.key]};border-radius:6px;padding:6px 8px` }, h('div', { style: 'font-size:12px;color:#94a3b8' }, t.label), h('div', { style: 'font-size:18px;font-weight:800' }, fmtDur(t.seconds)), h('div', { style: 'font-size:12px;color:#94a3b8' }, `${fmtPct(t.pctOfWindow)}${t.note ? ` · ${t.note}` : ''}`)))), small(`Program değişimi: ${sum.programChanges ?? 'BİLİNMİYOR'} · M30 sayacı farkı: ${sum.m30Delta ?? 'BİLİNMİYOR'} · Doğrulanabilir çevrim olayı: ${sum.cycleEvents ?? 'BİLİNMİYOR'} · Veri kapsamı: ${fmtPct(sum.coveragePct)}`, 'cnc-summary-counters'), small('Program aktif süresi, CNC kontrolünün “program koşuyor” bildirdiği süredir; talaş kaldırma süresi değildir.', 'cnc-summary-note')), panel('Renkli zaman çizelgesi', 'cnc-timeline-panel', picker, bar, legend(), detail));
-                    eventsHost.replaceChildren(panel('Olay geçmişi', 'cnc-events', ev.length ? h('div', { style: 'max-height:320px;overflow:auto' }, h('table', { style: 'border-collapse:collapse;font-size:12.5px;width:100%' }, ...ev.map((e) => h('tr', { 'data-testid': 'cnc-event', 'data-kind': e.kind }, h('td', { style: 'padding:3px 8px;white-space:nowrap;color:#94a3b8' }, fmt(e.at)), h('td', { style: 'padding:3px 8px' }, EVENT_TR[e.kind] ?? e.kind), h('td', { style: 'padding:3px 8px;color:#94a3b8' }, e.detail ? Object.entries(e.detail).map(([k, v]) => `${k}: ${v}`).join(' · ') : ''))))) : small('Seçili aralıkta olay yok.', 'cnc-events-empty')));
-                    renderPicker();
-                }
-                catch (e) {
-                    dyn.replaceChildren(small(isDenied(e) ? 'Bu bölümü görme yetkiniz yok (sunucu reddetti).' : 'CNC faaliyet verisi okunamadı (kaynak yanıt vermedi). Süre uydurulmaz.', 'cnc-history-error', 'color:#fbbf24'));
-                }
-            };
-            const renderPicker = () => {
-                const mk = (key, label) => h('button', { type: 'button', 'data-testid': `cnc-range-${key.toLowerCase()}`, 'aria-pressed': String(st.range.key === key), class: 'ps-btn', style: `padding:4px 10px;border-radius:6px;border:1px solid #334155;background:${st.range.key === key ? '#1e3a5f' : 'transparent'};color:inherit;cursor:pointer`, onClick: () => { st.range = rangeFor(key, ctx.nowIso(), st.custom.f || undefined, st.custom.t || undefined); void load(); } }, label);
-                const f = h('input', { type: 'date', 'data-testid': 'cnc-range-from', value: st.custom.f, style: 'background:transparent;color:inherit;border:1px solid #334155;border-radius:6px;padding:3px', onChange: (e) => { st.custom.f = e.target.value; } });
-                const t = h('input', { type: 'date', 'data-testid': 'cnc-range-to', value: st.custom.t, style: 'background:transparent;color:inherit;border:1px solid #334155;border-radius:6px;padding:3px', onChange: (e) => { st.custom.t = e.target.value; } });
-                picker.replaceChildren(mk('DAY', 'Gün'), mk('WEEK', 'Hafta'), mk('MONTH', 'Ay'), f, t, h('button', { type: 'button', 'data-testid': 'cnc-range-custom', style: 'padding:4px 10px;border-radius:6px;border:1px solid #334155;background:transparent;color:inherit;cursor:pointer', onClick: () => { if (!st.custom.f)
-                        return; st.range = rangeFor('CUSTOM', ctx.nowIso(), st.custom.f, st.custom.t || st.custom.f); void load(); } }, 'Özel aralık'));
-            };
-            renderPicker();
-            const loadShifts = async () => {
-                shiftsHost.replaceChildren(small('Vardiya verisi yükleniyor…'));
-                try {
-                    const shifts = await ctx.rpc('cnc_shift_summaries', { p_machine_code: code, p_last: 5 });
-                    const analysis = analyseShifts(Array.isArray(shifts) ? shifts : []);
-                    shiftsHost.replaceChildren(panel('Son 5 tamamlanmış vardiya karşılaştırması', 'cnc-shifts', Array.isArray(shifts) && shifts.length ? shiftTable(analysis) : small('Henüz tamamlanmış vardiya verisi yok.', 'cnc-shifts-empty'), small(`Vardiya sınırları KMI vardiya takviminden alınır. Veri kapsamı %${MIN_COVERAGE_PCT} altındaki vardiya yorumlanmaz. Eksik veri ve bilinmeyen zaman ayrı gösterilir.`, 'cnc-shifts-note')), aiSection(analysis));
-                }
-                catch (e) {
-                    shiftsHost.replaceChildren(panel('Son 5 tamamlanmış vardiya karşılaştırması', 'cnc-shifts', small(isDenied(e) ? 'Bu bölümü görme yetkiniz yok (sunucu reddetti).' : 'Vardiya verisi okunamadı. Sayı uydurulmaz.', 'cnc-shifts-error', 'color:#fbbf24')));
-                }
-            };
-            await Promise.all([load(), loadShifts()]);
+            await renderActivityCenter(ctx, m, host, lv.row.deviceSerial, liveBlock(m, lv.row, false, wo.length));
         },
     };
 }
