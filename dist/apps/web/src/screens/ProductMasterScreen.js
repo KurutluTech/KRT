@@ -39,7 +39,7 @@ const num = (s) => { const t = s.trim().replace(',', '.'); if (t === '')
 const val = (x) => x.value;
 const when = (s) => (s ? s.slice(0, 16).replace('T', ' ') : '—');
 export async function renderProductMasterScreen(container, api, state = {}) {
-    const go = (s) => renderProductMasterScreen(container, api, s);
+    const go = (s) => renderProductMasterScreen(container, api, { ...(state.embedBom ? { embedBom: state.embedBom } : {}), ...s });
     const shell = (...kids) => mount(container, h('div', { class: 'pm', 'data-testid': 'pm-root' }, h('style', {}, CSS), ...kids));
     const banner = state.banner ? h('div', { class: `card ${state.banner.kind === 'error' ? 'bad' : 'info'}`, 'data-testid': 'pm-banner', 'data-kind': state.banner.kind }, state.banner.text) : null;
     const fail = (e) => {
@@ -233,6 +233,13 @@ export async function renderProductMasterScreen(container, api, state = {}) {
                 const rid = bomRev;
                 const dr = await api.bomDrafts(rid);
                 const rev = c.revisions.find((r) => r.id === rid);
+                if (state.embedBom) {
+                    // ONE BOM: the same canonical card as Ürün Çalışma Alanı (one record per material; no semicolon format, no parallel draft). Earlier drafts / external suggestions stay reachable, optional.
+                    const host = h('div', { 'data-testid': 'pm-bom-host' });
+                    queueMicrotask(() => { void state.embedBom(host, id, rid); });
+                    const old = dr.drafts.map((d) => h('div', { class: 'card', 'data-testid': 'pm-bd', 'data-status': d.status, 'data-origin': d.origin }, h('div', { class: 'row' }, h('span', { class: `chip ${d.origin === 'AI_EXTERNAL' ? 'warn' : 'info'}` }, d.label), h('span', { class: 'chip' }, d.status)), ...d.lines.map((l) => h('div', { 'data-testid': 'pm-bd-line' }, `${l.materialCode} · ${n(l.qtyPerUnit)} · fire %${n(l.scrapAllowancePct)}${l.rationale ? ` · ${l.rationale}` : ''}`))));
+                    return h('div', {}, revPick('bom', rid), h('p', { class: 'mut', 'data-testid': 'pm-bom-one' }, 'BOM tek kayıttır: bu ekranda, Ürün Çalışma Alanı’nda ve Mühendislik’te aynı satırlar görünür ve aynı formla düzenlenir.'), host, dr.drafts.length ? h('details', { class: 'card', 'data-testid': 'pm-bd-old' }, h('summary', {}, `Önceki BOM taslakları / harici öneriler (${dr.drafts.length}, isteğe bağlı)`), ...old) : null);
+                }
                 const prov = h('input', { type: 'text', 'data-testid': 'pm-bd-prov', placeholder: 'AI/harici araç adı (AI önerisi ise zorunlu)' });
                 const text = h('textarea', { 'data-testid': 'pm-bd-lines', rows: 4, placeholder: 'Her satıra: malzeme;miktar;fire%;gerekçe', style: 'min-height:100px;padding:8px' });
                 const kind = h('select', { 'data-testid': 'pm-bd-origin' }, h('option', { value: 'MANUAL' }, 'Elle girilen taslak'), h('option', { value: 'AI_EXTERNAL' }, 'Harici AI aracından alınan öneri'));

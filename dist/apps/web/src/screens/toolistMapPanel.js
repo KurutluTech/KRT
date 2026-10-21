@@ -13,7 +13,7 @@ const letter = (i) => { let s = '', n = i + 1; while (n > 0) {
     s = String.fromCharCode(65 + r) + s;
     n = Math.floor((n - 1) / 26);
 } return s; };
-export async function drawToolistMap(host, api, versionId, fileName, done, showErr, ncTexts) {
+export async function drawToolistMap(host, api, versionId, fileName, done, showErr, ncTexts, readOnly = false) {
     host.replaceChildren();
     try {
         const f = await api.toolistFile(versionId);
@@ -117,12 +117,14 @@ export async function drawToolistMap(host, api, versionId, fileName, done, showE
             const inp = (r, k) => {
                 const el = (k === 'type' ? E('input', { list: 'pw-fill-types', 'data-testid': `pw-fill-${k}-${r.t}`, value: r[k] }) : E('input', { 'data-testid': `pw-fill-${k}-${r.t}`, value: r[k], inputmode: k === 'offset' || k === 'dia' || k === 'len' ? 'decimal' : 'text' }));
                 el.addEventListener('input', () => { const cur = merged().find((x) => x.t === r.t); edits.set(r.t, { dia: cur.dia, len: cur.len, holder: cur.holder, offset: cur.offset, type: cur.type, [k]: el.value }); sum(); });
+                if (readOnly)
+                    el.disabled = true;
                 return el;
             };
             const sumEl = E('div', { class: 'mut', 'data-testid': 'pw-fill-missing' });
             const sum = () => { const m2 = merged(); const c = (k) => m2.filter((r) => r[k].trim() === '').length; sumEl.textContent = `Eksik: çap ${c('dia')} · boy ${c('len')} · tutucu ${c('holder')} · offset ${c('offset')} · takım türü ${c('type')} (toplam ${m2.length} takım). Bilinmeyen değeri boş bırakın; sistem uydurmaz, o alan “doğrulanamadı” kalır.`; };
             const sugCount = rows.filter((r) => r.offset.trim() === '' && ncSugg.has(r.t)).length;
-            fillHost.replaceChildren(E('b', {}, 'Eksik alanları tamamla'), E('div', { class: 'mut', 'data-testid': 'pw-fill-restored' }, restored ? `Daha önce kaydettiğiniz tamamlama (${restored} takım) yüklendi.` : ''), sumEl, E('datalist', { id: 'pw-fill-types' }, ...TYPES.map((t) => E('option', { value: t }))), E('div', { class: 'pp-wrap' }, E('table', { class: 'pp-t' }, E('thead', {}, E('tr', {}, ...['T', 'Tanım', 'Çap', 'Boy', 'Tutucu', 'Offset (H)', 'NC önerisi', 'Takım türü'].map((x) => E('th', {}, x)))), E('tbody', {}, ...rows.map((r) => E('tr', { 'data-testid': 'pw-fill-row' }, E('td', {}, r.t), E('td', {}, r.desc.slice(0, 36) || '—'), E('td', {}, inp(r, 'dia')), E('td', {}, inp(r, 'len')), E('td', {}, inp(r, 'holder')), E('td', {}, inp(r, 'offset')), E('td', { 'data-testid': `pw-fill-sug-${r.t}` }, ncSugg.has(r.t) ? `H${ncSugg.get(r.t)}` : ncLoaded && ncTexts ? 'NC kesin söylemiyor' : '—'), E('td', {}, inp(r, 'type'))))))), E('div', { class: 'row' }, sugCount > 0 ? E('button', { class: 'ghost', type: 'button', 'data-testid': 'pw-fill-apply-nc', onClick: () => { for (const r of merged())
+            fillHost.replaceChildren(E('b', {}, 'Eksik alanları tamamla'), E('div', { class: 'mut', 'data-testid': 'pw-fill-restored' }, restored ? `Daha önce kaydettiğiniz tamamlama (${restored} takım) yüklendi.` : ''), sumEl, E('datalist', { id: 'pw-fill-types' }, ...TYPES.map((t) => E('option', { value: t }))), E('div', { class: 'pp-wrap' }, E('table', { class: 'pp-t' }, E('thead', {}, E('tr', {}, ...['T', 'Tanım', 'Çap', 'Boy', 'Tutucu', 'Offset (H)', 'NC önerisi', 'Takım türü'].map((x) => E('th', {}, x)))), E('tbody', {}, ...rows.map((r) => E('tr', { 'data-testid': 'pw-fill-row' }, E('td', {}, r.t), E('td', {}, r.desc.slice(0, 36) || '—'), E('td', {}, inp(r, 'dia')), E('td', {}, inp(r, 'len')), E('td', {}, inp(r, 'holder')), E('td', {}, inp(r, 'offset')), E('td', { 'data-testid': `pw-fill-sug-${r.t}` }, ncSugg.has(r.t) ? `H${ncSugg.get(r.t)}` : ncLoaded && ncTexts ? 'NC kesin söylemiyor' : '—'), E('td', {}, inp(r, 'type'))))))), readOnly ? E('div', { class: 'banner', 'data-testid': 'pw-fill-readonly' }, 'Bu sürüm onaylı olduğu için tablo yalnız görüntülenir. Eksikleri tamamlamak için yeni (düzeltilmiş) sürüm yüklenmelidir; orijinal Excel değişmez.') : E('div', { class: 'row' }, sugCount > 0 ? E('button', { class: 'ghost', type: 'button', 'data-testid': 'pw-fill-apply-nc', onClick: () => { for (const r of merged())
                     if (r.offset.trim() === '' && ncSugg.has(r.t)) {
                         edits.set(r.t, { dia: r.dia, len: r.len, holder: r.holder, offset: ncSugg.get(r.t), type: r.type });
                         applied.offset.add(r.t);
@@ -143,6 +145,8 @@ export async function drawToolistMap(host, api, versionId, fileName, done, showE
             sum();
         };
         const save = E('button', { class: 'primary', type: 'button', 'data-testid': 'pw-map-save' }, 'Kaydet ve NC ile karşılaştır');
+        if (readOnly)
+            save.style.display = 'none';
         save.addEventListener('click', () => void (async () => {
             try {
                 const cur = current();

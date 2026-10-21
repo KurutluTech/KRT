@@ -19,7 +19,7 @@ const CSS = `
 const ST_TR = { DRAFT: 'TASLAK', RELEASED: 'YAYINDA', OBSOLETE: 'ESKİ' };
 const num = (s) => Number(s.replace(',', '.'));
 export async function renderEngineeringScreen(container, api, state = {}) {
-    const go = (s) => renderEngineeringScreen(container, api, { ...(state.embed ? { embed: state.embed } : {}), ...s });
+    const go = (s) => renderEngineeringScreen(container, api, { ...(state.embed ? { embed: state.embed } : {}), ...(state.embedBom ? { embedBom: state.embedBom } : {}), ...s });
     let data;
     try {
         data = await api.load();
@@ -59,14 +59,14 @@ export async function renderEngineeringScreen(container, api, state = {}) {
         const scrap = h('input', { type: 'text', inputmode: 'decimal', 'data-testid': 'eng-bom-scrap', placeholder: 'Fire payı % (isteğe bağlı)' });
         const pNo = h('input', { type: 'text', 'data-testid': 'eng-prog-no', placeholder: 'Program no' });
         const pRev = h('input', { type: 'text', 'data-testid': 'eng-prog-rev', placeholder: 'Program rev. (A)' });
-        return h('div', { class: 'card', 'data-testid': 'eng-revision', 'data-revision': r.revision, 'data-status': r.status }, h('div', { class: 'row', style: 'justify-content:space-between' }, h('strong', { style: 'font-size:18px' }, `Revizyon ${r.revision}`), h('span', { class: `chip ${r.status === 'RELEASED' ? 'ok' : r.status === 'DRAFT' ? 'warn' : 'info'}`, 'data-testid': 'eng-rev-status' }, ST_TR[r.status])), h('h3', {}, 'Ürün reçetesi (BOM)'), lines.length
+        return h('div', { class: 'card', 'data-testid': 'eng-revision', 'data-revision': r.revision, 'data-status': r.status }, h('div', { class: 'row', style: 'justify-content:space-between' }, h('strong', { style: 'font-size:18px' }, `Revizyon ${r.revision}`), h('span', { class: `chip ${r.status === 'RELEASED' ? 'ok' : r.status === 'DRAFT' ? 'warn' : 'info'}`, 'data-testid': 'eng-rev-status' }, ST_TR[r.status])), h('h3', {}, 'Ürün reçetesi (BOM)'), state.embedBom ? h('div', { 'data-testid': 'eng-bom-host', 'data-rev': r.id }) : lines.length
             ? h('table', { 'data-testid': 'eng-bom' }, ...lines.map((l) => h('tr', { 'data-testid': 'eng-bom-line' }, h('td', {}, l.materialCode), h('td', {}, `${l.qtyPerUnit} / adet`), h('td', {}, l.scrapAllowancePct ? `fire %${l.scrapAllowancePct}` : ''))))
             : h('div', { class: 'chip warn', 'data-testid': 'eng-bom-empty' }, 'Reçete boş — iş emri malzeme gereksinimini bilemez'), r.status === 'DRAFT'
-            ? h('div', { class: 'grid' }, mat, qty, scrap, h('button', { type: 'button', class: 'ghost', 'data-testid': 'eng-bom-add', onClick: () => {
-                    if (!mat.value.trim() || !(num(qty.value) > 0))
-                        return fail('Malzeme kodu ve sıfırdan büyük miktar zorunlu.');
-                    void act(() => api.addBomLine(r.id, mat.value.trim(), num(qty.value), scrap.value.trim() ? num(scrap.value) : 0), 'Reçete satırı eklendi.');
-                } }, 'Reçeteye satır ekle'), h('button', { type: 'button', class: 'primary', 'data-testid': 'eng-rev-release', onClick: () => {
+            ? h('div', { class: 'grid' }, ...(state.embedBom ? [] : [mat, qty, scrap]), ...(state.embedBom ? [] : [h('button', { type: 'button', class: 'ghost', 'data-testid': 'eng-bom-add', onClick: () => {
+                        if (!mat.value.trim() || !(num(qty.value) > 0))
+                            return fail('Malzeme kodu ve sıfırdan büyük miktar zorunlu.');
+                        void act(() => api.addBomLine(r.id, mat.value.trim(), num(qty.value), scrap.value.trim() ? num(scrap.value) : 0), 'Reçete satırı eklendi.');
+                    } }, 'Reçeteye satır ekle')]), h('button', { type: 'button', class: 'primary', 'data-testid': 'eng-rev-release', onClick: () => {
                     if (!lines.length)
                         return fail('Boş reçeteli revizyon yayınlanamaz.');
                     void act(() => api.releaseRevision(r.id), `Revizyon ${r.revision} yayınlandı; öncekiler ESKİ oldu. Artık değiştirilemez.`);
@@ -99,6 +99,8 @@ export async function renderEngineeringScreen(container, api, state = {}) {
             } }, 'CAM programı ekle')));
     };
     const revNew = h('input', { type: 'text', 'data-testid': 'eng-rev-new', placeholder: 'Yeni revizyon (örn. B)' });
+    if (state.embedBom && prod)
+        queueMicrotask(() => { container.querySelectorAll('[data-testid="eng-bom-host"]').forEach((el) => { const host = el; void state.embedBom(host, prod.id, host.dataset['rev'] ?? ''); }); });
     if (state.embed && prod)
         queueMicrotask(() => { const host = container.querySelector('[data-testid="eng-ops-host"]'); if (host && state.embed)
             void state.embed(host, prod.id); });

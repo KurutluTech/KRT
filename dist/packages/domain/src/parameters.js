@@ -28,16 +28,19 @@ export function parameterChangeRefusal(c) {
         return 'NO_CHANGE';
     return null;
 }
-/** Σ (setup min + qty × (cycle s + inspection s) / 60). A missing standard is VERİ YOK — never 0; total is null until every operation has its standards. */
+const r2 = (v) => Math.round(v * 100) / 100;
+/** ROUTING_TIME_V2 (migration 0139): machine minutes = setup + qty × cycle / 60; inspection is a separate, parallel quality workload and is never added to the cycle.
+ *  A missing standard is VERİ YOK — never 0; the total is null until every operation has its standards. */
 export function estimateRoutingMinutes(ops, qty) {
     const lines = ops.map((o) => {
         if (o.setupMin === null || o.cycleSec === null)
-            return { opNo: o.opNo, minutes: null, state: 'MISSING' };
-        return { opNo: o.opNo, minutes: Math.round((o.setupMin + (qty * (o.cycleSec + (o.inspectionSec ?? 0))) / 60) * 100) / 100, state: 'OK' };
+            return { opNo: o.opNo, minutes: null, qualityMinutes: null, qualityBottleneck: null, state: 'MISSING' };
+        return { opNo: o.opNo, minutes: r2(o.setupMin + (qty * o.cycleSec) / 60), qualityMinutes: o.inspectionSec === null ? null : r2((qty * o.inspectionSec) / 60), qualityBottleneck: o.inspectionSec !== null && o.inspectionSec > o.cycleSec, state: 'OK' };
     });
     const complete = lines.length > 0 && lines.every((l) => l.state === 'OK');
-    const partial = Math.round(lines.reduce((a, l) => a + (l.minutes ?? 0), 0) * 100) / 100;
-    return { complete, totalMinutes: complete ? partial : null, partialMinutes: partial, operations: lines };
+    const partial = r2(lines.reduce((a, l) => a + (l.minutes ?? 0), 0));
+    const quality = r2(lines.reduce((a, l) => a + (l.qualityMinutes ?? 0), 0));
+    return { complete, totalMinutes: complete ? partial : null, partialMinutes: partial, totalQualityMinutes: complete ? quality : null, qualityBottleneck: lines.some((l) => l.qualityBottleneck === true), operations: lines };
 }
 export const CARD_STATE_TR = { MISSING: 'Eksik veri', DRAFT: 'Taslak', APPROVED: 'Onaylı', INVALID: 'Geçersiz' };
 /** Card state of a revision-bound item: no data → MISSING; otherwise the revision status decides (RELEASED = approved, DRAFT = draft, OBSOLETE = invalid). */

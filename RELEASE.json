@@ -1,8 +1,8 @@
 {
   "product": "KMI NEXT",
-  "commit": "5beb0668c942633718dd55559d0075715a727909",
+  "commit": "cb6990d5e25ea370fab5f1d49ced2466bef07c5c",
   "builtFrom": "clean git tree",
-  "fileCount": 357,
+  "fileCount": 358,
   "migrationsInRepo": 73,
   "lastMigration": "0073_kmi_next_puantaj_month.sql",
   "note": "Release candidate. Publishing to https://flow.kurutlu.com is a manual owner action; this file is not a publication permit.",
@@ -79,8 +79,8 @@
     },
     {
       "path": "dist/apps/web/src/app.js",
-      "bytes": 93885,
-      "sha256": "34f0c8c272cd1177198a4a2964d22a96d96cfe9f5bde8504defa156cc54c41a8"
+      "bytes": 94192,
+      "sha256": "395c6c862c5af09ef5c29c2f6ae31767c8258c43af23d19a6690caf6dd195c80"
     },
     {
       "path": "dist/apps/web/src/approvalsInboxApi.js",
@@ -679,8 +679,8 @@
     },
     {
       "path": "dist/apps/web/src/screens/EngineeringScreen.js",
-      "bytes": 13320,
-      "sha256": "249b258c1cb7a87c0a407d18ecce1ec2a7e63cbeca83264c53d6a7513bb010b1"
+      "bytes": 13760,
+      "sha256": "eef92977efea69ff1637acbb6227e8c1021a3d6402e8cbdc046086823d705f78"
     },
     {
       "path": "dist/apps/web/src/screens/EntityGalleryScreen.js",
@@ -844,13 +844,13 @@
     },
     {
       "path": "dist/apps/web/src/screens/ProductMasterScreen.js",
-      "bytes": 39867,
-      "sha256": "179ece182bf781c55ec92fc4383c9086387ef3d25aad5c1665ac8b456f4c8a73"
+      "bytes": 41324,
+      "sha256": "779dc3b52304f4d683ec0b802c366e778c41e499a47ab807c7c738680775cda8"
     },
     {
       "path": "dist/apps/web/src/screens/ProductWorkspaceScreen.js",
-      "bytes": 72200,
-      "sha256": "5c8a8b80fb08a6addcb9e0ccd530dd812e13283632efb9638dda8ebc688df9b7"
+      "bytes": 83767,
+      "sha256": "d01328eb85753f62a59510f6e1946048c5b49d6b9bc9cff0ae1be9ddc71f3ef6"
     },
     {
       "path": "dist/apps/web/src/screens/ProductionDeskScreen.js",
@@ -1044,8 +1044,8 @@
     },
     {
       "path": "dist/apps/web/src/screens/toolistMapPanel.js",
-      "bytes": 12439,
-      "sha256": "bea308457cf7c30aa90d9b7aaff61e2a52cdd3f398a1c260bb026bd735c66fa7"
+      "bytes": 12834,
+      "sha256": "8e6cf1c16cfcf5ecbfb10fe7d1a45889cf92118c952435b1adf7cef07f123f93"
     },
     {
       "path": "dist/apps/web/src/searchApi.js",
@@ -1308,6 +1308,11 @@
       "sha256": "b1bfff579ab26501ae888520773d16f3ebd5cf849b03c4d1799afa81e3a53bf3"
     },
     {
+      "path": "dist/packages/domain/src/barStock.js",
+      "bytes": 1300,
+      "sha256": "db15381da3df4438b2a675fcb688b9d4262701c4db1fb2e6729e66aefeab6112"
+    },
+    {
       "path": "dist/packages/domain/src/bom.js",
       "bytes": 4451,
       "sha256": "e70c9d93d6bad206f594a847ce14eadb54f7432e764617732679cddfc0c68329"
@@ -1549,8 +1554,8 @@
     },
     {
       "path": "dist/packages/domain/src/parameters.js",
-      "bytes": 4229,
-      "sha256": "672a361c3867eeb7aefa5a4cff4e57a9dc9d613e296c1b2e8e70002cab125dee"
+      "bytes": 4726,
+      "sha256": "e2acb3f9b094c92e805f7592f4aa7651fc785dcef408b6cdbb903cadbf5728f1"
     },
     {
       "path": "dist/packages/domain/src/passport.js",
