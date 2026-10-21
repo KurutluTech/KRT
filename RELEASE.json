@@ -1,6 +1,6 @@
 {
   "product": "KMI NEXT",
-  "commit": "8b92826a3d197b6a870ef83327fad8c1bb190892",
+  "commit": "9bf795a44a3afaa3f9b0d85b9eb953919644a211",
   "builtFrom": "clean git tree",
   "fileCount": 362,
   "migrationsInRepo": 73,
@@ -79,8 +79,8 @@
     },
     {
       "path": "dist/apps/web/src/app.js",
-      "bytes": 94192,
-      "sha256": "395c6c862c5af09ef5c29c2f6ae31767c8258c43af23d19a6690caf6dd195c80"
+      "bytes": 95247,
+      "sha256": "6b464e3f60031ca9af60e13e3885c930c09864ab20a161d7ed072916b8f72860"
     },
     {
       "path": "dist/apps/web/src/approvalsInboxApi.js",
@@ -154,8 +154,8 @@
     },
     {
       "path": "dist/apps/web/src/ds.js",
-      "bytes": 9780,
-      "sha256": "83628b0389ffcf0af8421602d94ab92ba423f1f266ff18370c23f3cdc62f1729"
+      "bytes": 9958,
+      "sha256": "9a430cf082fa0c91f43b9a07665b040f177da024c04846b154c701d8e9e1eb56"
     },
     {
       "path": "dist/apps/web/src/economicsApi.js",
@@ -239,8 +239,8 @@
     },
     {
       "path": "dist/apps/web/src/kx.js",
-      "bytes": 16229,
-      "sha256": "7f54177d51418e1b4077326a57624f5e1d8f711cf676e6566deefa835ae05f3a"
+      "bytes": 16326,
+      "sha256": "38be725e936b88b685a1343ad233a540f201708f7dd05ff79f90d31f8aac4ed4"
     },
     {
       "path": "dist/apps/web/src/labelApi.js",
@@ -529,8 +529,8 @@
     },
     {
       "path": "dist/apps/web/src/purchaseRequestsApi.js",
-      "bytes": 1124,
-      "sha256": "d6a0d971fc2964720747793e7c9ad30cebb60bae69e85d3689e9a18a74e74da1"
+      "bytes": 3112,
+      "sha256": "ae5334281d7f05ab7adf1e3f9f84a0be12f491638bcd1252fa8c5a722fcbee4f"
     },
     {
       "path": "dist/apps/web/src/purchasingApi.js",
@@ -669,13 +669,13 @@
     },
     {
       "path": "dist/apps/web/src/screens/DocumentControlScreen.js",
-      "bytes": 35358,
-      "sha256": "5425a4f8367aa916ac8223979285067c814d5df2c43436e30eb518123dc70833"
+      "bytes": 36625,
+      "sha256": "c6851c2a5d8a9db97e8c71eeffef925902d27c96f4d51e58df0b1586e1f69001"
     },
     {
       "path": "dist/apps/web/src/screens/DocumentsScreen.js",
-      "bytes": 19672,
-      "sha256": "fae8599c4c8a998763279588ce15b46a43e06e6f85ded2ee46e808354caaefb4"
+      "bytes": 23798,
+      "sha256": "f2ec15f83e883609876504450946bf82b99d9b49fde7db46917415124cef5ae5"
     },
     {
       "path": "dist/apps/web/src/screens/EconomicsScreen.js",
@@ -684,8 +684,8 @@
     },
     {
       "path": "dist/apps/web/src/screens/EngineeringScreen.js",
-      "bytes": 13760,
-      "sha256": "eef92977efea69ff1637acbb6227e8c1021a3d6402e8cbdc046086823d705f78"
+      "bytes": 15138,
+      "sha256": "d81ad4d8b6e5ed546f26333cd6bb1d3947dcbff8e87b6b1115b2ae2632c6821f"
     },
     {
       "path": "dist/apps/web/src/screens/EntityGalleryScreen.js",
@@ -729,8 +729,8 @@
     },
     {
       "path": "dist/apps/web/src/screens/MaintenanceScreen.js",
-      "bytes": 15899,
-      "sha256": "d4e0d9ff9f4e4d0e6efbe662469c19a31f94a2ea6b0ccc1440a7c9e23d487415"
+      "bytes": 17592,
+      "sha256": "5bbbfd064d2c1718b9ca45f5ad0fb819b0304aa834792439ceccc912ed722b60"
     },
     {
       "path": "dist/apps/web/src/screens/ManagementScreen.js",
@@ -849,13 +849,13 @@
     },
     {
       "path": "dist/apps/web/src/screens/ProductMasterScreen.js",
-      "bytes": 41324,
-      "sha256": "779dc3b52304f4d683ec0b802c366e778c41e499a47ab807c7c738680775cda8"
+      "bytes": 41932,
+      "sha256": "a9db5bd0980fb1f3323c37cf0a54229ed2ce178be3bdbf8056067e80403aeb45"
     },
     {
       "path": "dist/apps/web/src/screens/ProductWorkspaceScreen.js",
-      "bytes": 84831,
-      "sha256": "f91f8ad2a8e7bed3f24c7c374086eb612617f52ef28734d9ee560bcb1cfc17ef"
+      "bytes": 88397,
+      "sha256": "313259cd404181e714993e94fd74fdd9811322474f9c1a9a4b26ed681b1d34b0"
     },
     {
       "path": "dist/apps/web/src/screens/ProductionDeskScreen.js",
@@ -874,8 +874,8 @@
     },
     {
       "path": "dist/apps/web/src/screens/PurchaseRequestsScreen.js",
-      "bytes": 4255,
-      "sha256": "a3d24368679d5544ea07b4e944ff71584bb8c3349c2c4f733e1eee6f98ffd275"
+      "bytes": 12863,
+      "sha256": "c313eac64ab67183fd27030b272d142490a09d295922ced4a2b44030e8e775f3"
     },
     {
       "path": "dist/apps/web/src/screens/PurchasingScreen.js",
@@ -904,8 +904,8 @@
     },
     {
       "path": "dist/apps/web/src/screens/RoutingScreen.js",
-      "bytes": 20951,
-      "sha256": "d2de57c8533a061cdd0e7b1f071979728191597f47c81dc4a456d1bb2894a7a3"
+      "bytes": 20982,
+      "sha256": "57b57b915b8bdf0fb23a0566a212937e58b0aadf74521f3b8b99567644ddeb24"
     },
     {
       "path": "dist/apps/web/src/screens/ScanScreen.js",
@@ -959,8 +959,8 @@
     },
     {
       "path": "dist/apps/web/src/screens/ToolroomScreen.js",
-      "bytes": 6524,
-      "sha256": "3f0ec7a9bdd12f1d96d504c07c3ccf4df8f0027055e0510b0adf086b884ee4fe"
+      "bytes": 11907,
+      "sha256": "e9116b406aafa6b47a72cde742a42b415752a6c7525905bad7b2ae674fd9199e"
     },
     {
       "path": "dist/apps/web/src/screens/WorkOrderHubScreen.js",
@@ -1114,8 +1114,8 @@
     },
     {
       "path": "dist/apps/web/src/theme.js",
-      "bytes": 39296,
-      "sha256": "5a979f4ce9218df3429ade737f607cda7bb86fc9a66c479665c27bcaabeebb17"
+      "bytes": 39542,
+      "sha256": "f4ca3d5589fde17ace5980de5292ceffcf81ea7afc51f527189fd3f919a03e31"
     },
     {
       "path": "dist/apps/web/src/toolReadinessApi.js",

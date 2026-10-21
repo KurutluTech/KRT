@@ -35,7 +35,7 @@ export async function renderMaintenanceScreen(container, deps, banner) {
     function reasonInputFor(machineId) {
         let input = reasonInputs.get(machineId);
         if (!input) {
-            input = h('input', { type: 'text', 'data-testid': 'reason-input', 'data-machine-id': machineId });
+            input = h('input', { type: 'text', 'data-testid': 'reason-input', 'data-machine-id': machineId, style: 'min-width:210px', placeholder: 'Neden / açıklama (zorunlu)', 'aria-label': 'Neden' });
             reasonInputs.set(machineId, input);
         }
         return input;
@@ -153,8 +153,33 @@ export async function renderMaintenanceScreen(container, deps, banner) {
     const n = (st) => machines.filter((m) => m.status === st).length;
     const openTickets = tickets.filter((t) => t.status !== 'CLOSED').length;
     const mkBtn = (cls, testid, machineId, label, onClick) => h('button', { type: 'button', class: cls, 'data-testid': testid, 'data-machine-id': machineId, onClick }, label);
+    /** Kompakt düzen: makine başına TEK ana işlem + "Diğer işlemler" açılır listesi (devasa buton yığını yok). */
+    const mainAction = (m, el) => {
+        if (el.returnPath === 'RESUME_FROM_HOLD')
+            return mkBtn('okb', 'resume-from-hold-btn', m.id, 'Üretime döndür', () => handleResumeFromHold(m.id));
+        if (el.returnPath === 'AUTHORIZED_TEST_REQUIRED')
+            return mkBtn('okb', 'return-to-service-btn', m.id, 'Servise döndür (yetkili test)', () => handleReturnToService(m.id));
+        if (m.status === 'UP' || m.status === 'HOLD')
+            return mkBtn('danger', 'set-down-btn', m.id, 'Arıza / duruş bildir', () => handleSetDown(m.id));
+        if (m.status !== 'MAINTENANCE')
+            return mkBtn('primary', 'enter-maintenance-btn', m.id, "Bakıma al", () => handleEnterCondition(m.id, 'MAINTENANCE'));
+        return null;
+    };
+    const moreActions = (m, el) => {
+        const main = el.returnPath === 'RESUME_FROM_HOLD' ? 'resume' : el.returnPath === 'AUTHORIZED_TEST_REQUIRED' ? 'return' : m.status === 'UP' || m.status === 'HOLD' ? 'down' : m.status !== 'MAINTENANCE' ? 'maint' : '';
+        const items = [];
+        if ((m.status === 'UP' || m.status === 'HOLD') && main !== 'down')
+            items.push(mkBtn('danger', 'set-down-btn', m.id, 'Arıza / duruş bildir', () => handleSetDown(m.id)));
+        if (m.status !== 'MAINTENANCE' && main !== 'maint')
+            items.push(mkBtn('ghost', 'enter-maintenance-btn', m.id, "Bakıma al", () => handleEnterCondition(m.id, 'MAINTENANCE')));
+        if (m.status === 'UP') {
+            items.push(holdCategoryFor(m.id));
+            items.push(mkBtn('warnb', 'enter-hold-btn', m.id, 'Beklemeye al', () => handleEnterCondition(m.id, 'HOLD')));
+        }
+        return items.length ? h('details', { class: 'more', 'data-testid': 'machine-more' }, h('summary', {}, 'Diğer işlemler'), h('div', { class: 'acts-more' }, ...items)) : null;
+    };
     const screen = (h("div", { class: "maintenance-screen kd" },
-        h("style", null, DS_CSS + '.kd .mrow{display:grid;grid-template-columns:minmax(150px,1fr) minmax(200px,2fr);gap:12px;align-items:center}.kd .mrow .acts{display:flex;gap:8px;flex-wrap:wrap;align-items:center}.kd .mrow.down{border-left:4px solid #dc2626;padding-left:10px}.kd .mrow.maint{border-left:4px solid #3b82f6;padding-left:10px}.kd .mrow.hold{border-left:4px solid #d97706;padding-left:10px}.kd .mrow.up{border-left:4px solid #16a34a;padding-left:10px}@media(max-width:700px){.kd .mrow{grid-template-columns:1fr}}'),
+        h("style", null, DS_CSS + '.kd .mrow{display:grid;grid-template-columns:minmax(150px,1fr) minmax(200px,2fr);gap:12px;align-items:center}.kd .mrow .acts{display:flex;gap:8px;flex-wrap:wrap;align-items:center;justify-content:flex-end}.kd details.more{position:relative}.kd details.more>summary{cursor:pointer;list-style:none;min-height:36px;display:inline-flex;align-items:center;padding:0 12px;border-radius:10px;background:#1e293b;color:#e2e8f0;font-size:13px;font-weight:700}.kd details.more>summary::-webkit-details-marker{display:none}.kd details.more[open]>summary{background:#273449}.kd .acts-more{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:8px;padding:10px;border:1px solid #1e293b;border-radius:10px;background:#0b1220}.kd .mrow.down{border-left:4px solid #dc2626;padding-left:10px}.kd .mrow.maint{border-left:4px solid #3b82f6;padding-left:10px}.kd .mrow.hold{border-left:4px solid #d97706;padding-left:10px}.kd .mrow.up{border-left:4px solid #16a34a;padding-left:10px}@media(max-width:700px){.kd .mrow{grid-template-columns:1fr}}'),
         h("h1", { "data-testid": "maintenance-heading" }, "Bak\u0131m / Makine Sa\u011Fl\u0131\u011F\u0131"),
         banner ? (h("div", { class: `banner ${banner.kind}`, "data-testid": "maintenance-banner", "data-kind": banner.kind }, banner.text)) : null,
         loadError ? (h("div", { class: "banner error", "data-testid": "maintenance-load-error" },
@@ -179,9 +204,8 @@ export async function renderMaintenanceScreen(container, deps, banner) {
                                     h("span", { class: `pill ${st[1]}`, "data-testid": "machine-status", "data-code": m.status }, st[0]),
                                     h("span", { class: `pill ${el.eligible ? 'ok' : 'warn'}`, "data-testid": "machine-eligibility", "data-eligible": String(el.eligible), "data-return-path": el.returnPath }, el.label),
                                     cncBy.has(m.code) ? h("span", { class: "mut", "data-testid": "machine-cnc", "data-cnc-headline": machineStateOf({ status: 'UP', active: [], cnc: cncBy.get(m.code) }).headline },
-                                        "Fiziksel CNC (kontrol bildiriyor): ",
-                                        h("b", null, HEADLINE_TR[machineStateOf({ status: 'UP', active: [], cnc: cncBy.get(m.code) }).headline]),
-                                        " \u2014 bak\u0131m kayd\u0131ndan ayr\u0131 bir bilgidir, bak\u0131m kap\u0131lar\u0131n\u0131 de\u011Fi\u015Ftirmez") : null,
+                                        h("span", { title: "Fiziksel CNC bilgisi bak\u0131m kayd\u0131ndan ayr\u0131d\u0131r; bak\u0131m kap\u0131lar\u0131n\u0131 de\u011Fi\u015Ftirmez." }, "CNC kontrol\u00FC (fiziksel): "),
+                                        h("b", null, HEADLINE_TR[machineStateOf({ status: 'UP', active: [], cnc: cncBy.get(m.code) }).headline])) : null,
                                     h("span", { class: "mut" },
                                         "Toplam duru\u015F: ",
                                         h("span", { "data-testid": "machine-down-minutes" }, String(m.totalDownMinutes)),
@@ -196,12 +220,8 @@ export async function renderMaintenanceScreen(container, deps, banner) {
                                     h("a", { href: passportHref('MACHINE', m.id), "data-testid": "machine-passport", style: "color:#67e8f9;font-weight:700;text-decoration:none" }, "Pasaport \u2192"))),
                             h("div", { class: "acts" },
                                 reasonInputFor(m.id),
-                                m.status === 'UP' || m.status === 'HOLD' ? mkBtn('danger', 'set-down-btn', m.id, 'ARIZA / DURUŞ Bildir', () => handleSetDown(m.id)) : null,
-                                el.returnPath === 'RESUME_FROM_HOLD' ? mkBtn('okb', 'resume-from-hold-btn', m.id, 'Üretime Döndür (bakım testi gerekmez)', () => handleResumeFromHold(m.id)) : null,
-                                el.returnPath === 'AUTHORIZED_TEST_REQUIRED' ? mkBtn('okb', 'return-to-service-btn', m.id, 'Servise Döndür (Yetkili Test)', () => handleReturnToService(m.id)) : null,
-                                m.status !== 'MAINTENANCE' ? mkBtn('primary', 'enter-maintenance-btn', m.id, "BAKIM'a Al", () => handleEnterCondition(m.id, 'MAINTENANCE')) : null,
-                                m.status === 'UP' ? holdCategoryFor(m.id) : null,
-                                m.status === 'UP' ? mkBtn('warnb', 'enter-hold-btn', m.id, 'BEKLEMEYE Al', () => handleEnterCondition(m.id, 'HOLD')) : null)));
+                                mainAction(m, el),
+                                moreActions(m, el))));
                     }))),
             h("div", { class: "panel", "data-testid": "tickets-table" },
                 h("h2", null, "Bak\u0131m kay\u0131tlar\u0131"),

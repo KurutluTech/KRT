@@ -163,9 +163,10 @@ html[data-kmi-touch="1"] .kmi-panel .nfav{min-height:var(--kmi-target,48px);widt
 .kmi-content th{background:#131d2e;color:var(--kmi-mut);font-size:12px;text-transform:uppercase;letter-spacing:.04em}
 .kmi-content td,.kmi-content th{border-bottom:1px solid var(--kmi-line);padding:6px 8px;text-align:left}
 .kmi-content tbody tr:hover{background:#131d2e}
-.kmi-content input:not([type=checkbox]):not([type=radio]):not([type=file]),.kmi-content select,.kmi-content textarea{background:#0f172a;color:#e2e8f0;border:1px solid var(--kmi-line2);border-radius:10px;padding:8px 10px;font-size:16px;min-height:40px;max-width:100%}
+.kmi-content input:not([type=checkbox]):not([type=radio]):not([type=file]),.kmi-content select,.kmi-content textarea{background:#0f172a;color:#e2e8f0;border:1px solid var(--kmi-line2);border-radius:10px;padding:6px 10px;font-size:14px;min-height:38px;max-width:100%}
+@media (max-width:1100px){.kmi-content input:not([type=checkbox]):not([type=radio]):not([type=file]),.kmi-content select,.kmi-content textarea{font-size:16px;min-height:44px}.kmi-content button{min-height:44px}}
 .kmi-content input::placeholder,.kmi-content textarea::placeholder{color:#64748b}
-.kmi-content button{font:inherit;font-weight:700;color:#fff;background:var(--kmi-blue);border:0;border-radius:10px;min-height:40px;padding:0 14px;cursor:pointer}
+.kmi-content button{font:inherit;font-size:13px;font-weight:700;color:#fff;background:var(--kmi-blue);border:0;border-radius:10px;min-height:36px;padding:4px 14px;cursor:pointer;line-height:1.25}
 .kmi-content button:hover:not(:disabled){filter:brightness(1.12)}
 .kmi-content button:disabled{opacity:.45;cursor:not-allowed}
 .kmi-content code{background:#1e293b;color:#e2e8f0;border-radius:6px;padding:1px 6px}

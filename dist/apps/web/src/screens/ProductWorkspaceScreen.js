@@ -279,8 +279,13 @@ export async function renderProductWorkspaceScreen(container, api, state = {}) {
         };
         // ---------------------------------------------------------------------------------------- rota ve operasyonlar
         const activeOps = ws.routing.filter((o) => o.active);
-        const quickReason = reasonBox('pw-quick-reason', 'Gerekçe (en az 10 karakter)');
-        const prompt0 = () => { const v = val(quickReason).trim(); if (v.length < 10) {
+        const quickReason = reasonBox('pw-quick-reason', rev?.status === 'DRAFT' ? 'İsteğe bağlı' : 'Gerekçe (en az 10 karakter)');
+        /** Sunucu her rota işleminde ≥10 karakterlik açıklama ister (RT: REASON_REQUIRED). Taslakta kullanıcıdan gerekçe beklenmez: alan, YAPILAN İŞLEMİN gerçek tanımıyla görünür biçimde doldurulur
+         *  (kullanıcı görür, değiştirebilir; denetim izine işlem açıklaması olarak yazılır — uydurma gerekçe değil). Yayınlanmış/yürürlükteki veride gerçek gerekçe zorunlu kalır. */
+        const prompt0 = (what) => { let v = val(quickReason).trim(); if (v.length < 10 && rev?.status === 'DRAFT' && what) {
+            v = `Taslak düzenleme: ${what}`.slice(0, 400);
+            quickReason.value = v;
+        } if (v.length < 10) {
             invalid(quickReason, true);
             fail(new Error('REASON_REQUIRED: gerekçe en az 10 karakter'));
             return null;
@@ -348,6 +353,8 @@ export async function renderProductWorkspaceScreen(container, api, state = {}) {
                     if (val(name).trim() !== op.name)
                         diffs.push(`Ad: ${changeText(op.name, val(name).trim())}`);
                 }
+                if (val(reason).trim().length < 10 && rev?.status === 'DRAFT')
+                    reason.value = `Taslak düzenleme: OP${no} ${op ? 'güncellendi' : 'eklendi'}${diffs.length ? ` — ${diffs.join('; ')}` : ''}`.slice(0, 400);
                 try {
                     const r = await api.saveOperation({ revisionId: rev.id, opNo: no, name: val(name).trim(), machineIds: ids, primaryId: val(primary) || null, skillCode: val(skill).trim() || null, skillLevel: num(val(level)),
                         camId: op?.camProgramId ?? null, setup: setupV, cycle: cycleV, firstPiece: isChecked(fp), qc: isChecked(qc), instructions: val(ins).trim() || null, reason: val(reason).trim() });
@@ -358,7 +365,7 @@ export async function renderProductWorkspaceScreen(container, api, state = {}) {
                     fail(e);
                 }
             };
-            return E('div', { class: 'stack', 'data-testid': op ? 'pw-op-edit' : 'pw-op-new' }, E('fieldset', { class: 'fsec' }, h('legend', {}, 'Genel'), E('div', { class: 'fgrid' }, field('Operasyon no', noIn), field('Ad', name), field('Öncelikli makine', primary), field('Yeterlilik', skill), field('Seviye (1-5)', level))), E('fieldset', { class: 'fsec' }, h('legend', {}, 'Süreler'), E('div', { class: 'fgrid' }, field('Hazırlık (dk)', setup), field('Çevrim (sn/adet)', cycle))), E('fieldset', { class: 'fsec' }, h('legend', {}, 'İzinli makineler'), E('div', { class: 'row', style: 'gap:4px 16px' }, ...mach.map((x) => h('label', { class: 'chk' }, x.box, x.m.code))), machines.length ? null : E('div', { class: 'mut' }, 'Makine listesi okunamadı.')), E('div', { class: 'row', style: 'gap:4px 20px' }, h('label', { class: 'chk' }, fp, 'İlk parça kontrolü şart'), h('label', { class: 'chk' }, qc, 'Kalite kontrolü şart')), field('Operatör talimatı', ins), !can.editStructure && structural ? E('div', { class: 'mut' }, 'Yeni operasyon eklemek için taslak revizyon gerekir.') : null, E('div', { class: 'row', style: 'align-items:flex-end' }, E('div', { class: 'grow' }, field('Değişiklik gerekçesi', reason, 'Her kayıt sürümlenir; eski hâli korunur.')), btn('primary', 'pw-op-save', 'Kaydet', () => void save())));
+            return E('div', { class: 'stack', 'data-testid': op ? 'pw-op-edit' : 'pw-op-new' }, E('fieldset', { class: 'fsec' }, h('legend', {}, 'Genel'), E('div', { class: 'fgrid' }, field('Operasyon no', noIn), field('Ad', name), field('Öncelikli makine', primary), field('Yeterlilik', skill), field('Seviye (1-5)', level))), E('fieldset', { class: 'fsec' }, h('legend', {}, 'Süreler'), E('div', { class: 'fgrid' }, field('Hazırlık (dk)', setup), field('Çevrim (sn/adet)', cycle))), E('fieldset', { class: 'fsec' }, h('legend', {}, 'İzinli makineler'), E('div', { class: 'row', style: 'gap:4px 16px' }, ...mach.map((x) => h('label', { class: 'chk' }, x.box, x.m.code))), machines.length ? null : E('div', { class: 'mut' }, 'Makine listesi okunamadı.')), E('div', { class: 'row', style: 'gap:4px 20px' }, h('label', { class: 'chk' }, fp, 'İlk parça kontrolü şart'), h('label', { class: 'chk' }, qc, 'Kalite kontrolü şart')), field('Operatör talimatı', ins), !can.editStructure && structural ? E('div', { class: 'mut' }, 'Yeni operasyon eklemek için taslak revizyon gerekir.') : null, E('div', { class: 'row', style: 'align-items:flex-end' }, E('div', { class: 'grow' }, field(rev?.status === 'DRAFT' ? 'Not (isteğe bağlı)' : 'Değişiklik gerekçesi', reason, rev?.status === 'DRAFT' ? 'Boş bırakırsanız yapılan işlemin açıklaması kaydedilir. Her kayıt sürümlenir.' : 'Her kayıt sürümlenir; eski hâli korunur.')), btn('primary', 'pw-op-save', 'Kaydet', () => void save())));
         };
         const opExtras = (o) => {
             const insp = h('input', { 'data-testid': 'pw-insp-value', inputmode: 'decimal', placeholder: 'sn/adet', value: o.inspectionSeconds != null ? String(o.inspectionSeconds) : '' });
@@ -372,7 +379,7 @@ export async function renderProductWorkspaceScreen(container, api, state = {}) {
             const qcPlan = h('select', { 'data-testid': 'pw-qc-plan' }, h('option', { value: '' }, '— kontrol planı seçilmedi —'), ...plans.map((q) => h('option', { value: q.id }, `${q.operationNo != null ? 'OP' + q.operationNo : 'Genel'} v${q.version} (${q.status}) · ${q.characteristics} karakteristik`)));
             const qcKind = h('select', { 'data-testid': 'pw-qc-kind' }, ...['FIRST_PIECE', 'IN_PROCESS', 'FINAL'].map((k) => h('option', { value: k }, KIND_TR[k])));
             const depSel = h('select', { 'data-testid': 'pw-dep-sel' }, h('option', { value: '' }, '— ön koşul operasyon —'), ...activeOps.filter((x) => x.opNo < o.opNo && !o.dependsOn.some((d) => d.operationId === x.id)).map((x) => h('option', { value: x.id }, x.opCode)));
-            const act = async (fn, text) => { const why = prompt0(); if (why === null)
+            const act = async (fn, text) => { const why = prompt0(text); if (why === null)
                 return; try {
                 await fn();
                 await reload(text, 'ok', { openOp: o.id });
@@ -407,7 +414,7 @@ export async function renderProductWorkspaceScreen(container, api, state = {}) {
             if (j < 0 || j >= ids.length)
                 return;
             [ids[i], ids[j]] = [ids[j], ids[i]];
-            const why = prompt0();
+            const why = prompt0(`${o.opCode} sırası değiştirildi`);
             if (why === null)
                 return;
             try {
@@ -468,14 +475,14 @@ export async function renderProductWorkspaceScreen(container, api, state = {}) {
         const checks = Array.isArray(ws.routingCheck) ? ws.routingCheck : ws.routingCheck?.checks ?? [];
         const addOp = () => { clearBanner(); openOp = 'NEW'; drawOps(); scrollTo(opsHost.lastElementChild); };
         const routingCard = card({ title: 'Rota ve operasyonlar', testid: 'pw-card-routing', span: 12, id: 'card-routing', chip: stateChip(ws.routing.length ? (rev?.state ?? 'MISSING') : 'MISSING'),
-            actions: [can.editStructure ? btn('primary', 'pw-op-add', '+ Operasyon ekle', addOp) : null] }, checks.length ? E('div', { class: 'row', style: 'gap:6px;margin-bottom:10px' }, ...checks.map((c) => chip(`${c.label}: ${c.detail}`, c.status === 'OK' ? 'ok' : c.status === 'NA' ? '' : 'warn', { 'data-testid': 'pw-route-check', 'data-code': c.code, 'data-status': c.status, title: c.detail, style: 'white-space:normal' }))) : null, can.editRouting && editable ? E('div', { class: 'row', style: 'margin-bottom:6px' }, E('div', { class: 'grow' }, field('Hızlı işlem gerekçesi', quickReason, 'Sırala, pasife al, bağımlılık, kaynak ve kalite noktası işlemleri bu gerekçeyi kullanır.'))) : null, chainHost, opsHost, can.editRouting && rev?.status === 'RELEASED' ? E('div', { class: 'mut', style: 'margin-top:10px' }, 'Yürürlükteki revizyonda operasyon ekleme, sıralama ve pasife alma yapılmaz; makine, süre, kaynak ve talimat güncellenir (sürümlenir). Yapısal değişiklik için taslak revizyon açın.') : null);
+            actions: [can.editStructure ? btn('primary', 'pw-op-add', '+ Operasyon ekle', addOp) : null] }, checks.length ? E('div', { class: 'row', style: 'gap:6px;margin-bottom:10px' }, ...checks.map((c) => chip(`${c.label}: ${c.detail}`, c.status === 'OK' ? 'ok' : c.status === 'NA' ? '' : 'warn', { 'data-testid': 'pw-route-check', 'data-code': c.code, 'data-status': c.status, title: c.detail, style: 'white-space:normal' }))) : null, can.editRouting && editable ? E('div', { class: 'row', style: 'margin-bottom:6px' }, E('div', { class: 'grow' }, field(rev?.status === 'DRAFT' ? 'Not (isteğe bağlı — boşsa işlemin açıklaması kaydedilir)' : 'Hızlı işlem gerekçesi', quickReason, 'Sırala, pasife al, bağımlılık, kaynak ve kalite noktası işlemleri bu gerekçeyi kullanır.'))) : null, chainHost, opsHost, can.editRouting && rev?.status === 'RELEASED' ? E('div', { class: 'mut', style: 'margin-top:10px' }, 'Yürürlükteki revizyonda operasyon ekleme, sıralama ve pasife alma yapılmaz; makine, süre, kaynak ve talimat güncellenir (sürümlenir). Yapısal değişiklik için taslak revizyon açın.') : null);
         drawOps();
         void drawChainPanel(chainHost, api, ws, { act: !!(can.editRouting || can.manageDocuments) && editable }, (m) => reload(m), (e) => fail(e), (c) => {
             chainNow = c;
             if (!opsHost.querySelector('input:focus, textarea:focus, select:focus'))
                 drawOps(); // never wipe a field the user is typing in
             const o = orderReadiness(ws.readiness?.overall, c, ws.bom.length);
-            orderHost.replaceChildren(E('div', { class: `banner ${o.ready ? 'ok' : o.ready === false ? 'bad' : ''}`, 'data-testid': 'pw-order-ready', 'data-ready': String(o.ready) }, E('b', {}, o.ready ? 'Siparişe hazır' : o.ready === false ? 'Siparişe hazır değil' : 'Siparişe hazırlık doğrulanamadı'), o.reasons.length ? ` — ${o.reasons.join('; ')}` : ' — tek hazırlık cevabı ve her operasyonun teknik zinciri tamam.'));
+            orderHost.replaceChildren(E('div', { class: `banner ${o.ready ? 'ok' : o.ready === false ? 'bad' : ''}`, 'data-testid': 'pw-order-ready', 'data-ready': String(o.ready) }, E('b', {}, o.ready ? 'Siparişe hazır' : o.ready === false ? 'Siparişe hazır değil' : 'Siparişe hazırlık doğrulanamadı'), o.reasons.length ? (o.ready === false && missingN.length ? (o.reasons.filter((x) => /OP\d/.test(x)).length ? ` — ${o.reasons.filter((x) => /OP\d/.test(x)).join('; ')}. Diğer eksikler yukarıdaki listede.` : ' — eksikler yukarıdaki listede.') : ` — ${o.reasons.join('; ')}`) : ' — tek hazırlık cevabı ve her operasyonun teknik zinciri tamam.'));
         });
         // ---------------------------------------------------------------------------------------- süre hesabı
         const qty = h('input', { 'data-testid': 'pw-calc-qty', type: 'number', min: 1, value: String(state.qty ?? 1), 'aria-label': 'Adet' });
@@ -563,7 +570,7 @@ export async function renderProductWorkspaceScreen(container, api, state = {}) {
             const kerfWhy = h('input', { 'data-testid': 'pw-bom-kerf-reason', placeholder: 'Varsayılandan farklıysa neden?', value: sp?.kerfReason ?? '' });
             const den = h('input', { 'data-testid': 'pw-bom-den', inputmode: 'decimal', placeholder: '7,85 (çelik varsayılanı)', value: sp && sp.densitySource === 'SPEC' ? fmtIn(sp.densityGCm3) : '' });
             const pq = h('input', { 'data-testid': 'pw-bom-prevqty', inputmode: 'numeric', value: '37', 'aria-label': 'Önizleme adedi' });
-            const prev = E('div', { 'data-testid': 'pw-bom-preview', class: 'mut' });
+            const prev = E('div', { 'data-testid': 'pw-bom-preview', class: 'kx-sub mut' });
             const setReasonDefault = () => { if (!val(reason).trim() || reason.dataset['auto'] === '1') {
                 reason.value = m.kind === 'remove' ? '' : `BOM: ${val(code).trim() || 'malzeme'} ${type.value === 'BAR' ? 'çubuk hammadde tanımı' : 'satırı'} ${cur ? 'güncellendi' : 'tanımlandı'}`;
                 reason.dataset['auto'] = '1';
@@ -582,7 +589,7 @@ export async function renderProductWorkspaceScreen(container, api, state = {}) {
                 }
                 const plan = d && b && c && n ? barPlanPreview({ barMm: b, cutMm: c, kerfMm: k ?? DEFAULT_KERF_MM, diaMm: d, densityGCm3: de ?? DEFAULT_STEEL_DENSITY, qty: n }) : null;
                 prev.replaceChildren(!plan ? 'Çap, çubuk boyu ve kesim boyunu girince hesap burada görünür.' : plan.barsNeeded === null ? 'Kesim boyu + testere payı çubuğa sığmıyor — kayıt edilemez.' :
-                    E('div', { 'data-testid': 'pw-bom-preview-text' }, E('b', {}, `${plan.piecesPerBar} parça/çubuk · ${fmt(n)} adet için ${plan.barsNeeded} çubuk`), ` · artan ${plan.sparePieces} parça · kullanılan malzeme ${fmtMm(plan.usedMm)} mm · toplam kalan ${fmtMm(plan.leftoverMmTotal)} mm (çubuk başına ${fmtMm(plan.remainderMmPerBar)} mm) · ham parça ${fmtMm(plan.pieceMassG)} g. Önizlemedir: kayıttan sonra sunucu hesabıyla gösterilir; stok ayrılmaz.`));
+                    E('div', { 'data-testid': 'pw-bom-preview-text' }, chip('ÖNİZLEME — henüz kaydedilmedi', 'warn', { 'data-testid': 'pw-bom-preview-badge' }), ' ', E('b', {}, `${plan.piecesPerBar} parça/çubuk · ${fmt(n)} adet için ${plan.barsNeeded} çubuk`), ` · artan ${plan.sparePieces} parça · kullanılan malzeme ${fmtMm(plan.usedMm)} mm · toplam kalan ${fmtMm(plan.leftoverMmTotal)} mm (çubuk başına ${fmtMm(plan.remainderMmPerBar)} mm) · ham parça ${fmtMm(plan.pieceMassG)} g. Önizlemedir: kayıttan sonra sunucu hesabıyla gösterilir; stok ayrılmaz.`));
                 setReasonDefault();
             };
             const qFld = E('div', {}, field('Miktar (ürün başına)', q));
@@ -666,6 +673,7 @@ export async function renderProductWorkspaceScreen(container, api, state = {}) {
         function drawBom() {
             const revTone = (rev ? { DRAFT: 'info', RELEASED: 'ok', OBSOLETE: 'off' }[rev.status] : '') ?? '';
             bomHost.replaceChildren(...[
+                ws.bom.length ? E('div', { class: 'row', style: 'margin-bottom:6px', 'data-testid': 'pw-bom-saved-badge' }, chip('KAYITLI BOM', 'ok'), E('span', { class: 'mut' }, 'Aşağıdaki satırlar kaydedilmiştir. Forma girilenler “BOM taslağını kaydet” denmeden kayıt olmaz.')) : null,
                 ws.bom.length ? E('div', { class: 'rows' }, E('div', { class: 'r hd bomg' }, E('span', {}, 'Malzeme kodu'), E('span', {}, 'Miktar / ürün'), E('span', {}, 'Fire %'), E('span', {}, 'Durum'), E('span', { class: 'acts' }, bomEditable ? 'İşlem' : '')), ...ws.bom.map((b) => E('div', { class: 'r bomg', 'data-testid': 'pw-bom-row', 'data-code': b.materialCode }, E('b', {}, b.materialCode), E('span', { class: 'num' }, lbl('Miktar', ''), specOf(b.materialCode) ? `Ø${fmtMm(specOf(b.materialCode).diaMm)} çubuk · ${specOf(b.materialCode).plan.piecesPerBar} parça/çubuk` : `${fmt(b.qtyPerUnit)} adet/ürün`), E('span', { class: 'num' }, lbl('Fire', ''), b.scrapAllowancePct != null ? `%${fmt(b.scrapAllowancePct)}` : NA), E('span', {}, chip(rev ? REV_TR[rev.status] ?? rev.status : '—', revTone)), E('div', { class: 'acts' }, bomEditable ? [btn('ghost sm', 'pw-bom-row-edit', 'Düzenle', () => { bomMode = { kind: 'edit', code: b.materialCode }; drawBom(); }), btn('danger sm', 'pw-bom-row-remove', 'Kaldır', () => { bomMode = { kind: 'remove', code: b.materialCode }; drawBom(); })] : null))))
                     : emptyState(`${NA} — bu revizyonda BOM yok`, bomEditable ? '“+ Satır ekle” ile ilk malzemeyi tanımlayın. Eksik kalırsa ürün hazırlığı tamamlanmış sayılmaz.' : 'BOM, taslak revizyonda tanımlanır.'),
                 bomPanel(), bomEditable ? null : E('div', { class: 'mut', 'data-testid': 'pw-bom-note', style: 'margin-top:10px' }, !can.manageBom ? 'BOM düzenleme yetkiniz yok.' : rev?.status === 'RELEASED' ? 'Yürürlükteki revizyonun BOM’u teknik veridir: değişiklik için yeni (taslak) revizyon açın — kaynak aynı BOM’dur, ikinci reçete oluşmaz.' : '')
@@ -699,13 +707,25 @@ export async function renderProductWorkspaceScreen(container, api, state = {}) {
         // ---------------------------------------------------------------------------------------- üst bölüm: başlık, hazırlık özeti, ana işlemler
         const docState = (c) => (c?.state ?? 'MISSING');
         const rs = (rev?.state ?? 'MISSING');
-        const ready = [
-            { label: 'Teknik resim', st: docState(ws.cards.drawing), target: 'drawing' }, { label: 'CAD/STEP', st: docState(ws.cards.cad), target: 'cad' }, { label: 'CAM/NC', st: docState(ws.cards.cam), target: 'cam' }, { label: 'Takım listesi', st: docState(ws.cards.tools), target: 'tools' },
-            { label: 'BOM', st: ws.bom.length ? rs : 'MISSING', target: 'bom' }, { label: 'Rota', st: ws.routing.length ? rs : 'MISSING', target: 'routing' }, { label: 'Kalite planı', st: ws.quality.length ? rs : 'MISSING', target: 'quality' }
+        // Akış sırası: Ürün bilgisi → BOM → Rota/Operasyon → CAM/NC → Takım listesi → Kontrol planı → Hazırlık/Yayın
+        const worst = (...xs) => (xs.includes('MISSING') ? 'MISSING' : xs.includes('INVALID') ? 'INVALID' : xs.includes('DRAFT') ? 'DRAFT' : 'APPROVED');
+        const stagesRaw = [
+            { label: 'Ürün bilgisi', st: worst(docState(ws.cards.drawing), docState(ws.cards.cad)), target: 'drawing', next: 'Teknik resim ve CAD/STEP dosyalarını yükleyin.' },
+            { label: 'BOM', st: ws.bom.length ? rs : 'MISSING', target: 'bom', next: 'Hammaddeyi (malzeme, çap, boy, kesim) tanımlayın.' },
+            { label: 'Rota / Operasyon', st: ws.routing.length ? rs : 'MISSING', target: 'routing', next: 'İlk operasyonu ekleyin (süreler, makine).' },
+            { label: 'CAM / NC', st: docState(ws.cards.cam), target: 'cam', next: 'NC programını yükleyin ve operasyona bağlayın.' },
+            { label: 'Takım listesi', st: docState(ws.cards.tools), target: 'tools', next: 'Takım listesini yükleyin; eksik çap/tutucu/offset bilgisini tamamlayın.' },
+            { label: 'Kontrol planı', st: ws.quality.length ? rs : 'MISSING', target: 'quality', next: 'Kalite kontrol noktalarını tanımlayın.' }
         ];
-        const missingN = ready.filter((r) => r.st === 'MISSING');
+        const allBefore = worst(...stagesRaw.map((x) => x.st));
+        const stages = [...stagesRaw, { label: 'Hazırlık / Yayın', st: (rev?.state === 'APPROVED' ? 'APPROVED' : allBefore === 'MISSING' ? 'MISSING' : 'DRAFT'), target: 'ready', next: rev?.state === 'APPROVED' ? 'Yayında.' : 'Revizyonu yayınlayın (Mühendislik ekranı → “Revizyonu yayınla”).' }];
+        const STAGE_TR = { MISSING: ['Eksik', 'bad'], DRAFT: ['Onay bekliyor', 'warn'], APPROVED: ['Tamam', 'ok'], INVALID: ['Geçersiz — yenile', 'warn'] };
+        const ready = stages.slice(0, 6);
+        const missingN = stages.slice(0, 6).filter((r) => r.st === 'MISSING');
+        const nextStage = stages.find((x) => x.st !== 'APPROVED');
         const orderHost = E('div', { style: 'margin-top:8px' });
-        const readyCard = card({ title: 'Hazırlık özeti', testid: 'pw-ready', span: 12, tone: missingN.length ? 'warn' : 'ok', chip: chip(missingN.length ? `${missingN.length} eksik` : 'Temel veriler tanımlı', missingN.length ? 'warn' : 'ok') }, E('div', { class: 'ready' }, ...ready.map((r) => E('button', { type: 'button', class: STATE_TONE[r.st], 'data-testid': `pw-ready-${r.target}`, 'data-state': r.st, onClick: () => scrollTo(container.querySelector(`[data-testid="pw-card-${r.target}"]`)) }, E('span', { class: 'dot' }), `${r.label}: ${CARD_STATE_TR[r.st]}`))), missingN.length ? E('div', { class: 'mut', style: 'margin-top:8px' }, `Eksik veri: ${missingN.map((m) => m.label).join(', ')}. Eksik değerler 0 sayılmaz; üretime hazırlık için tamamlanmalıdır.`) : null, orderHost);
+        const readyCard = card({ title: 'Ürün hazırlık akışı', testid: 'pw-ready', span: 12, tone: missingN.length ? 'warn' : 'ok', chip: chip(missingN.length ? `${missingN.length} eksik` : nextStage ? 'Onay / yayın bekliyor' : 'Hazır', missingN.length ? 'warn' : nextStage ? 'info' : 'ok') }, E('div', { class: 'ready flow', role: 'list' }, ...stages.map((r, i) => E('button', { type: 'button', role: 'listitem', class: `${STATE_TONE[r.st]}${nextStage === r ? ' next' : ''}`, 'data-testid': `pw-ready-${r.target}`, 'data-state': r.st, 'aria-current': nextStage === r ? 'step' : undefined,
+            onClick: () => scrollTo(container.querySelector(`[data-testid="pw-card-${r.target}"]`)) }, E('span', { class: 'dot' }), `${i + 1}. ${r.label}: `, E('b', {}, STAGE_TR[r.st][0])))), nextStage ? E('div', { class: 'banner', style: 'margin:10px 0 0', 'data-testid': 'pw-next-step' }, E('b', {}, `Sıradaki adım — ${nextStage.label}: `), nextStage.next) : null, missingN.length ? E('div', { class: 'mut', style: 'margin-top:8px', 'data-testid': 'pw-missing-list' }, `Eksik: ${missingN.map((m) => m.label).join(' · ')}. Eksik değerler 0 sayılmaz.`) : null, orderHost);
         const head = E('div', { class: 'page-head' }, E('div', { class: 'ttl' }, E('div', { class: 'crumb' }, btn('', 'pw-back', '← Ürünler', () => void go({}))), E('h1', { title: `${ws.product.code} — ${ws.product.name}` }, E('span', { class: 'head-name' }, `${ws.product.code} — ${ws.product.name}`)), E('div', { class: 'row', style: 'gap:6px' }, rev ? stateChip(rev.state) : null, E('span', { class: 'mut' }, can.editRouting ? 'Düzenleme yetkiniz var' : 'Yalnız görüntüleme'))), E('div', { class: 'acts' }, E('div', { style: 'min-width:180px' }, revSel), h('a', { class: 'btn ghost', href: '#/dokuman-kontrol' }, 'Doküman Kontrol'), h('a', { class: 'btn ghost', href: `#/urun-master?urun=${ws.product.id}` }, 'Ürün Master'), can.editStructure ? btn('primary', 'pw-top-op-add', '+ Operasyon', () => { addOp(); scrollTo(container.querySelector('[data-testid="pw-card-routing"]')); }) : null));
         if (state.only) {
             const all = { identity: idCard, drawing: docCard('drawing', 'Teknik resim', ws.cards.drawing, 'DRAWING'), cad: docCard('cad', 'CAD / STEP', ws.cards.cad, 'CAD_MODEL'), cam: docCard('cam', 'CAM / NC', ws.cards.cam, 'NC_PROGRAM', true), tools: docCard('tools', 'Takım listesi', ws.cards.tools, 'TOOL_LIST'),

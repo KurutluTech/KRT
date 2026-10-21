@@ -19,8 +19,8 @@ export const DS_CSS = `.kd{display:flex;flex-direction:column;gap:14px;color:#e2
 .kd .item{border-top:1px solid #1e293b;padding:10px 0;display:flex;gap:10px;align-items:center;flex-wrap:wrap}.kd .item:first-of-type{border-top:0}
 .kd .mut{color:#94a3b8;font-size:12px}.kd .empty{color:#94a3b8;font-size:13px}
 .kd .avatar{width:36px;height:36px;border-radius:50%;background:#1e293b;border:1px solid #334155;display:flex;align-items:center;justify-content:center;font-weight:800;color:#67e8f9;flex:none}
-.kd input,.kd select{min-height:44px;font-size:16px;border-radius:10px;border:1px solid #334155;background:#0f172a;color:#fff;padding:0 10px;box-sizing:border-box;min-width:0}
-.kd button,.kd a.btn{min-height:44px;font-size:15px;font-weight:700;border-radius:10px;border:0;padding:6px 14px;white-space:normal;text-align:center;line-height:1.25;max-width:100%;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;text-decoration:none}
+.kd input,.kd select,.kd textarea{min-height:38px;font-size:14px;font-family:inherit;border-radius:10px;border:1px solid #334155;background:#0f172a;color:#fff;padding:0 10px;box-sizing:border-box;min-width:0}
+.kd button,.kd a.btn{min-height:36px;font-size:13px;font-weight:700;border-radius:10px;border:0;padding:6px 14px;white-space:normal;text-align:center;line-height:1.25;max-width:100%;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;text-decoration:none}
 /* KMI semantic action tokens (KMI-004): ONE place for what an action colour means. ok = approve / release (green) · no = reject / destructive (red) · go = primary work action, go to record (turquoise/blue)
    · info = inspect, detail, filter (neutral dark) · hold = controlled wait / HOLD (amber) · off = not possible (muted). Colour never carries the meaning alone: labels and icons say it too. */
 .kd{--act-ok:#15803d;--act-no:#b91c1c;--act-no-soft:#7f1d1d;--act-go:#0e7490;--act-primary:#1d4ed8;--act-hold:#b45309;--act-info:#1e293b;--act-off:#273244;--act-off-fg:#8b99ad}
@@ -29,6 +29,7 @@ export const DS_CSS = `.kd{display:flex;flex-direction:column;gap:14px;color:#e2
 .kd button:focus-visible,.kd a:focus-visible,.kd input:focus-visible,.kd select:focus-visible,.kd textarea:focus-visible,.kd summary:focus-visible{outline:3px solid #67e8f9;outline-offset:2px}
 .kd .banner{padding:10px 14px;border-radius:10px;font-weight:700}.kd .banner.error{background:#7f1d1d;color:#fecaca}.kd .banner.info{background:#14532d;color:#bbf7d0}
 .kd .tabs{display:flex;gap:6px;flex-wrap:wrap}.kd .tabs button{background:#0f172a;border:1px solid #334155;color:#cbd5e1}.kd .tabs button.on{background:#1d4ed8;border-color:#3b82f6;color:#fff}
+@media (max-width:1100px){.kd button,.kd a.btn{min-height:44px;font-size:15px}.kd input,.kd select,.kd textarea{min-height:44px;font-size:16px}}
 .kd .bar{height:8px;border-radius:99px;background:#1e293b;overflow:hidden}.kd .bar>i{display:block;height:100%;background:linear-gradient(90deg,#22d3ee,#6366f1)}`;
 export const pill = (text, kind = '', testid) => h('span', { class: `pill ${kind}`, ...(testid ? { 'data-testid': testid } : {}) }, text);
 export const kpi = (label, value, testid) => h('div', { class: 'kpi', ...(testid ? { 'data-testid': testid } : {}) }, h('div', { class: 'n' }, value), h('div', { class: 'l' }, label));

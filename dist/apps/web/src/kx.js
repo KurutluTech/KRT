@@ -75,7 +75,7 @@ export const KX_CSS = `
 .kx .kv>div{min-width:0}.kx .kv .k{font-size:11px;color:#94a3b8;letter-spacing:.04em;text-transform:uppercase}.kx .kv .v{font-size:14px;font-weight:600;color:#fff;overflow-wrap:anywhere;line-height:1.35}.kx .kv .v.na{color:#94a3b8;font-weight:500}
 /* hazırlık şeridi */
 .kx .ready{display:flex;flex-wrap:wrap;gap:6px}.kx .ready button{min-height:32px;padding:3px 10px;font-size:12px;border:1px solid #334155;background:#0f172a;color:#e2e8f0}
-.kx .ready button .dot{width:8px;height:8px;border-radius:50%;background:#64748b;display:inline-block}
+.kx .ready.flow button.next{outline:2px solid #3b82f6;outline-offset:1px}.kx .ready.flow{gap:8px}.kx .ready button .dot{width:8px;height:8px;border-radius:50%;background:#64748b;display:inline-block}
 .kx .ready button.ok .dot{background:#22c55e}.kx .ready button.info .dot{background:#3b82f6}.kx .ready button.bad .dot{background:#ef4444}.kx .ready button.warn .dot{background:#f59e0b}
 /* tablo / satır listesi: masaüstünde sütun, dar ekranda kart */
 .kx .tw{overflow-x:auto}.kx table{border-collapse:collapse;width:100%;font-size:13px}.kx th,.kx td{border-bottom:1px solid #1e293b;padding:7px 8px;text-align:left;vertical-align:top}.kx th{color:#94a3b8;font-size:11px;letter-spacing:.04em;text-transform:uppercase;white-space:nowrap;font-weight:700}

@@ -32,6 +32,14 @@ const EV_TR = { MASTER_CREATED: 'Ürün oluşturuldu', MASTER_UPDATED: 'Ürün b
     REVISION_APPROVED: 'Revizyon onaylandı', REVISION_REJECTED: 'Revizyon reddedildi', ORDER_ITEM_REVISION_SET: 'Sipariş kalemi revizyona bağlandı', BOM_DRAFT_PROPOSED: 'BOM taslağı önerildi', BOM_DRAFT_APPROVED: 'BOM taslağı onaylandı',
     BOM_DRAFT_REJECTED: 'BOM taslağı reddedildi', BOM_DRAFT_APPLIED: 'BOM taslağı uygulandı', PRODUCT_CREATED: 'Ürün kaydı', PRODUCT_REVISION_CREATED: 'Revizyon kaydı', PRODUCT_REVISION_RELEASED: 'Revizyon yürürlüğe alındı', BOM_LINE_ADDED: 'BOM satırı eklendi',
     WO_CREATED: 'İş emri', NCR_OPENED: 'Uygunsuzluk (NCR)', HOLD_OPENED: 'Kalite HOLD', ORDER_ITEM: 'Sipariş kalemi', QUOTE_LINE: 'Teklif satırı' };
+/** Değişiklik farkı: ham JSON yerine "alan: eski → yeni" (yalnız değişen alanlar). */
+const diffText = (before, after) => {
+    const b = (before ?? {});
+    const a = (after ?? {});
+    const show = (v) => (v === null || v === undefined || v === '' ? '—' : typeof v === 'object' ? JSON.stringify(v) : String(v));
+    const rows = [...new Set([...Object.keys(b), ...Object.keys(a)])].filter((k) => !/(^id$|_id$|^created_at$|^updated_at$)/.test(k) && JSON.stringify(b[k]) !== JSON.stringify(a[k])).map((k) => `${k.replace(/_/g, ' ')}: ${show(b[k])} → ${show(a[k])}`);
+    return rows.length ? rows.join(' · ') : 'Değişiklik kaydedildi';
+};
 const newId = () => (typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(16).slice(2)}`);
 const n = (v) => (v === null || v === undefined ? NA : v.toLocaleString('tr-TR', { maximumFractionDigits: 3 }));
 const num = (s) => { const t = s.trim().replace(',', '.'); if (t === '')
@@ -207,7 +215,7 @@ export async function renderProductMasterScreen(container, api, state = {}) {
         if (tab === 'gecmis')
             return guard(async () => {
                 const hs = await api.history(id);
-                return h('div', { class: 'card', 'data-testid': 'pm-history' }, h('h2', {}, 'Ürün geçmişi'), h('div', { class: 'mut' }, 'Yalnız kaynak kayıtlarda bulunan olaylar gösterilir; fiyat/maliyet içermez.'), ...hs.map((e) => h('div', { class: 'row', 'data-testid': 'pm-ev', 'data-code': e.code, style: 'margin:4px 0;align-items:flex-start' }, h('span', { class: 'mut', style: 'min-width:120px' }, when(e.at)), h('b', {}, EV_TR[e.code] ?? e.code), h('span', { class: 'mut', style: 'white-space:normal' }, [e.detail, e.actor ? `— ${e.actor}` : ''].filter(Boolean).join(' ')), e.before && e.after ? h('span', { class: 'mut', 'data-testid': 'pm-ev-diff', style: 'white-space:normal' }, `önce: ${JSON.stringify(e.before)} → sonra: ${JSON.stringify(e.after)}`) : null)), !hs.length ? h('div', { class: 'mut' }, 'Kayıt yok.') : null);
+                return h('div', { class: 'card', 'data-testid': 'pm-history' }, h('h2', {}, 'Ürün geçmişi'), h('div', { class: 'mut' }, 'Yalnız kaynak kayıtlarda bulunan olaylar gösterilir; fiyat/maliyet içermez.'), ...hs.map((e) => h('div', { class: 'row', 'data-testid': 'pm-ev', 'data-code': e.code, style: 'margin:4px 0;align-items:flex-start' }, h('span', { class: 'mut', style: 'min-width:120px' }, when(e.at)), h('b', {}, EV_TR[e.code] ?? e.code), h('span', { class: 'mut', style: 'white-space:normal' }, [e.detail, e.actor ? `— ${e.actor}` : ''].filter(Boolean).join(' ')), e.before && e.after ? h('span', { class: 'mut', 'data-testid': 'pm-ev-diff', style: 'white-space:normal' }, diffText(e.before, e.after)) : null)), !hs.length ? h('div', { class: 'mut' }, 'Kayıt yok.') : null);
             });
         if (tab === 'sure')
             return guard(async () => {
