@@ -341,7 +341,7 @@ export const ROUTES = [
     { path: '/depo', label: 'Depo / Stok / Malzeme', group: 'Satınalma / Depo', inMenu: true, render: (el, c, s) => renderDepartmentScreen(el, createDepartmentApi(c, s, createWorkOrderHubApi(c, s)), 'DEPO') },
     { path: '/takimhane', label: 'Takımhane', group: 'Saha', inMenu: true, render: (el, c, s) => renderToolroomScreen(el, { api: createToolroomApi(c, s) }) },
     { path: '/komuta', label: 'Performance Center', group: 'Yönetim', inMenu: true, render: (el, c, s, q) => renderPerformanceCenter(el, createPerformanceCenterSources(c, s), { today: istanbulToday(), dept: q.get('birim'), refreshMs: 60_000 }) },
-    { path: '/rota', label: 'Rota / Operasyonlar', group: 'Yönetim', inMenu: true, render: (el, c, s) => renderRoutingScreen(el, createRoutingApi(c, s)) },
+    { path: '/rota', label: 'Rota / Operasyonlar', group: 'Yönetim', inMenu: true, render: (el, c, s) => { const pw = createProductWorkspaceApi(c, s); return renderRoutingScreen(el, createRoutingApi(c, s), { embed: { list: () => pw.search(''), render: (host, productId) => renderProductWorkspaceScreen(host, pw, { product: productId, only: ['routing'] }) } }); } },
     { path: '/planlama-kokpit', label: 'Planlama Kokpiti', group: 'Yönetim', inMenu: true, render: (el, c, s, q, a) => renderPlanCockpit(el, { api: createPlanCockpitApi(c, s), machineStates: () => loadMachineStates(createLiveApi(c, s)), today: istanbulToday(), canPlan: a.actions.includes('WORK_ORDER_ASSIGN_MACHINE') }) },
     { path: '/vardiya-planlayici', label: 'Shift Planner', group: 'Yönetim', inMenu: true, render: (el, c, s, q, a) => {
             const num = (k) => { const v = Number(q.get(k)); return Number.isFinite(v) && v > 0 ? v : undefined; };
@@ -421,7 +421,7 @@ export const ROUTES = [
     { path: '/urun-master', label: 'Ürün Master / Digital DNA', group: 'Yönetim', inMenu: true, render: (el, c, s, q) => (q.get('urun') ? renderProductMasterScreen(el, createProductMasterApi(c, s), { product: q.get('urun'), tab: q.get('sekme') ?? undefined })
             : renderEntityGalleryScreen(el, galleryDeps(c, s), { kind: 'PRODUCT', listHref: '#/urun-liste', listLabel: 'Ürün Master listesi (tablo)' })) },
     { path: '/urun-liste', label: 'Ürün Master listesi', group: 'Yönetim', inMenu: false, render: (el, c, s, q) => renderProductMasterScreen(el, createProductMasterApi(c, s), { product: null, tab: undefined, ...(q.get('yeni') === '1' ? { creating: true } : {}) }) },
-    { path: '/muhendislik', label: 'Ürün mühendisliği (revizyon · reçete · CAM)', group: 'Yönetim', inMenu: true, render: (el, c, s) => renderEngineeringScreen(el, createEngineeringApi(c, s)) },
+    { path: '/muhendislik', label: 'Ürün mühendisliği (revizyon · reçete · CAM)', group: 'Yönetim', inMenu: true, render: (el, c, s) => { const pw = createProductWorkspaceApi(c, s); return renderEngineeringScreen(el, createEngineeringApi(c, s), { embed: (host, productId) => renderProductWorkspaceScreen(host, pw, { product: productId, only: ['routing'] }) }); } },
     { path: '/varliklar', label: 'Dijital Varlık Merkezi', group: 'Saha', inMenu: true, render: (el, c, s, q, a) => {
             const f = q.get('f');
             const k = q.get('k');

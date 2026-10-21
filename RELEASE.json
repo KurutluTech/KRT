@@ -1,6 +1,6 @@
 {
   "product": "KMI NEXT",
-  "commit": "30703ab9c23047216e9dcd1f329f97ea34740302",
+  "commit": "f3d937986aad882ef9ce97447222cd9b48e5f012",
   "builtFrom": "clean git tree",
   "fileCount": 356,
   "migrationsInRepo": 73,
@@ -79,8 +79,8 @@
     },
     {
       "path": "dist/apps/web/src/app.js",
-      "bytes": 93220,
-      "sha256": "cb5544919ae65de71231c580b8300908a15ea8a76abb6c1f6ef4325fdecf416e"
+      "bytes": 93601,
+      "sha256": "4fa99a9a8b4dff9c9abd921c4830f70a4a08df2d23366f65b1dc791172dba1b0"
     },
     {
       "path": "dist/apps/web/src/approvalsInboxApi.js",
@@ -674,8 +674,8 @@
     },
     {
       "path": "dist/apps/web/src/screens/EngineeringScreen.js",
-      "bytes": 11670,
-      "sha256": "309df98c5a776fb30081d53d54953f783eac6e5ab752be881d260537806bbc05"
+      "bytes": 12897,
+      "sha256": "8b4f247d176db5704d4289c1839a8aca61cbfcc5ef78e11d894efbb1601e1e28"
     },
     {
       "path": "dist/apps/web/src/screens/EntityGalleryScreen.js",
@@ -844,8 +844,8 @@
     },
     {
       "path": "dist/apps/web/src/screens/ProductWorkspaceScreen.js",
-      "bytes": 70443,
-      "sha256": "6f3a2428fe78c664f5bc1207499c2fd4573b8ae9e2856ae1706b87576ea818ca"
+      "bytes": 72084,
+      "sha256": "bacd02bcb10122d5c058bca4dfce8ea2ac39d9c93aa126fd7df50b889118ff80"
     },
     {
       "path": "dist/apps/web/src/screens/ProductionDeskScreen.js",
@@ -894,8 +894,8 @@
     },
     {
       "path": "dist/apps/web/src/screens/RoutingScreen.js",
-      "bytes": 17918,
-      "sha256": "d0edde999b3b779693f079b58bcd6732e037d56e04f7b7a823ac7114d92f6334"
+      "bytes": 20624,
+      "sha256": "be128c57deed7b47786d012dc263405a25d1d5e7e26eb62d2972010dcb4006f6"
     },
     {
       "path": "dist/apps/web/src/screens/ScanScreen.js",
@@ -1029,8 +1029,8 @@
     },
     {
       "path": "dist/apps/web/src/screens/productChainPanel.js",
-      "bytes": 7256,
-      "sha256": "138799880aeac7c6595248aeda0211c5bf23934fb1bbdcdaf75eb4497b25c943"
+      "bytes": 10661,
+      "sha256": "73c2036546060785a91f6e34aeda6ea1ae347c372d8d5a8a6778fac9cc3b945d"
     },
     {
       "path": "dist/apps/web/src/screens/readinessPanel.js",

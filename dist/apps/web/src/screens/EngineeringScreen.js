@@ -4,7 +4,7 @@
 import { h, mount } from '../../../../packages/ui/src/h.js';
 import { errorText } from '../errorText.js';
 const CSS = `
-.eng{font-family:system-ui,-apple-system,"Segoe UI",sans-serif;padding:12px;max-width:820px;margin:0 auto;box-sizing:border-box;color:#0f172a}
+.eng{font-family:system-ui,-apple-system,"Segoe UI",sans-serif;padding:12px;max-width:1200px;margin:0 auto;box-sizing:border-box;color:#0f172a}
 .eng button{min-height:44px;font-size:16px;font-weight:700;border-radius:12px;border:0;padding:0 14px;cursor:pointer}
 .eng input,.eng select{min-height:44px;font-size:16px;border-radius:10px;border:1px solid #cbd5e1;padding:0 10px;box-sizing:border-box;width:100%}
 .eng .card{background:#fff;border-radius:16px;padding:14px;margin:10px 0;box-shadow:0 1px 3px rgba(0,0,0,.08)}
@@ -12,13 +12,13 @@ const CSS = `
 .eng .ok{background:#dcfce7;color:#166534}.eng .warn{background:#fef3c7;color:#92400e}.eng .bad{background:#fee2e2;color:#991b1b}.eng .info{background:#e0e7ff;color:#3730a3}
 .eng .primary{background:#1d4ed8;color:#fff}.eng .ghost{background:#e2e8f0;color:#0f172a}
 .eng .row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}.eng .grid{display:grid;gap:8px;margin-top:8px}
-.eng h2{font-size:17px;margin:14px 0 4px}.eng h3{font-size:15px;margin:10px 0 2px}
+.eng h1{color:#fff}.eng h2{font-size:17px;margin:14px 0 4px;color:#fff}.eng h3{font-size:15px;margin:10px 0 2px;color:#0f172a}.eng .note{color:#475569;font-size:14px;line-height:1.45}
 .eng table{width:100%;border-collapse:collapse;font-size:14px}.eng td,.eng th{padding:6px 4px;border-bottom:1px solid #e2e8f0;text-align:left}
 `;
 const ST_TR = { DRAFT: 'TASLAK', RELEASED: 'YAYINDA', OBSOLETE: 'ESKİ' };
 const num = (s) => Number(s.replace(',', '.'));
 export async function renderEngineeringScreen(container, api, state = {}) {
-    const go = (s) => renderEngineeringScreen(container, api, s);
+    const go = (s) => renderEngineeringScreen(container, api, { ...(state.embed ? { embed: state.embed } : {}), ...s });
     let data;
     try {
         data = await api.load();
@@ -65,7 +65,7 @@ export async function renderEngineeringScreen(container, api, state = {}) {
                         return fail('Boş reçeteli revizyon yayınlanamaz.');
                     void act(() => api.releaseRevision(r.id), `Revizyon ${r.revision} yayınlandı; öncekiler ESKİ oldu. Artık değiştirilemez.`);
                 } }, `Revizyon ${r.revision} yayınla`))
-            : null, h('h3', {}, 'CAM programları'), programs.length ? h('div', {}, ...programs.map((c) => {
+            : null, h('h3', {}, 'CAM programları'), state.embed ? h('p', { class: 'note', 'data-testid': 'eng-cam-hint' }, 'NC dosyasına bağlı CAM kaydı için aşağıdaki “Operasyonlar ve teknik zincir” bölümünü kullanın (mevcut NC’den oluşturur, çoğaltmaz). Buradaki elle ekleme NC’ye bağlı olmayan, boş bir program kaydı açar.') : null, programs.length ? h('div', {}, ...programs.map((c) => {
             const tools = data.tools.filter((t) => t.camProgramId === c.id);
             const tType = h('input', { type: 'text', 'data-testid': 'eng-tool-type', placeholder: 'Takım tipi (örn. FREZE-D10)' });
             const tQty = h('input', { type: 'text', inputmode: 'numeric', 'data-testid': 'eng-tool-qty', placeholder: 'Adet' });
@@ -93,12 +93,15 @@ export async function renderEngineeringScreen(container, api, state = {}) {
             } }, 'CAM programı ekle')));
     };
     const revNew = h('input', { type: 'text', 'data-testid': 'eng-rev-new', placeholder: 'Yeni revizyon (örn. B)' });
+    if (state.embed && prod)
+        queueMicrotask(() => { const host = container.querySelector('[data-testid="eng-ops-host"]'); if (host && state.embed)
+            void state.embed(host, prod.id); });
     mount(container, h('div', { class: 'eng', 'data-testid': 'eng-root' }, h('style', {}, CSS), h('h1', {}, 'Ürün Mühendisliği'), h('p', { style: 'color:#475569' }, 'Ürün → revizyon → reçete (BOM) → CAM programı → takım listesi. Yayınlanan revizyon ve program değiştirilemez; değişiklik yeni revizyonla yapılır.'), state.banner ? h('div', { class: `card ${state.banner.kind === 'error' ? 'bad' : 'ok'}`, 'data-testid': 'eng-banner', 'data-kind': state.banner.kind }, state.banner.text) : null, h('div', { class: 'card' }, h('select', { 'data-testid': 'eng-product', onChange: (e) => void go({ product: e.target.value || null }) }, h('option', { value: '' }, '— ürün seçin —'), ...data.products.map((p) => h('option', { value: p.id, selected: p.id === state.product ? 'selected' : undefined }, `${p.code} · ${p.name}`))), h('details', { style: 'margin-top:8px' }, h('summary', { style: 'min-height:44px;display:flex;align-items:center;font-weight:700' }, 'Yeni ürün'), h('div', { class: 'grid' }, pCode, pName, h('button', { type: 'button', class: 'primary', 'data-testid': 'eng-new-product', onClick: () => {
             if (!pCode.value.trim() || !pName.value.trim())
                 return fail('Ürün kodu ve adı zorunlu.');
             void act(() => api.createProduct(pCode.value.trim(), pName.value.trim()), 'Ürün oluşturuldu.');
         } }, 'Ürünü oluştur')))), prod
-        ? h('div', {}, h('h2', {}, `${prod.code} · ${prod.name}`), ...data.revisions.filter((r) => r.productId === prod.id).map(revisionBlock), h('div', { class: 'card' }, h('div', { class: 'grid' }, revNew, h('button', { type: 'button', class: 'ghost', 'data-testid': 'eng-rev-create', onClick: () => {
+        ? h('div', {}, h('h2', {}, `${prod.code} · ${prod.name}`), ...data.revisions.filter((r) => r.productId === prod.id).map(revisionBlock), state.embed ? h('div', { class: 'card', 'data-testid': 'eng-ops-card', style: 'background:transparent;box-shadow:none;padding:0' }, h('h2', {}, 'Operasyonlar ve teknik zincir (NC · CAM · takım listesi)'), h('p', { class: 'note', style: 'color:#94a3b8' }, 'Operasyonlar, her operasyonun NC belgesi, CAM kaydı ve takım listesi bağlantısı burada Ürün Çalışma Alanı ile aynı kayıttan gösterilir. NC dosyasından CAM kaydı oluşturma, yayınlama ve operasyona bağlama de buradadır.'), h('div', { 'data-testid': 'eng-ops-host' })) : null, h('div', { class: 'card' }, h('div', { class: 'grid' }, revNew, h('button', { type: 'button', class: 'ghost', 'data-testid': 'eng-rev-create', onClick: () => {
                 if (!revNew.value.trim())
                     return fail('Revizyon adı zorunlu.');
                 void act(() => api.createRevision(prod.id, revNew.value.trim()), 'Yeni revizyon oluşturuldu (taslak).');

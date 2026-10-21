@@ -13,7 +13,8 @@ const REVIEW_COLOR = { UNKNOWN: '#b45309', DEFINED: '#15803d', NONE_REQUIRED: '#
 let reqSeq = 0;
 const requestId = () => `op-${Date.now().toString(36)}-${(reqSeq += 1)}-${Math.random().toString(36).slice(2, 8)}`;
 export async function renderRoutingScreen(container, api, state = {}) {
-    const tab = state.tab ?? 'OPS';
+    const emb = state.embed ?? null;
+    const tab = state.tab ?? (emb ? 'PRODUCT' : 'OPS');
     const go = (next) => void renderRoutingScreen(container, api, { ...state, message: null, ...next });
     const act = async (fn, ok) => {
         try {
@@ -34,9 +35,19 @@ export async function renderRoutingScreen(container, api, state = {}) {
     let suggestError = null;
     let revisions = [];
     let defs = [];
+    let products = [];
     try {
+        if (emb) {
+            try {
+                products = await emb.list();
+            }
+            catch {
+                products = [];
+            }
+        }
         people = await api.people();
-        if (tab === 'OPS') {
+        if (tab === 'PRODUCT') { /* the embedded canonical card loads itself */ }
+        else if (tab === 'OPS') {
             woIds = await api.routedWorkOrders();
             try {
                 pf = api.pilotFlags ? await api.pilotFlags(woIds) : null;
@@ -142,12 +153,28 @@ export async function renderRoutingScreen(container, api, state = {}) {
         const save = () => act(() => api.setRoutingOperation({ revisionId: rid, opNo: Number(opNo.value), name: name.value, skillCode: skill.value.trim() || null,
             skillLevel: skill.value.trim() ? Number(level.value) : null, firstPiece: fp.checked, qc: qc.checked, reason: reason.value,
             machineIds: [...container.querySelectorAll('[data-testid="def-machine"]:checked')].map((c) => c.value) }), 'Rota operasyonu kaydedildi');
-        return h('section', {}, revisions.length ? h('select', { 'data-testid': 'def-revision', onChange: (e) => go({ tab: 'DEF', revisionId: e.target.value }) }, ...revisions.map((r) => h('option', { value: r.id, ...(r.id === rid ? { selected: 'selected' } : {}) }, `Revizyon ${r.revision} (${r.status}) · ${r.productId.slice(0, 8)}`)))
+        return h('section', {}, revisions.length ? h('select', { 'data-testid': 'def-revision', onChange: (e) => go({ tab: 'DEF', revisionId: e.target.value }) }, ...revisions.map((r) => h('option', { value: r.id, ...(r.id === rid ? { selected: 'selected' } : {}) }, `${products.find((x) => x.id === r.productId)?.code ?? r.productId.slice(0, 8)} · Revizyon ${r.revision} (${r.status})`)))
             : h('div', { 'data-testid': 'def-no-revision' }, 'Ürün revizyonu yok — önce ürün/revizyon tanımlanmalı.'), ...defs.map((d) => h('div', { 'data-testid': 'def-row', 'data-op': String(d.opNo), style: 'font-size:13px;border-top:1px solid #f1f5f9;padding:4px 0;overflow-wrap:anywhere' }, `${d.opNo} · ${d.name} · makine: ${d.allowedMachineIds.map((id) => matrix.find((m) => m.machineId === id)?.code ?? '?').join(' / ')}`
             + (d.requiredSkillCode ? ` · ${d.requiredSkillCode} ≥ ${d.requiredSkillLevel}` : '') + (d.firstPieceRequired ? ' · ilk parça' : '') + (d.qcRequired ? ' · kalite' : ''))), rid ? h('div', { style: 'display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:8px' }, opNo, name, skill, level, h('label', {}, fp, ' ilk parça'), h('label', {}, qc, ' kalite kontrol'), reason) : null, rid ? h('div', { 'data-testid': 'def-machines', style: 'display:flex;gap:8px;flex-wrap:wrap;margin:6px 0' }, ...boxes) : null, rid ? h('button', { type: 'button', 'data-testid': 'def-save', onClick: () => void save() }, 'Operasyonu kaydet') : null, h('div', { style: 'display:flex;gap:6px;flex-wrap:wrap;margin-top:10px' }, woIn, h('button', { type: 'button', 'data-testid': 'def-apply', onClick: () => void act(() => api.applyRouting(woIn.value.trim()), 'Rota iş emrine uygulandı') }, 'İş emrine uygula')));
     };
-    mount(container, h('div', { class: 'routing-screen', style: 'padding:0 16px;box-sizing:border-box;max-width:100%' }, h('h1', { 'data-testid': 'rt-heading' }, 'Rota / Operasyonlar'), h('div', { style: 'display:flex;gap:6px;margin:6px 0' }, h('button', { type: 'button', 'data-testid': 'rt-tab-ops', 'aria-pressed': String(tab === 'OPS'), onClick: () => go({ tab: 'OPS' }) }, 'Operasyonlar'), h('button', { type: 'button', 'data-testid': 'rt-tab-def', 'aria-pressed': String(tab === 'DEF'), onClick: () => go({ tab: 'DEF' }) }, 'Rota tanımı'), h('button', { type: 'button', 'data-testid': 'rt-tab-matrix', 'aria-pressed': String(tab === 'MATRIX'), onClick: () => go({ tab: 'MATRIX' }) }, 'Makine–yetkinlik matrisi')), state.message ? h('div', { 'data-testid': 'rt-message', 'data-kind': state.message.kind, style: `padding:10px;border-radius:8px;margin:6px 0;background:${state.message.kind === 'ok' ? '#dcfce7' : '#fee2e2'}` }, state.message.text) : null, loadError ? h('div', { 'data-testid': 'rt-load-error', style: 'padding:10px;border-radius:8px;background:#fee2e2' }, `Yüklenemedi: ${loadError}`) : null, tab === 'OPS' && !loadError
-        ? h('section', {}, routing && pf?.has(routing.workOrderId) ? pilotBanner(pf.retired(routing.workOrderId)) : null, woIds.length
+    const productTab = () => {
+        const pid = (state.productId && products.some((x) => x.id === state.productId) ? state.productId : null) ?? (() => { try {
+            const v = sessionStorage.getItem('kmi.rota.product');
+            return v && products.some((x) => x.id === v) ? v : null;
+        }
+        catch {
+            return null;
+        } })() ?? products[0]?.id ?? null;
+        if (pid)
+            queueMicrotask(() => { const host = container.querySelector('[data-testid="rt-product-host"]'); if (host && emb)
+                void emb.render(host, pid); });
+        return h('section', {}, h('p', { class: 'rt-note' }, 'Ürünün rota tanımı: operasyonlar, makine, süreler, NC · CAM · takım listesi durumu. Ürün Çalışma Alanı ile AYNI kayıt ve AYNI düzenleme ekranıdır; yeni kopya yoktur.'), products.length ? h('select', { 'data-testid': 'rt-product', 'aria-label': 'Ürün', onChange: (e) => { const v = e.target.value; try {
+                sessionStorage.setItem('kmi.rota.product', v);
+            }
+            catch { /* storage may be blocked */ } go({ tab: 'PRODUCT', productId: v }); } }, ...products.map((x) => h('option', { value: x.id, ...(x.id === pid ? { selected: 'selected' } : {}) }, `${x.code} — ${x.name}`))) : h('div', { 'data-testid': 'rt-no-product' }, 'Ürün bulunamadı.'), h('div', { 'data-testid': 'rt-product-host', style: 'margin-top:10px' }));
+    };
+    mount(container, h('div', { class: 'routing-screen', style: 'padding:0 16px;box-sizing:border-box;max-width:100%' }, h('h1', { 'data-testid': 'rt-heading' }, 'Rota / Operasyonlar'), h('style', {}, '.routing-screen .rt-tabs{display:flex;gap:8px;flex-wrap:wrap;margin:8px 0 12px}.routing-screen .rt-tabs button{min-height:40px;font-weight:700}.routing-screen .rt-tabs button[aria-pressed="true"]{box-shadow:0 0 0 2px #fff inset}.routing-screen .rt-note{color:#94a3b8;font-size:13px;line-height:1.45;max-width:70ch;margin:6px 0}'), h('div', { class: 'rt-tabs' }, ...(emb ? [h('button', { type: 'button', 'data-testid': 'rt-tab-product', 'aria-pressed': String(tab === 'PRODUCT'), onClick: () => go({ tab: 'PRODUCT' }) }, 'Ürün operasyonları (rota)')] : []), h('button', { type: 'button', 'data-testid': 'rt-tab-ops', 'aria-pressed': String(tab === 'OPS'), onClick: () => go({ tab: 'OPS' }) }, emb ? 'İş emri operasyonları' : 'Operasyonlar'), h('button', { type: 'button', 'data-testid': 'rt-tab-def', 'aria-pressed': String(tab === 'DEF'), onClick: () => go({ tab: 'DEF' }) }, emb ? 'Hızlı rota formu' : 'Rota tanımı'), h('button', { type: 'button', 'data-testid': 'rt-tab-matrix', 'aria-pressed': String(tab === 'MATRIX'), onClick: () => go({ tab: 'MATRIX' }) }, 'Makine–yetkinlik matrisi')), state.message ? h('div', { 'data-testid': 'rt-message', 'data-kind': state.message.kind, style: `padding:10px;border-radius:8px;margin:6px 0;background:${state.message.kind === 'ok' ? '#dcfce7' : '#fee2e2'}` }, state.message.text) : null, loadError ? h('div', { 'data-testid': 'rt-load-error', style: 'padding:10px;border-radius:8px;background:#fee2e2' }, `Yüklenemedi: ${loadError}`) : null, tab === 'PRODUCT' && emb && !loadError ? productTab() : null, tab === 'OPS' && !loadError
+        ? h('section', {}, emb ? h('p', { class: 'rt-note', 'data-testid': 'rt-ops-hint' }, 'Bu sekme iş emirlerine UYGULANMIŞ operasyonları gösterir (üretim akışı). Ürünün rota tanımı (OP10, OP30 …) “Ürün operasyonları (rota)” sekmesindedir.') : null, routing && pf?.has(routing.workOrderId) ? pilotBanner(pf.retired(routing.workOrderId)) : null, woIds.length
             ? h('select', { 'data-testid': 'rt-wo', onChange: (e) => go({ tab: 'OPS', workOrderId: e.target.value }) }, ...woIds.map((id) => h('option', { value: id, ...(id === wid ? { selected: 'selected' } : {}) }, pilotText(`İş emri ${id.slice(0, 8)}`, pf?.has(id) === true))))
             : h('div', { 'data-testid': 'rt-no-routed' }, 'Rotası uygulanmış iş emri yok.'), routing ? h('div', { 'data-testid': 'rt-final', 'data-ready': String(routing.finalReleaseReady), style: 'margin:6px 0;font-weight:700' }, routing.finalReleaseReady ? 'Tüm operasyonlar tamam — final serbest bırakma yapılabilir.' : 'Final serbest bırakma için tüm operasyonlar TAMAM olmalı.') : null, ...(routing ? routing.operations.map((o) => opCard(o, routing.workOrderId)) : []))
         : null, tab === 'DEF' && !loadError ? defForm() : null, tab === 'MATRIX' && !loadError
