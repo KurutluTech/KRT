@@ -180,6 +180,7 @@ import { homeCardsFor } from '../../../packages/domain/src/homeLayout.js';
 import { startIdleGuard } from './idleGuard.js';
 import { createUxTelemetry, errorClassOf, routeKey } from '../../../packages/domain/src/uxTelemetry.js';
 import { IDLE_LIMIT_MS, deviceProfile, idleGuardApplies, resolveDeviceMode } from '../../../packages/domain/src/idleSession.js';
+import { rememberProduct } from './lastProduct.js';
 import { NAV_TREE, NAV_ITEM_BY_PATH, breadcrumbOf, trTitle, NAV_STATE_KEY, iconSvg, isOperatorOnly, nextNavState, readNavState, simpleNav, visibleNav, visibleGates, gateOfPath, gateOfWorkspace } from './nav.js';
 const NAV_TREE_FIRST = Object.fromEntries(NAV_TREE.map((g) => [g.id, g.items.find((i) => i.path !== '/')?.path ?? g.items[0].path]));
 const SESSION_KEY = 'kmi-next.session';
@@ -254,7 +255,8 @@ export const ROUTES = [
     {
         // KMI-CARD-004: the ONE digital-passport hub for every card family (?t=<KIND>&id=<id>&s=<topic>). /nesne (classic object page) and /pasaport-calisma (classic store page) stay reachable.
         path: '/kart', label: 'Dijital pasaport', group: 'Saha', inMenu: false, needs: ['t', 'id'],
-        render: (el, c, s, q, access) => renderPassportHubScreen(el, { client: c, session: s, access, myUserId: s?.user.id ?? null, trace: createTraceMounter(createPassportApi(c, s), (href) => { location.hash = href; }) }, { kind: q.get('t'), id: q.get('id'), topic: q.get('s') }),
+        render: (el, c, s, q, access) => { if (q.get('t') === 'PRODUCT')
+            rememberProduct(q.get('id')); return renderPassportHubScreen(el, { client: c, session: s, access, myUserId: s?.user.id ?? null, trace: createTraceMounter(createPassportApi(c, s), (href) => { location.hash = href; }) }, { kind: q.get('t'), id: q.get('id'), topic: q.get('s') }); },
     },
     {
         path: '/nesne', label: 'Nesne pasaportu', group: 'Saha', inMenu: false, needs: ['t', 'id'],
@@ -341,7 +343,7 @@ export const ROUTES = [
     { path: '/depo', label: 'Depo / Stok / Malzeme', group: 'Satınalma / Depo', inMenu: true, render: (el, c, s) => renderDepartmentScreen(el, createDepartmentApi(c, s, createWorkOrderHubApi(c, s)), 'DEPO') },
     { path: '/takimhane', label: 'Takımhane', group: 'Saha', inMenu: true, render: (el, c, s) => renderToolroomScreen(el, { api: createToolroomApi(c, s) }) },
     { path: '/komuta', label: 'Performance Center', group: 'Yönetim', inMenu: true, render: (el, c, s, q) => renderPerformanceCenter(el, createPerformanceCenterSources(c, s), { today: istanbulToday(), dept: q.get('birim'), refreshMs: 60_000 }) },
-    { path: '/rota', label: 'Rota / Operasyonlar', group: 'Yönetim', inMenu: true, render: (el, c, s) => { const pw = createProductWorkspaceApi(c, s); return renderRoutingScreen(el, createRoutingApi(c, s), { embed: { list: () => pw.search(''), render: (host, productId) => renderProductWorkspaceScreen(host, pw, { product: productId, only: ['routing'] }) } }); } },
+    { path: '/rota', label: 'Rota / Operasyonlar', group: 'Yönetim', inMenu: true, render: (el, c, s, q) => { const pw = createProductWorkspaceApi(c, s); return renderRoutingScreen(el, createRoutingApi(c, s), { productId: q.get('urun') ?? q.get('product'), embed: { list: () => pw.search(''), render: (host, productId) => renderProductWorkspaceScreen(host, pw, { product: productId, only: ['routing'] }) } }); } },
     { path: '/planlama-kokpit', label: 'Planlama Kokpiti', group: 'Yönetim', inMenu: true, render: (el, c, s, q, a) => renderPlanCockpit(el, { api: createPlanCockpitApi(c, s), machineStates: () => loadMachineStates(createLiveApi(c, s)), today: istanbulToday(), canPlan: a.actions.includes('WORK_ORDER_ASSIGN_MACHINE') }) },
     { path: '/vardiya-planlayici', label: 'Shift Planner', group: 'Yönetim', inMenu: true, render: (el, c, s, q, a) => {
             const num = (k) => { const v = Number(q.get(k)); return Number.isFinite(v) && v > 0 ? v : undefined; };
@@ -421,7 +423,7 @@ export const ROUTES = [
     { path: '/urun-master', label: 'Ürün Master / Digital DNA', group: 'Yönetim', inMenu: true, render: (el, c, s, q) => (q.get('urun') ? renderProductMasterScreen(el, createProductMasterApi(c, s), { product: q.get('urun'), tab: q.get('sekme') ?? undefined })
             : renderEntityGalleryScreen(el, galleryDeps(c, s), { kind: 'PRODUCT', listHref: '#/urun-liste', listLabel: 'Ürün Master listesi (tablo)' })) },
     { path: '/urun-liste', label: 'Ürün Master listesi', group: 'Yönetim', inMenu: false, render: (el, c, s, q) => renderProductMasterScreen(el, createProductMasterApi(c, s), { product: null, tab: undefined, ...(q.get('yeni') === '1' ? { creating: true } : {}) }) },
-    { path: '/muhendislik', label: 'Ürün mühendisliği (revizyon · reçete · CAM)', group: 'Yönetim', inMenu: true, render: (el, c, s) => { const pw = createProductWorkspaceApi(c, s); return renderEngineeringScreen(el, createEngineeringApi(c, s), { embed: (host, productId) => renderProductWorkspaceScreen(host, pw, { product: productId, only: ['routing'] }) }); } },
+    { path: '/muhendislik', label: 'Ürün mühendisliği (revizyon · reçete · CAM)', group: 'Yönetim', inMenu: true, render: (el, c, s, q) => { const pw = createProductWorkspaceApi(c, s); return renderEngineeringScreen(el, createEngineeringApi(c, s), { ...(q.get('urun') ?? q.get('product') ? { product: (q.get('urun') ?? q.get('product')) } : {}), embed: (host, productId) => renderProductWorkspaceScreen(host, pw, { product: productId, only: ['routing'] }) }); } },
     { path: '/varliklar', label: 'Dijital Varlık Merkezi', group: 'Saha', inMenu: true, render: (el, c, s, q, a) => {
             const f = q.get('f');
             const k = q.get('k');

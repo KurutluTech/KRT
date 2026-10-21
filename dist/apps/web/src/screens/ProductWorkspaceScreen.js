@@ -2,6 +2,7 @@
 // UX/UI turu: ortak `kx` tasarım standardı (kart, buton, input, rozet), özet üst bölüm, açılır düzenleme panelleri, dosya işlemleri (aç/önizle/indir/yeni sürüm/geçmiş), kompakt BOM tablosu,
 // okunur operasyon satırları, anlaşılır parametre kartı ve gerçek süre hesabı ekranı. Veri kaynakları ve sunucu kuralları DEĞİŞMEDİ: yetki, revizyon sınıfı, geçerlilik, hesap durumu SUNUCUDA.
 // ONE FACT → ONE SOURCE: kartlar kanonik kaynakları gösterir/düzenler; bağımsız kopya yok. Boş değer 0 yazılmaz (VERİ YOK). Gerçek üretim ölçümü bu ekrandan değiştirilemez.
+import { rememberProduct } from '../lastProduct.js';
 import { h, mount } from '../../../../packages/ui/src/h.js';
 import { CARD_STATE_TR, changeText } from '../../../../packages/domain/src/parameters.js';
 import { bytesToHex } from '../../../../packages/domain/src/documents.js';
@@ -23,7 +24,7 @@ const PW_CSS = `
 .pw .opx .chip,.pw [data-testid="pw-chain"] .chip{white-space:normal;max-width:100%;text-align:left;line-height:1.3;overflow-wrap:break-word}.pw .opr .num{white-space:nowrap}
 .pw .cl{display:none;font-size:11px;color:#94a3b8;margin-right:4px}
 @media (max-width:1280px){.pw .oph{display:none}.pw .opr{grid-template-columns:1fr 1fr;gap:6px 12px}.pw .opr .nm,.pw .opr .c-machine,.pw .opr .c-cam,.pw .opr .acts{grid-column:1/-1}.pw .opr .acts{justify-content:flex-start}.pw .cl{display:inline}}
-.pw .head-name{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.pw .head-name{display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
 .pw .bomg{grid-template-columns:minmax(0,2fr) minmax(0,1fr) minmax(0,1fr) minmax(0,1fr) auto}
 .pw .docg{grid-template-columns:minmax(0,1fr)}.pw .docg>*{min-width:0;max-width:100%}.pw .docg .row{flex-wrap:wrap}.pw .docg .mut,.pw .docg b,.pw .docg .stack>div{overflow-wrap:anywhere;word-break:break-word}.pw .docg .acts{display:flex;flex-wrap:wrap;gap:6px;justify-content:flex-start}
 .pw .parg{grid-template-columns:minmax(0,1.3fr) repeat(3,minmax(0,1fr)) auto}
@@ -75,6 +76,8 @@ export async function renderProductWorkspaceScreen(container, api, state = {}) {
     };
     const stateChip = (s) => chip(CARD_STATE_TR[s], STATE_TONE[s], { 'data-state': s });
     const reasonBox = (tid, ph = 'Gerekçe (en az 10 karakter)') => h('input', { 'data-testid': tid, placeholder: ph, maxlength: 400 });
+    if (state.product)
+        rememberProduct(state.product);
     if (!state.product)
         return renderHome();
     return renderWorkspace(state.product);

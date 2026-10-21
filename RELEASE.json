@@ -1,8 +1,8 @@
 {
   "product": "KMI NEXT",
-  "commit": "f3d937986aad882ef9ce97447222cd9b48e5f012",
+  "commit": "5beb0668c942633718dd55559d0075715a727909",
   "builtFrom": "clean git tree",
-  "fileCount": 356,
+  "fileCount": 357,
   "migrationsInRepo": 73,
   "lastMigration": "0073_kmi_next_puantaj_month.sql",
   "note": "Release candidate. Publishing to https://flow.kurutlu.com is a manual owner action; this file is not a publication permit.",
@@ -79,8 +79,8 @@
     },
     {
       "path": "dist/apps/web/src/app.js",
-      "bytes": 93601,
-      "sha256": "4fa99a9a8b4dff9c9abd921c4830f70a4a08df2d23366f65b1dc791172dba1b0"
+      "bytes": 93885,
+      "sha256": "34f0c8c272cd1177198a4a2964d22a96d96cfe9f5bde8504defa156cc54c41a8"
     },
     {
       "path": "dist/apps/web/src/approvalsInboxApi.js",
@@ -246,6 +246,11 @@
       "path": "dist/apps/web/src/labelApi.js",
       "bytes": 517,
       "sha256": "bb273b62e689026a740560a5529ad04f07c409954915830e0db3ba221242f048"
+    },
+    {
+      "path": "dist/apps/web/src/lastProduct.js",
+      "bytes": 1488,
+      "sha256": "0f7084fc1df01e8fb260d2806db7c8e746228d5ba37b31aba091a6f1e4b32f68"
     },
     {
       "path": "dist/apps/web/src/liveApi.js",
@@ -674,8 +679,8 @@
     },
     {
       "path": "dist/apps/web/src/screens/EngineeringScreen.js",
-      "bytes": 12897,
-      "sha256": "8b4f247d176db5704d4289c1839a8aca61cbfcc5ef78e11d894efbb1601e1e28"
+      "bytes": 13320,
+      "sha256": "249b258c1cb7a87c0a407d18ecce1ec2a7e63cbeca83264c53d6a7513bb010b1"
     },
     {
       "path": "dist/apps/web/src/screens/EntityGalleryScreen.js",
@@ -844,8 +849,8 @@
     },
     {
       "path": "dist/apps/web/src/screens/ProductWorkspaceScreen.js",
-      "bytes": 72084,
-      "sha256": "bacd02bcb10122d5c058bca4dfce8ea2ac39d9c93aa126fd7df50b889118ff80"
+      "bytes": 72200,
+      "sha256": "5c8a8b80fb08a6addcb9e0ccd530dd812e13283632efb9638dda8ebc688df9b7"
     },
     {
       "path": "dist/apps/web/src/screens/ProductionDeskScreen.js",
@@ -894,8 +899,8 @@
     },
     {
       "path": "dist/apps/web/src/screens/RoutingScreen.js",
-      "bytes": 20624,
-      "sha256": "be128c57deed7b47786d012dc263405a25d1d5e7e26eb62d2972010dcb4006f6"
+      "bytes": 20951,
+      "sha256": "d2de57c8533a061cdd0e7b1f071979728191597f47c81dc4a456d1bb2894a7a3"
     },
     {
       "path": "dist/apps/web/src/screens/ScanScreen.js",

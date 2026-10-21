@@ -1,6 +1,7 @@
 // KMI NEXT — Ürün Mühendisliği: ürün → revizyon → ürün reçetesi (BOM) → CAM programı → takım listesi → çevrim süresi → yayın.
 // Bu zincir olmadan bir iş emri "malzeme / takım gereksinimi bilinmiyor" diye başlatılamaz (güvenli varsayılan); yani gerçek kullanımın ilk
 // adımıdır. Yayınlanan revizyon / program DEĞİŞTİRİLEMEZ (sunucu kilidi); değişiklik yeni revizyonla yapılır. Yetki: BOM_RELEASE (sunucuda).
+import { chooseProduct, rememberProduct } from '../lastProduct.js';
 import { h, mount } from '../../../../packages/ui/src/h.js';
 import { errorText } from '../errorText.js';
 const CSS = `
@@ -27,6 +28,11 @@ export async function renderEngineeringScreen(container, api, state = {}) {
         mount(container, h('div', { class: 'eng', 'data-testid': 'eng-root' }, h('style', {}, CSS), h('div', { class: 'card bad', 'data-testid': 'eng-error' }, `Yüklenemedi: ${errorText(e)}`)));
         return;
     }
+    // product to show: explicit (link/previous action) → last viewed → the only product → none ("ürün seçin")
+    if (state.product === undefined)
+        state = { ...state, product: chooseProduct(data.products.map((p) => p.id), null) };
+    else if (state.product)
+        rememberProduct(state.product);
     let busy = false;
     const act = async (fn, ok) => {
         if (busy)
@@ -96,7 +102,7 @@ export async function renderEngineeringScreen(container, api, state = {}) {
     if (state.embed && prod)
         queueMicrotask(() => { const host = container.querySelector('[data-testid="eng-ops-host"]'); if (host && state.embed)
             void state.embed(host, prod.id); });
-    mount(container, h('div', { class: 'eng', 'data-testid': 'eng-root' }, h('style', {}, CSS), h('h1', {}, 'Ürün Mühendisliği'), h('p', { style: 'color:#475569' }, 'Ürün → revizyon → reçete (BOM) → CAM programı → takım listesi. Yayınlanan revizyon ve program değiştirilemez; değişiklik yeni revizyonla yapılır.'), state.banner ? h('div', { class: `card ${state.banner.kind === 'error' ? 'bad' : 'ok'}`, 'data-testid': 'eng-banner', 'data-kind': state.banner.kind }, state.banner.text) : null, h('div', { class: 'card' }, h('select', { 'data-testid': 'eng-product', onChange: (e) => void go({ product: e.target.value || null }) }, h('option', { value: '' }, '— ürün seçin —'), ...data.products.map((p) => h('option', { value: p.id, selected: p.id === state.product ? 'selected' : undefined }, `${p.code} · ${p.name}`))), h('details', { style: 'margin-top:8px' }, h('summary', { style: 'min-height:44px;display:flex;align-items:center;font-weight:700' }, 'Yeni ürün'), h('div', { class: 'grid' }, pCode, pName, h('button', { type: 'button', class: 'primary', 'data-testid': 'eng-new-product', onClick: () => {
+    mount(container, h('div', { class: 'eng', 'data-testid': 'eng-root' }, h('style', {}, CSS), h('h1', {}, 'Ürün Mühendisliği'), h('p', { style: 'color:#475569' }, 'Ürün → revizyon → reçete (BOM) → CAM programı → takım listesi. Yayınlanan revizyon ve program değiştirilemez; değişiklik yeni revizyonla yapılır.'), state.banner ? h('div', { class: `card ${state.banner.kind === 'error' ? 'bad' : 'ok'}`, 'data-testid': 'eng-banner', 'data-kind': state.banner.kind }, state.banner.text) : null, h('div', { class: 'card' }, h('select', { 'data-testid': 'eng-product', onChange: (e) => { const v = e.target.value || null; rememberProduct(v); void go({ product: v }); } }, h('option', { value: '' }, '— ürün seçin —'), ...data.products.map((p) => h('option', { value: p.id, selected: p.id === state.product ? 'selected' : undefined }, `${p.code} · ${p.name}`))), h('details', { style: 'margin-top:8px' }, h('summary', { style: 'min-height:44px;display:flex;align-items:center;font-weight:700' }, 'Yeni ürün'), h('div', { class: 'grid' }, pCode, pName, h('button', { type: 'button', class: 'primary', 'data-testid': 'eng-new-product', onClick: () => {
             if (!pCode.value.trim() || !pName.value.trim())
                 return fail('Ürün kodu ve adı zorunlu.');
             void act(() => api.createProduct(pCode.value.trim(), pName.value.trim()), 'Ürün oluşturuldu.');
