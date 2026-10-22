@@ -10,6 +10,7 @@ import { guessMime } from './DocumentsScreen.js';
 import { errorText } from '../errorText.js';
 import { chainChips, chainGapText, drawChainPanel, orderReadiness } from './productChainPanel.js';
 import { drawToolistWork } from './toolistWorkPanel.js';
+import { drawControlPlan } from './controlPlanPanel.js';
 import { drawToolistMap } from './toolistMapPanel.js';
 import { drawBarStock, fmtMm } from './barStockPanel.js';
 import { barPlanPreview, DEFAULT_KERF_MM, DEFAULT_STEEL_DENSITY } from '../../../../packages/domain/src/barStock.js';
@@ -689,10 +690,13 @@ export async function renderProductWorkspaceScreen(container, api, state = {}) {
         const bomAdd = bomCard.querySelector('[data-testid="pw-bom-open-add"]');
         bomAdd?.addEventListener('click', () => scrollTo(bomHost));
         // ---------------------------------------------------------------------------------------- kalite planı
+        const cpHost = E('div', { 'data-testid': 'pw-cp-host' });
+        if (rev)
+            void drawControlPlan(cpHost, api, { revisionId: rev.id, opNos: ws.routing.filter((x) => x.active).map((x) => x.opNo), showErr: fail, onChanged: (m) => reload(m) });
         const qualityCard = card({ title: 'Kalite planı', testid: 'pw-card-quality', span: 5, id: 'card-quality', chip: stateChip(ws.quality.length ? (rev?.state ?? 'MISSING') : 'MISSING') }, ws.quality.length ? E('div', { class: 'rows' }, ...ws.quality.map((q) => {
             const linked = ws.routing.flatMap((o) => o.qcPoints.filter((p) => p.controlPlanId === q.id).map((p) => `${o.opCode} KN${p.pointNo}`));
             return E('div', { class: 'r', style: 'grid-template-columns:minmax(0,1fr) auto', 'data-testid': 'pw-plan', 'data-linked': String(linked.length) }, E('div', {}, E('b', {}, q.operationNo != null ? `OP${q.operationNo}` : 'Genel'), ` · v${q.version} · ${q.status}`, E('div', { class: 'mut' }, `${q.characteristics} karakteristik`)), chip(linked.length ? `Bağlı: ${linked.join(', ')}` : 'Operasyona bağlı değil', linked.length ? 'ok' : 'warn'));
-        })) : emptyState(`${NA} — kontrol planı yok`, 'Kontrol planı Kalite’de hazırlanır.'), (() => { const miss = ws.routing.filter((o) => o.qcPoints.length === 0).map((o) => o.opCode); return miss.length ? E('div', { class: 'banner', 'data-testid': 'pw-quality-missing' }, `Kalite noktası eksik: ${miss.join(', ')} — operasyonu açıp mevcut kontrol planından bir nokta bağlayın.`) : E('div', { class: 'mut', 'data-testid': 'pw-quality-missing' }, 'Tüm operasyonların kalite noktası bağlı.'); })(), E('div', { class: 'mut', style: 'margin-top:10px' }, 'Plan kaynağı Kalite’dir; burada yalnız mevcut plan, operasyonun kalite noktasına bağlanır (yeni kalite verisi oluşmaz). Bağlama: operasyonu açın → Kalite kontrol noktaları.'), E('div', { class: 'kx-foot' }, h('a', { href: '#/kalite' }, 'Kontrol planı düzenleme: Kalite')));
+        })) : emptyState(`${NA} — kontrol planı yok`, 'Kontrol planı Kalite’de hazırlanır.'), (() => { const miss = ws.routing.filter((o) => o.qcPoints.length === 0).map((o) => o.opCode); return miss.length ? E('div', { class: 'banner', 'data-testid': 'pw-quality-missing' }, `Kalite noktası eksik: ${miss.join(', ')} — operasyonu açıp mevcut kontrol planından bir nokta bağlayın.`) : E('div', { class: 'mut', 'data-testid': 'pw-quality-missing' }, 'Tüm operasyonların kalite noktası bağlı.'); })(), cpHost, E('div', { class: 'mut', style: 'margin-top:10px' }, 'Onaylanan kontrol planı yürürlüğe girer ve operasyonun kalite noktasına otomatik bağlanır (revizyon taslakken). Eksik ölçü varsa onay verilmez.'), E('div', { class: 'kx-foot' }, h('a', { href: '#/kalite' }, 'Kontrol planı düzenleme: Kalite')));
         // ---------------------------------------------------------------------------------------- parametreler
         const editOk = can.editRouting && editable;
         const pCell = (o, p, value, from, ver) => {

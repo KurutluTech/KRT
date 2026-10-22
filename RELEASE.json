@@ -1,8 +1,8 @@
 {
   "product": "KMI NEXT",
-  "commit": "9bf795a44a3afaa3f9b0d85b9eb953919644a211",
+  "commit": "ff8571ccaca9aae6036bcc8ea8d73514c9c88ae8",
   "builtFrom": "clean git tree",
-  "fileCount": 362,
+  "fileCount": 364,
   "migrationsInRepo": 73,
   "lastMigration": "0073_kmi_next_puantaj_month.sql",
   "note": "Release candidate. Publishing to https://flow.kurutlu.com is a manual owner action; this file is not a publication permit.",
@@ -509,8 +509,8 @@
     },
     {
       "path": "dist/apps/web/src/productWorkspaceApi.js",
-      "bytes": 7834,
-      "sha256": "d7e4464fa4dc2e578bc3fc024d1b7a5fd464ee77f13193b989e2adffe50272fc"
+      "bytes": 8360,
+      "sha256": "5264ed34b4aeb4f86005a76b6f37d9f8ca41f312b037c3f64cf0f850af7b4f1e"
     },
     {
       "path": "dist/apps/web/src/productionApi.js",
@@ -854,8 +854,8 @@
     },
     {
       "path": "dist/apps/web/src/screens/ProductWorkspaceScreen.js",
-      "bytes": 88397,
-      "sha256": "313259cd404181e714993e94fd74fdd9811322474f9c1a9a4b26ed681b1d34b0"
+      "bytes": 88689,
+      "sha256": "2da1c663ee42fc0a259b1fd7968cb51ad3b84a1d40db40eec6b2e45f737aca02"
     },
     {
       "path": "dist/apps/web/src/screens/ProductionDeskScreen.js",
@@ -981,6 +981,11 @@
       "path": "dist/apps/web/src/screens/barStockPanel.js",
       "bytes": 5043,
       "sha256": "c6195f3b35906ea7c3cd8e4ce2e7e1c1d40de0eaf8cf397907a37c29a43624c8"
+    },
+    {
+      "path": "dist/apps/web/src/screens/controlPlanPanel.js",
+      "bytes": 8636,
+      "sha256": "01527945e68b12c7eeb8be5e873c4108a9136713f95e3aaed4c83c39dd203adf"
     },
     {
       "path": "dist/apps/web/src/screens/costCalcs.js",
@@ -1361,6 +1366,11 @@
       "path": "dist/packages/domain/src/competencyImport.js",
       "bytes": 2972,
       "sha256": "b998a8586a10baa8b2de5d5d8555ec91e811e4172b5cfdb926d5aced29153354"
+    },
+    {
+      "path": "dist/packages/domain/src/controlPlanSheet.js",
+      "bytes": 4015,
+      "sha256": "ccdeef992be29780661a64a726105e9d1bad4b1a18b22fe64da35fbc492099fb"
     },
     {
       "path": "dist/packages/domain/src/costImport.js",
