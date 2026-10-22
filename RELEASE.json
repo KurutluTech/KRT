@@ -1,8 +1,8 @@
 {
   "product": "KMI NEXT",
-  "commit": "ff8571ccaca9aae6036bcc8ea8d73514c9c88ae8",
+  "commit": "f22a0f4e9d7b8f6a605dc20ce8c8b66ae52f347d",
   "builtFrom": "clean git tree",
-  "fileCount": 364,
+  "fileCount": 365,
   "migrationsInRepo": 73,
   "lastMigration": "0073_kmi_next_puantaj_month.sql",
   "note": "Release candidate. Publishing to https://flow.kurutlu.com is a manual owner action; this file is not a publication permit.",
@@ -854,8 +854,8 @@
     },
     {
       "path": "dist/apps/web/src/screens/ProductWorkspaceScreen.js",
-      "bytes": 88689,
-      "sha256": "2da1c663ee42fc0a259b1fd7968cb51ad3b84a1d40db40eec6b2e45f737aca02"
+      "bytes": 88807,
+      "sha256": "c01f3040530269eca903425dc487f50fcaea49b447284a30dac6fe4800714e46"
     },
     {
       "path": "dist/apps/web/src/screens/ProductionDeskScreen.js",
@@ -1059,8 +1059,8 @@
     },
     {
       "path": "dist/apps/web/src/screens/toolistWorkPanel.js",
-      "bytes": 21183,
-      "sha256": "48d70ccfa78f66f53f4301d5b30ef6a4288f1dbbfd632e1cfd45c2aa1061f122"
+      "bytes": 25287,
+      "sha256": "8925a69d03cae0ba5f0bc5ee4da53960b5f4cefbfc2e3020a2d8c2c6af85b4e2"
     },
     {
       "path": "dist/apps/web/src/searchApi.js",
@@ -1081,6 +1081,11 @@
       "path": "dist/apps/web/src/spindle.js",
       "bytes": 10204,
       "sha256": "50ba69dcf6bf48a4c1f5aab6378ec1b30145c57ec09c8ecf1a7cf9e86c83faff"
+    },
+    {
+      "path": "dist/apps/web/src/stageText.js",
+      "bytes": 993,
+      "sha256": "64eed67452410f545e587573a31826cf6f2de3b84f04f94e439d4370de0d3b4e"
     },
     {
       "path": "dist/apps/web/src/stockApi.js",
@@ -1744,13 +1749,13 @@
     },
     {
       "path": "dist/packages/domain/src/toolListDiff.js",
-      "bytes": 2906,
-      "sha256": "c71c32aa8a1405a4ae7a751ba749781106d335ba16ce04289dfd0c5327ab8723"
+      "bytes": 3374,
+      "sha256": "45c4695f2f88c3be088aa5ca5f28bc038600b86066efdc9271e63db5e4daea3e"
     },
     {
       "path": "dist/packages/domain/src/toolListSheet.js",
-      "bytes": 6766,
-      "sha256": "f303f7a7b1ffd7d8a38c94f80dd75c94607f9f317b4d7ecfba72e8a5f59a1b31"
+      "bytes": 8319,
+      "sha256": "d91c1a46290cfb43f4a97a800f533e889c42f387009399369ff31069dd5daa61"
     },
     {
       "path": "dist/packages/domain/src/toolroom.js",

@@ -11,11 +11,14 @@ const ALIAS = {
     desc: ['aciklama', 'tanim', 'description', 'takimadi', 'takimtanimi', 'ad', 'adi'],
     dia: ['dia', 'diameter', 'diametermm', 'cap', 'capmm', 'capi', 'toolcap', 'takimcapi'],
     len: ['l', 'length', 'uzunluk', 'boy', 'boymm', 'oal', 'toollength', 'takimboyu', 'takimuzunlugu', 'gaugelength', 'baglamaboyu'],
-    holder: ['holder', 'holdercode', 'tutucu', 'tutucukodu', 'kovan', 'collet', 'takimtutucu'],
+    holder: ['holder', 'holdercode', 'tutucu', 'tutucukodu', 'tutucuadi', 'kovan', 'collet', 'takimtutucu'],
     offset: ['offset', 'ofset', 'offsetno', 'ofsetno', 'hno', 'hoffset', 'lengthoffset', 'duzeltme', 'dno', 'hd', 'hdno', 'hduzeltme'],
     type: ['type', 'tip', 'tipi', 'tur', 'tooltype', 'takimtipi'], code: ['takimkodu', 'kod', 'code', 'katalogkodu', 'toolcode'],
 };
 const isT = (s) => /^T\s*0*\d{1,4}$/i.test(s.trim());
+/** A tool number cell: "T8", or — only when the header said so — a plain number (Fusion / engineer sheets write 8, 24 …; "8.0" from a numeric cell too). */
+const isTool = (s, plain) => isT(s) || (plain === true && /^\d{1,4}(\.0+)?$/.test(s.trim()));
+const toolNo = (s) => { const v = s.trim(); return /^\d/.test(v) ? 'T' + Number(v) : v.toUpperCase().replace(/\s+/g, ''); };
 /** Looks for the header row (first rows) and the data columns. Header text decides; the description column is the one that carries "Ø…" patterns when no header says so. */
 export function guessMapping(g) {
     const none = { no: null, desc: null, dia: null, len: null, holder: null, offset: null, type: null, code: null };
@@ -35,12 +38,14 @@ export function guessMapping(g) {
             bestScore = score;
         }
     }
-    const dataRows = g.slice(best.headerRow + 1).filter((row) => best.cols.no !== null && isT(row[best.cols.no] ?? ''));
+    best.plainNo = best.cols.no !== null;
+    const dataRows = g.slice(best.headerRow + 1).filter((row) => best.cols.no !== null && isTool(row[best.cols.no] ?? '', best.plainNo));
     if (best.cols.no === null) { // no usable header: fall back to the column that holds T-codes
         const width = Math.max(0, ...g.map((r) => r.length));
         for (let c = 0; c < width; c++)
             if (g.filter((r) => isT(r[c] ?? '')).length >= 2) {
                 best.cols.no = c;
+                best.plainNo = false;
                 break;
             }
     }
@@ -65,12 +70,12 @@ export function normalizeSheet(g, m) {
         return { csv: '', rows, header: [], missing: ['takım no'] };
     for (const r of g.slice(m.headerRow + 1)) {
         const t = (r[c.no] ?? '').trim();
-        if (!isT(t))
+        if (!isTool(t, m.plainNo))
             continue;
         const cell = (i) => (i === null ? '' : (r[i] ?? '').trim());
         const desc = cell(c.desc);
         const dia = c.dia !== null ? cell(c.dia) : m.diaFromDesc ? (/Ø\s*(\d+(?:[.,]\d+)?)/.exec(desc)?.[1] ?? '') : '';
-        rows.push({ t: t.toUpperCase().replace(/\s+/g, ''), dia, len: cell(c.len), holder: cell(c.holder), offset: cell(c.offset), type: cell(c.type), desc, code: cell(c.code) });
+        rows.push({ t: toolNo(t), dia, len: cell(c.len), holder: cell(c.holder), offset: cell(c.offset), type: cell(c.type), desc, code: cell(c.code) });
     }
     const cols = [['T', 't', true], ['Cap', 'dia', c.dia !== null || m.diaFromDesc], ['Boy', 'len', c.len !== null], ['Tutucu', 'holder', c.holder !== null], ['Offset', 'offset', c.offset !== null], ['Tip', 'type', c.type !== null]];
     const used = cols.filter((x) => x[2]);
@@ -111,4 +116,26 @@ export function csvFromRows(rows) {
     const used = defs.filter(([, k]) => k === 't' || rows.some((r) => r[k].trim() !== ''));
     const header = used.map((x) => x[0]);
     return { csv: [header.join(';'), ...rows.map((r) => used.map(([, k]) => r[k].replace(/[;\r\n]/g, ' ')).join(';'))].join('\n'), header };
+}
+/** Header texts of columns that carry data but were NOT mapped to a tool field — shown in the preview, never silently dropped. */
+export function unmappedColumns(g, m) {
+    const used = new Set(Object.values(m.cols).filter((x) => x !== null));
+    const head = g[m.headerRow] ?? [];
+    const out = [];
+    head.forEach((h, i) => { const name = (h ?? '').replace(/\s+/g, ' ').trim().replace(/:$/, ''); if (!name || used.has(i))
+        return; if (g.slice(m.headerRow + 1).some((r) => (r[i] ?? '').trim() !== ''))
+        out.push(name); });
+    return out;
+}
+/** Nominal diameters the NC program itself declares in its tool comments, e.g. "(T7  D=3.8 CR=0. TAPER=40deg - …)". A cross-check only: never filled in, never a measurement. */
+export function ncDeclaredDiameters(text) {
+    const out = new Map();
+    const re = /\(\s*T\s*0*(\d{1,4})\s+D\s*=\s*(\d+(?:[.,]\d+)?)/gi;
+    let m;
+    while ((m = re.exec(text)) !== null) {
+        const t = 'T' + Number(m[1]);
+        if (!out.has(t))
+            out.set(t, m[2].replace(',', '.'));
+    }
+    return out;
 }

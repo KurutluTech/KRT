@@ -35,7 +35,8 @@ export const CRITICAL = ['dia', 'len', 'holder', 'offset'];
 export function missingCells(rows) {
     return Object.values(rows).flatMap((r) => CRITICAL.filter((f) => (r[f] ?? '').trim() === '').map((f) => ({ t: r.t, field: f })));
 }
-export function diffExcel(current, incoming) {
+/** Only EMPTY cells being filled are selected by default. Anything that replaces a filled value (approved file, typed in KMI, or NC says otherwise) or adds a tool that is not in the list needs an explicit tick. */
+export function diffExcel(current, incoming, ncDia) {
     const out = { changes: [], newTools: [], unmatched: [], same: 0, blankIgnored: 0 };
     const seen = new Set();
     for (const r of incoming) {
@@ -59,7 +60,9 @@ export function diffExcel(current, incoming) {
                 continue;
             }
             const protectedByKmi = !!cur && old !== '' && cur.src?.[f] === 'KMI';
-            out.changes.push({ t, field: f, old, next, newTool: !cur, conflict: old !== '', protectedByKmi, selected: !protectedByKmi });
+            const nd = f === 'dia' ? ncDia?.get(t) : undefined;
+            const ncDiffers = nd !== undefined && Number(nd) !== Number(next);
+            out.changes.push({ t, field: f, old, next, newTool: !cur, conflict: old !== '', protectedByKmi, selected: !cur ? Object.keys(current).length === 0 && !ncDiffers : old === '' && !ncDiffers, ...(ncDiffers ? { ncDia: nd } : {}) });
         }
     }
     out.unmatched = Object.keys(current).filter((t) => !seen.has(t)).sort((a, b) => Number(a.slice(1)) - Number(b.slice(1)));
