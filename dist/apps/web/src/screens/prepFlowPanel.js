@@ -28,7 +28,7 @@ export const PREP_CSS = `
 .pv2 .opcard .nm{font-weight:700;color:#fff;overflow-wrap:anywhere}.pv2 .opcard .meta{display:flex;flex-wrap:wrap;gap:4px 8px;margin-top:6px;font-size:12px;color:#94a3b8}
 .pv2 .opcard .mv{display:flex;gap:6px}.pv2 .opcard .mv button{min-width:44px}
 .pv2 .pv2-editor{grid-column:1/-1;margin-top:10px;border-top:1px dashed #334155;padding-top:10px;display:flex;flex-direction:column;gap:12px;min-width:0;overflow-wrap:anywhere}.pv2 .pv2-editor .edbar{display:flex;justify-content:space-between;gap:8px;align-items:center}.pv2 .opmenu{position:relative}.pv2 .opmenu summary{list-style:none;display:flex;align-items:center;justify-content:center;min-width:44px}.pv2 .opmenu summary::-webkit-details-marker{display:none}.pv2 .opmenu .menu{position:absolute;right:0;top:48px;z-index:5;background:#0f172a;border:1px solid #334155;border-radius:10px;padding:6px;min-width:150px}.pv2 .opcard .newno{font-weight:800;color:#93c5fd}
-.pv2 .guide{display:flex;flex-direction:column;gap:8px}.pv2 .guide h3{margin:0;font-size:15px}.pv2 .gline{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:6px 10px;align-items:center;border:1px solid #334155;border-radius:10px;padding:10px;min-width:0}.pv2 .gline .gt{min-width:0;overflow-wrap:anywhere}.pv2 .gline .gt b{display:block}.pv2 .gline .gs{color:#fbbf24;font-size:13px}.pv2 .gline .gw{color:#94a3b8;font-size:12px;margin-top:2px}.pv2 .gline .gp{color:#94a3b8;font-size:12px;max-width:180px;text-align:right}@media (max-width:560px){.pv2 .gline{grid-template-columns:minmax(0,1fr)}.pv2 .gline .gp{text-align:left;max-width:none}.pv2 .gline .pbtn{width:100%}}.pv2 .pvstep.flash{outline:2px solid #60a5fa;outline-offset:2px}.pv2 .wo{display:flex;flex-direction:column;gap:10px}.pv2 .wo .why{display:flex;flex-direction:column;gap:4px;color:#fca5a5;font-size:13px}
+.pv2 .guide{display:flex;flex-direction:column;gap:8px}.pv2 .guide h3{margin:0;font-size:15px}.pv2 .gline{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:6px 10px;align-items:center;border:1px solid #334155;border-radius:10px;padding:10px;min-width:0}.pv2 .gline .gt{min-width:0;overflow-wrap:anywhere}.pv2 .gline .gt b{display:block}.pv2 .gline .gs{color:#fbbf24;font-size:13px}.pv2 .gline .gw{color:#94a3b8;font-size:12px;margin-top:2px}.pv2 .gline .gp{color:#94a3b8;font-size:12px;max-width:180px;text-align:right}@media (max-width:560px){.pv2 .gline{grid-template-columns:minmax(0,1fr)}.pv2 .gline .gp{text-align:left;max-width:none}.pv2 .gline .pbtn{width:100%}}.pv2 .pv2-editor,.pv2 .pvstep{scroll-margin-top:84px}.pv2 .pvstep.flash{outline:2px solid #60a5fa;outline-offset:2px}.pv2 .wo{display:flex;flex-direction:column;gap:10px}.pv2 .wo .why{display:flex;flex-direction:column;gap:4px;color:#fca5a5;font-size:13px}
 .pv2 select,.pv2 input{min-height:44px;font-size:16px;border-radius:10px;border:1px solid #334155;background:#0f172a;color:#fff;padding:0 10px;max-width:100%}
 .pv2 details.tech{margin-top:10px}.pv2 details.tech summary{cursor:pointer;color:#93c5fd}.pv2 .tech .kv{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:4px 12px;margin-top:8px;font-size:13px}
 @media (max-width:900px){.pv2 .kpis{grid-template-columns:repeat(2,minmax(0,1fr))}}
@@ -115,11 +115,11 @@ export async function drawPrepFlow(host, c) {
         return; ed = null; edNodes = []; dirty = false; saveEd(); draw(); };
     /** Rehber eylemi: editör açık değilse açar (kapatmaz), görünür alana kaydırır. */
     const showEd = (n) => { if (ed?.slot === n.slot) {
-        host.querySelector(`[data-testid="pv2-editor-${n.slot}"]`)?.scrollIntoView?.({ block: 'center', behavior: 'auto' });
+        host.querySelector(`[data-testid="pv2-editor-${n.slot}"]`)?.scrollIntoView?.({ block: 'start', behavior: 'auto' });
         return;
-    } openEd(n); setTimeout(() => host.querySelector(`[data-testid="pv2-editor-${n.slot}"]`)?.scrollIntoView?.({ block: 'center', behavior: 'auto' }), 60); };
+    } openEd(n); setTimeout(() => host.querySelector(`[data-testid="pv2-editor-${n.slot}"]`)?.scrollIntoView?.({ block: 'start', behavior: 'auto' }), 60); };
     const gotoStep = (key) => { const el = host.querySelector(`[data-testid="pv2-step-${key}"]`); if (!el)
-        return; el.scrollIntoView?.({ block: 'center', behavior: 'auto' }); el.classList.add('flash'); setTimeout(() => el.classList.remove('flash'), 2200); el.querySelector('button')?.focus?.({ preventScroll: true }); };
+        return; el.scrollIntoView?.({ block: 'start', behavior: 'auto' }); el.classList.add('flash'); setTimeout(() => el.classList.remove('flash'), 2200); el.querySelector('button')?.focus?.({ preventScroll: true }); };
     const guideAct = (g) => {
         if (g.target === 'order') {
             if (cur())
