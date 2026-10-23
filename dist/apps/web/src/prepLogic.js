@@ -1,4 +1,3 @@
-import { chainGapText, nextChainAction } from './screens/productChainPanel.js';
 const WORD_OK = 'YÜRÜRLÜKTE';
 const allOk = (ops, pick) => ops.length > 0 && ops.every((o) => pick(o) === WORD_OK);
 export function buildSteps(i) {
@@ -7,86 +6,135 @@ export function buildSteps(i) {
     const ops = chain?.operations ?? [];
     const S = (key, no, title, status, label, line, action, target) => ({ key, no, title, status, label, line, action, target });
     const steps = [];
+    // Durumlar kullanıcı dilinde: Hazır / Tamamlanacak / Onay bekliyor / Teknik kontrol gerekli / Veri doğrulanamadı. Bilinmeyen asla "Eksik" denmez; yalnız taslak olan belge asla "yok" denmez.
     // 1 Ürün ve teknik belgeler
-    const dr = ws.cards.drawing?.state ?? 'MISSING', cad = ws.cards.cad?.state ?? 'MISSING';
-    const docsOk = dr === 'APPROVED' && cad === 'APPROVED';
-    steps.push(docsOk ? S('docs', 1, 'Ürün ve teknik belgeler', 'DONE', 'Hazır', 'Teknik resim ve CAD yürürlükte.', null, null)
-        : S('docs', 1, 'Ürün ve teknik belgeler', 'TODO', dr === 'MISSING' || cad === 'MISSING' ? 'Eksik' : 'Onay bekliyor', `${dr === 'APPROVED' ? '' : 'Teknik resim '}${cad === 'APPROVED' ? '' : 'CAD/STEP '}${dr === 'MISSING' || cad === 'MISSING' ? 'yüklenmeli.' : 'onaylanmalı.'}`.replace(/\s+/g, ' ').trim(), 'Tamamla', 'drawing'));
-    // 2 Hammadde / BOM — "kayıtlı" ile "onaylı" ayrı: kayıtlıysa "tanımlayın" denmez
+    const dr = ws.cards.drawing?.state, cad = ws.cards.cad?.state;
+    const T = 'Ürün ve teknik belgeler';
+    if (!dr || !cad)
+        steps.push(S('docs', 1, T, 'WAIT', 'Veri doğrulanamadı', 'Belge durumu okunamadı.', 'Belgeyi incele', 'drawing'));
+    else if (dr === 'APPROVED' && cad === 'APPROVED')
+        steps.push(S('docs', 1, T, 'DONE', 'Hazır', 'Teknik resim ve CAD yürürlükte.', null, null));
+    else if (dr === 'INVALID' || cad === 'INVALID')
+        steps.push(S('docs', 1, T, 'TODO', 'Teknik kontrol gerekli', `${dr === 'INVALID' ? 'Teknik resim' : 'CAD/STEP'} kaydı geçersiz görünüyor; incelenmeli.`, 'Belgeyi incele', 'drawing'));
+    else {
+        const name = (st, n) => (st === 'APPROVED' ? '' : n);
+        const miss = [name(dr === 'MISSING' ? 'x' : 'APPROVED', 'Teknik resim'), name(cad === 'MISSING' ? 'x' : 'APPROVED', 'CAD/STEP')].filter(Boolean).join(' ve ');
+        const wait = [dr === 'DRAFT' ? 'Teknik resim' : '', cad === 'DRAFT' ? 'CAD/STEP' : ''].filter(Boolean).join(' ve ');
+        steps.push(S('docs', 1, T, 'TODO', miss ? 'Tamamlanacak' : 'Onay bekliyor', `${miss ? `${miss} yüklenecek.` : ''}${miss && wait ? ' ' : ''}${wait ? `${wait} kaydı mevcut, onay bekliyor.` : ''}`, 'Belgeyi incele', 'drawing'));
+    }
+    // 2 Hammadde / BOM — "kayıtlı" ile "onaylı" ayrı. BOM onayı = revizyon yayını (ayrı bir onay işlevi yok).
+    const B = 'Hammadde / BOM';
     if (!ws.bom.length)
-        steps.push(S('bom', 2, 'Hammadde / BOM', 'TODO', 'Eksik', 'Hammadde tanımlı değil: malzeme, çap, boy ve kesim boyunu girin.', 'Hammaddeyi ekle', 'bom'));
+        steps.push(S('bom', 2, B, 'TODO', 'Tamamlanacak', 'Hammadde tanımlanacak: malzeme, çap, boy ve kesim boyu.', 'Hammaddeyi ekle', 'bom'));
     else if (rev?.state === 'APPROVED')
-        steps.push(S('bom', 2, 'Hammadde / BOM', 'DONE', 'Hazır', 'BOM onaylı.', null, null));
+        steps.push(S('bom', 2, B, 'DONE', 'Hazır', 'BOM onaylı.', null, null));
     else
-        steps.push(S('bom', 2, 'Hammadde / BOM', 'WAIT', 'Onay bekliyor', 'BOM kayıtlı; revizyon onayı ile birlikte onaylanır.', "BOM'u onayla", 'bom'));
+        steps.push(S('bom', 2, B, 'WAIT', 'Onay bekliyor', `BOM kaydı mevcut; Rev ${rev?.revision ?? ''} yayınıyla onaylanır.`, "BOM'u incele", 'bom'));
     // 3 Operasyon sırası ve CAM
+    const R = 'Operasyon sırası ve CAM';
     if (!ws.routing.length)
-        steps.push(S('route', 3, 'Operasyon sırası ve CAM', 'TODO', 'Eksik', 'Rota yok: ilk operasyonu ekleyin.', 'Operasyon ekle', 'routing'));
+        steps.push(S('route', 3, R, 'TODO', 'Tamamlanacak', 'Rota boş: ilk operasyon eklenecek.', 'Operasyon ekle', 'routing'));
     else if (!chain)
-        steps.push(S('route', 3, 'Operasyon sırası ve CAM', 'WAIT', 'Doğrulanamadı', 'Operasyon zinciri okunamadı.', null, 'routing'));
+        steps.push(S('route', 3, R, 'WAIT', 'Veri doğrulanamadı', 'Operasyon zinciri okunamadı.', 'CAM bağlantısını doğrula', 'routing'));
     else {
         const stale = new Set(i.staleOps ?? []);
-        const camOk = ops.every((o) => o.nc.status === WORD_OK && o.cam.status === WORD_OK && !stale.has(o.routingOperationId));
-        if (camOk)
-            steps.push(S('route', 3, 'Operasyon sırası ve CAM', 'DONE', 'Hazır', `${ops.length} operasyon: NC ve CAM yürürlükte.`, null, null));
+        const bad = ops.find((o) => !(o.nc.status === WORD_OK && o.cam.status === WORD_OK && !stale.has(o.routingOperationId)));
+        if (!bad)
+            steps.push(S('route', 3, R, 'DONE', 'Hazır', `${ops.length} operasyon: NC ve CAM yürürlükte.`, null, null));
         else {
-            const bad = ops.find((o) => !(o.nc.status === WORD_OK && o.cam.status === WORD_OK && !stale.has(o.routingOperationId)));
             const st = stale.has(bad.routingOperationId);
-            steps.push(S('route', 3, 'Operasyon sırası ve CAM', 'TODO', st ? 'Yenileme gerekli' : 'Eksik', `OP${bad.opNo}: ${chainGapText(bad, st) ?? 'NC / CAM tamamlanmalı.'}`, nextChainAction(bad, st)?.label ?? 'Tamamla', 'routing'));
+            const op = `OP${bad.opNo}`;
+            const nc = bad.nc.status, cam = bad.cam.status;
+            if (nc === 'YOK')
+                steps.push(S('route', 3, R, 'TODO', 'Tamamlanacak', `${op}: NC programı yüklenecek.`, 'Belgeyi incele', 'routing'));
+            else if (nc === 'BELGE VAR' || nc === 'TEKNİK ONAY BEKLİYOR')
+                steps.push(S('route', 3, R, 'WAIT', 'Onay bekliyor', `${op}: NC kaydı mevcut, yürürlük bekliyor.`, 'Belgeyi incele', 'routing'));
+            else if (cam === 'YOK')
+                steps.push(S('route', 3, R, 'TODO', 'Tamamlanacak', `${op}: NC yürürlükte, CAM kaydı oluşturulacak.`, 'CAM bağlantısını doğrula', 'routing'));
+            else if (cam === 'TEKNİK ONAY BEKLİYOR')
+                steps.push(S('route', 3, R, 'WAIT', 'Onay bekliyor', `${op}: CAM kaydı mevcut, yayın bekliyor.`, 'CAM bağlantısını doğrula', 'routing'));
+            else if (st)
+                steps.push(S('route', 3, R, 'TODO', 'Teknik kontrol gerekli', `${op}: NC değişti, CAM kaydı yeniden oluşturulacak.`, 'CAM bağlantısını doğrula', 'routing'));
+            else
+                steps.push(S('route', 3, R, 'TODO', 'Teknik kontrol gerekli', `${op}: CAM kaydı mevcut, operasyon bağlantısı kontrol edilecek.`, 'CAM bağlantısını doğrula', 'routing'));
         }
     }
     // 4 Takım listesi
-    if (!chain || !ops.length)
-        steps.push(S('tools', 4, 'Takım listesi', 'LOCKED', 'Önce rota', 'Rota ve NC tamamlanınca takım listesi doğrulanır.', null, null));
+    const L = 'Takım listesi';
+    if (!ws.routing.length)
+        steps.push(S('tools', 4, L, 'LOCKED', 'Tamamlanacak', 'Rota hazır olunca doğrulanır.', null, null));
+    else if (!chain)
+        steps.push(S('tools', 4, L, 'WAIT', 'Veri doğrulanamadı', 'Takım listesi durumu okunamadı.', 'Takım listesini yürürlüğe al', 'tools'));
     else if (allOk(ops, (o) => o.toolList.status))
-        steps.push(S('tools', 4, 'Takım listesi', 'DONE', 'Hazır', `${i.toolCount != null ? `${i.toolCount} takım` : 'Takım listesi'} yürürlükte.`, null, null));
+        steps.push(S('tools', 4, L, 'DONE', 'Hazır', `${i.toolCount != null ? `${i.toolCount} takım` : 'Takım listesi'} yürürlükte.`, null, null));
     else {
         const bad = ops.find((o) => o.toolList.status !== WORD_OK);
-        const n = i.toolCount != null ? `${i.toolCount} takım hazır. ` : '';
-        steps.push(S('tools', 4, 'Takım listesi', bad.toolList.status === 'YOK' ? 'TODO' : 'WAIT', bad.toolList.status === 'YOK' ? 'Eksik' : 'Yürürlük bekliyor', bad.toolList.status === 'YOK' ? 'Takım listesi yüklenmeli.' : `${n}Teknik listeyi doğrula ve yürürlüğe al.`, 'Tamamla', 'tools'));
+        const ts = bad.toolList.status;
+        const n = i.toolCount != null ? ` (${i.toolCount} takım)` : '';
+        if (ts === 'YOK')
+            steps.push(S('tools', 4, L, 'TODO', 'Tamamlanacak', 'Takım listesi yüklenecek.', 'Belgeyi incele', 'tools'));
+        else if (ts === 'OPERASYONA BAĞLI DEĞİL')
+            steps.push(S('tools', 4, L, 'TODO', 'Teknik kontrol gerekli', 'Kayıt mevcut, operasyon bağlantısı kontrol edilecek.', 'Takım listesini yürürlüğe al', 'tools'));
+        else
+            steps.push(S('tools', 4, L, 'WAIT', 'Onay bekliyor', `Kayıt mevcut${n}, yürürlük bekliyor.`, 'Takım listesini yürürlüğe al', 'tools'));
     }
     // 5 Kalite kontrol planı
+    const Q = 'Kalite kontrol planı';
     const activeOps = ws.routing.filter((o) => o.active);
     const linked = activeOps.length > 0 && activeOps.every((o) => o.qcPoints.some((p) => !!p.controlPlanId));
     if (i.plan?.released && linked)
-        steps.push(S('quality', 5, 'Kalite kontrol planı', 'DONE', 'Hazır', `Plan onaylı, ${i.plan.characteristics} karakteristik, operasyona bağlı.`, null, null));
-    else if (i.plan && !i.plan.released)
-        steps.push(S('quality', 5, 'Kalite kontrol planı', 'WAIT', 'Taslak', `${i.plan.characteristics} karakteristikli taslak var${i.plan.openItems ? `; ${i.plan.openItems} ölçü eksik veya kapsam dışı kararı bekliyor` : ''}. Onaylanana kadar geçerli sayılmaz.`, 'Tamamla', 'quality'));
-    else if (ws.quality.length && !i.plan)
-        steps.push(S('quality', 5, 'Kalite kontrol planı', 'WAIT', 'Doğrulanamadı', 'Kontrol planı okunamadı.', 'Tamamla', 'quality'));
+        steps.push(S('quality', 5, Q, 'DONE', 'Hazır', `Plan onaylı, ${i.plan.characteristics} karakteristik, operasyona bağlı.`, null, null));
+    else if (i.plan?.released)
+        steps.push(S('quality', 5, Q, 'TODO', 'Teknik kontrol gerekli', 'Plan onaylı; operasyona bağlantısı kontrol edilecek.', 'Kalite planını tamamla', 'quality'));
+    else if (i.plan)
+        steps.push(S('quality', 5, Q, i.plan.openItems ? 'TODO' : 'WAIT', i.plan.openItems ? 'Tamamlanacak' : 'Onay bekliyor', i.plan.openItems ? `Taslak mevcut, ${i.plan.openItems} ölçü tamamlanacak.` : 'Taslak mevcut, onay bekliyor.', 'Kalite planını tamamla', 'quality'));
+    else if (ws.quality.length)
+        steps.push(S('quality', 5, Q, 'WAIT', 'Veri doğrulanamadı', 'Kontrol planı okunamadı.', 'Kalite planını tamamla', 'quality'));
     else
-        steps.push(S('quality', 5, 'Kalite kontrol planı', 'TODO', 'Eksik', 'Kontrol planı yok: kalite noktaları tanımlanmalı.', 'Tamamla', 'quality'));
+        steps.push(S('quality', 5, Q, 'TODO', 'Tamamlanacak', 'Kontrol planı hazırlanacak.', 'Kalite planını tamamla', 'quality'));
     // 6 Üretime hazırla (revizyon yayını + sunucu hazırlık cevabı)
+    const P = 'Üretime hazırla';
     const overall = ws.readiness?.overall;
     const prior = steps.slice(0, 5);
+    const rv = rev?.revision ?? '';
     if (rev?.status === 'RELEASED' && overall === 'READY' && chain?.operations.every((o) => o.workOrderReady))
-        steps.push(S('ready', 6, 'Üretime hazırla', 'DONE', 'Hazır', 'Revizyon yürürlükte ve rota iş emrine hazır.', null, null));
+        steps.push(S('ready', 6, P, 'DONE', 'Hazır', 'Revizyon yürürlükte ve rota iş emrine hazır.', null, null));
     else if (prior.some((s) => s.status !== 'DONE'))
-        steps.push(S('ready', 6, 'Üretime hazırla', 'LOCKED', 'Önce yukarıdakiler', `Önce: ${prior.filter((s) => s.status !== 'DONE').map((s) => s.title).join(', ')}.`, null, null));
+        steps.push(S('ready', 6, P, 'LOCKED', 'Tamamlanacak', 'Yukarıdaki adımlar bitince yayınlanır.', null, null));
+    else if (rev?.status === 'RELEASED')
+        steps.push(S('ready', 6, P, 'TODO', 'Teknik kontrol gerekli', `Rev ${rv} yayında; sunucu hazırlık kontrolü henüz “hazır” demiyor.`, null, null));
     else
-        steps.push(S('ready', 6, 'Üretime hazırla', 'TODO', 'Yayın bekliyor', `Rev ${rev?.revision ?? ''} taslak: yayınlanınca iş emri açılabilir.`, 'Revizyonu yayınla', 'release'));
+        steps.push(S('ready', 6, P, 'TODO', 'Onay bekliyor', `Rev ${rv} taslak: yayınlanınca iş emri açılabilir.`, `Rev ${rv}'yı yayınla`, 'release'));
     // 7 İş emri oluştur
     const gate = workOrderGate(i, steps[5]);
-    steps.push(gate.open ? S('wo', 7, 'İş emri oluştur', 'TODO', 'Hazır', 'Her şey tamam: iş emri oluşturma ekranına geçebilirsiniz.', 'İş Emri Oluştur', 'order') : S('wo', 7, 'İş emri oluştur', 'LOCKED', 'Kapalı', gate.reasons[0] ?? '', null, null));
+    const W = 'İş emri oluştur';
+    if (gate.open)
+        steps.push(S('wo', 7, W, 'TODO', 'Hazır', 'Her şey tamam; iş emri ekranına geçebilirsiniz.', 'İş emri oluştur', 'order'));
+    else if (steps[5].status === 'DONE')
+        steps.push(S('wo', 7, W, 'WAIT', 'Onay bekliyor', gate.reasons[0] ?? '', null, null));
+    else
+        steps.push(S('wo', 7, W, 'LOCKED', 'Tamamlanacak', 'Hazırlık bitince açılır.', null, null));
     return steps;
 }
-/** The only gate to the work-order screen. Never opens on a guess; lists every reason it is closed. */
+/** The only gate to the work-order screen. Never opens on a guess; short reasons only (the step lines already name the gaps). */
 export function workOrderGate(i, readyStep) {
     const reasons = [];
     const rs = readyStep ?? buildSteps({ ...i, order: i.order }).find((s) => s.key === 'ready');
     if (rs.status !== 'DONE')
-        reasons.push(rs.status === 'LOCKED' ? `Hazırlık tamamlanmadı — ${rs.line}` : `Hazırlık tamamlanmadı — ${rs.line}`);
+        reasons.push('Ürün hazırlığı tamamlanacak.');
     if (!i.order)
         reasons.push('Sipariş seçilmedi: iş emri bir sipariş kalemine bağlıdır.');
+    else if (i.order.status === 'DRAFT')
+        reasons.push('Sipariş onayı bekleniyor.');
     else if (!['CONFIRMED', 'IN_PRODUCTION'].includes(i.order.status))
-        reasons.push(`${i.order.orderNo} henüz ${ORDER_TR[i.order.status] ?? i.order.status}: iş emri için sipariş “Onaylandı” olmalı.`);
+        reasons.push(`${i.order.orderNo} ${ORDER_TR[i.order.status] ?? i.order.status}: iş emri için sipariş “Onaylandı” olmalı.`);
     return { open: reasons.length === 0, reasons, target: reasons.length === 0 ? 'order' : null };
 }
 export const ORDER_TR = { DRAFT: 'taslak', CONFIRMED: 'onaylı', IN_PRODUCTION: 'üretimde', SHIPPED: 'sevk edildi', CLOSED: 'kapalı', CANCELLED: 'iptal' };
 export function overallStatus(steps) {
     if (steps.slice(0, 6).every((s) => s.status === 'DONE'))
         return { kind: 'READY', text: 'Üretime hazır' };
-    if (steps.some((s) => s.status === 'WAIT' && /Doğrulanamadı/.test(s.label)))
+    if (steps.some((s) => /Veri doğrulanamadı|Teknik kontrol gerekli/.test(s.label)))
         return { kind: 'CHECK', text: 'Kontrol gerekli' };
     return { kind: 'PREP', text: 'Hazırlanıyor' };
 }
@@ -97,7 +145,7 @@ export function materialSummary(qty, line) {
     const capacity = line.plan.barsNeeded * line.plan.piecesPerBar;
     return { qty, bars: line.plan.barsNeeded, perBar: line.plan.piecesPerBar, capacity, extra: capacity - Math.ceil(qty), material: line.materialCode, dia: line.diaMm, barMm: line.barLengthMm, cutMm: line.cutLengthMm, kerfMm: line.kerfMm };
 }
-/** CNC cycle time only (inspection runs parallel and is never added). setup is per lot. */
+/** CNC cycle time = SUM of all real route operations (never only OP30); inspection runs parallel and is never added. setup is per lot. */
 export function cncTime(qty, ops) {
     const cyc = ops.map((o) => o.cycleSec).filter((x) => typeof x === 'number');
     if (!cyc.length || cyc.length !== ops.length)
@@ -116,7 +164,11 @@ export const sameOrder = (a, b) => a.length === b.length && a.every((x, i) => x 
 /** Server refusals in plain Turkish; unknown errors pass through. */
 export function reorderErrorText(msg) {
     if (/OP_NO_REFERENCED/.test(msg))
-        return 'Bu sıra değişikliği, belgesi veya kontrol planı OP numarasına bağlı bir operasyonun numarasını değiştirir. Belge bağlantıları operasyon kimliğine taşınmadan numara değiştirilmez; kayıt yapılmadı, hiçbir bağlantı bozulmadı.';
+        return 'Bu sıra değişikliği, belgesi veya kontrol planı OP numarasına bağlı bir operasyonun numarasını değiştirir; sunucu bunu henüz kimlikle taşımıyor. Kayıt yapılmadı, hiçbir bağlantı bozulmadı.';
+    if (/RECHECK_OPEN/.test(msg))
+        return 'Bu operasyon için açık bir takım yeniden-kontrol kaydı var; önce kapatılmalı. Kayıt yapılmadı.';
+    if (/OP_RULE_REFERENCED/.test(msg))
+        return 'Bu operasyon numarasına bağlı ürün düzeyinde belge kapısı kuralı veya hurda eşiği var; numara değiştirilemez. Kayıt yapılmadı.';
     if (/DEPENDENCY_ORDER_VIOLATED/.test(msg))
         return 'Bir operasyon kendi ön koşulundan önce gelemez; kayıt yapılmadı.';
     if (/REVISION_NOT_DRAFT|NOT_DRAFT|DRAFT/.test(msg) && /rt_need_draft|taslak|DRAFT/i.test(msg))
