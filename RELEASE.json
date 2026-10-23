@@ -1,6 +1,6 @@
 {
   "product": "KMI NEXT",
-  "commit": "f22a0f4e9d7b8f6a605dc20ce8c8b66ae52f347d",
+  "commit": "031e1062de106c07496346c5bf6cd10f78325b68",
   "builtFrom": "clean git tree",
   "fileCount": 365,
   "migrationsInRepo": 73,
@@ -509,8 +509,8 @@
     },
     {
       "path": "dist/apps/web/src/productWorkspaceApi.js",
-      "bytes": 8360,
-      "sha256": "5264ed34b4aeb4f86005a76b6f37d9f8ca41f312b037c3f64cf0f850af7b4f1e"
+      "bytes": 8654,
+      "sha256": "69b7b6088a9b47dc14ae7dd64799150d79b9ac353d30922cc51dc17b4e3560f3"
     },
     {
       "path": "dist/apps/web/src/productionApi.js",
@@ -854,8 +854,8 @@
     },
     {
       "path": "dist/apps/web/src/screens/ProductWorkspaceScreen.js",
-      "bytes": 88807,
-      "sha256": "c01f3040530269eca903425dc487f50fcaea49b447284a30dac6fe4800714e46"
+      "bytes": 91720,
+      "sha256": "05491f4c8ffcb05ccccb0ebb4ca1462fc2157b3e400fb846539ce590ef36599f"
     },
     {
       "path": "dist/apps/web/src/screens/ProductionDeskScreen.js",
@@ -1044,8 +1044,8 @@
     },
     {
       "path": "dist/apps/web/src/screens/productChainPanel.js",
-      "bytes": 10661,
-      "sha256": "73c2036546060785a91f6e34aeda6ea1ae347c372d8d5a8a6778fac9cc3b945d"
+      "bytes": 12915,
+      "sha256": "1f53c5d1a79be86bfa7e61bfb4d86a1cfa95522b0c26e362b3a55f0df5f93fbe"
     },
     {
       "path": "dist/apps/web/src/screens/readinessPanel.js",

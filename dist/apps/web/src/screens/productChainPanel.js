@@ -2,7 +2,7 @@
 // YOK · BELGE VAR · OPERASYONA BAĞLI DEĞİL · TEKNİK ONAY BEKLİYOR · YÜRÜRLÜKTE  (+ İŞ EMRİNE HAZIR for the whole operation).
 // The panel never decides anything: it shows what op_technical_chain says and offers the next real action (link, register CAM from the existing NC, release, attach). Titles / file names never count as a relation.
 import { h } from '../../../../packages/ui/src/h.js';
-const gapText = (op) => { const t = chainGapText(op); return t ? E('div', { class: 'mut', style: 'margin-top:6px', 'data-testid': 'pw-chain-gap' }, t) : null; };
+const gapText = (op, stale = false) => { const t = chainGapText(op, stale); return t ? E('div', { class: 'mut', style: 'margin-top:6px', 'data-testid': 'pw-chain-gap' }, t) : null; };
 const E = (tag, props = null, ...kids) => h(tag, props, ...kids);
 export const CHAIN_TONE = { 'YOK': 'bad', 'BELGE VAR': 'warn', 'OPERASYONA BAĞLI DEĞİL': 'warn', 'TEKNİK ONAY BEKLİYOR': 'warn', 'YÜRÜRLÜKTE': 'ok' };
 const word = (label, it, testid) => E('span', { class: `chip ${CHAIN_TONE[it.status] ?? 'warn'}`, 'data-testid': testid, 'data-status': it.status, title: it.detail ?? '' }, `${label}: ${it.status}${it.docNo ? ` · ${it.docNo}` : ''}${it.programNo && label === 'CAM' ? ` · ${it.programNo}` : ''}`);
@@ -12,13 +12,15 @@ export function chainChips(op) {
 }
 /** Plain-language reason for what is missing on ONE operation — the three records are different things: the NC DOCUMENT (a file under document control),
  *  the CAM RECORD (program record made from that NC) and the LINK of the CAM record to the operation. Pure — unit tested. Returns null when nothing is missing. */
-export function chainGapText(op) {
+export function chainGapText(op, staleCam = false) {
     const nc = op.nc.status, cam = op.cam.status, tl = op.toolList.status;
     const doc = op.nc.docNo ?? 'NC belgesi';
     if (nc === 'YOK')
         return 'NC programı yok: bu operasyon için bir NC dosyası yüklenip yürürlüğe alınmalı.';
     if (nc === 'BELGE VAR' || (nc === 'TEKNİK ONAY BEKLİYOR'))
         return `${doc} var ama henüz yürürlükte değil (belge kontrolünden onaylanıp yürürlüğe alınmalı).`;
+    if (staleCam && nc === 'YÜRÜRLÜKTE' && cam === 'YÜRÜRLÜKTE')
+        return `${doc} yeni sürümle yürürlüğe alındı ama CAM kaydı hâlâ eski NC'den: CAM kaydı ve takım türleri eski kalır. CAM kaydı yeni NC'den yeniden oluşturulmalı.`;
     if (cam === 'YOK')
         return `${doc} yürürlükte, ancak CAM kaydı yok. NC belgesi (dosya) ile CAM kaydı (program kaydı) ayrı kayıtlardır: CAM kaydı bu NC'den oluşturulmalı.`;
     if (cam === 'TEKNİK ONAY BEKLİYOR')
@@ -36,11 +38,13 @@ export function chainGapText(op) {
     return null;
 }
 /** The next real action for an operation, or null. Pure — unit tested. */
-export function nextChainAction(op) {
+export function nextChainAction(op, staleCam = false) {
     if (op.nc.status === 'OPERASYONA BAĞLI DEĞİL' && op.nc.controlState === 'EFFECTIVE' && op.cam.status === 'YOK')
         return { kind: 'REGISTER_CAM', label: `CAM kaydını mevcut NC'den oluştur (${op.nc.docNo ?? 'NC'})` };
     if (op.nc.status === 'YÜRÜRLÜKTE' && op.cam.status === 'YOK')
         return { kind: 'REGISTER_CAM', label: `CAM kaydını mevcut NC'den oluştur (${op.nc.docNo ?? 'NC'})` };
+    if (staleCam && op.nc.status === 'YÜRÜRLÜKTE' && op.cam.status === 'YÜRÜRLÜKTE')
+        return { kind: 'REBUILD_CAM', label: `NC değişti — CAM kaydını yeni NC'den yeniden oluştur (${op.nc.docNo ?? 'NC'})` };
     if (op.cam.status === 'TEKNİK ONAY BEKLİYOR')
         return { kind: 'RELEASE_CAM', label: 'CAM kaydını yayınla' };
     if (op.cam.status === 'OPERASYONA BAĞLI DEĞİL')
@@ -65,8 +69,28 @@ export async function drawChainPanel(host, api, ws, can, reload, showErr, onChai
     const shown = onlyOpNo == null ? chain.operations : chain.operations.filter((x) => x.opNo === onlyOpNo);
     if (!shown.length)
         return;
+    // NC in force is newer than the one the CAM record was made from (hash differs): offer to rebuild the CAM record. Read-only comparison of real records; any read error = no claim.
+    const stale = new Set();
+    for (const op of shown) {
+        if (op.nc.status !== 'YÜRÜRLÜKTE' || op.cam.status !== 'YÜRÜRLÜKTE' || !op.nc.documentId || !op.cam.ncSha256)
+            continue;
+        try {
+            const f = await api.documentFile(op.nc.documentId);
+            if (f.effective && f.content.sha256 && f.content.sha256 !== op.cam.ncSha256)
+                stale.add(op.routingOperationId);
+        }
+        catch { /* unknown: no claim */ }
+    }
     const rows = shown.map((op) => {
-        const act = can.act ? nextChainAction(op) : null;
+        const isStale = stale.has(op.routingOperationId);
+        const act = can.act ? nextChainAction(op, isStale) : null;
+        const attachCam = async (camId) => {
+            const o = ws.routing.find((x) => x.id === op.routingOperationId);
+            if (!o || !ws.revision)
+                throw new Error('OPERATION_NOT_FOUND');
+            await api.saveOperation({ revisionId: ws.revision.id, opNo: o.opNo, name: o.name, machineIds: o.machines.map((m) => m.id), primaryId: o.machines.find((m) => m.primary)?.id ?? null, skillCode: o.skillCode, skillLevel: o.skillLevel, camId: camId,
+                setup: o.setupMinutes, cycle: o.cycleSeconds, firstPiece: o.firstPieceRequired, qc: o.qcRequired, instructions: o.instructions, reason: 'CAM kaydı operasyona bağlandı' });
+        };
         let busy = false; // one click = one record: a second click (or a slow network) never creates a second CAM record for the same NC
         const run = async (ev) => {
             if (!act || busy)
@@ -92,12 +116,18 @@ export async function drawChainPanel(host, api, ws, can, reload, showErr, onChai
                     await reload('CAM kaydı yayınlandı.');
                 }
                 else if (act.kind === 'ATTACH_CAM') {
-                    const o = ws.routing.find((x) => x.id === op.routingOperationId);
-                    if (!o || !ws.revision)
-                        throw new Error('OPERATION_NOT_FOUND');
-                    await api.saveOperation({ revisionId: ws.revision.id, opNo: o.opNo, name: o.name, machineIds: o.machines.map((m) => m.id), primaryId: o.machines.find((m) => m.primary)?.id ?? null, skillCode: o.skillCode, skillLevel: o.skillLevel, camId: op.cam.camProgramId,
-                        setup: o.setupMinutes, cycle: o.cycleSeconds, firstPiece: o.firstPieceRequired, qc: o.qcRequired, instructions: o.instructions, reason: 'CAM kaydı operasyona bağlandı' });
+                    await attachCam(op.cam.camProgramId);
                     await reload('CAM kaydı operasyona bağlandı.');
+                }
+                else if (act.kind === 'REBUILD_CAM') {
+                    // one click = three real records, in order, each re-read from the server: new CAM record from the NC now in force → release → attach to the operation. The old CAM record stays in history.
+                    const now = (await api.techChain(ws.revision.id)).operations.find((x) => x.routingOperationId === op.routingOperationId);
+                    if (!now?.nc.versionId)
+                        throw new Error('NC_VERSION_NOT_FOUND');
+                    const made = await api.camFromNc(op.routingOperationId, now.nc.versionId, null);
+                    await api.releaseCam(made.id);
+                    await attachCam(made.id);
+                    await reload('CAM kaydı yeni NC sürümünden oluşturuldu, yayınlandı ve operasyona bağlandı. Takım türleri yeni NC başlığından türetildi.');
                 }
                 else if (act.kind === 'LINK_TOOL_LIST') {
                     await api.linkDocumentToOp(op.toolList.documentId, op.opNo);
@@ -111,7 +141,7 @@ export async function drawChainPanel(host, api, ws, can, reload, showErr, onChai
                 showErr(e);
             }
         };
-        return E('div', { class: 'r', 'data-testid': 'pw-chain-op', 'data-op': String(op.opNo), 'data-ready': String(op.workOrderReady) }, E('div', { class: 'row', style: 'gap:6px;flex-wrap:wrap' }, E('b', {}, `OP${op.opNo}`), E('span', {}, op.name), word('NC', op.nc, 'pw-chain-nc'), word('CAM', op.cam, 'pw-chain-cam'), word('Takım listesi', op.toolList, 'pw-chain-tl'), E('span', { class: `chip ${op.workOrderReady ? 'ok' : 'warn'}`, 'data-testid': 'pw-chain-ready' }, op.workOrderReady ? 'İŞ EMRİNE HAZIR' : 'İŞ EMRİNE HAZIR DEĞİL')), gapText(op), act ? E('div', { class: 'row', style: 'margin-top:6px' }, E('button', { class: 'btn primary sm', type: 'button', 'data-testid': 'pw-chain-act', 'data-kind': act.kind, onClick: (ev) => void run(ev) }, act.label)) : null);
+        return E('div', { class: 'r', 'data-testid': 'pw-chain-op', 'data-op': String(op.opNo), 'data-ready': String(op.workOrderReady) }, E('div', { class: 'row', style: 'gap:6px;flex-wrap:wrap' }, E('b', {}, `OP${op.opNo}`), E('span', {}, op.name), word('NC', op.nc, 'pw-chain-nc'), word('CAM', op.cam, 'pw-chain-cam'), word('Takım listesi', op.toolList, 'pw-chain-tl'), E('span', { class: `chip ${op.workOrderReady ? 'ok' : 'warn'}`, 'data-testid': 'pw-chain-ready' }, op.workOrderReady ? 'İŞ EMRİNE HAZIR' : 'İŞ EMRİNE HAZIR DEĞİL')), gapText(op, isStale), act ? E('div', { class: 'row', style: 'margin-top:6px' }, E('button', { class: 'btn primary sm', type: 'button', 'data-testid': 'pw-chain-act', 'data-kind': act.kind, onClick: (ev) => void run(ev) }, act.label)) : null);
     });
     host.append(E('div', { class: 'formbox', 'data-testid': 'pw-chain', style: 'margin-bottom:10px' }, E('b', {}, 'Operasyon zinciri (NC · CAM · takım listesi)'), E('div', { class: 'mut' }, 'Üç ayrı kayıt vardır: NC belgesi (dosya) · CAM kaydı (o NC\'den oluşan program kaydı) · CAM kaydının operasyona bağlantısı. Belge başlığı veya dosya adı ilişki sayılmaz; her şey gerçek kayıttan okunur. “Yürürlükte” = onaylı ve yürürlüğe alınmış. CNC tezgâhına program gönderilmez.'), E('div', { class: 'rows' }, ...rows)));
 }

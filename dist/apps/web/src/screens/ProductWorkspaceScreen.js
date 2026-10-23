@@ -184,6 +184,9 @@ export async function renderProductWorkspaceScreen(container, api, state = {}) {
                 const file = h('input', { type: 'file', 'data-testid': `pw-${tid}-file`, ...(docType === 'TOOL_LIST' ? { accept: '.xlsx,.xls,.csv,.pdf' } : {}) });
                 const note = h('input', { 'data-testid': `pw-${tid}-note`, placeholder: target ? 'Bu sürümde ne değişti? (isteğe bağlı)' : 'Not (isteğe bağlı)' });
                 const ttl = multi && !target ? h('input', { 'data-testid': `pw-${tid}-title`, placeholder: 'Program adı (ör. OP10 tornalama)' }) : null;
+                const canDecide = !!(can.approveDocument && api.docSubmit && api.docReview && api.docApprove && api.docPublish);
+                const decision = canDecide ? h('select', { 'data-testid': `pw-${tid}-decision` }, h('option', { value: 'DRAFT' }, 'Yalnız yükle (TASLAK kalsın)'), h('option', { value: 'APPROVED' }, 'Yükle ve onayla (kontrol + onay, benim kararım)'), ...(docType === 'TOOL_LIST' ? [] : [h('option', { value: 'EFFECTIVE' }, 'Yükle, onayla ve yürürlüğe al (benim kararım)')])) : null;
+                const label = h('input', { 'data-testid': `pw-${tid}-label`, value: rev?.revision ?? '', placeholder: 'Belgenin üzerinde yazan revizyon (ör. A)' });
                 const upload = async () => {
                     const f = file.files?.[0];
                     if (!f || !rev) {
@@ -193,13 +196,38 @@ export async function renderProductWorkspaceScreen(container, api, state = {}) {
                     try {
                         const bytes = new Uint8Array(await f.arrayBuffer());
                         const r = await api.upload({ docType, entityType: 'PRODUCT_REVISION', entityId: rev.id, title: target ? null : ((ttl && val(ttl).trim()) || `${title} ${ws.product.code}`), fileName: f.name, mimeType: guessMime(f.name, f.type), contentBase64: toBase64(bytes), validUntil: null, note: val(note).trim() || null, documentId: target?.id ?? null });
-                        await reload(`Yüklendi: sürüm ${r.versionNo} — TASLAK. Üretimde geçerli olması için Doküman Kontrol'den onay ve yürürlüğe alma gerekir.`);
+                        const want = decision ? val(decision) : 'DRAFT';
+                        if (want === 'DRAFT' || !api.docSubmit || !api.docReview || !api.docApprove || !api.docPublish) {
+                            await reload(`Yüklendi: sürüm ${r.versionNo} — TASLAK. Üretimde geçerli olması için Doküman Kontrol'den onay ve yürürlüğe alma gerekir.`);
+                            return;
+                        }
+                        // upload-time decision: the SAME four document-control calls the Doküman Kontrol screen makes, in order, each recorded with the user's name and reason. A refusal stops the chain; what was done stays recorded.
+                        const why = `${val(note).trim() || 'Yükleme anında karar'} — ${f.name} (yükleyen kendi kararı)`;
+                        let done = 'yüklendi (TASLAK)';
+                        try {
+                            await api.docSubmit(r.versionId, why, val(label).trim() || null);
+                            done = 'onaya gönderildi';
+                            await api.docReview(r.versionId, why);
+                            done = 'kontrol edildi';
+                            await api.docApprove(r.versionId, why);
+                            done = 'onaylandı';
+                            if (want === 'EFFECTIVE') {
+                                await api.docPublish(r.versionId, why);
+                                done = 'yürürlüğe alındı';
+                            }
+                        }
+                        catch (e) {
+                            await reload(`Sürüm ${r.versionNo} ${done}; sonraki adım yapılamadı. Kalanı Doküman Kontrol'den tamamlayın.`);
+                            fail(e);
+                            return;
+                        }
+                        await reload(want === 'EFFECTIVE' ? `Yüklendi ve yürürlüğe alındı: sürüm ${r.versionNo}.${docType === 'NC_PROGRAM' ? ' CAM kaydı eski NC’den ise “CAM kaydını yeni NC’den yeniden oluştur” düğmesi çıkar.' : ''}` : `Yüklendi ve onaylandı: sürüm ${r.versionNo} (yürürlüğe alınmadı).${docType === 'TOOL_LIST' ? ' Takım listesinde yürürlük, takım verisi doğrulandıktan sonra “Yürürlüğe Al” ile yapılır.' : ''}`);
                     }
                     catch (e) {
                         fail(e);
                     }
                 };
-                formHost.append(E('div', { class: 'formbox' }, E('div', { class: 'mut' }, target ? `${target.docNo ?? ''} için YENİ SÜRÜM: eski sürüm silinmez ve yürürlükteki sürüm değişmez; yeni dosya TASLAK olarak eklenir.` : 'Yeni doküman TASLAK olarak eklenir; onay ve yürürlüğe alma Doküman Kontrol’dedir.'), E('div', { class: 'fgrid w2' }, ...(ttl ? [field('Program adı', ttl)] : []), field('Dosya', file), field('Not', note)), E('div', { class: 'row' }, btn('primary', `pw-${tid}-upload`, 'Yükle (TASLAK)', () => void upload()), btn('ghost', null, 'Vazgeç', () => formHost.replaceChildren()))));
+                formHost.append(E('div', { class: 'formbox' }, E('div', { class: 'mut' }, target ? `${target.docNo ?? ''} için YENİ SÜRÜM: eski sürüm silinmez ve yürürlükteki sürüm değişmez; yeni dosya TASLAK olarak eklenir.` : 'Yeni doküman TASLAK olarak eklenir; onay ve yürürlüğe alma Doküman Kontrol’dedir.'), E('div', { class: 'fgrid w2' }, ...(ttl ? [field('Program adı', ttl)] : []), field('Dosya', file), field('Not', note), ...(decision ? [field('Yüklerken karar', decision), field('Belge revizyonu (karar verilecekse)', label)] : [])), E('div', { class: 'row' }, btn('primary', `pw-${tid}-upload`, 'Yükle (TASLAK)', () => void upload()), btn('ghost', null, 'Vazgeç', () => formHost.replaceChildren()))));
             };
             const toolHost = E('div', { 'data-testid': 'pw-tools-control', style: 'margin-top:10px' });
             const STATUS_TR = { OK: 'DOĞRULANDI', FAIL: 'HATA', WARN: 'UYARI', NOT_VERIFIABLE: 'SİSTEM DOĞRULAYAMADI' };
