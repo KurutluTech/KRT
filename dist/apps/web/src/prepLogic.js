@@ -114,6 +114,16 @@ export function buildSteps(i) {
         steps.push(S('wo', 7, W, 'WAIT', 'Onay bekliyor', gate.reasons[0] ?? '', null, null));
     else
         steps.push(S('wo', 7, W, 'LOCKED', 'Tamamlanacak', 'Hazırlık bitince açılır.', null, null));
+    // Tamamlanmış adım da aynı sayfada açılabilir (yeni sürüm yükleme, inceleme, düzenleme); ikincil düğme.
+    const OPEN = { docs: ['Belgeleri aç', 'drawing'], bom: ["BOM'u aç", 'bom'], route: ['Operasyonları aç', 'routing'], tools: ['Takım listesini aç', 'tools'], quality: ['Kalite planını aç', 'quality'] };
+    for (const st of steps) {
+        const o = OPEN[st.key];
+        if (st.status === 'DONE' && o && !st.action) {
+            st.action = o[0];
+            st.target = o[1];
+            st.secondary = true;
+        }
+    }
     return steps;
 }
 /** The only gate to the work-order screen. Never opens on a guess; short reasons only (the step lines already name the gaps). */
@@ -164,7 +174,7 @@ export const sameOrder = (a, b) => a.length === b.length && a.every((x, i) => x 
 /** Server refusals in plain Turkish; unknown errors pass through. */
 export function reorderErrorText(msg) {
     if (/OP_NO_REFERENCED/.test(msg))
-        return 'Bu sıra değişikliği, belgesi veya kontrol planı OP numarasına bağlı bir operasyonun numarasını değiştirir; sunucu bunu henüz kimlikle taşımıyor. Kayıt yapılmadı, hiçbir bağlantı bozulmadı.';
+        return 'Bu operasyonun bağlı belgeleri bulunduğundan sıra değişikliği henüz kaydedilemiyor. Kayıt yapılmadı, hiçbir bağlantı bozulmadı.';
     if (/RECHECK_OPEN/.test(msg))
         return 'Bu operasyon için açık bir takım yeniden-kontrol kaydı var; önce kapatılmalı. Kayıt yapılmadı.';
     if (/OP_RULE_REFERENCED/.test(msg))
