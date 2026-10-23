@@ -115,11 +115,11 @@ export async function drawPrepFlow(host, c) {
         return; ed = null; edNodes = []; dirty = false; saveEd(); draw(); };
     /** Rehber eylemi: editör açık değilse açar (kapatmaz), görünür alana kaydırır. */
     const showEd = (n) => { if (ed?.slot === n.slot) {
-        host.querySelector(`[data-testid="pv2-editor-${n.slot}"]`)?.scrollIntoView?.({ block: 'center', behavior: 'smooth' });
+        host.querySelector(`[data-testid="pv2-editor-${n.slot}"]`)?.scrollIntoView?.({ block: 'center', behavior: 'auto' });
         return;
-    } openEd(n); setTimeout(() => host.querySelector(`[data-testid="pv2-editor-${n.slot}"]`)?.scrollIntoView?.({ block: 'center', behavior: 'smooth' }), 60); };
+    } openEd(n); setTimeout(() => host.querySelector(`[data-testid="pv2-editor-${n.slot}"]`)?.scrollIntoView?.({ block: 'center', behavior: 'auto' }), 60); };
     const gotoStep = (key) => { const el = host.querySelector(`[data-testid="pv2-step-${key}"]`); if (!el)
-        return; el.scrollIntoView?.({ block: 'center', behavior: 'smooth' }); el.classList.add('flash'); setTimeout(() => el.classList.remove('flash'), 2200); el.querySelector('button')?.focus?.({ preventScroll: true }); };
+        return; el.scrollIntoView?.({ block: 'center', behavior: 'auto' }); el.classList.add('flash'); setTimeout(() => el.classList.remove('flash'), 2200); el.querySelector('button')?.focus?.({ preventScroll: true }); };
     const guideAct = (g) => {
         if (g.target === 'order') {
             if (cur())

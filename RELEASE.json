@@ -1,6 +1,6 @@
 {
   "product": "KMI NEXT",
-  "commit": "a0903897a96551c1b24ccd91bbf9cb3fe1ff1315",
+  "commit": "18d905a70cd0407ed1b0bc5c2037f21d8e79b0ab",
   "builtFrom": "clean git tree",
   "fileCount": 367,
   "migrationsInRepo": 73,
@@ -1049,8 +1049,8 @@
     },
     {
       "path": "dist/apps/web/src/screens/prepFlowPanel.js",
-      "bytes": 30878,
-      "sha256": "17a617cc0155033adbaf467d9490f07cd11c67066722b22e2e8d76c17cc61308"
+      "bytes": 30872,
+      "sha256": "dec1f43cae959b52ea4e0e8391de46b279158174100f0c46cdd0135e2a1bef5b"
     },
     {
       "path": "dist/apps/web/src/screens/productChainPanel.js",
