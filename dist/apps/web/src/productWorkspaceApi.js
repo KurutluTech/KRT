@@ -67,6 +67,25 @@ export function createProductWorkspaceApi(client, session) {
             }
             return { done };
         },
+        async releaseRevision(revisionId) { await rpc('release_product_revision', { p_revision_id: revisionId }); },
+        async orderLines(productId) {
+            const items = await client.select('order_items', { columns: 'id,order_id,qty,due_date', filters: { product_id: `eq.${productId}` }, order: 'due_date.asc' }, session);
+            if (!items.length)
+                return [];
+            const oids = [...new Set(items.map((x) => x.orderId))];
+            const orders = await client.select('orders', { columns: 'id,customer_po,status,customer_id', filters: { id: `in.(${oids.join(',')})` } }, session);
+            const cids = [...new Set(orders.map((o) => o.customerId))];
+            const custs = cids.length ? await client.select('customers', { columns: 'id,name', filters: { id: `in.(${cids.join(',')})` } }, session) : [];
+            let wos = [];
+            try {
+                wos = await selReal(client, 'work_orders', { columns: 'id,order_item_id', filters: { order_item_id: `in.(${items.map((x) => x.id).join(',')})` } }, session);
+            }
+            catch {
+                wos = [];
+            }
+            return items.flatMap((it) => { const o = orders.find((x) => x.id === it.orderId); if (!o)
+                return []; return [{ itemId: it.id, orderId: o.id, orderNo: o.customerPo, customer: custs.find((c) => c.id === o.customerId)?.name ?? '', status: o.status, qty: Number(it.qty), dueDate: it.dueDate, workOrders: wos.filter((w) => w.orderItemId === it.id).length }]; });
+        },
         async linkDocumentToOp(d, opNo) { await rpc('document_link_operation', { p_document: d, p_op_no: opNo, p_on: true }); },
         cncProgramMatch: (m, c) => rpc('cnc_program_match', { p_machine: m, p_cam_program: c }),
         async copyRouting(f, t, r) { await rpc('routing_copy', { p_from: f, p_to: t, p_reason: r }); },

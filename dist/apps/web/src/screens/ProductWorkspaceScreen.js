@@ -13,6 +13,7 @@ import { drawToolistWork } from './toolistWorkPanel.js';
 import { drawControlPlan } from './controlPlanPanel.js';
 import { nextText } from '../stageText.js';
 import { drawToolistMap } from './toolistMapPanel.js';
+import { drawPrepFlow, PREP_CSS } from './prepFlowPanel.js';
 import { drawBarStock, fmtMm } from './barStockPanel.js';
 import { barPlanPreview, DEFAULT_KERF_MM, DEFAULT_STEEL_DENSITY } from '../../../../packages/domain/src/barStock.js';
 import { KX_CSS, NA, card, chip, emptyState, field, fmt, fold, fromBase64, invalid, isChecked, kvItem, showFile, toBase64, val, when } from '../kx.js';
@@ -34,6 +35,7 @@ const PW_CSS = `
 .pw .parg{grid-template-columns:minmax(0,1.3fr) repeat(3,minmax(0,1fr)) auto}
 .pw .pcell{display:flex;flex-direction:column;gap:1px;align-items:flex-start}.pw .pcell .cl{display:none}.pw .pcell .linkbtn{min-height:24px;padding:0;font-size:12px}
 @media (max-width:900px){.pw .pcell{flex-direction:row;flex-wrap:wrap;gap:4px 10px;align-items:center}.pw .pcell .cl{display:inline;min-width:120px}}
+.pw [data-testid="pw-calc-out"] .chip,.pw .calcg .chip{white-space:normal;max-width:100%;overflow-wrap:anywhere;text-align:left;line-height:1.3}
 .pw .calcg{grid-template-columns:minmax(0,1.3fr) repeat(4,minmax(0,.8fr)) minmax(0,1.4fr)}
 .pw .prevg{grid-template-columns:auto minmax(0,.7fr) minmax(0,.8fr) minmax(0,1fr) auto}
 .pw .prodg{grid-template-columns:110px minmax(0,2fr) 140px auto}
@@ -58,7 +60,7 @@ const btn = (cls, testid, text, fn, extra = {}) => E('button', { class: cls, typ
 const lbl = (t, _v = '') => E('span', { class: 'cl' }, t);
 export async function renderProductWorkspaceScreen(container, api, state = {}) {
     const go = (s) => renderProductWorkspaceScreen(container, api, { ...s, ...(state.only ? { only: state.only } : {}) });
-    const shell = (...kids) => mount(container, h('div', { class: 'kx pw', 'data-testid': 'pw-root' }, h('style', {}, KX_CSS + PW_CSS), ...kids));
+    const shell = (...kids) => mount(container, h('div', { class: 'kx pw', 'data-testid': 'pw-root' }, h('style', {}, KX_CSS + PW_CSS + PREP_CSS), ...kids));
     const banner = state.banner ? E('div', { class: `banner ${state.banner.kind === 'error' ? 'bad' : state.banner.kind === 'ok' ? 'ok' : ''}`, 'data-testid': 'pw-banner', 'data-kind': state.banner.kind, role: state.banner.kind === 'error' ? 'alert' : 'status' }, state.banner.text) : null;
     const fail = (e) => {
         const text = errorText(e);
@@ -778,8 +780,45 @@ export async function renderProductWorkspaceScreen(container, api, state = {}) {
             shell(banner, noRevBox, E('div', { class: 'row', style: 'margin-bottom:10px' }, E('div', { style: 'min-width:180px' }, revSel)), E('div', { class: 'kx-grid' }, ...state.only.map((k) => all[k]).filter((x) => !!x)));
             return;
         }
-        shell(head, banner, noRevBox, readyCard, E('div', { style: 'height:14px' }), E('div', { class: 'kx-grid' }, idCard, // 1 Teknik belgeler → 2 Operasyonlar ve CAM/NC → 3 Takım listesi → 4 Hammadde/BOM → 5 Kalite planı → 6 Süre ve kapasite
+        // V2: tek akışlı "Üretime hazırlık" katmanı üstte; ayrıntılı düzenleme kartları (aynı kanonik editörler) aynı sayfada, adımın "Tamamla" düğmesiyle açılır.
+        const DETAIL_KEY = 'kmi.pw.detail';
+        const wasOpen = (() => { try {
+            return sessionStorage.getItem(DETAIL_KEY) === '1';
+        }
+        catch {
+            return false;
+        } })();
+        const detail = h('details', { class: 'pv2-detail', 'data-testid': 'pw-detail', ...(wasOpen || state.banner || state.openOp ? { open: 'open' } : {}) }, h('summary', { class: 'sec-sum', 'data-testid': 'pw-detail-sum', style: 'cursor:pointer;color:#93c5fd;font-weight:700;padding:10px 2px' }, 'Ayrıntılı düzenleme (belgeler, BOM, kalite, parametreler, geçmiş)'), E('div', { class: 'row', style: 'margin:6px 0 10px' }, h('a', { class: 'btn ghost', href: '#/dokuman-kontrol' }, 'Doküman Kontrol'), h('a', { class: 'btn ghost', href: `#/urun-master?urun=${ws.product.id}` }, 'Ürün Master'), can.editStructure ? btn('primary', 'pw-top-op-add', '+ Operasyon', () => { addOp(); scrollTo(container.querySelector('[data-testid="pw-card-routing"]')); }) : null), readyCard, E('div', { style: 'height:14px' }), E('div', { class: 'kx-grid' }, idCard, // 1 Teknik belgeler → 2 Operasyonlar ve CAM/NC → 3 Takım listesi → 4 Hammadde/BOM → 5 Kalite planı → 6 Süre ve kapasite
         docCard('drawing', 'Teknik resim', ws.cards.drawing, 'DRAWING'), docCard('cad', 'CAD / STEP', ws.cards.cad, 'CAD_MODEL'), routingCard, docCard('cam', 'CAM / NC', ws.cards.cam, 'NC_PROGRAM', true), docCard('tools', 'Takım listesi', ws.cards.tools, 'TOOL_LIST'), bomCard, qualityCard, calcCard, paramCard, histCard));
+        detail.addEventListener('toggle', () => { try {
+            sessionStorage.setItem(DETAIL_KEY, detail.open ? '1' : '0');
+        }
+        catch { /* private mode */ } });
+        const openDetail = (t, opCode) => {
+            detail.open = true;
+            try {
+                sessionStorage.setItem(DETAIL_KEY, '1');
+            }
+            catch { /* private mode */ }
+            if (t === 'routing') {
+                if (opCode === 'NEW')
+                    addOp();
+                else {
+                    const op = ws.routing.find((x) => x.opCode === opCode);
+                    if (op) {
+                        clearBanner();
+                        openOp = op.id;
+                        drawOps();
+                    }
+                }
+            }
+            const card0 = container.querySelector(`[data-testid="pw-card-${t === 'release' ? 'ready' : t}"]`) ?? container.querySelector('[data-testid="pw-ready"]');
+            setTimeout(() => scrollTo(card0), 30);
+        };
+        const prepHost = E('div', { class: 'pv2', 'data-testid': 'pv2-root' });
+        const backBtn = E('div', { class: 'crumb' }, btn('', 'pw-back', '← Ürünler', () => void go({})));
+        shell(banner, noRevBox, prepHost, E('div', { style: 'height:14px' }), detail);
+        void drawPrepFlow(prepHost, { api, ws, revSelect: E('div', { style: 'min-width:180px' }, revSel), backBtn, initialQty: state.qty, openDetail, reload: (m) => reload(m), fail, navigate: (hsh) => { location.hash = hsh; } });
         if (state.openOp && state.openOp !== 'NEW')
             scrollTo(opsHost.querySelector(`[data-op-id="${state.openOp}"]`));
     }

@@ -420,7 +420,7 @@ export const ROUTES = [
     { path: '/tedarikciler', label: 'Tedarikçiler (kartlar)', group: 'Yönetim', inMenu: true, render: (el, c, s) => renderEntityGalleryScreen(el, galleryDeps(c, s), { kind: 'SUPPLIER', listHref: '#/katalog?k=tedarikci', listLabel: 'Katalog Merkezi' }) },
     { path: '/takim-kartlari', label: 'Takım kartları', group: 'Saha', inMenu: true, render: (el, c, s) => renderEntityGalleryScreen(el, galleryDeps(c, s), { kind: 'TOOL', listHref: '#/takimhane', listLabel: 'Takım Odası (işlemler)' }) },
     { path: '/olcum-ekipmani', label: 'Ölçüm ekipmanı (kartlar)', group: 'Saha', inMenu: true, render: (el, c, s) => renderEntityGalleryScreen(el, galleryDeps(c, s), { kind: 'MEASUREMENT', listHref: '#/kalite', listLabel: 'Kalite / Metroloji' }) },
-    { path: '/siparis-komuta', label: 'Sipariş Komuta Merkezi', group: 'Yönetim', inMenu: true, render: (el, c, s) => renderOrderCommandScreen(el, createOrderCommandApi(c, s)) },
+    { path: '/siparis-komuta', label: 'Sipariş Komuta Merkezi', group: 'Yönetim', inMenu: true, render: (el, c, s, q) => renderOrderCommandScreen(el, createOrderCommandApi(c, s), q.get('siparis') ? { order: q.get('siparis') } : {}) },
     { path: '/siparisler', label: 'Siparişler', group: 'Yönetim', inMenu: true, render: (el, c, s) => renderOrdersScreen(el, createOrdersApi(c, s)) },
     { path: '/pdf-siparis', label: 'PDF’ten Sipariş', group: 'Yönetim', inMenu: true, render: (el, c, s, q) => renderOrderImportScreen(el, createOrderImportApi(c, s), { id: q.get('id') }) },
     { path: '/yetki-yonetimi', label: 'Yetki Yönetimi (sahipler · izinler)', group: 'Yönetim', inMenu: true, render: (el, c, s) => renderPermissionAdminScreen(el, createPermissionAdminApi(c, s)) },
