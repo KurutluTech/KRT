@@ -59,7 +59,7 @@ const E = (tag, props = null, ...kids) => h(tag, props, ...kids);
 const btn = (cls, testid, text, fn, extra = {}) => E('button', { class: cls, type: 'button', ...(testid ? { 'data-testid': testid } : {}), onClick: fn, ...extra }, text);
 const lbl = (t, _v = '') => E('span', { class: 'cl' }, t);
 export async function renderProductWorkspaceScreen(container, api, state = {}) {
-    const go = (s) => renderProductWorkspaceScreen(container, api, { ...s, ...(state.only ? { only: state.only } : {}) });
+    const go = (s) => renderProductWorkspaceScreen(container, api, { ...s, ...(state.only ? { only: state.only } : {}), ...(state.canOpenOrders !== undefined ? { canOpenOrders: state.canOpenOrders } : {}) });
     const shell = (...kids) => mount(container, h('div', { class: 'kx pw', 'data-testid': 'pw-root' }, h('style', {}, KX_CSS + PW_CSS + PREP_CSS), ...kids));
     const banner = state.banner ? E('div', { class: `banner ${state.banner.kind === 'error' ? 'bad' : state.banner.kind === 'ok' ? 'ok' : ''}`, 'data-testid': 'pw-banner', 'data-kind': state.banner.kind, role: state.banner.kind === 'error' ? 'alert' : 'status' }, state.banner.text) : null;
     const fail = (e) => {
@@ -831,6 +831,6 @@ export async function renderProductWorkspaceScreen(container, api, state = {}) {
         const prepHost = E('div', { class: 'pv2', 'data-testid': 'pv2-root' });
         const backBtn = E('div', { class: 'crumb' }, btn('', 'pw-back', '← Ürünler', () => void go({})));
         shell(banner, noRevBox, prepHost);
-        void drawPrepFlow(prepHost, { api, ws, revSelect: E('div', { style: 'min-width:180px' }, revSel), backBtn, initialQty: state.qty, editors, setActive, reload: (m) => reload(m), fail, navigate: (hsh) => { location.hash = hsh; }, productId: ws.product.id, initialOp: state.openOp ?? null, bindOpenOp: (f) => { opOpenHook = f; } });
+        void drawPrepFlow(prepHost, { api, ws, revSelect: E('div', { style: 'min-width:180px' }, revSel), backBtn, initialQty: state.qty, editors, setActive, reload: (m) => reload(m), fail, navigate: (hsh) => { location.hash = hsh; }, productId: ws.product.id, ...(state.canOpenOrders !== undefined ? { canOpenOrders: state.canOpenOrders } : {}), initialOp: state.openOp ?? null, bindOpenOp: (f) => { opOpenHook = f; } });
     }
 }

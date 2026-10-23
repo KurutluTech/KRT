@@ -29,7 +29,7 @@ export function buildSteps(i) {
     else if (rev?.state === 'APPROVED')
         steps.push(S('bom', 2, B, 'DONE', 'Hazır', 'BOM onaylı.', null, null));
     else
-        steps.push(S('bom', 2, B, 'WAIT', 'Onay bekliyor', `BOM kaydı mevcut; Rev ${rev?.revision ?? ''} yayınıyla onaylanır.`, "BOM'u incele", 'bom'));
+        steps.push(S('bom', 2, B, 'WAIT', 'Revizyon yayını bekliyor', `BOM kayıtlı. Rev ${rev?.revision ?? ''} yayınlandığında yürürlüğe girer.`, "BOM'u incele", 'bom'));
     // 3 Operasyon sırası ve CAM
     const R = 'Operasyon sırası ve CAM';
     if (!ws.routing.length)
@@ -87,7 +87,7 @@ export function buildSteps(i) {
     else if (i.plan?.released)
         steps.push(S('quality', 5, Q, 'TODO', 'Teknik kontrol gerekli', 'Plan onaylı; operasyona bağlantısı kontrol edilecek.', 'Kalite planını tamamla', 'quality'));
     else if (i.plan)
-        steps.push(S('quality', 5, Q, i.plan.openItems ? 'TODO' : 'WAIT', i.plan.openItems ? 'Tamamlanacak' : 'Onay bekliyor', i.plan.openItems ? `Taslak mevcut, ${i.plan.openItems} ölçü tamamlanacak.` : 'Taslak mevcut, onay bekliyor.', 'Kalite planını tamamla', 'quality'));
+        steps.push(S('quality', 5, Q, i.plan.openItems ? 'TODO' : 'WAIT', i.plan.openItems ? 'Tamamlanacak' : 'Onay bekliyor', (i.plan.openItems ? `Taslak mevcut, ${i.plan.openItems} ölçü tamamlanacak` : 'Taslak mevcut, onay bekliyor') + (linked ? '.' : '; operasyona bağlı değil.'), 'Kalite planını tamamla', 'quality'));
     else if (ws.quality.length)
         steps.push(S('quality', 5, Q, 'WAIT', 'Veri doğrulanamadı', 'Kontrol planı okunamadı.', 'Kalite planını tamamla', 'quality'));
     else
@@ -95,7 +95,7 @@ export function buildSteps(i) {
     // 6 Üretime hazırla (revizyon yayını + sunucu hazırlık cevabı)
     const P = 'Üretime hazırla';
     const overall = ws.readiness?.overall;
-    const prior = steps.slice(0, 5);
+    const prior = steps.slice(0, 5).filter((s) => !(s.key === 'bom' && s.status === 'WAIT')); /* BOM onayı = bu yayın: yayın kendi onayını beklemez */
     const rv = rev?.revision ?? '';
     if (rev?.status === 'RELEASED' && overall === 'READY' && chain?.operations.every((o) => o.workOrderReady))
         steps.push(S('ready', 6, P, 'DONE', 'Hazır', 'Revizyon yürürlükte ve rota iş emrine hazır.', null, null));
@@ -104,7 +104,7 @@ export function buildSteps(i) {
     else if (rev?.status === 'RELEASED')
         steps.push(S('ready', 6, P, 'TODO', 'Teknik kontrol gerekli', `Rev ${rv} yayında; sunucu hazırlık kontrolü henüz “hazır” demiyor.`, null, null));
     else
-        steps.push(S('ready', 6, P, 'TODO', 'Onay bekliyor', `Rev ${rv} taslak: yayınlanınca iş emri açılabilir.`, `Rev ${rv}'yı yayınla`, 'release'));
+        steps.push(S('ready', 6, P, 'TODO', 'Yayın bekliyor', `Rev ${rv} taslak: yayınlanınca BOM ve revizyon yürürlüğe girer, iş emri açılabilir.`, `Rev ${rv}'yı yayınla`, 'release'));
     // 7 İş emri oluştur
     const gate = workOrderGate(i, steps[5]);
     const W = 'İş emri oluştur';
@@ -186,4 +186,47 @@ export function reorderErrorText(msg) {
     if (/NO_CHANGE/.test(msg))
         return 'Sıra değişmedi; yeni sürüm açılmadı.';
     return msg;
+}
+/** "İş emrini açmak için kalan işlemler": adımlar + sipariş kapısından türetilir (yeni durum yok). Tamamlanan satır kendiliğinden kaybolur. */
+export function remainingActions(i, steps, perm, toolDocNo) {
+    const rows = [];
+    const by = (k) => steps.find((s) => s.key === k);
+    const rev = i.ws.revision?.revision ?? '';
+    const row = (key, title, status, why, action, target, ok, noPerm) => ({ key, title, status, why, action: ok ? action : null, target: ok ? target : null, noPerm: !ok && action ? noPerm : null });
+    const docs = by('docs');
+    if (docs.status !== 'DONE')
+        rows.push(row('docs', 'Teknik belgeler', docs.label === 'Onay bekliyor' ? 'Yürürlük bekliyor' : docs.label, docs.line, 'Belgeleri aç', 'drawing', perm.docs, 'Belge yükleme/onay yetkiniz yok'));
+    const route = by('route');
+    if (route.status !== 'DONE')
+        rows.push(row('route', 'Operasyon / CAM', route.label === 'Onay bekliyor' ? 'Yürürlük bekliyor' : route.label, route.line, route.action ? 'Operasyonu aç' : null, 'routing', perm.docs, 'Rota/CAM düzenleme yetkiniz yok'));
+    const tools = by('tools');
+    if (tools.status !== 'DONE')
+        rows.push(row('tools', `Takım listesi${toolDocNo ? ' ' + toolDocNo : ''}`, tools.label === 'Onay bekliyor' ? 'Yürürlük bekliyor' : tools.label, null, 'Takım listesine git', 'tools', perm.tools, 'Takım listesini yürürlüğe alma yetkiniz yok'));
+    const q = by('quality');
+    if (q.status !== 'DONE') {
+        const act = i.ws.routing.filter((o) => o.active);
+        const opn = act.length === 1 ? ` OP${act[0].opNo}` : '';
+        const unlinked = !(act.length > 0 && act.every((o) => o.qcPoints.some((p) => !!p.controlPlanId)));
+        const st = i.plan?.openItems ? `${i.plan.openItems} ölçü eksik` : q.label === 'Onay bekliyor' ? 'Onay bekliyor' : q.label;
+        rows.push(row('quality', `Kalite planı${opn}`, st, i.plan && unlinked ? 'Plan operasyona bağlı değil.' : null, 'Kalite planını aç', 'quality', perm.quality, 'Kalite planı düzenleme yetkiniz yok'));
+    }
+    const r6 = by('ready');
+    if (r6.status !== 'DONE') {
+        const prior = steps.slice(0, 5).filter((s) => !(s.key === 'bom' && s.status === 'WAIT'));
+        const blocked = prior.some((s) => s.status !== 'DONE');
+        if (blocked)
+            rows.push({ key: 'release', title: `Rev ${rev}`, status: 'Yayın bekliyor', why: 'Önceki hazırlık adımları bekleniyor.', action: null, target: null, noPerm: null });
+        else if (r6.action)
+            rows.push(row('release', `Rev ${rev}`, 'Yayın bekliyor', null, 'Revizyon adımına git', 'release-step', perm.release, 'Revizyon yayınlama yetkiniz yok'));
+        else
+            rows.push({ key: 'release', title: `Rev ${rev}`, status: r6.label, why: r6.line, action: null, target: null, noPerm: null });
+    }
+    const o = i.order;
+    if (!o)
+        rows.push({ key: 'order', title: 'Sipariş', status: 'Sipariş seçilmedi', why: 'İş emri bir sipariş kalemine bağlıdır.', action: null, target: null, noPerm: null });
+    else if (o.status === 'DRAFT')
+        rows.push(row('order', o.orderNo, 'Sipariş onayı bekliyor', null, 'Siparişi aç', 'order', perm.order, 'Sipariş ekranını açma yetkiniz yok'));
+    else if (!['CONFIRMED', 'IN_PRODUCTION'].includes(o.status))
+        rows.push({ key: 'order', title: o.orderNo, status: ORDER_TR[o.status] ?? o.status, why: 'İş emri için sipariş “Onaylandı” olmalı.', action: null, target: null, noPerm: null });
+    return rows;
 }
