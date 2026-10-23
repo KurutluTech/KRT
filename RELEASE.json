@@ -1,6 +1,6 @@
 {
   "product": "KMI NEXT",
-  "commit": "031e1062de106c07496346c5bf6cd10f78325b68",
+  "commit": "a04e34ba8dfd81d3efda436cc6ac208c8884101b",
   "builtFrom": "clean git tree",
   "fileCount": 365,
   "migrationsInRepo": 73,
@@ -509,8 +509,8 @@
     },
     {
       "path": "dist/apps/web/src/productWorkspaceApi.js",
-      "bytes": 8654,
-      "sha256": "69b7b6088a9b47dc14ae7dd64799150d79b9ac353d30922cc51dc17b4e3560f3"
+      "bytes": 9805,
+      "sha256": "fa942d00f015bac2df7516b227673037ae7e448d6105994f2ae48f70f91793bf"
     },
     {
       "path": "dist/apps/web/src/productionApi.js",
@@ -854,8 +854,8 @@
     },
     {
       "path": "dist/apps/web/src/screens/ProductWorkspaceScreen.js",
-      "bytes": 91720,
-      "sha256": "05491f4c8ffcb05ccccb0ebb4ca1462fc2157b3e400fb846539ce590ef36599f"
+      "bytes": 92780,
+      "sha256": "41a787826b0e8e091065c599e481a80faf856356424042fea9532c864c13223a"
     },
     {
       "path": "dist/apps/web/src/screens/ProductionDeskScreen.js",
@@ -979,8 +979,8 @@
     },
     {
       "path": "dist/apps/web/src/screens/barStockPanel.js",
-      "bytes": 5043,
-      "sha256": "c6195f3b35906ea7c3cd8e4ce2e7e1c1d40de0eaf8cf397907a37c29a43624c8"
+      "bytes": 5719,
+      "sha256": "1e8d0f76c23685f1d7368f0bf86f9a91363b5b804549ffb9f4bbd8ee9e807d83"
     },
     {
       "path": "dist/apps/web/src/screens/controlPlanPanel.js",

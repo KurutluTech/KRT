@@ -42,6 +42,31 @@ export function createProductWorkspaceApi(client, session) {
         async docReview(v, note) { await dc.review(v, true, note); },
         async docApprove(v, note) { await dc.approve(v, true, note); },
         async docPublish(v, reason) { await dc.publish(v, reason); },
+        async docDecide(documentId, label, reason, publish) {
+            const lc = await dc.lifecycle(documentId);
+            const v = [...lc.versions].sort((a, b) => b.versionNo - a.versionNo)[0];
+            if (!v?.control)
+                throw new Error('DOCUMENT_VERSION_NOT_FOUND');
+            const c = v.control;
+            let done = 'hiçbir adım gerekmedi';
+            if (c.state === 'DRAFT') {
+                await dc.submit(v.id, reason, label || c.docRevisionLabel || lc.document.revision || null);
+                done = 'onaya gönderildi';
+            }
+            if (c.state === 'DRAFT' || (c.state === 'IN_REVIEW' && !c.reviewedBy)) {
+                await dc.review(v.id, true, reason);
+                done = 'kontrol edildi';
+            }
+            if (c.state === 'DRAFT' || c.state === 'IN_REVIEW') {
+                await dc.approve(v.id, true, reason);
+                done = 'onaylandı';
+            }
+            if (publish && c.state !== 'EFFECTIVE') {
+                await dc.publish(v.id, reason);
+                done = 'yürürlüğe alındı';
+            }
+            return { done };
+        },
         async linkDocumentToOp(d, opNo) { await rpc('document_link_operation', { p_document: d, p_op_no: opNo, p_on: true }); },
         cncProgramMatch: (m, c) => rpc('cnc_program_match', { p_machine: m, p_cam_program: c }),
         async copyRouting(f, t, r) { await rpc('routing_copy', { p_from: f, p_to: t, p_reason: r }); },

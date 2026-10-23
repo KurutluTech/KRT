@@ -301,7 +301,17 @@ export async function renderProductWorkspaceScreen(container, api, state = {}) {
                     } })())) : null));
                 }
             };
-            const docRow = (d) => E('div', { class: 'r docg', 'data-testid': 'pw-doc', 'data-doc-no': d.docNo ?? '' }, E('div', { class: 'stack', style: 'gap:3px' }, E('div', { class: 'row', style: 'gap:6px' }, E('b', {}, d.docNo ?? '—'), chip(CTL_TR[d.controlState ?? ''] ?? '—', CTL_TONE[d.controlState ?? ''] ?? ''), E('span', { class: 'mut' }, `v${d.versionNo ?? '—'}${d.effectiveVersionNo ? ` · yürürlükte v${d.effectiveVersionNo}` : ''}`)), E('div', {}, d.title), E('div', { class: 'mut' }, `${DOC_TR[d.docType] ?? d.docType}${d.fileName ? ` · ${d.fileName}` : ''}${d.opNos.length ? ` · OP${d.opNos.join(', OP')}` : ''}`)), E('div', { class: 'acts' }, btn('ghost sm', 'pw-doc-open', 'Önizle', () => void view(d, false)), btn('ghost sm', 'pw-doc-dl', 'İndir', () => void view(d, true)), h('a', { class: 'btn ghost sm', href: `#/dokuman-kontrol?doc=${d.id}`, 'data-testid': 'pw-doc-history' }, 'Geçmiş'), canUpload ? btn('ghost sm', `pw-${tid}-newver-${d.docNo ?? ''}`, 'Yeni sürüm', () => openForm(d)) : null));
+            const docRow = (d) => E('div', { class: 'r docg', 'data-testid': 'pw-doc', 'data-doc-no': d.docNo ?? '' }, E('div', { class: 'stack', style: 'gap:3px' }, E('div', { class: 'row', style: 'gap:6px' }, E('b', {}, d.docNo ?? '—'), chip(CTL_TR[d.controlState ?? ''] ?? '—', CTL_TONE[d.controlState ?? ''] ?? ''), E('span', { class: 'mut' }, `v${d.versionNo ?? '—'}${d.effectiveVersionNo ? ` · yürürlükte v${d.effectiveVersionNo}` : ''}`)), E('div', {}, d.title), E('div', { class: 'mut' }, `${DOC_TR[d.docType] ?? d.docType}${d.fileName ? ` · ${d.fileName}` : ''}${d.opNos.length ? ` · OP${d.opNos.join(', OP')}` : ''}`)), E('div', { class: 'acts' }, btn('ghost sm', 'pw-doc-open', 'Önizle', () => void view(d, false)), btn('ghost sm', 'pw-doc-dl', 'İndir', () => void view(d, true)), h('a', { class: 'btn ghost sm', href: `#/dokuman-kontrol?doc=${d.id}`, 'data-testid': 'pw-doc-history' }, 'Geçmiş'), canUpload ? btn('ghost sm', `pw-${tid}-newver-${d.docNo ?? ''}`, 'Yeni sürüm', () => openForm(d)) : null, (canUpload && can.approveDocument && api.docDecide && ['DRAFT', 'IN_REVIEW', 'APPROVED'].includes(d.controlState ?? '')) ? btn('primary sm', `pw-${tid}-onepass-${d.docNo ?? ''}`, docType === 'TOOL_LIST' ? 'Tek onay' : 'Tek onay + yürürlük', () => void (async () => {
+                const publish = docType !== 'TOOL_LIST';
+                const why = `Tek onay${publish ? ' ve yürürlük' : ''}: ${d.docNo ?? ''} ${d.fileName ?? ''} (sahibi kararı)`.trim();
+                try {
+                    const r = await api.docDecide(d.id, ws.revision?.revision ?? null, why, publish);
+                    await reload(`${d.docNo ?? 'Belge'}: ${r.done}.${docType === 'TOOL_LIST' ? ' Takım listesinde yürürlük, takım verisi doğrulanınca “Yürürlüğe Al” ile yapılır.' : ''}`);
+                }
+                catch (e) {
+                    fail(e);
+                }
+            })()) : null));
             const addBtn = canUpload && (docs.length === 0 || multi) ? btn(docs.length ? 'ghost sm' : 'primary sm', `pw-${tid}-open-upload`, docs.length ? '+ Yeni program' : 'Dosya yükle', () => openForm(null)) : null;
             const cardEl = card({ title, span, testid: `pw-card-${tid}`, chip: stateChip(st), attrs: { 'data-state': st }, actions: [addBtn] }, docs.length ? E('div', { class: 'rows' }, ...docs.map(docRow)) : (whyNoUpload === 'NO_REV' ? emptyState(`Revizyon yok — ${title.toLowerCase()} eklenemez`, WHY_TR.NO_REV) : emptyState(`${NA} — bu revizyonda ${title.toLowerCase()} yok`, canUpload ? 'İlk dosyayı “Dosya yükle” ile ekleyin.' : (whyNoUpload ? WHY_TR[whyNoUpload] : ''))), formHost, viewHost, docType === 'TOOL_LIST' ? toolHost : null);
             void drawTools();
@@ -556,6 +566,8 @@ export async function renderProductWorkspaceScreen(container, api, state = {}) {
         catch (e) {
             fail(e);
         } };
+        if (rev && ws.routing.length)
+            void doEstimate(); // hesap sayfa açılınca kendisi yapılır (yalnız gösterir; kayıt ayrı)
         const reeval = async (runId) => { const why = val(creason).trim(); try {
             const r = await api.reevaluate(runId, why);
             await reload(`Hesap yenilendi: ${changeText(r.oldTotalMinutes, r.newTotalMinutes, 'dk')}. Eski kayıt silinmedi.`);

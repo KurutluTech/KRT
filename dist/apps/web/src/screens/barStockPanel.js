@@ -4,9 +4,22 @@ const E = (tag, props = null, ...kids) => h(tag, props, ...kids);
 const n = (s) => { const t = s.trim().replace(',', '.'); if (t === '')
     return null; const v = Number(t); return Number.isFinite(v) ? v : NaN; };
 export const fmtMm = (v) => String(Math.round(v * 1000) / 1000).replace('.', ',');
+// The typed quantity survives every redraw of the card (a save elsewhere re-renders it) — it used to jump back to 37.
+let lastQty = '';
+const rememberedQty = () => { if (lastQty)
+    return lastQty; try {
+    return sessionStorage.getItem('kmi.bar.qty') ?? '';
+}
+catch {
+    return '';
+} };
+const rememberQty = (v) => { lastQty = v; try {
+    sessionStorage.setItem('kmi.bar.qty', v);
+}
+catch { /* storage unavailable: kept in memory only */ } };
 export async function drawBarStock(host, api, revisionId, materials, editable, reload, showErr) {
     host.replaceChildren();
-    const qty = E('input', { 'data-testid': 'pw-bar-qty', inputmode: 'numeric', value: '37', style: 'max-width:90px' });
+    const qty = E('input', { 'data-testid': 'pw-bar-qty', inputmode: 'numeric', value: rememberedQty() || '1', style: 'max-width:90px' });
     const out = E('div', { 'data-testid': 'pw-bar-out' });
     const calc = async () => {
         const q = n(qty.value);
@@ -31,7 +44,9 @@ export async function drawBarStock(host, api, revisionId, materials, editable, r
             out.append(E('div', { class: 'r', 'data-testid': 'pw-bar-line', 'data-material': l.materialCode }, E('b', {}, `${l.materialCode} · Ø${fmtMm(l.diaMm)} · çubuk ${fmtMm(l.barLengthMm)} mm · kesim ${fmtMm(l.cutLengthMm)} mm`), E('span', { 'data-testid': 'pw-bar-result' }, p.barsNeeded === null ? 'Hesaplanamadı (kesim boyu çubuğa sığmıyor)' : `${p.piecesPerBar} parça/çubuk → ${q} adet için ${p.barsNeeded} çubuk (${p.sparePieces} parça artar) · çubuk başına kalan ${fmtMm(p.remainderMmPerBar)} mm · kesilen parça ${fmtMm(p.pieceMassG)} g · ham toplam ${p.blankTotalKg === null ? '—' : fmtMm(p.blankTotalKg) + ' kg'}`), E('span', { class: 'mut', 'data-testid': 'pw-bar-source' }, `testere payı ${fmtMm(l.kerfMm)} mm (${l.kerfSource === 'DEFAULT' ? 'KMI varsayılanı' : 'istisna: ' + (l.kerfReason ?? '')}) · yoğunluk ${l.densityGCm3} g/cm³ (${l.densitySource === 'DEFAULT' ? 'varsayılan, ölçülmüş değil' : 'spec'}) · bitmiş parça ağırlığı: doğrulanmış geometri yok → hesaplanmadı`)));
         }
     };
-    qty.addEventListener('change', () => void calc());
+    let timer;
+    qty.addEventListener('input', () => { rememberQty(qty.value); clearTimeout(timer); timer = setTimeout(() => void calc(), 300); }); // recalculates while typing
+    qty.addEventListener('change', () => { rememberQty(qty.value); void calc(); });
     const form = E('div', { 'data-testid': 'pw-bar-form-host' });
     if (editable && materials.length) {
         const sel = E('select', { 'data-testid': 'pw-bar-material' }, ...materials.map((m) => E('option', { value: m }, m)));
