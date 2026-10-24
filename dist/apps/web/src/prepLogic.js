@@ -71,8 +71,13 @@ export function buildSteps(i) {
         steps.push(S('tools', 4, L, 'LOCKED', 'Tamamlanacak', 'Rota hazır olunca doğrulanır.', null, null));
     else if (!chain)
         steps.push(S('tools', 4, L, 'WAIT', 'Veri doğrulanamadı', 'Takım listesi durumu okunamadı.', 'Takım listesini yürürlüğe al', 'tools'));
-    else if (allOk(ops, (o) => o.toolList.status))
-        steps.push(S('tools', 4, L, 'DONE', 'Hazır', `${i.toolCount != null ? `${i.toolCount} takım` : 'Takım listesi'} yürürlükte.`, null, null));
+    else if (allOk(ops, (o) => o.toolList.status)) {
+        const rc = i.tool?.rechecks ?? [];
+        if (rc.length)
+            steps.push(S('tools', 4, L, 'WAIT', 'Yeniden kontrol bekliyor', `Takım listesi yürürlükte. ${rc.map((r) => 'OP' + r.opNo).join(', ')}: takım verisi değişti; CAM/NC uygunluğu yetkili kişi tarafından kaydedilmeli (kayıt girilene kadar operasyon iş emrinde başlatılamaz).`, 'Kontrolü kaydet', 'tool-recheck'));
+        else
+            steps.push(S('tools', 4, L, 'DONE', 'Hazır', `${i.toolCount != null ? `${i.toolCount} takım` : 'Takım listesi'} yürürlükte.`, null, null));
+    }
     else {
         const bad = ops.find((o) => o.toolList.status !== WORD_OK);
         const ts = bad.toolList.status;
@@ -81,6 +86,10 @@ export function buildSteps(i) {
             steps.push(S('tools', 4, L, 'TODO', 'Tamamlanacak', 'Takım listesi yüklenecek.', 'Belgeyi incele', 'tools'));
         else if (ts === 'OPERASYONA BAĞLI DEĞİL')
             steps.push(S('tools', 4, L, 'TODO', 'Teknik kontrol gerekli', 'Kayıt mevcut, operasyon bağlantısı kontrol edilecek.', 'Takım listesini yürürlüğe al', 'tools'));
+        else if (i.tool?.attested)
+            steps.push(S('tools', 4, L, 'WAIT', 'Yürürlük bekliyor', `Takımhane doğrulaması kayıtlı${i.tool.workRev ? ` (r${i.tool.workRev})` : ''}${n}. Kalan: Doküman Kontrol’de “Yürürlüğe al”.`, 'Doküman Kontrol’de yürürlüğe al', 'doc-control'));
+        else if (i.tool)
+            steps.push(S('tools', 4, L, 'WAIT', 'Onay bekliyor', `Kayıt mevcut${n}, takımhane doğrulaması bekliyor; sonra yürürlük.`, 'Takım doğrulamasını aç', 'tools'));
         else
             steps.push(S('tools', 4, L, 'WAIT', 'Onay bekliyor', `Kayıt mevcut${n}, yürürlük bekliyor.`, 'Takım listesini yürürlüğe al', 'tools'));
     }
@@ -194,7 +203,7 @@ export function reorderErrorText(msg) {
     return msg;
 }
 /** "İş emrini açmak için kalan işlemler": adımlar + sipariş kapısından türetilir (yeni durum yok). Tamamlanan satır kendiliğinden kaybolur. */
-export function remainingActions(i, steps, perm, toolDocNo, toolAttested = false) {
+export function remainingActions(i, steps, perm, toolDocNo) {
     const rows = [];
     const by = (k) => steps.find((s) => s.key === k);
     const rev = i.ws.revision?.revision ?? '';
@@ -207,12 +216,17 @@ export function remainingActions(i, steps, perm, toolDocNo, toolAttested = false
         rows.push(row('route', 'Operasyon / CAM', route.label === 'Onay bekliyor' ? 'Yürürlük bekliyor' : route.label, route.line, route.action ? 'Operasyonu aç' : null, 'routing', perm.docs, 'Rota/CAM düzenleme yetkiniz yok'));
     const tools = by('tools');
     if (tools.status !== 'DONE') {
-        const st = tools.label === 'Onay bekliyor' ? 'Yürürlük bekliyor' : tools.label;
-        const ttl = `Takım listesi${toolDocNo ? ' ' + toolDocNo : ''}`;
-        if (toolAttested)
-            rows.push(row('tools', ttl, st, 'Kritik alanlar doğrulandı ve kaydedildi. Yürürlüğe alma Doküman Kontrol’dedir.', 'Doküman Kontrol’ü aç', 'doc-control', perm.tools, 'Takım listesini yürürlüğe alma yetkiniz yok'));
+        const t = i.tool;
+        const docNo = toolDocNo ?? t?.docNo ?? null;
+        const ttl = `Takım listesi${docNo ? ' ' + docNo : ''}`;
+        const ops = (t?.rechecks ?? []).map((r) => 'OP' + r.opNo).join(', ');
+        const eff = tools.label === 'Yeniden kontrol bekliyor';
+        if (eff)
+            rows.push(row('tools', ttl, `${ops} CAM/NC yeniden kontrolü bekliyor`, 'Takım verisi doğrulandı ve liste yürürlükte; takım verisi değiştiği için CAM/NC uygunluğunu yetkili kişi (Yönetici/Kalite) kaydetmeli. Bu kayıt girilene kadar operasyon iş emrinde başlatılamaz.', 'Kontrolü kaydet', 'tool-recheck', perm.tools, 'CAM/NC yeniden kontrolü için yetkiniz yok'));
+        else if (t?.attested)
+            rows.push(row('tools', ttl, 'Yürürlük bekliyor', `Takımhane doğrulaması kayıtlı${t.workRev ? ` (r${t.workRev})` : ''}; tekrar istenmez. Kalan tek işlem: Doküman Kontrol’de “Yürürlüğe al” (yetkili: Yönetici/Kalite).${ops ? ` Ardından ${ops} için CAM/NC yeniden kontrolü kaydedilecek.` : ''}`, 'Doküman Kontrol’de yürürlüğe al', 'doc-control', perm.tools, 'Takım listesini yürürlüğe alma yetkiniz yok'));
         else
-            rows.push(row('tools', ttl, st, 'Çap, boy, tutucu ve offset yetkili kişi tarafından doğrulanıp kaydedilmeli; sonra Doküman Kontrol’de yürürlüğe alınır.', 'Takım doğrulamasını aç', 'tools', perm.tools, 'Takım listesini yürürlüğe alma yetkiniz yok'));
+            rows.push(row('tools', ttl, tools.label === 'Onay bekliyor' ? 'Yürürlük bekliyor' : tools.label, 'Çap, boy, tutucu ve offset yetkili kişi tarafından doğrulanıp kaydedilmeli; sonra Doküman Kontrol’de yürürlüğe alınır.', 'Takım doğrulamasını aç', 'tools', perm.tools, 'Takım listesini yürürlüğe alma yetkiniz yok'));
     }
     const q = by('quality');
     if (q.status !== 'DONE') {

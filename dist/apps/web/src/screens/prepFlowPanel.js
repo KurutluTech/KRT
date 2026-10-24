@@ -63,6 +63,7 @@ export async function drawPrepFlow(host, c) {
     const toolDocNo = ov?.documents[0]?.docNo ?? null;
     const tchk = tv ? await safe(() => api.toolistChecks(tv.versionId)) : null;
     const toolAttested = tchk?.attested === true;
+    const toolFacts = { docId: ov?.documents[0]?.documentId ?? null, docNo: toolDocNo, attested: toolAttested, workRev: tchk?.workRev ?? null, rechecks: (ov?.rechecksOpen ?? []).map((r) => ({ id: r.id, opNo: r.opNo })) };
     if (tv && api.toolistWorkGet) {
         const w = await safe(() => api.toolistWorkGet(tv.versionId));
         const rows = (w?.draft ?? w?.published)?.rows;
@@ -149,6 +150,14 @@ export async function drawPrepFlow(host, c) {
         };
         setTimeout(tick, 150);
     };
+    /** Açık CAM/NC yeniden-kontrol kaydına (Kontrol edildi) kaydırır; editör açılınca görünür. */
+    const openToolRecheck = () => { let tries = 0; const tick = () => { tries += 1; const el = host.querySelector('[data-testid="pw-tools-recheck"]'); if (el) {
+        el.scrollIntoView?.({ block: 'center', behavior: 'auto' });
+        el.classList.add('flash');
+        setTimeout(() => el.classList.remove('flash'), 2200);
+        return;
+    } if (tries < 40)
+        setTimeout(tick, 150); }; setTimeout(tick, 150); };
     const guideAct = (g) => {
         if (g.target === 'order') {
             if (cur())
@@ -160,7 +169,12 @@ export async function drawPrepFlow(host, c) {
             return;
         }
         if (g.target === 'doc-control') {
-            c.navigate('#/dokuman-kontrol');
+            c.navigate(toolFacts.docId ? `#/dokuman-kontrol?doc=${toolFacts.docId}` : '#/dokuman-kontrol');
+            return;
+        }
+        if (g.target === 'tool-recheck') {
+            showEd({ slot: 'tools', target: 'tools' });
+            openToolRecheck();
             return;
         }
         if (g.target === 'tools') {
@@ -205,7 +219,7 @@ export async function drawPrepFlow(host, c) {
     };
     const cur = () => lines.find((l) => l.itemId === itemId) ?? null;
     const qtyNow = () => cur()?.qty ?? manualQty;
-    const input = () => ({ ws, chain, order: cur(), toolCount, plan, staleOps });
+    const input = () => ({ ws, chain, order: cur(), toolCount, plan, staleOps, tool: toolFacts });
     const loadCalc = async () => {
         if (!rev)
             return;
@@ -278,7 +292,7 @@ export async function drawPrepFlow(host, c) {
         // E ---------------------------------------------------------------------------------------------
         const prim = act.flatMap((x) => x.machines.filter((m) => m.primary).map((m) => m.code))[0];
         const perm = { docs: !!(ws.can.manageDocuments || ws.can.approveDocument), tools: !!(ws.can.manageDocuments || ws.can.approveDocument), quality: !!(ws.can.editRouting || ws.can.manageDocuments), release: !!ws.can.manageBom, order: c.canOpenOrders !== false };
-        const guide = gate.open ? [] : remainingActions(input(), steps, perm, toolDocNo, toolAttested);
+        const guide = gate.open ? [] : remainingActions(input(), steps, perm, toolDocNo);
         const guideEl = (g) => E('div', { class: 'gline', 'data-testid': 'pv2-guide-row', 'data-key': g.key }, E('div', { class: 'gt' }, E('b', {}, g.title), E('span', { class: 'gs', 'data-testid': 'pv2-guide-status' }, g.status), g.why ? E('div', { class: 'gw' }, g.why) : null), g.action && g.target ? E('button', { class: 'pbtn ghost', type: 'button', 'data-testid': `pv2-guide-go-${g.key}`, onClick: () => guideAct(g) }, g.action) : g.noPerm ? E('div', { class: 'gp', 'data-testid': 'pv2-guide-noperm' }, g.noPerm) : null);
         const E_ = E('section', { class: 'sec wo', 'data-testid': 'pv2-e' }, E('button', { class: 'pbtn', type: 'button', style: 'min-height:56px;font-size:16px', 'data-testid': 'pv2-wo-btn', ...(gate.open ? {} : { disabled: 'disabled' }), onClick: () => { if (o)
                 c.navigate(`#/siparis-komuta?siparis=${o.orderId}`); } }, o ? `${o.orderNo} için İş Emri Oluştur` : 'İş Emri Oluştur'), gate.open ? E('div', { class: 'mut', 'data-testid': 'pv2-wo-info' }, `İş emri ekranı açılır; sipariş kalemi, Rev ${rev?.revision}, ${fmt(qtyNow())} adet ve rota taşınır. ${prim ? `Önerilen makine: ${prim} (rotadaki öncelikli makine).` : ''} Operatör ve makine ataması yetki ve uygunluk kontrolünden geçmeden kesinleşmez. İş emri kendiliğinden oluşturulmaz.`)
@@ -288,6 +302,15 @@ export async function drawPrepFlow(host, c) {
     async function stepAct(s) {
         if (s.target === 'release') {
             await doRelease();
+            return;
+        }
+        if (s.target === 'doc-control') {
+            c.navigate(toolFacts.docId ? `#/dokuman-kontrol?doc=${toolFacts.docId}` : '#/dokuman-kontrol');
+            return;
+        }
+        if (s.target === 'tool-recheck') {
+            showEd({ slot: 'tools', target: 'tools' });
+            openToolRecheck();
             return;
         }
         if (s.target)

@@ -1,6 +1,6 @@
 {
   "product": "KMI NEXT",
-  "commit": "58022fe8a5914f31c431a14d0d9d7a280802aa78",
+  "commit": "b9f81838baf48207d0a0d07a563680ea711c5fe6",
   "builtFrom": "clean git tree",
   "fileCount": 367,
   "migrationsInRepo": 73,
@@ -504,8 +504,8 @@
     },
     {
       "path": "dist/apps/web/src/prepLogic.js",
-      "bytes": 18665,
-      "sha256": "8fdae390bb42594aeba5f039640869598a6c21a4b1774991e30eb75aa7477ead"
+      "bytes": 20400,
+      "sha256": "b235ecd015e32d9f33cf7bc42605c374d263080e69c92827370dfcedc5aae290"
     },
     {
       "path": "dist/apps/web/src/productMasterApi.js",
@@ -859,8 +859,8 @@
     },
     {
       "path": "dist/apps/web/src/screens/ProductWorkspaceScreen.js",
-      "bytes": 96566,
-      "sha256": "0e5172984f734b3d57b0c85750e7d2e14cd35408292e091e397b088c687b0aec"
+      "bytes": 96726,
+      "sha256": "c4405a6cb35caf679780cd89de3b7f32fd0cee3d353b48f778d6ea1858f74e3d"
     },
     {
       "path": "dist/apps/web/src/screens/ProductionDeskScreen.js",
@@ -1049,8 +1049,8 @@
     },
     {
       "path": "dist/apps/web/src/screens/prepFlowPanel.js",
-      "bytes": 34748,
-      "sha256": "eb7c878daf2d2dca1e50c24f7451eaa97831431c752cd05e81c75816f8fa999f"
+      "bytes": 36071,
+      "sha256": "aeef7b103693bb70e06c0a821e23463d6d607b020455eb34be7ff805b42178f0"
     },
     {
       "path": "dist/apps/web/src/screens/productChainPanel.js",

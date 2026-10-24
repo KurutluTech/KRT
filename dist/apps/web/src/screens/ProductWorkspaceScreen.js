@@ -295,7 +295,7 @@ export async function renderProductWorkspaceScreen(container, api, state = {}) {
                     }
                 for (const r of ov.rechecksOpen) {
                     const note = h('input', { 'data-testid': 'pw-tools-recheck-note', placeholder: 'CAM/NC ve operasyon yeni listeyle uyumlu mu? Kısa not' });
-                    toolHost.append(E('div', { class: 'banner', role: 'status', 'data-testid': 'pw-tools-recheck' }, E('b', {}, `OP${r.opNo}: takım listesi değişti — CAM/NC ve operasyon uygunluğu yeniden kontrol edilmeli. `), 'Kayıt girilene kadar bu operasyon iş emrinde başlatılamaz.', ov.canAttest ? E('div', { class: 'row', style: 'margin-top:6px' }, note, btn('primary sm', 'pw-tools-recheck-done', 'Kontrol edildi', () => void (async () => { try {
+                    toolHost.append(E('div', { class: 'banner', role: 'status', 'data-testid': 'pw-tools-recheck' }, E('b', {}, `OP${r.opNo}: takım listesi değişti — CAM/NC ve operasyon uygunluğu yeniden kontrol edilmeli. `), 'Kayıt girilene kadar bu operasyon iş emrinde başlatılamaz. Kim: yetkili kişi (Yönetici/Kalite) — CAM/NC programının bu takım listesiyle uyumunu kontrol edip kısa not yazar; sistem bunu kendiliğinden onaylamaz.', ov.canAttest ? E('div', { class: 'row', style: 'margin-top:6px' }, note, btn('primary sm', 'pw-tools-recheck-done', 'Kontrol edildi', () => void (async () => { try {
                         await api.toolistRecheckDone(r.id, val(note).trim());
                         await reload('Yeniden kontrol kaydedildi.');
                     }
