@@ -158,6 +158,14 @@ export async function drawPrepFlow(host, c) {
         return;
     } if (tries < 40)
         setTimeout(tick, 150); }; setTimeout(tick, 150); };
+    /** Düzenleyici açılınca verilen alana kaydırır (varsa). */
+    const scrollTid = (tid) => { let tries = 0; const tick = () => { tries += 1; const el = host.querySelector(`[data-testid="${tid}"]`); if (el) {
+        el.scrollIntoView?.({ block: 'center', behavior: 'auto' });
+        el.classList.add('flash');
+        setTimeout(() => el.classList.remove('flash'), 2200);
+        return;
+    } if (tries < 30)
+        setTimeout(tick, 150); }; setTimeout(tick, 200); };
     const guideAct = (g) => {
         if (g.target === 'order') {
             if (cur())
@@ -184,6 +192,7 @@ export async function drawPrepFlow(host, c) {
         }
         if (g.target === 'quality') {
             showEd({ slot: 'quality', target: 'quality' });
+            scrollTid('cp-decision');
             return;
         }
         if (g.target === 'drawing') {

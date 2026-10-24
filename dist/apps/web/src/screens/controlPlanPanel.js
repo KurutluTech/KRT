@@ -137,12 +137,19 @@ export async function drawControlPlan(host, api, o) {
     };
     const bSave = E('button', { class: 'ghost sm', type: 'button', 'data-testid': 'cp-save', disabled: true }, 'Taslak Kaydet');
     const bUpApprove = E('button', { class: 'primary sm', type: 'button', 'data-testid': 'cp-upload-approve', disabled: true }, 'Excel Yükle ve Onayla');
-    const bApprove = E('button', { class: 'primary sm', type: 'button', 'data-testid': 'cp-approve', ...(draft ? {} : { disabled: true }) }, draft ? `Onayla (v${draft.version})` : 'Onayla');
+    const bApprove = E('button', { class: 'primary sm', type: 'button', 'data-testid': 'cp-approve', ...(draft ? {} : { disabled: true }) }, draft ? `Kalite planını onayla ve OP30’a bağla (v${draft.version})` : 'Onayla');
+    const why = E('div', { class: 'mut', role: 'status', 'data-testid': 'cp-approve-why' });
+    const bClear = E('button', { class: 'ghost sm', type: 'button', 'data-testid': 'cp-clear-file', style: 'display:none' }, 'Dosya seçimini temizle');
     const sync = () => {
         const ok = !!parsed && parsed.rows.length > 0;
         bSave.disabled = !ok;
         bUpApprove.disabled = !(ok && parsed.openItems.length === 0 && verify.checked);
         bApprove.disabled = !(draft && draft.openItems.length === 0 && verify.checked) || (!!parsed && ok);
+        bClear.style.display = parsed ? '' : 'none';
+        // pasif düğmenin NEDENİ her zaman yazılı
+        why.textContent = !draft ? '' : draft.openItems.length > 0 ? `${draft.openItems.length} eksik / belirsiz ölçü var; önce tamamlanmalı.`
+            : !verify.checked ? 'Onay için önce “Ölçüleri teknik resimle karşılaştırıp doğruladım” kutusunu işaretleyin.'
+                : parsed ? 'Bir Excel dosyası seçili. Kayıtlı planı onaylamak için dosya gerekmez: “Dosya seçimini temizle”ye basın (ya da bu dosyayı kullanmak için “Excel Yükle ve Onayla”).' : 'Hazır: onaylarsanız plan yürürlüğe girer ve OP30’a otomatik bağlanır.';
     };
     const run = async (fn) => { [bSave, bUpApprove, bApprove].forEach((b) => { b.disabled = true; }); try {
         const m = await fn();
@@ -186,9 +193,15 @@ export async function drawControlPlan(host, api, o) {
         sync();
     });
     verify.addEventListener('change', sync);
+    bClear.addEventListener('click', () => { file.value = ''; parsed = null; src = null; out.replaceChildren(); sync(); });
     bSave.addEventListener('click', () => void run(async () => { await saveRows(); return 'Kontrol planı taslağı kaydedildi — onay bekliyor.'; }));
-    bUpApprove.addEventListener('click', () => void run(async () => { const id = await saveRows(); await api.controlPlanApprove(id, true, note.value.trim() || null); return 'Kontrol planı onaylandı ve yürürlüğe girdi.'; }));
-    bApprove.addEventListener('click', () => void run(async () => { await api.controlPlanApprove(draft.id, true, note.value.trim() || null); return 'Kontrol planı onaylandı ve yürürlüğe girdi.'; }));
-    host.append(E('div', { class: 'kx-sub', 'data-testid': 'cp-form', style: 'margin-top:10px' }, E('div', { class: 'row' }, E('b', {}, 'Excel ile yükle'), ' ', opSel, ' ', file), out, E('label', { class: 'row', style: 'gap:6px;align-items:center' }, verify, E('span', {}, 'Ölçüleri teknik resimle karşılaştırıp doğruladım.')), note, E('div', { class: 'row', style: 'gap:8px;margin-top:6px' }, bSave, bUpApprove, bApprove), E('div', { class: 'mut' }, released.length ? 'Yeni onay, mevcut yürürlükteki planı “eski sürüm” yapar; yeni plan hemen yürürlüğe girer.' : 'Onaylanan plan doğrudan yürürlüğe girer ve OP kontrol noktası hazırlığında görünür.')));
+    bUpApprove.addEventListener('click', () => void run(async () => { const id = await saveRows(); await api.controlPlanApprove(id, true, note.value.trim() || null); return 'Kalite planı onaylandı ve OP30’a bağlandı (ilk parça kontrol noktası oluşturuldu / güncellendi).'; }));
+    bApprove.addEventListener('click', () => void run(async () => { await api.controlPlanApprove(draft.id, true, note.value.trim() || null); return 'Kalite planı onaylandı ve OP30’a bağlandı (ilk parça kontrol noktası oluşturuldu / güncellendi).'; }));
+    const complete = !!draft && draft.openItems.length === 0;
+    const verifyRow = E('label', { class: 'row', style: 'gap:6px;align-items:center' }, verify, E('span', {}, 'Ölçüleri teknik resimle karşılaştırıp doğruladım.'));
+    const excelBox = E('div', {}, E('div', { class: 'row' }, E('b', {}, complete ? 'İsterseniz başka bir Excel yükleyin (kayıtlı planı onaylamak için gerekmez)' : 'Excel ile yükle'), ' ', opSel, ' ', file, ' ', bClear), out);
+    const releasedNote = E('div', { class: 'mut' }, released.length ? 'Yeni onay, mevcut yürürlükteki planı “eski sürüm” yapar; yeni plan hemen yürürlüğe girer.' : 'Onaylanan plan doğrudan yürürlüğe girer, OP30 kontrol noktasına (ilk parça) otomatik bağlanır; ayrıca bağlama işlemi gerekmez.');
+    const nCh = draft ? (draft.rows?.length ?? 0) : 0;
+    host.append(E('div', { class: 'kx-sub', 'data-testid': 'cp-form', style: 'margin-top:10px' }, complete ? E('div', { class: 'formbox', 'data-testid': 'cp-decision' }, E('b', {}, `Kayıtlı taslak: OP${draft.opNo ?? 30} v${draft.version} · ${nCh} karakteristik · açık madde yok`), E('div', { class: 'mut' }, 'Teknik kalite onayını yetkili kişi verir. Onayla birlikte plan OP30’a otomatik bağlanır. Dosya yeniden yüklemeniz gerekmez.'), verifyRow, note, E('div', { class: 'row', style: 'gap:8px;margin-top:6px' }, bApprove), why) : null, excelBox, complete ? null : verifyRow, complete ? null : note, E('div', { class: 'row', style: 'gap:8px;margin-top:6px' }, bSave, bUpApprove, complete ? null : bApprove), complete ? null : why, releasedNote));
     sync();
 }

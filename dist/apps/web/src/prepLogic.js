@@ -101,8 +101,10 @@ export function buildSteps(i) {
         steps.push(S('quality', 5, Q, 'DONE', 'Hazır', `Plan onaylı, ${i.plan.characteristics} karakteristik, operasyona bağlı.`, null, null));
     else if (i.plan?.released)
         steps.push(S('quality', 5, Q, 'TODO', 'Teknik kontrol gerekli', 'Plan onaylı; operasyona bağlantısı kontrol edilecek.', 'Kalite planını tamamla', 'quality'));
+    else if (i.plan && i.plan.openItems)
+        steps.push(S('quality', 5, Q, 'TODO', 'Tamamlanacak', `Taslak mevcut, ${i.plan.openItems} ölçü tamamlanacak` + (linked ? '.' : '; operasyona bağlı değil.'), 'Kalite planını tamamla', 'quality'));
     else if (i.plan)
-        steps.push(S('quality', 5, Q, i.plan.openItems ? 'TODO' : 'WAIT', i.plan.openItems ? 'Tamamlanacak' : 'Onay bekliyor', (i.plan.openItems ? `Taslak mevcut, ${i.plan.openItems} ölçü tamamlanacak` : 'Taslak mevcut, onay bekliyor') + (linked ? '.' : '; operasyona bağlı değil.'), 'Kalite planını tamamla', 'quality'));
+        steps.push(S('quality', 5, Q, 'WAIT', 'Onay bekliyor', `Taslak tam (${i.plan.characteristics} karakteristik, açık madde yok); onay bekliyor` + (linked ? '.' : '; onaylanınca OP30’a otomatik bağlanır.'), 'Kalite planını onayla ve OP30’a bağla', 'quality'));
     else if (ws.quality.length)
         steps.push(S('quality', 5, Q, 'WAIT', 'Veri doğrulanamadı', 'Kontrol planı okunamadı.', 'Kalite planını tamamla', 'quality'));
     else
@@ -234,7 +236,9 @@ export function remainingActions(i, steps, perm, toolDocNo) {
         const opn = act.length === 1 ? ` OP${act[0].opNo}` : '';
         const unlinked = !(act.length > 0 && act.every((o) => o.qcPoints.some((p) => !!p.controlPlanId)));
         const st = i.plan?.openItems ? `${i.plan.openItems} ölçü eksik` : q.label === 'Onay bekliyor' ? 'Onay bekliyor' : q.label;
-        rows.push(row('quality', `Kalite planı${opn}`, st, i.plan && unlinked ? 'Plan operasyona bağlı değil.' : null, 'Kalite planını aç', 'quality', perm.quality, 'Kalite planı düzenleme yetkiniz yok'));
+        const ready = !!i.plan && !i.plan.released && !i.plan.openItems;
+        const why = ready ? `Taslak tam: ${i.plan.characteristics} karakteristik, açık madde yok. Kalan tek işlem: teknik kalite onayı (yetkili: Yönetici/Kalite). Onayla birlikte plan OP30’a otomatik bağlanır; ayrıca bağlama gerekmez.` : (i.plan && unlinked ? 'Plan operasyona bağlı değil.' : null);
+        rows.push(row('quality', `Kalite planı${opn}`, st, why, ready ? 'Kalite planını onayla ve OP30’a bağla' : 'Kalite planını aç', 'quality', perm.quality, 'Kalite planı düzenleme yetkiniz yok'));
     }
     const r6 = by('ready');
     if (r6.status !== 'DONE') {
