@@ -1,6 +1,6 @@
 {
   "product": "KMI NEXT",
-  "commit": "6d035d598cefd6f2e6341001897eb135537cd5d2",
+  "commit": "58022fe8a5914f31c431a14d0d9d7a280802aa78",
   "builtFrom": "clean git tree",
   "fileCount": 367,
   "migrationsInRepo": 73,
@@ -169,8 +169,8 @@
     },
     {
       "path": "dist/apps/web/src/errorText.js",
-      "bytes": 28254,
-      "sha256": "6fc246b43517889ff5755d6300deb241f72072697ddcc69ab330f5089630714f"
+      "bytes": 28419,
+      "sha256": "bf09c7832daa775029210946d009badacd0de86b72f1e0812b01e4b3dd72b6b0"
     },
     {
       "path": "dist/apps/web/src/feasibilityApi.js",
@@ -504,8 +504,8 @@
     },
     {
       "path": "dist/apps/web/src/prepLogic.js",
-      "bytes": 17592,
-      "sha256": "d14ce2601a010610623f8ef9209943a8d93f6f8981337296bc93f455aaf5bc4b"
+      "bytes": 18665,
+      "sha256": "8fdae390bb42594aeba5f039640869598a6c21a4b1774991e30eb75aa7477ead"
     },
     {
       "path": "dist/apps/web/src/productMasterApi.js",
@@ -989,8 +989,8 @@
     },
     {
       "path": "dist/apps/web/src/screens/controlPlanPanel.js",
-      "bytes": 8636,
-      "sha256": "01527945e68b12c7eeb8be5e873c4108a9136713f95e3aaed4c83c39dd203adf"
+      "bytes": 17034,
+      "sha256": "a6326177ad0feacaef6055948d38dd7ad8d701304311a499e5ffedd657d64a43"
     },
     {
       "path": "dist/apps/web/src/screens/costCalcs.js",
@@ -1049,8 +1049,8 @@
     },
     {
       "path": "dist/apps/web/src/screens/prepFlowPanel.js",
-      "bytes": 30922,
-      "sha256": "f6494c41d9aaaeb09cffa4f7530b49b14259fdfbc94a7d1d933290e2497ed38d"
+      "bytes": 34748,
+      "sha256": "eb7c878daf2d2dca1e50c24f7451eaa97831431c752cd05e81c75816f8fa999f"
     },
     {
       "path": "dist/apps/web/src/screens/productChainPanel.js",

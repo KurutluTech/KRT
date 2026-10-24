@@ -32,6 +32,94 @@ export async function drawControlPlan(host, api, o) {
             host.append(E('div', { class: 'mut', 'data-testid': 'cp-nomanage' }, 'Kontrol planını yönetici ve yetkili kalite personeli yükler / onaylar.'));
         return;
     }
+    // ---- 0145: taslağı tamamla — eksik/belirsiz ölçüler (açık maddeler) ve nitel kontroller AYNI taslakta düzenlenir; mevcut sayısal satırlar aynen korunur
+    if (draft && api.controlPlanSave && (draft.openItems.length > 0 || draft.rows.some((r) => r.kind === 'QUALITATIVE'))) {
+        const inp = (tid, ph, v = '', extra = {}) => E('input', { type: 'text', 'data-testid': tid, placeholder: ph, value: v, 'aria-label': ph, style: 'width:100%', ...extra });
+        const has0145 = draft.rows.length > 0 && draft.rows.every((r) => 'kind' in r); // sunucuda nitel destek (0145) var mı
+        const rowOf = (code) => draft.rows.find((r) => r.code === code);
+        const str = (v) => (v === null || v === undefined ? '' : String(v));
+        const mk = (code, text) => {
+            const ex = rowOf(code);
+            const q = ex?.kind === 'QUALITATIVE';
+            const kind = E('select', { 'data-testid': `cp-kind-${code}`, 'aria-label': `${code} kontrol türü` }, E('option', { value: 'NUMERIC' }, 'Sayısal ölçüm'), ...(has0145 ? [E('option', { value: 'QUALITATIVE', ...(q ? { selected: true } : {}) }, 'Nitel / fonksiyonel kontrol (geçti-kaldı)')] : []));
+            const c = { code, text, kind, desc: inp(`cp-desc-${code}`, 'Kontrol tanımı', str(ex?.description) || text.split(':')[0].trim()), nom: inp(`cp-nom-${code}`, 'Nominal', str(ex?.nominal), { inputmode: 'decimal' }), lo: inp(`cp-lo-${code}`, 'Alt tolerans (örn. -0,05)', str(ex?.tolLower ?? ex?.tol_lower), { inputmode: 'decimal' }), hi: inp(`cp-hi-${code}`, 'Üst tolerans (örn. 0,05)', str(ex?.tolUpper ?? ex?.tol_upper), { inputmode: 'decimal' }),
+                meth: inp(`cp-meth-${code}`, 'Kontrol yöntemi (zorunlu)', str(ex?.method)), gauge: inp(`cp-gauge-${code}`, 'Mastar / pim / ekipman', str(ex?.gauge)), acc: inp(`cp-acc-${code}`, 'Kabul kriteri / teknik referans (zorunlu)', str(ex?.acceptance)), freq: inp(`cp-freq-${code}`, 'Sıklık', str(ex?.frequency)),
+                num: E('div'), qual: E('div') };
+            c.num = E('div', { class: 'row', style: 'gap:6px' }, c.nom, c.lo, c.hi);
+            c.qual = E('div', { class: 'stack', style: 'gap:6px' }, c.meth, c.gauge, c.acc);
+            const sw = () => { const isQ = kind.value === 'QUALITATIVE'; c.num.style.display = isQ ? 'none' : ''; c.qual.style.display = isQ ? '' : 'none'; };
+            kind.addEventListener('change', sw);
+            sw();
+            return c;
+        };
+        const codes = [...draft.openItems.map((i) => ({ code: i.code, text: i.text })), ...draft.rows.filter((r) => r.kind === 'QUALITATIVE' && !draft.openItems.some((i) => i.code === r.code)).map((r) => ({ code: String(r.code), text: str(r.description) }))];
+        const cards = codes.map((x) => mk(x.code, x.text));
+        const fmsg = E('div', { role: 'status', 'data-testid': 'cp-complete-msg' });
+        const num = (v) => { const t = v.trim().replace(',', '.'); if (t === '')
+            return null; const n = Number(t); return Number.isFinite(n) ? n : NaN; };
+        const bDone = E('button', { class: 'primary sm', type: 'button', 'data-testid': 'cp-complete-save' }, 'Tamamlananları taslağa kaydet');
+        bDone.addEventListener('click', () => void (async () => {
+            const errs = [];
+            const doneRows = [];
+            const stillOpen = [];
+            for (const c of cards) {
+                const base = { code: c.code, description: c.desc.value.trim() || c.text, feature: null, unit: 'mm', frequency: c.freq.value.trim() || null };
+                if (c.kind.value === 'QUALITATIVE') {
+                    const m = c.meth.value.trim();
+                    const a = c.acc.value.trim();
+                    if (!m && !a && !c.gauge.value.trim()) {
+                        stillOpen.push({ code: c.code, text: c.text });
+                        continue;
+                    }
+                    if (!m || !a) {
+                        errs.push(`${c.code}: nitel kontrolde yöntem ve kabul kriteri ikisi de yazılmalı.`);
+                        stillOpen.push({ code: c.code, text: c.text });
+                        continue;
+                    }
+                    doneRows.push({ ...base, nominal: null, tol_lower: null, tol_upper: null, unit: '—', method: m, kind: 'QUALITATIVE', gauge: c.gauge.value.trim() || null, acceptance: a });
+                }
+                else {
+                    const n = num(c.nom.value);
+                    const lo = num(c.lo.value);
+                    const hi = num(c.hi.value);
+                    if (n === null && lo === null && hi === null) {
+                        stillOpen.push({ code: c.code, text: c.text });
+                        continue;
+                    }
+                    if (n === null || lo === null || hi === null || [n, lo, hi].some((x) => Number.isNaN(x))) {
+                        errs.push(`${c.code}: sayısal ölçümde nominal, alt ve üst tolerans sayı olarak yazılmalı (bilmiyorsanız boş bırakın ya da nitel seçin).`);
+                        stillOpen.push({ code: c.code, text: c.text });
+                        continue;
+                    }
+                    if (lo > hi) {
+                        errs.push(`${c.code}: alt tolerans üst toleranstan büyük olamaz.`);
+                        stillOpen.push({ code: c.code, text: c.text });
+                        continue;
+                    }
+                    doneRows.push({ ...base, nominal: n, tol_lower: lo, tol_upper: hi, method: null, kind: 'NUMERIC' });
+                }
+            }
+            if (errs.length) {
+                fmsg.replaceChildren(E('div', { class: 'banner bad', 'data-testid': 'cp-complete-err' }, errs.join(' · ')));
+                return;
+            }
+            if (!doneRows.length) {
+                fmsg.replaceChildren(E('div', { class: 'banner', 'data-testid': 'cp-complete-err' }, 'Kaydedilecek tamamlanmış kontrol yok. Değerleri yetkili kişiden alıp yazın; sistem değer uydurmaz.'));
+                return;
+            }
+            const keep = draft.rows.filter((r) => !cards.some((c) => c.code === r.code)).map((r) => ({ code: String(r.code), description: (r.description ?? null), feature: (r.feature ?? null), nominal: (r.nominal ?? null), tol_lower: ((r.tolLower ?? r.tol_lower) ?? null), tol_upper: ((r.tolUpper ?? r.tol_upper) ?? null), unit: String(r.unit ?? 'mm'), method: (r.method ?? null), frequency: (r.frequency ?? null), kind: (r.kind === 'QUALITATIVE' ? 'QUALITATIVE' : 'NUMERIC'), gauge: (r.gauge ?? null), acceptance: (r.acceptance ?? null) }));
+            bDone.disabled = true;
+            try {
+                await api.controlPlanSave(o.revisionId, draft.opNo ?? 30, [...keep, ...doneRows], stillOpen, draft.sourceFile ? { name: draft.sourceFile, sha256: '' } : null);
+                await o.onChanged(stillOpen.length ? `Kaydedildi. Hâlâ ${stillOpen.length} kontrol tamamlanmadı; onay için hepsi gerekli.` : 'Kontrol planı taslağı tamamlandı ve kaydedildi. Şimdi doğrulama kutusunu işaretleyip “Onayla” diyebilirsiniz; onayla plan OP30’a otomatik bağlanır.');
+            }
+            catch (e) {
+                bDone.disabled = false;
+                o.showErr(e);
+            }
+        })());
+        host.append(E('div', { class: 'kx-sub', 'data-testid': 'cp-complete', style: 'margin-top:10px' }, E('b', {}, 'Kalite planını tamamla'), has0145 ? null : E('div', { class: 'banner', 'data-testid': 'cp-no-qual' }, 'Nitel (geçti-kaldı) kontrol desteği sunucuda henüz etkin değil; bu kontroller yalnız sayısal değerle tamamlanabilir. Etkinleştirme için yönetici onayı (SQL 0145) gerekir.'), E('div', { class: 'mut' }, 'Eksik / belirsiz kontroller aşağıdadır. Sayı yalnız teknik resimden/kalite sorumlusundan alınan değerle girilir. Diş mastarı, geçiş pimi gibi geçti-kaldı kontrolleri için “Nitel” seçin: sayı gerekmez, yöntem ve kabul kriteri gerekir. GEÇTİ/KALDI sonucu burada değil, üretimdeki kontrol sırasında kaydedilir.'), ...cards.map((c) => E('div', { class: 'formbox', 'data-testid': 'cp-card', 'data-code': c.code, style: 'margin-top:8px' }, E('div', { class: 'row', style: 'gap:8px;flex-wrap:wrap' }, E('b', {}, c.code), E('span', { class: 'mut' }, c.text), c.kind), c.desc, c.num, c.qual, c.freq)), E('div', { class: 'row', style: 'gap:8px;margin-top:8px' }, bDone), fmsg));
+    }
     // ---- yükleme alanı
     const opSel = E('select', { 'data-testid': 'cp-op', 'aria-label': 'Operasyon' }, ...o.opNos.map((n) => E('option', { value: String(n), ...(n === 30 ? { selected: true } : {}) }, `OP${n}`)));
     if (!o.opNos.includes(30))

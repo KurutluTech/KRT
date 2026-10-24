@@ -26,10 +26,16 @@ export function buildSteps(i) {
     const B = 'Hammadde / BOM';
     if (!ws.bom.length)
         steps.push(S('bom', 2, B, 'TODO', 'Tamamlanacak', 'Hammadde tanımlanacak: malzeme, çap, boy ve kesim boyu.', 'Hammaddeyi ekle', 'bom'));
-    else if (rev?.state === 'APPROVED')
-        steps.push(S('bom', 2, B, 'DONE', 'Hazır', 'BOM onaylı.', null, null));
-    else
-        steps.push(S('bom', 2, B, 'WAIT', 'Revizyon yayını bekliyor', `BOM kayıtlı. Rev ${rev?.revision ?? ''} yayınlandığında yürürlüğe girer.`, "BOM'u incele", 'bom'));
+    else {
+        // geçerlilik = kayıtlı satırın malzemesi ve birim miktarı var (mevcut kuralla aynı: sistem ek alan uydurmaz). Geçerli BOM hazırlığı bloke etmez; yürürlük ayrıca Rev yayınında.
+        const bad = ws.bom.filter((l) => !String(l.materialCode ?? '').trim() || !(Number(l.qtyPerUnit) > 0));
+        if (bad.length)
+            steps.push(S('bom', 2, B, 'TODO', 'Düzeltilecek', `${bad.length} BOM satırında malzeme kodu veya birim miktar eksik/geçersiz. Aynı ekranda düzeltip kaydedin.`, "BOM'u düzenle", 'bom'));
+        else if (rev?.state === 'APPROVED')
+            steps.push(S('bom', 2, B, 'DONE', 'Hazır', 'BOM onaylı.', null, null));
+        else
+            steps.push(S('bom', 2, B, 'DONE', 'Hazır', `BOM kayıtlı ve geçerli. Rev ${rev?.revision ?? ''} yayınlandığında yürürlüğe girecek.`, "BOM'u incele", 'bom'));
+    }
     // 3 Operasyon sırası ve CAM
     const R = 'Operasyon sırası ve CAM';
     if (!ws.routing.length)
@@ -188,7 +194,7 @@ export function reorderErrorText(msg) {
     return msg;
 }
 /** "İş emrini açmak için kalan işlemler": adımlar + sipariş kapısından türetilir (yeni durum yok). Tamamlanan satır kendiliğinden kaybolur. */
-export function remainingActions(i, steps, perm, toolDocNo) {
+export function remainingActions(i, steps, perm, toolDocNo, toolAttested = false) {
     const rows = [];
     const by = (k) => steps.find((s) => s.key === k);
     const rev = i.ws.revision?.revision ?? '';
@@ -200,8 +206,14 @@ export function remainingActions(i, steps, perm, toolDocNo) {
     if (route.status !== 'DONE')
         rows.push(row('route', 'Operasyon / CAM', route.label === 'Onay bekliyor' ? 'Yürürlük bekliyor' : route.label, route.line, route.action ? 'Operasyonu aç' : null, 'routing', perm.docs, 'Rota/CAM düzenleme yetkiniz yok'));
     const tools = by('tools');
-    if (tools.status !== 'DONE')
-        rows.push(row('tools', `Takım listesi${toolDocNo ? ' ' + toolDocNo : ''}`, tools.label === 'Onay bekliyor' ? 'Yürürlük bekliyor' : tools.label, null, 'Takım listesine git', 'tools', perm.tools, 'Takım listesini yürürlüğe alma yetkiniz yok'));
+    if (tools.status !== 'DONE') {
+        const st = tools.label === 'Onay bekliyor' ? 'Yürürlük bekliyor' : tools.label;
+        const ttl = `Takım listesi${toolDocNo ? ' ' + toolDocNo : ''}`;
+        if (toolAttested)
+            rows.push(row('tools', ttl, st, 'Kritik alanlar doğrulandı ve kaydedildi. Yürürlüğe alma Doküman Kontrol’dedir.', 'Doküman Kontrol’ü aç', 'doc-control', perm.tools, 'Takım listesini yürürlüğe alma yetkiniz yok'));
+        else
+            rows.push(row('tools', ttl, st, 'Çap, boy, tutucu ve offset yetkili kişi tarafından doğrulanıp kaydedilmeli; sonra Doküman Kontrol’de yürürlüğe alınır.', 'Takım doğrulamasını aç', 'tools', perm.tools, 'Takım listesini yürürlüğe alma yetkiniz yok'));
+    }
     const q = by('quality');
     if (q.status !== 'DONE') {
         const act = i.ws.routing.filter((o) => o.active);

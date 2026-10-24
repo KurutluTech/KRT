@@ -61,6 +61,8 @@ export async function drawPrepFlow(host, c) {
     const ov = rev ? await safe(() => api.toolistOverview(rev.id)) : null;
     const tv = ov?.documents[0]?.versions[0];
     const toolDocNo = ov?.documents[0]?.docNo ?? null;
+    const tchk = tv ? await safe(() => api.toolistChecks(tv.versionId)) : null;
+    const toolAttested = tchk?.attested === true;
     if (tv && api.toolistWorkGet) {
         const w = await safe(() => api.toolistWorkGet(tv.versionId));
         const rows = (w?.draft ?? w?.published)?.rows;
@@ -120,6 +122,33 @@ export async function drawPrepFlow(host, c) {
     } openEd(n); setTimeout(() => host.querySelector(`[data-testid="pv2-editor-${n.slot}"]`)?.scrollIntoView?.({ block: 'start', behavior: 'auto' }), 60); };
     const gotoStep = (key) => { const el = host.querySelector(`[data-testid="pv2-step-${key}"]`); if (!el)
         return; el.scrollIntoView?.({ block: 'start', behavior: 'auto' }); el.classList.add('flash'); setTimeout(() => el.classList.remove('flash'), 2200); el.querySelector('button')?.focus?.({ preventScroll: true }); };
+    /** Takım doğrulaması: editör açılınca onaylı sürümün "Takım verisi" tablosunu açar ve doğrulama/yürürlük bloğuna kaydırır (13 takım, mevcut değerler dolu; yeni işlev yok). */
+    const openToolVerify = () => {
+        let tries = 0;
+        let opened = false;
+        const tick = () => {
+            tries += 1;
+            const rows = [...host.querySelectorAll('[data-testid="pw-tools-version"]')];
+            const row = rows.find((r) => /Onaylı|Kontrolde/.test(r.textContent ?? '') && !/Yürürlükte/.test(r.textContent ?? '')) ?? rows[0];
+            if (row && !opened) {
+                const b = row.querySelector('[data-testid="pw-tools-work"]');
+                if (b) {
+                    b.click();
+                    opened = true;
+                }
+            }
+            const ap = host.querySelector('[data-testid="tw-approve"]');
+            if (ap) {
+                ap.scrollIntoView?.({ block: 'center', behavior: 'auto' });
+                ap.classList.add('flash');
+                setTimeout(() => ap.classList.remove('flash'), 2200);
+                return;
+            }
+            if (tries < 40)
+                setTimeout(tick, 150);
+        };
+        setTimeout(tick, 150);
+    };
     const guideAct = (g) => {
         if (g.target === 'order') {
             if (cur())
@@ -130,8 +159,17 @@ export async function drawPrepFlow(host, c) {
             gotoStep('ready');
             return;
         }
-        if (g.target === 'tools' || g.target === 'quality') {
-            showEd({ slot: g.target, target: g.target });
+        if (g.target === 'doc-control') {
+            c.navigate('#/dokuman-kontrol');
+            return;
+        }
+        if (g.target === 'tools') {
+            showEd({ slot: 'tools', target: 'tools' });
+            openToolVerify();
+            return;
+        }
+        if (g.target === 'quality') {
+            showEd({ slot: 'quality', target: 'quality' });
             return;
         }
         if (g.target === 'drawing') {
@@ -142,9 +180,27 @@ export async function drawPrepFlow(host, c) {
             showEd({ slot: 'route', target: 'routing' });
         }
     };
+    /** BOM'da ayrı "kaydet/onayla" düğmesi yoktur: satırlar kaydedilince BOM kayıtlıdır, onayı Rev yayınıdır. Kullanıcıya bunu ve yayın için kalanı söyler. */
+    const bomNote = () => {
+        const st = buildSteps(input());
+        const rows = remainingActions(input(), st, { docs: true, tools: true, quality: true, release: true, order: true }, null).filter((r) => ['docs', 'route', 'tools', 'quality'].includes(r.key));
+        const rv = rev?.revision ?? '';
+        const canRel = st.find((x) => x.key === 'ready')?.action;
+        if (!ws.bom.length)
+            return E('div', { class: 'banner', 'data-testid': 'pv2-bom-note' }, 'Önce hammadde satırını ekleyin ve kaydedin. Onay, Rev ' + rv + ' yayınıyla gelir.');
+        return E('div', { class: 'banner', 'data-testid': 'pv2-bom-note' }, E('b', {}, 'BOM kayıtlı. '), `Ayrıca kaydet / onayla düğmesi yoktur: BOM, Rev ${rv} yayınlandığında yürürlüğe girer. `, canRel ? E('span', {}, `Rev ${rv}'yı yayınlamak için 6. adımdaki düğmeyi kullanın. `) : E('span', {}, `Rev ${rv} yayını için kalan: ${rows.map((r) => r.title).join(', ') || 'önceki adımlar'}. `), E('button', { class: 'pbtn ghost sm', type: 'button', 'data-testid': 'pv2-bom-note-go', onClick: () => gotoStep('ready') }, `Rev ${rv} yayın adımına git`));
+    };
     const edBox = (slot) => {
-        const box = E('div', { class: 'pv2-editor', 'data-testid': `pv2-editor-${slot}` }, E('div', { class: 'edbar' }, E('span', { class: 'mut' }, 'Düzenleme aynı sayfada açık'), E('button', { class: 'pbtn ghost', type: 'button', 'data-testid': 'pv2-editor-close', onClick: closeEd }, 'Kapat')), ...edNodes);
-        box.addEventListener('input', () => { dirty = true; });
+        const box = E('div', { class: 'pv2-editor', 'data-testid': `pv2-editor-${slot}` }, E('div', { class: 'edbar' }, E('span', { class: 'mut' }, 'Düzenleme aynı sayfada açık'), E('button', { class: 'pbtn ghost', type: 'button', 'data-testid': 'pv2-editor-close', onClick: closeEd }, 'Kapat')), ...(slot === 'bom' ? [bomNote()] : []), ...edNodes);
+        box.addEventListener('input', (ev) => { const t = ev.target; /* dosya seçimi, onay kutusu, açılır liste yazı değildir: uyarı çıkarmaz */ /* dosya seçimi, onay kutusu, açılır liste yazı değildir: uyarı çıkarmaz */ if (t && (t.type === 'file' || t.type === 'checkbox' || t.type === 'radio' || t.tagName === 'SELECT'))
+            return; dirty = true; }); /* başarılı kayıt bildirimi (yeşil başlık) gelince kaydedilmemiş değişiklik kalmamıştır */
+        try {
+            new MutationObserver((ms) => { for (const m of ms)
+                for (const n of Array.from(m.addedNodes))
+                    if (n instanceof HTMLElement && (n.matches('.banner.ok') || n.querySelector?.('.banner.ok')))
+                        dirty = false; }).observe(box, { childList: true, subtree: true });
+        }
+        catch { /* eski tarayıcı */ }
         return box;
     };
     const cur = () => lines.find((l) => l.itemId === itemId) ?? null;
@@ -222,7 +278,7 @@ export async function drawPrepFlow(host, c) {
         // E ---------------------------------------------------------------------------------------------
         const prim = act.flatMap((x) => x.machines.filter((m) => m.primary).map((m) => m.code))[0];
         const perm = { docs: !!(ws.can.manageDocuments || ws.can.approveDocument), tools: !!(ws.can.manageDocuments || ws.can.approveDocument), quality: !!(ws.can.editRouting || ws.can.manageDocuments), release: !!ws.can.manageBom, order: c.canOpenOrders !== false };
-        const guide = gate.open ? [] : remainingActions(input(), steps, perm, toolDocNo);
+        const guide = gate.open ? [] : remainingActions(input(), steps, perm, toolDocNo, toolAttested);
         const guideEl = (g) => E('div', { class: 'gline', 'data-testid': 'pv2-guide-row', 'data-key': g.key }, E('div', { class: 'gt' }, E('b', {}, g.title), E('span', { class: 'gs', 'data-testid': 'pv2-guide-status' }, g.status), g.why ? E('div', { class: 'gw' }, g.why) : null), g.action && g.target ? E('button', { class: 'pbtn ghost', type: 'button', 'data-testid': `pv2-guide-go-${g.key}`, onClick: () => guideAct(g) }, g.action) : g.noPerm ? E('div', { class: 'gp', 'data-testid': 'pv2-guide-noperm' }, g.noPerm) : null);
         const E_ = E('section', { class: 'sec wo', 'data-testid': 'pv2-e' }, E('button', { class: 'pbtn', type: 'button', style: 'min-height:56px;font-size:16px', 'data-testid': 'pv2-wo-btn', ...(gate.open ? {} : { disabled: 'disabled' }), onClick: () => { if (o)
                 c.navigate(`#/siparis-komuta?siparis=${o.orderId}`); } }, o ? `${o.orderNo} için İş Emri Oluştur` : 'İş Emri Oluştur'), gate.open ? E('div', { class: 'mut', 'data-testid': 'pv2-wo-info' }, `İş emri ekranı açılır; sipariş kalemi, Rev ${rev?.revision}, ${fmt(qtyNow())} adet ve rota taşınır. ${prim ? `Önerilen makine: ${prim} (rotadaki öncelikli makine).` : ''} Operatör ve makine ataması yetki ve uygunluk kontrolünden geçmeden kesinleşmez. İş emri kendiliğinden oluşturulmaz.`)

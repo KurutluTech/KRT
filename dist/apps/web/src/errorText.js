@@ -211,7 +211,7 @@ const BUSINESS_TR = [
     [/^TOOL_LIST_FILE_TYPE/, 'Takım listesi yalnız .xlsx, .xls, .csv veya .pdf olabilir; dosya türü, uzantı ve içerik uyuşmalı.'],
     [/^TOOL_LIST_MACRO_REFUSED/, 'Makro içeren Excel dosyası kabul edilmez; makrosuz .xlsx olarak kaydedip yükleyin.'],
     [/^TOOLIST_CHECK_FAILED/, 'Takım listesi otomatik kontrolden geçemedi; üretime verilemez. Kontrol sonuçlarındaki kırmızı maddeleri düzeltip yeni sürüm yükleyin.'],
-    [/^TOOLIST_ATTESTATION_REQUIRED/, 'Takım listesinin sistemin doğrulayamadığı kritik alanları (çap, boy, tutucu, offset…) yetkili kişi tarafından elle doğrulanıp kaydedilmeden yürürlüğe alınamaz.'],
+    [/^TOOLIST_ATTESTATION_REQUIRED/, 'Takım listesinin sistemin doğrulayamadığı kritik alanları (çap, boy, tutucu, offset…) yetkili kişi tarafından elle doğrulanıp kaydedilmeden yürürlüğe alınamaz. Yapılacak: Ürün Çalışma Alanı → Takım listesi → “Takım verisi” → onay kutusu + not → “Yürürlüğe Al”; sonra buradan yürürlüğe alın.'],
     [/^TOOLIST_ATTEST_INCOMPLETE/, 'Her kritik alan tek tek doğrulandı olarak işaretlenmeli.'],
     [/^TOOLIST_ALREADY_ATTESTED/, 'Bu sürümün doğrulaması zaten kaydedilmiş.'],
     [/^RECHECK_ALREADY_DONE/, 'Bu yeniden kontrol zaten kaydedilmiş.'],
