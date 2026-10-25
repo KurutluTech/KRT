@@ -1,11 +1,11 @@
 {
  "product": "KMI NEXT",
- "commit": "b9fbee753bcc4f5a09bb35319efe3b95642cf140",
+ "commit": "71a2138ce408b423229217e1fac2bdc4b46b788c",
  "builtFrom": "clean git tree",
  "fileCount": 382,
  "migrationsInRepo": 74,
  "lastMigration": "0159_routing_apply_idempotent.sql (repoda; PROD'A UYGULANMADI)",
- "note": "KMI-013: Is Emri Ac on kontrol ekrani (/is-emri-ac) + CNC fiziksel durum tutarliligi. Frontend-only; DB degisikligi bu pakette YOK. Ekran, m0159 uygulanana kadar rota uygulama dugmesini calistirmaz/gerekirse eski davranisla calisir.",
+ "note": "KMI-013 v2: Is Emri Ac ekrani production RPC okuma yoluna alindi (bom_bar_specs tablosu ve routing_readiness_blockers istemciye kapali oldugu icin 'kesim kaydi yok/takim dogrulanamadi' yanlisti). Frontend-only; DB degisikligi YOK.",
  "files": [
   {
    "path": "assets/apple-touch-icon.png",
@@ -354,13 +354,13 @@
   },
   {
    "path": "dist/apps/web/src/modules/workorder/WorkOrderOpenScreen.js",
-   "bytes": 14554,
-   "sha256": "6513acf18579716c4eccc6cc025e04ef9ef5c3c75c4ccdb2665096aacb69b0bf"
+   "bytes": 16096,
+   "sha256": "cb15d05ae4e01c18fd6289ae381cf90ae16e82b73e8d444a895bef67f70a2e03"
   },
   {
    "path": "dist/apps/web/src/modules/workorder/precheckModel.js",
-   "bytes": 14314,
-   "sha256": "4d7f59053f1fa074225bb13919fb39483ff31de72b34516dd988bcb1185ceda2"
+   "bytes": 15436,
+   "sha256": "8032eda1ea960bcc546b3af40140133787e5496d97cdb432c76cc09903c1b08d"
   },
   {
    "path": "dist/apps/web/src/nav.js",

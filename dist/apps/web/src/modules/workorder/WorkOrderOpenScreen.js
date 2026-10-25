@@ -29,13 +29,24 @@ export async function renderWorkOrderOpen(el, deps) {
         byRev('routing_operations', 'id,op_no,op_kind,name,allowed_machine_ids,primary_machine_id,first_piece_required,qc_required,active', { order: 'op_no.asc' }), byRev('cam_programs', 'id,routing_operation_id,status'),
         wo ? safe(sel('work_order_operations', { columns: 'id,op_no,op_kind,name,status,planned_machine_id,assigned_operator_id,qty_in,routing_operation_id', filters: { work_order_id: `eq.${wo.id}` }, order: 'op_no.asc' }), []) : [],
         safe(sel('machines', { columns: 'id,code,status' }), []), safe(sel('personnel', { columns: 'id,name,roles,department,shift_code,active' }), []),
-        safe(client.rpc('cnc_live_states', {}, session), null), rid ? safe(client.rpc('routing_route_check', { p_revision: rid }, session), null) : [], rid ? safe(client.rpc('routing_readiness_blockers', { p_rev: rid }, session), null) : [],
+        safe(client.rpc('cnc_live_states', {}, session), null), rid ? safe(client.rpc('routing_route_check', { p_revision: rid }, session), null) : [], rid ? safe(client.rpc('routing_op_readiness', { p_rev: rid }, session), null) : [],
         wo ? safe(sel('audit_log', { columns: 'at,action,reason,after_state', filters: { entity_id: `eq.${wo.id}`, action: 'eq.WORK_ORDER_STATUS_TRANSITION' }, order: 'at.desc', limit: 1 }), []) : [], rid ? safe(sel('bom_lines', { columns: 'id,material_code,qty_per_unit', filters: { product_revision_id: `eq.${rid}` } }), []) : []]);
-      const specs = bomLines.length ? await safe(sel('bom_bar_specs', { columns: 'bom_line_id,dia_mm,bar_length_mm,cut_length_mm,kerf_mm,end_trim_mm', filters: { bom_line_id: `in.(${bomLines.map((b) => b.id).join(',')})` } }), []) : [];
+      // Üretimde bom_bar_specs tablosu istemciye KAPALI (RLS, politika yok) ve routing_readiness_blockers yalnız sunucu içindir: yetkili okuma yolları RPC'dir.
+      const g = (o, a, b) => (o ? (o[a] ?? o[b] ?? null) : null);
+      const need = rid ? await safe(client.rpc('bar_material_need', { p_revision: rid, p_qty: Number(wo?.qtyPlanned ?? item.qty ?? 0) || 1 }, session), null) : null;
+      const needLine = (need && (need.lines ?? [])[0]) || null;
+      const cutChk = wo ? await safe(client.rpc('cutprep_check', { p_wo: wo.id }, session), null) : null;
+      const cutRow = Array.isArray(cutChk) ? cutChk.find((r) => g(r, 'code', 'code') === 'CUT_SPEC') ?? null : null;
+      const woReady = wo ? await safe(client.rpc('work_order_readiness', { p_work_order_id: wo.id }, session), null) : null;
+      const plan = needLine ? (needLine.plan ?? null) : null;
+      const specs = needLine ? [{ diaMm: g(needLine, 'dia_mm', 'diaMm'), barLengthMm: g(needLine, 'bar_length_mm', 'barLengthMm'), cutLengthMm: g(needLine, 'cut_length_mm', 'cutLengthMm'), kerfMm: g(needLine, 'kerf_mm', 'kerfMm'), endTrimMm: null,
+        piecesPerBar: g(plan, 'pieces_per_bar', 'piecesPerBar'), barsNeeded: g(plan, 'bars_needed', 'barsNeeded'), sparePieces: g(plan, 'spare_pieces', 'sparePieces') }] : [];
+      const readyArr = Array.isArray(readiness) ? readiness : null;
+      const readinessBlockers = readyArr === null ? null : [...new Set(readyArr.filter((r) => g(r, 'state', 'state') === 'UNDECLARED').map((r) => `REQ_UNDECLARED:${g(r, 'op_code', 'opCode')}`)), ...readyArr.filter((r) => g(r, 'required', 'required') && !g(r, 'present', 'present')).map((r) => `REQ_MISSING:${g(r, 'op_code', 'opCode')}:${g(r, 'kind', 'kind')}`)];
       const cncBy = cnc ? Object.fromEntries(cnc.filter((r) => r.machineCode).map((r) => [r.machineCode, r])) : null;
-      const input = { item: { ...item, productCode: product[0]?.code }, wos, revision, bom: bomLines.map((b) => ({ materialCode: b.materialCode, qtyPerUnit: b.qtyPerUnit })), bar: specs[0] ? { diaMm: specs[0].diaMm, barLengthMm: specs[0].barLengthMm, cutLengthMm: specs[0].cutLengthMm, kerfMm: specs[0].kerfMm, endTrimMm: specs[0].endTrimMm } : null,
+      const input = { item: { ...item, productCode: product[0]?.code }, wos, revision, bom: bomLines.map((b) => ({ materialCode: b.materialCode, qtyPerUnit: b.qtyPerUnit })), bar: specs[0] ?? null, cutSpecState: cutRow ? g(cutRow, 'state', 'state') : null, woReadiness: Array.isArray(woReady) ? woReady.map((r) => ({ kind: g(r, 'kind', 'kind'), state: g(r, 'state', 'state'), reason: g(r, 'reason', 'reason') })) : null,
         routing: routing.map((r) => ({ id: r.id, opNo: r.opNo, opKind: r.opKind, name: r.name, active: r.active, allowedMachineIds: r.allowedMachineIds, primaryMachineId: r.primaryMachineId, firstPieceRequired: r.firstPieceRequired, qcRequired: r.qcRequired })),
-        routeBlockers, readinessBlockers: readiness, woOps: woOps.map((o) => ({ id: o.id, opNo: o.opNo, opKind: o.opKind, name: o.name, status: o.status, plannedMachineId: o.plannedMachineId, assignedOperatorId: o.assignedOperatorId })), cam: cam.map((c) => ({ routingOperationId: c.routingOperationId, status: c.status })),
+        routeBlockers, readinessBlockers, woOps: woOps.map((o) => ({ id: o.id, opNo: o.opNo, opKind: o.opKind, name: o.name, status: o.status, plannedMachineId: o.plannedMachineId, assignedOperatorId: o.assignedOperatorId })), cam: cam.map((c) => ({ routingOperationId: c.routingOperationId, status: c.status })),
         machines, cnc: cncBy, hold: audit[0] ? { reason: audit[0].reason, at: audit[0].at } : null, canCreate: !!canCreate, canAssign: !!canAssign };
       st.data = { input, pre: buildPrecheck(input), product: product[0] ?? null, candidates: operatorCandidates(people.map((p) => ({ id: p.id, name: p.name, roles: p.roles, department: p.department, shiftCode: p.shiftCode, active: p.active }))), machines }; st.error = null;
     } catch (e) { st.error = e; }

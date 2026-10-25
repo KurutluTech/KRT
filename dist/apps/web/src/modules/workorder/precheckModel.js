@@ -34,11 +34,16 @@ export function buildPrecheck(i) {
   else if (badBom.length) checks.push(C('bom', 'BOM', 'MISSING', `${badBom.length} satırda malzeme veya miktar eksik.`, OWNER.bom, 'BOM satırını düzelt'));
   else checks.push(C('bom', 'BOM', 'OK', `${i.bom.length} satır: ${i.bom.map((l) => l.materialCode).join(', ')}`));
   // 3 Hammadde ve kesim parametreleri
-  const b = i.bar ?? null; const ppb = piecesPerBar(b);
-  if (!b) checks.push(C('material', 'Hammadde ve kesim parametreleri', 'MISSING', 'Çubuk/kesim kaydı yok.', OWNER.material, 'Çap, boy, kesim boyu, kerf ve uç payı gir'));
-  else if (num(b.endTrimMm) === null) checks.push(C('material', 'Hammadde ve kesim parametreleri', 'BLOCKED', `Ø${b.diaMm ?? '?'} × ${b.barLengthMm ?? '?'} mm, kesim ${b.cutLengthMm ?? '?'} mm, kerf ${b.kerfMm ?? '?'} mm; end_trim_mm BOŞ — çubuk başına adet hesaplanamaz.`, OWNER.material, 'end_trim_mm değerini ölçüm/onayla gir (yetkili GO ile)'));
+  const b = i.bar ?? null; const sv = b && num(b.piecesPerBar) !== null ? num(b.piecesPerBar) : null; const ppb = sv ?? piecesPerBar(b);
+  const dims = b ? `Ø${b.diaMm ?? '?'} × ${b.barLengthMm ?? '?'} mm, kesim ${b.cutLengthMm ?? '?'} mm, kerf ${b.kerfMm ?? '?'} mm` : '';
+  const shortage = (i.woReadiness ?? []).filter((r) => r.kind === 'MATERIAL' && r.state !== 'READY' && r.state !== 'OK');
+  if (!b) checks.push(C('material', 'Hammadde ve kesim parametreleri', 'MISSING', 'Çubuk/kesim kaydı okunamadı veya tanımlı değil.', OWNER.material, 'Çap, boy, kesim boyu, kerf ve uç payı gir'));
+  else if (i.cutSpecState === 'BLOCKED' || (i.cutSpecState == null && b.endTrimMm !== undefined && num(b.endTrimMm) === null && sv === null)) checks.push(C('material', 'Hammadde ve kesim parametreleri', 'BLOCKED', `${dims}; sunucu CUT/PREP kesim kontrolü ENGELLİ (uç payı end_trim_mm tanımsız) — çubuk başına adet doğrulanamaz.`, OWNER.material, 'end_trim_mm değerini ölçüm/onayla gir (yetkili GO ile)'));
+  else if (i.cutSpecState == null && sv !== null && b.endTrimMm == null) checks.push(C('material', 'Hammadde ve kesim parametreleri', 'WARN', `${dims} → ${sv} adet/çubuk (sunucu planı); uç payı (end_trim_mm) iş emri olmadan doğrulanamadı.`, OWNER.material, 'İş emri üzerinden CUT/PREP kesim kontrolünü doğrula'));
   else if (ppb === null) checks.push(C('material', 'Hammadde ve kesim parametreleri', 'BLOCKED', 'Parametrelerle çubuk başına en az 1 parça çıkmıyor.', OWNER.material, 'Parametreleri düzelt'));
-  else { const need = num(wo?.qtyPlanned ?? i.item?.qty); checks.push(C('material', 'Hammadde ve kesim parametreleri', 'OK', `Ø${b.diaMm} × ${b.barLengthMm} mm, kesim ${b.cutLengthMm} mm, kerf ${b.kerfMm} mm, uç payı ${b.endTrimMm} mm → ${ppb} adet/çubuk${need ? `; ${need} adet için ${Math.ceil(need / ppb)} çubuk` : ''}.`)); }
+  else { const need = num(wo?.qtyPlanned ?? i.item?.qty); const bars = need ? (num(b.barsNeeded) ?? Math.ceil(need / ppb)) : null; const spare = bars ? bars * ppb - need : null;
+    const detail = `${dims}${b.endTrimMm != null ? `, uç payı ${b.endTrimMm} mm` : ', uç payı sunucuda doğrulandı'} → ${ppb} adet/çubuk${bars ? `; ${need} adet için ${bars} çubuk (kalan kapasite ${spare} adet)` : ''}.`;
+    checks.push(shortage.length ? C('material', 'Hammadde ve kesim parametreleri', 'WARN', `${detail} Stok: ${shortage.map((r) => r.reason ?? r.state).join(', ')}.`, OWNER.material, 'Hammadde stoğunu/tahsisini doğrula') : C('material', 'Hammadde ve kesim parametreleri', 'OK', detail)); }
   // 4 Rota
   const rb = i.routeBlockers; const applied = woOps.length > 0;
   if (rb === null || rb === undefined) checks.push(C('route', 'Rota', 'UNKNOWN', 'Rota doğrulaması okunamadı.', OWNER.route, 'Yeniden dene'));
