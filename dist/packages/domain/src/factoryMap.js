@@ -4,7 +4,7 @@
 import { machineStateOf } from './machineState.js';
 const CLASS_LABEL = { MACHINING: 'CNC / talaşlı imalat', MEASUREMENT: 'Ölçüm / metroloji', MATERIAL_HANDLING: 'Malzeme taşıma', AUXILIARY: 'Yardımcı', UNCLASSIFIED: 'Sınıf belirtilmemiş' };
 const ORDER = ['MACHINING', 'MEASUREMENT', 'MATERIAL_HANDLING', 'AUXILIARY', 'UNCLASSIFIED'];
-const EMPTY = () => ({ DOWN: 0, MAINTENANCE: 0, HOLD: 0, ACTIVE_WORK_ORDER: 0, FIRST_PIECE: 0, READY_IDLE: 0, UNKNOWN: 0, CNC_RUNNING: 0, CNC_FEED_HOLD: 0, CNC_ALARM: 0, CNC_STALE: 0 });
+const EMPTY = () => ({ DOWN: 0, MAINTENANCE: 0, HOLD: 0, ACTIVE_WORK_ORDER: 0, FIRST_PIECE: 0, READY_IDLE: 0, READY_UNKNOWN: 0, UNKNOWN: 0, CNC_RUNNING: 0, CNC_FEED_HOLD: 0, CNC_ALARM: 0, CNC_STALE: 0 });
 export function buildFactoryMap(machines, info) {
     const byCode = new Map(info.map((i) => [i.code, i]));
     const tiles = machines.map((m) => {

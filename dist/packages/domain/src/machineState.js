@@ -1,10 +1,11 @@
+import { physicalState } from './cncPhysical.js';
 export const MACHINE_CLASS_TR = { MACHINING: 'CNC / talaşlı imalat', MEASUREMENT: 'Ölçüm / metroloji', MATERIAL_HANDLING: 'Malzeme taşıma', AUXILIARY: 'Yardımcı ekipman' };
 export const MACHINE_CLASS_UNKNOWN_TR = 'Sınıf belirtilmemiş';
 export const DATA_SOURCE_TR = { OPERATOR_DECLARED: 'Operatör beyanı', CNC_CONNECTED: 'CNC bağlantısı (doğrulanmış)', UNKNOWN: 'Bilinmiyor', STALE: 'Bayat — güncel veri yok' };
 /** KMI-013 spindle colour language: GREEN running · BLUE idle · RED fault · ORANGE maintenance. HOLD/FIRST_PIECE/STALE/UNKNOWN stay separate (never forced into the four). */
 export const SPINDLE_COLOUR_TR = { ACTIVE_WORK_ORDER: 'YEŞİL', READY_IDLE: 'MAVİ', DOWN: 'KIRMIZI', MAINTENANCE: 'TURUNCU' };
 export const HEADLINE_TR = {
-    DOWN: 'ARIZA', MAINTENANCE: 'BAKIMDA', HOLD: 'BEKLETMEDE', ACTIVE_WORK_ORDER: 'AKTİF İŞ EMRİ', FIRST_PIECE: 'İLK PARÇA', READY_IDLE: 'HAZIR · BOŞTA', UNKNOWN: 'BİLİNMİYOR',
+    DOWN: 'ARIZA', MAINTENANCE: 'BAKIMDA', HOLD: 'BEKLETMEDE', ACTIVE_WORK_ORDER: 'AKTİF İŞ EMRİ', FIRST_PIECE: 'İLK PARÇA', READY_IDLE: 'HAZIR · BOŞTA', READY_UNKNOWN: 'HAZIR · FİZİKSEL DURUM BİLİNMİYOR', UNKNOWN: 'BİLİNMİYOR',
     CNC_RUNNING: 'ÇALIŞIYOR · CNC', CNC_FEED_HOLD: 'FEED HOLD · CNC', CNC_ALARM: 'ALARM / ACİL STOP · CNC', CNC_STALE: 'VERİ BAYAT · CNC',
 };
 export const AVAILABILITY_TR = { READY: 'Kullanıma hazır', DOWN: 'Arızalı', MAINTENANCE: 'Bakımda', HOLD: 'Bekletmede', UNKNOWN: 'Bilinmiyor' };
@@ -16,25 +17,26 @@ export function machineState(i) {
         : live.some((a) => a.runStatus === 'FIRST_PIECE_PENDING' || a.runStatus === 'FIRST_PIECE_APPROVED') ? 'FIRST_PIECE' : 'NONE';
     const stale = availability === 'READY' && live.length === 0 && i.active.some((a) => !!a.stale && (a.runStatus === 'IN_PROGRESS' || a.runStatus === 'FIRST_PIECE_PENDING' || a.runStatus === 'FIRST_PIECE_APPROVED'));
     const t = i.telemetry && i.telemetry.running !== null && i.telemetry.running !== undefined ? i.telemetry
-        : i.cnc && i.cnc.link === 'UP' && (i.cnc.state === 'CNC_ACTIVE' || i.cnc.state === 'CNC_STOPPED') ? { running: i.cnc.state === 'CNC_ACTIVE' } : null;
+        : (() => { const q = physicalState(i.cnc ?? null); return q.key === 'RUNNING' ? { running: true } : q.key === 'IDLE_STOPPED' && i.cnc.state === 'CNC_STOPPED' ? { running: false } : null; })();
     const physical = t ? (t.running ? 'RUNNING' : 'STOPPED') : 'UNKNOWN';
     // CNC-connected machine: the controller (via cnc_live_states, already interpreted in the database) decides the headline — but ONLY while the administrative record is READY.
     // DOWN / MAINTENANCE / HOLD / UNKNOWN stay exactly as people recorded them (a CNC signal never changes maintenance authority); a disagreement is shown through `conflict` and the CNC notes.
     const c = i.cnc ?? null;
     const cncUp = !!c && c.link === 'UP';
+    // TEK kanonik değerlendirici (cncPhysical.js): ALARM_ESTOP / RUNNING / IDLE_STOPPED / OFFLINE / UNKNOWN. CNC satırı ya da zaman damgası yoksa fiziksel durum BİLİNMEZ.
+    const phys = physicalState(c);
     const cncHead = !c || availability !== 'READY' ? null
-        : !cncUp ? 'CNC_STALE'
-            : c.state === 'CNC_ALARM' ? 'CNC_ALARM'
-                : c.state === 'CNC_ACTIVE' ? (workOrderActivity === 'ACTIVE' ? 'ACTIVE_WORK_ORDER' : 'CNC_RUNNING')
-                    : c.state === 'CNC_FEED_HOLD' ? 'CNC_FEED_HOLD'
-                        : c.state === 'CNC_STOPPED' || c.state === 'CNC_INTERRUPTED' ? 'READY_IDLE'
-                            : 'UNKNOWN';
+        : phys.key === 'OFFLINE' ? 'CNC_STALE'
+            : phys.key === 'ALARM_ESTOP' ? 'CNC_ALARM'
+                : phys.key === 'RUNNING' ? (workOrderActivity === 'ACTIVE' ? 'ACTIVE_WORK_ORDER' : 'CNC_RUNNING')
+                    : phys.key === 'IDLE_STOPPED' ? (c.state === 'CNC_FEED_HOLD' ? 'CNC_FEED_HOLD' : 'READY_IDLE')
+                        : 'UNKNOWN';
     const headline = cncHead ? cncHead : availability === 'DOWN' ? 'DOWN' : availability === 'MAINTENANCE' ? 'MAINTENANCE' : availability === 'HOLD' ? 'HOLD'
-        : availability === 'UNKNOWN' ? 'UNKNOWN' : workOrderActivity === 'ACTIVE' ? 'ACTIVE_WORK_ORDER' : workOrderActivity === 'FIRST_PIECE' ? 'FIRST_PIECE' : 'READY_IDLE';
+        : availability === 'UNKNOWN' ? 'UNKNOWN' : workOrderActivity === 'ACTIVE' ? 'ACTIVE_WORK_ORDER' : workOrderActivity === 'FIRST_PIECE' ? 'FIRST_PIECE' : 'READY_UNKNOWN';
     const openSession = i.active.some((a) => a.runStatus === 'IN_PROGRESS' || a.runStatus === 'FIRST_PIECE_PENDING' || a.runStatus === 'FIRST_PIECE_APPROVED');
     const declaredVsCnc = t ? (t.running === (workOrderActivity === 'ACTIVE') ? 'AGREE' : 'CONFLICT') : 'N/A';
     const dataSource = c && !cncUp ? 'STALE' : t ? 'CNC_CONNECTED' : availability === 'UNKNOWN' ? 'UNKNOWN' : stale ? 'STALE' : 'OPERATOR_DECLARED';
-    return { availability, workOrderActivity, physical, headline, dataSource, stale: stale && !cncHead, cnc: c ? { link: c.link, state: c.state } : null, cncRunning: cncUp && c.state === 'CNC_ACTIVE', declaredVsCnc, conflict: availability !== 'READY' && availability !== 'UNKNOWN' && openSession };
+    return { physicalKey: phys.key, physicalLabel: phys.label, availability, workOrderActivity, physical, headline, dataSource, stale: stale && !cncHead, cnc: c ? { link: c.link, state: c.state } : null, cncRunning: phys.key === 'RUNNING', declaredVsCnc, conflict: availability !== 'READY' && availability !== 'UNKNOWN' && openSession };
 }
 /** The ONE way a board machine (live_board row, optionally carrying its CNC row) becomes a state. Every screen calls this - none passes status/active by hand. */
 export function machineStateOf(m) {

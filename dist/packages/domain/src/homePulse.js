@@ -89,7 +89,7 @@ export function orderPulse(tiles, access) {
 /** Machine park ordering for a department: its own problems first (QUALITY → hold/first piece, MAINTENANCE → down/maintenance, PRODUCTION → down/active). */
 export function fleetPriority(access) {
     const d = homeDomainsFor(access);
-    const base = ['DOWN', 'CNC_ALARM', 'HOLD', 'MAINTENANCE', 'FIRST_PIECE', 'ACTIVE_WORK_ORDER', 'CNC_RUNNING', 'CNC_FEED_HOLD', 'READY_IDLE', 'CNC_STALE', 'UNKNOWN'];
+    const base = ['DOWN', 'CNC_ALARM', 'HOLD', 'MAINTENANCE', 'FIRST_PIECE', 'ACTIVE_WORK_ORDER', 'CNC_RUNNING', 'CNC_FEED_HOLD', 'READY_IDLE', 'READY_UNKNOWN', 'CNC_STALE', 'UNKNOWN'];
     if (d === 'ALL')
         return base;
     const first = [];

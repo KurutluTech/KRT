@@ -33,7 +33,7 @@ function cardOf(m, today) {
     const routed = (m.routed ?? []).filter((o) => !!o.status && ACTIVE_OP.has(o.status));
     const activeRows = [...(m.active ? [{ runStatus: m.active.status }] : []), ...routed.map((o) => ({ runStatus: o.status === 'RUNNING' ? 'IN_PROGRESS' : String(o.status), stale: o.stale }))];
     const row = m.cnc ?? null;
-    const ms = machineStateOf({ status: deriveStatus(m), active: activeRows, cnc: row ? { link: String(row.link), state: String(row.state) } : null });
+    const ms = machineStateOf({ status: deriveStatus(m), active: activeRows, cnc: row ? { link: String(row.link), state: String(row.state), lastSourceTs: row.lastSourceTs ?? null, ageS: row.ageS ?? null, estop: row.estop ?? null } : null });
     const cd = row ? cncDisplay(row) : null;
     const hasCnc = !!row;
     const woPresent = !!m.active || routed.length > 0;

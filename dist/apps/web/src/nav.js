@@ -72,6 +72,7 @@ export const NAV_TREE = [
             { path: '/tara', label: 'QR / Barkod', icon: 'scan' },
         ] },
     { id: 'plan', short: 'Planlama', title: 'ÜRETİM PLANLAMA', icon: 'layers', items: [
+            { path: '/is-emri-ac', label: 'İş Emri Aç', icon: 'layers' },
             { path: '/planlama-merkezi', label: 'Planlama Merkezi', icon: 'layers' },
             { path: '/planlama-kokpit', label: 'Planlama Kokpiti', icon: 'layers' },
             { path: '/vardiya-planlayici', label: 'Shift Planner', icon: 'layers' },
