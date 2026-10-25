@@ -1,11 +1,11 @@
 {
   "product": "KMI NEXT",
-  "commit": "27441a451d5b5b8f429bb9b4e3a038c1c9b81b60",
+  "commit": "88059cebee24edb0d4f6128d3806faf287208c26",
   "builtFrom": "clean git tree",
-  "fileCount": 378,
-  "migrationsInRepo": 84,
+  "fileCount": 379,
+  "migrationsInRepo": 73,
   "lastMigration": "0158_supplement_work_order.sql",
-  "note": "Planlama Merkezi + Makine Detayi + operasyon yetkisi + kismi transfer + ek is emri. Production DB migration 0144,0147-0158 uygulandi ve dogrulandi. Yayin elle yapilir.",
+  "note": "Makine Detayi hotfix: fiziksel CNC durumu yalniz CNC kanitindan; [object Object] duzeltmesi; makine kodu ile adres. DB degisikligi YOK. Yayin elle yapilir.",
   "files": [
     {
       "path": "assets/apple-touch-icon.png",
@@ -79,8 +79,8 @@
     },
     {
       "path": "dist/apps/web/src/app.js",
-      "bytes": 95995,
-      "sha256": "cf4949bb2ae1aa504e1ab84574f07f2d6ccbbcfbfd55db1606dcef03361475ed"
+      "bytes": 95986,
+      "sha256": "ecfb5967a9df95530230d55cf42f63f80ac39f3a5c61b0fa2bbc11221b35fced"
     },
     {
       "path": "dist/apps/web/src/approvalsInboxApi.js",
@@ -294,8 +294,8 @@
     },
     {
       "path": "dist/apps/web/src/modules/planning/MachineDetailScreen.js",
-      "bytes": 15946,
-      "sha256": "9e64a68a42a26c93a38386f7649b6bafc3a5b634ca027036a96efa5819d6b2b6"
+      "bytes": 17367,
+      "sha256": "595db630384dce3d84a303484d8521028edea6213f6026c23841c7aabd5d360d"
     },
     {
       "path": "dist/apps/web/src/modules/planning/PlanDialogs.js",
@@ -311,6 +311,11 @@
       "path": "dist/apps/web/src/modules/planning/PlanningCenterScreen.js",
       "bytes": 15775,
       "sha256": "680c3934f29eb842c1b054c9956ad14b9eef310d5cda4ad20ba6b2934b1ed059"
+    },
+    {
+      "path": "dist/apps/web/src/modules/planning/machinePhysical.js",
+      "bytes": 5246,
+      "sha256": "f44314ba7b3e78d0f7292ef7198c9c4fa8d546d4c273913cc4416cfd0ad9ad37"
     },
     {
       "path": "dist/apps/web/src/modules/planning/machineQueueApi.js",

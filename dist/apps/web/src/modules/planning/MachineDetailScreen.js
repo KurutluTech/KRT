@@ -6,17 +6,20 @@ import { PLAN_CSS } from './planCss.js';
 import { loadPlan } from './planData.js';
 import { SHIFT_NAME, OP_STATUS_TR, STATUS_TR, errText, addDays, weekStart, dayLabel, dayLong, fmtQty, fmtMin } from './planText.js';
 import { renderQueue, queueOf, dlgClose } from './PlanQueue.js';
+import { physicalState, cncLines, resolveMachine, safeText } from './machinePhysical.js';
 
 export async function renderMachineDetail(el, deps) {
-  const { client, session } = deps; const q = deps.query ?? new URLSearchParams(); const mid = q.get('m'); const TODAY = q.get('t') || deps.today; const anchor = q.get('d') || TODAY;
+  const { client, session } = deps; const q = deps.query ?? new URLSearchParams(); let mid = q.get('m'); const midParam = q.get('m'); const TODAY = q.get('t') || deps.today; const anchor = q.get('d') || TODAY;
   const root = h('div', { class: 'kd plan', 'data-testid': 'md-root' }, h('style', {}, DS_CSS + PLAN_CSS)); mount(el, root);
-  const st = { data: null, error: null, done: [], live: null, cap: [] }; const selection = new Set();
-  const ctx = { root, client, session, selection, defaultDate: TODAY, today: TODAY, get data() { return st.data; }, machineId: mid, selectedSlice: null, toast(m, bad) { const t = h('div', { class: `banner ${bad ? 'error' : 'info'} toast`, 'data-testid': 'toast' }, m); root.appendChild(t); setTimeout(() => t.remove(), 4500); }, fail(e) { ctx.toast(errText(e), true); }, reload, rerender: paint };
+  const st = { data: null, error: null, done: [], live: null, cnc: null, cap: [], resolved: null }; const selection = new Set();
+  const ctx = { root, client, session, selection, defaultDate: TODAY, today: TODAY, get data() { return st.data; }, get machineId() { return mid; }, selectedSlice: null, toast(m, bad) { const t = h('div', { class: `banner ${bad ? 'error' : 'info'} toast`, 'data-testid': 'toast' }, m); root.appendChild(t); setTimeout(() => t.remove(), 4500); }, fail(e) { ctx.toast(errText(e), true); }, reload, rerender: paint };
   async function reload() {
     try { st.data = await loadPlan(client, session); st.error = null;
+      st.resolved = resolveMachine(st.data.allMachines, midParam); mid = st.resolved.machine ? st.resolved.machine.id : null;
+      if (!mid) { paint(); return; }
       st.done = await client.select('production_plan_slices', { columns: 'id,work_order_id,operation_id,machine_id,planned_qty,planned_date,shift_code,actual_good,actual_scrap,actual_tashih,actual_released,closed_at', filters: { machine_id: `eq.${mid}`, status: 'eq.DONE' }, order: 'closed_at.desc', limit: 30 }, session).catch(() => []);
       st.cap = await st.data.api.capacity(mid, TODAY, TODAY).catch(() => []);
-      st.live = deps.cncStates ? await deps.cncStates().catch(() => null) : null;
+      st.cnc = deps.cncRows ? await deps.cncRows().catch(() => null) : null;   // cnc_live_states — Komuta'nın kullandığı tek kaynak
     } catch (e) { st.error = e; }
     paint();
   }
@@ -25,8 +28,8 @@ export async function renderMachineDetail(el, deps) {
     const kids = [h('style', {}, DS_CSS + PLAN_CSS)]; const d = st.data;
     if (st.error) { kids.push(h('h1', {}, 'Makine Detayı'), st.error.missing ? stateBox('unknown', 'Planlama altyapısı bu veritabanında kurulu değil', 'Dilim planlama (m0155/m0156) kurulduktan sonra çalışır.', 'md-backend-missing') : stateBox('error', 'Makine verisi okunamadı', errText(st.error), 'md-error'), h('button', { 'data-testid': 'btn-retry', onClick: reload }, 'Tekrar dene')); root.replaceChildren(...kids); return; }
     if (!d) { kids.push(stateBox('loading', 'Yükleniyor…', '', 'md-loading')); root.replaceChildren(...kids); return; }
-    const m = d.allMachines.find((x) => x.id === mid);
-    if (!m) { kids.push(h('h1', {}, 'Makine Detayı'), stateBox('unknown', 'Makine bulunamadı', 'Adresteki makine kimliği geçersiz veya görme yetkiniz yok.', 'md-notfound'), h('a', { href: '#/planlama-merkezi', class: 'btn' }, '← Planlama Merkezi')); root.replaceChildren(...kids); return; }
+    const m = st.resolved?.machine ?? null;
+    if (!m) { const er = st.resolved?.error; kids.push(h('h1', {}, 'Makine Detayı'), stateBox('unknown', er === 'AMBIGUOUS' ? 'Makine kodu belirsiz' : 'Makine bulunamadı', er === 'AMBIGUOUS' ? 'Bu kodla birden fazla makine eşleşiyor; Planlama Merkezi’nden seçin.' : er === 'MISSING' ? 'Adreste makine belirtilmemiş. Planlama Merkezi’nden bir makine seçin.' : 'Adresteki makine kodu/kimliği geçersiz veya görme yetkiniz yok.', 'md-notfound'), h('a', { href: '#/planlama-merkezi', class: 'btn' }, '← Planlama Merkezi')); root.replaceChildren(...kids); return; }
     const rows = queueOf(d, mid); const cur = rows.find((r) => r.status === 'STARTED'); const planned = rows.filter((r) => r.status === 'PLANNED'); const next = planned[0];
     const wk0 = weekStart(anchor); const days = Array.from({ length: 7 }, (_, i) => addDays(wk0, i)); const todayRows = rows.filter((r) => r.plannedDate <= TODAY && r.status === 'PLANNED'); const weekRows = rows.filter((r) => days.includes(r.plannedDate));
     // Ana operasyon: üretimdeki dilimin operasyonu; yoksa en son kapanan dilimin operasyonu; yoksa sıradaki dilimin operasyonu
@@ -34,21 +37,25 @@ export async function renderMachineDetail(el, deps) {
     kids.push(h('div', { class: 'head' }, h('h1', { 'data-testid': 'md-title' }, `Makine ${m.code}${m.name ? ' · ' + m.name : ''}`), pill(d.canPlan ? 'Plan değiştirme yetkisi VAR' : 'Salt okunur', d.canPlan ? 'info' : 'unknown', 'auth-pill'), h('span', { class: 'grow' }), h('a', { href: '#/planlama-merkezi', class: 'btn', 'data-testid': 'to-center' }, '← Planlama Merkezi')));
     // ---- üç bilgi AYRI: fiziksel makine durumu · üretim oturumu · planlama dilimi durumu ----
     const doneGood = sum?.producedGood ?? 0; const need = sum?.remainingGoodNeed ?? null;
-    const PHYS = { UP: ['Çalışır durumda', 'ok'], DOWN: ['Arızalı', 'warn'], MAINT: ['Bakımda', 'warn'], MAINTENANCE: ['Bakımda', 'warn'] };
-    const [physTxt, physKind] = PHYS[m.status] ?? [m.status, 'warn'];
+    const AVAIL = { UP: ['Kullanıma hazır (kayıt)', 'ok'], DOWN: ['Arızalı (kayıt)', 'warn'], MAINT: ['Bakımda (kayıt)', 'warn'], MAINTENANCE: ['Bakımda (kayıt)', 'warn'], HOLD: ['Bekletmede (kayıt)', 'warn'] };
+    const [availTxt, availKind] = AVAIL[m.status] ?? [safeText(m.status) ?? 'Bilinmiyor', 'unknown'];
+    const cncRow = Array.isArray(st.cnc) ? st.cnc.find((r) => safeText(r?.machineCode) === m.code) ?? null : null;
+    const cl = cncLines(cncRow); const phys = cl.phys;   // fiziksel durum: YALNIZ CNC verisinden; kayıttaki UP fiziksel çalışma sayılmaz
     const act = d.ops.find((o) => o.machineId === mid && ['RUNNING', 'FIRST_PIECE_PENDING'].includes(o.status) && !o.batchPaused); const actWo = act ? d.woInfo[act.workOrderId] : null;
     const qtyDone = !!cur && Number(cur.remainingQty) <= 0;   // dilim miktarı tamam ama dilim hâlâ STARTED
     const lab = (o, w) => `${w?.label ?? ''} · ${d.opLabel(o)}`;
     let stateMsg = null, stateKind = 'info';
     if (qtyDone) { stateMsg = 'Planlanan miktar tamamlandı; dilimi kapatınca makine yeni işe hazır olacak.'; stateKind = 'warn'; }
-    else if (m.status !== 'UP') { stateMsg = 'Makine şu an üretime uygun değil; yeni iş başlatılamaz.'; stateKind = 'warn'; }
-    else if (act && next) stateMsg = 'Makine çalışabilir durumda, ancak şu anda başka operasyon yürütülüyor.';
-    else if (act) stateMsg = `Makine çalışabilir durumda; şu anda ${lab(act, actWo)} yürütülüyor.`;
-    else stateMsg = 'Makine çalışabilir durumda ve şu an aktif üretim oturumu yok.';
+    else if (m.status !== 'UP') { stateMsg = 'Makine kaydı üretime uygun değil; yeni iş başlatılamaz.'; stateKind = 'warn'; }
+    else if (act && next) stateMsg = 'Makine kayıtta kullanıma hazır, ancak şu anda başka operasyon yürütülüyor (planlama meşguliyeti).';
+    else if (act) stateMsg = `Makine kayıtta kullanıma hazır; şu anda ${lab(act, actWo)} yürütülüyor.`;
+    else stateMsg = 'Makine kayıtta kullanıma hazır ve şu an aktif üretim oturumu yok.';
+    if (phys.key === 'ALARM_ESTOP') { stateMsg = 'CNC ALARM / E-STOP bildiriyor. ' + stateMsg; stateKind = 'warn'; }
     const row = (k, v, tid) => h('div', { class: 'nrow' }, h('span', { class: 'nk' }, k), h('span', { class: 'nv', ...(tid ? { 'data-testid': tid } : {}) }, v));
     const nowBox = h('div', { class: 'panel big', 'data-testid': 'md-now' }, h('h2', {}, 'ŞU AN'),
-      row('Fiziksel makine durumu', pill(physTxt, physKind, 'md-status'), null),
-      row('Üretim oturumu', act ? `Aktif iş var — ${lab(act, actWo)}` : 'Aktif iş yok', 'md-session'),
+      row('Fiziksel makine durumu (CNC)', pill(phys.label, phys.kind, 'md-status'), 'md-phys'),
+      row('Makine kullanılabilirliği (kayıt)', pill(availTxt, availKind, 'md-avail'), null),
+      row('Planlama meşguliyeti / üretim oturumu', act ? `Aktif iş var — ${lab(act, actWo)}` : 'Aktif iş yok', 'md-session'),
       row('Planlama dilimi', cur ? pill(STATUS_TR[cur.status] ?? cur.status, 'info', 'md-slicestate') : pill('Aktif dilim yok', 'unknown', 'md-slicestate'), null),
       h('div', { class: `banner ${stateKind}`, 'data-testid': 'md-state-msg' }, stateMsg),
       cur ? h('div', {}, row('Aktif operasyon', `${lab(op, wo)} — hedef ${fmtQty(sum?.targetQty)} sağlam`, 'md-now-op'),
@@ -82,9 +89,9 @@ export async function renderMachineDetail(el, deps) {
     kids.push(block('md-queue', 'Kuyruk ve dilimler', renderQueue(ctx, mid)));
     kids.push(block('md-week', 'Haftalık plan', h('div', { class: 'scroll' }, h('table', { class: 't' }, h('thead', {}, h('tr', {}, ...days.map((x) => h('th', {}, dayLabel(x))))), h('tbody', {}, h('tr', {}, ...days.map((x) => h('td', { 'data-testid': `md-day-${x}` }, ...rows.filter((r) => r.plannedDate === x).map((r) => h('div', { class: 'chip' }, `${d.woInfo[r.workOrderId]?.label?.split(' · ')[0]} ${r.opCode} · ${fmtQty(r.plannedQty)} ${r.shiftCode === 'TeamK1' ? 'V1' : 'V2'}`))))))))));
     kids.push(block('md-history', 'Kapanan dilimler', st.done.length === 0 ? h('div', { class: 'empty' }, 'Kapanan dilim yok.') : h('div', {}, ...st.done.map((s) => h('div', { class: 'item', 'data-testid': `md-done-${s.id}` }, `${d.woInfo[s.workOrderId]?.label} · planlanan ${fmtQty(s.plannedQty)} → sağlam ${fmtQty(s.actualGood)} / hurda ${fmtQty(s.actualScrap)} / tahsis ${fmtQty(s.actualTashih)} · kalitece serbest ${fmtQty(s.actualReleased)}`)))));
-    const live = st.live instanceof Map ? st.live.get(m.code) : null;
+    const cncBox = cncRow ? h('div', {}, ...cl.rows.map((r) => h('div', { class: 'nrow' }, h('span', { class: 'nk' }, r.k), h('span', { class: 'nv' }, r.kind ? pill(r.v, r.kind) : r.v))), h('div', { class: 'mut' }, 'Kaynak: cnc_live_states (denetleyici) — Komuta ile aynı')) : h('div', { class: 'empty', 'data-testid': 'md-cnc-none' }, 'Canlı makine verisi bağlı değil / okunamadı. Fiziksel durum bilinmiyor. (Üretim adedi olarak kullanılmaz.)');
     kids.push(h('div', { style: 'display:grid;gap:14px;grid-template-columns:repeat(auto-fit,minmax(260px,1fr))' },
-      h('div', { class: 'srcbox', 'data-testid': 'md-cnc' }, h('h2', {}, 'CNC canlı verisi (makineden)'), live ? h('div', {}, pill(String(live.state ?? live), 'info'), h('div', { class: 'mut' }, 'Kaynak: makine bağlantısı')) : h('div', { class: 'empty', 'data-testid': 'md-cnc-none' }, 'Canlı makine verisi bağlı değil / okunamadı. (Üretim adedi olarak kullanılmaz.)')),
+      h('div', { class: 'srcbox', 'data-testid': 'md-cnc' }, h('h2', {}, 'CNC canlı verisi (makineden)'), cncBox),
       h('div', { class: 'srcbox', 'data-testid': 'md-declared' }, h('h2', {}, 'Operatör üretim beyanı'), cur ? h('div', {}, `Dilim başlangıcından beri beyan: ${fmtQty(cur.actualGood)} sağlam · ${fmtQty(cur.actualScrap)} hurda · ${fmtQty(cur.actualTashih)} tahsis`, h('div', { class: 'mut' }, 'Kaynak: operasyon sayaçları (operatör beyanı; kalite onayı ayrı)')) : h('div', { class: 'empty' }, 'Aktif beyan yok.'))));
     kids.push(h('div', { class: 'stamp', 'data-testid': 'provenance' }, `Kaynak: machine_slice_queue · production_plan_slices · veri anı ${d.loadedAt.slice(11, 19)} UTC`));
     root.replaceChildren(...kids);
