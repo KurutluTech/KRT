@@ -130,6 +130,8 @@ import { renderAssetCenterScreen } from './screens/AssetCenterScreen.js';
 import { createPlanCockpitApi } from './planCockpitApi.js';
 import { loadMachineStates } from './machineStateLoader.js';
 import { renderPlanCockpit } from './screens/PlanCockpitScreen.js';
+import { renderPlanningCenter } from './modules/planning/PlanningCenterScreen.js';
+import { renderMachineDetail } from './modules/planning/MachineDetailScreen.js';
 import { renderShiftPlanner } from './screens/ShiftPlannerScreen.js';
 import { renderAssetPassportScreen } from './screens/AssetPassportScreen.js';
 import { renderCatalogCenterScreen } from './screens/CatalogCenterScreen.js';
@@ -350,6 +352,8 @@ export const ROUTES = [
     { path: '/takimhane', label: 'Takımhane', group: 'Saha', inMenu: true, render: (el, c, s) => { const dc = createDocumentControlApi(c, s); return renderToolroomScreen(el, { api: createToolroomApi(c, s), lists: { pw: createProductWorkspaceApi(c, s), load: async () => (await dc.list('', '', true)).filter((r) => r.docType === 'TOOL_LIST' && r.status === 'ACTIVE').map((r) => ({ docNo: r.docNo, title: r.title, productId: r.productId, productCode: r.productCode, productName: r.productName, revision: r.revision, revisionId: r.revisionId, state: r.state, versionNo: r.latestVersionNo, opLinks: r.opLinks, awaiting: r.awaiting })) } }); } },
     { path: '/komuta', label: 'Performance Center', group: 'Yönetim', inMenu: true, render: (el, c, s, q) => renderPerformanceCenter(el, createPerformanceCenterSources(c, s), { today: istanbulToday(), dept: q.get('birim'), refreshMs: 60_000 }) },
     { path: '/rota', label: 'Rota / Operasyonlar', group: 'Yönetim', inMenu: true, render: (el, c, s, q) => { const pw = createProductWorkspaceApi(c, s); return renderRoutingScreen(el, createRoutingApi(c, s), { productId: q.get('urun') ?? q.get('product'), embed: { list: () => pw.search(''), render: (host, productId) => renderProductWorkspaceScreen(host, pw, { product: productId, only: ['routing'] }) } }); } },
+    { path: '/planlama-merkezi', label: 'Planlama Merkezi', group: 'Yönetim', inMenu: true, render: (el, c, s, q) => renderPlanningCenter(el, { client: c, session: s, query: q, today: istanbulToday() }) },
+    { path: '/makine-detay', label: 'Makine Detayı', group: 'Yönetim', inMenu: false, needs: ['m'], render: (el, c, s, q) => renderMachineDetail(el, { client: c, session: s, query: q, today: istanbulToday(), cncStates: () => loadMachineStates(createLiveApi(c, s)) }) },
     { path: '/planlama-kokpit', label: 'Planlama Kokpiti', group: 'Yönetim', inMenu: true, render: (el, c, s, q, a) => renderPlanCockpit(el, { api: createPlanCockpitApi(c, s), machineStates: () => loadMachineStates(createLiveApi(c, s)), today: istanbulToday(), canPlan: a.actions.includes('WORK_ORDER_ASSIGN_MACHINE') }) },
     { path: '/vardiya-planlayici', label: 'Shift Planner', group: 'Yönetim', inMenu: true, render: (el, c, s, q, a) => {
             const num = (k) => { const v = Number(q.get(k)); return Number.isFinite(v) && v > 0 ? v : undefined; };

@@ -1,11 +1,11 @@
 {
   "product": "KMI NEXT",
-  "commit": "0abd37af624acad997f70651760f7dc34bcddaad",
+  "commit": "27441a451d5b5b8f429bb9b4e3a038c1c9b81b60",
   "builtFrom": "clean git tree",
-  "fileCount": 367,
-  "migrationsInRepo": 73,
-  "lastMigration": "0073_kmi_next_puantaj_month.sql",
-  "note": "Release candidate. Publishing to https://flow.kurutlu.com is a manual owner action; this file is not a publication permit.",
+  "fileCount": 378,
+  "migrationsInRepo": 84,
+  "lastMigration": "0158_supplement_work_order.sql",
+  "note": "Planlama Merkezi + Makine Detayi + operasyon yetkisi + kismi transfer + ek is emri. Production DB migration 0144,0147-0158 uygulandi ve dogrulandi. Yayin elle yapilir.",
   "files": [
     {
       "path": "assets/apple-touch-icon.png",
@@ -79,8 +79,8 @@
     },
     {
       "path": "dist/apps/web/src/app.js",
-      "bytes": 95352,
-      "sha256": "9bee0510236fc1c4bdc7274559dc3a39ba684d3a1db87309869d90253066fb95"
+      "bytes": 95995,
+      "sha256": "cf4949bb2ae1aa504e1ab84574f07f2d6ccbbcfbfd55db1606dcef03361475ed"
     },
     {
       "path": "dist/apps/web/src/approvalsInboxApi.js",
@@ -293,9 +293,64 @@
       "sha256": "d86c1dd532db930d26719a96022420fa6a4dff17d3d645ebb86982b4096a8650"
     },
     {
+      "path": "dist/apps/web/src/modules/planning/MachineDetailScreen.js",
+      "bytes": 15946,
+      "sha256": "9e64a68a42a26c93a38386f7649b6bafc3a5b634ca027036a96efa5819d6b2b6"
+    },
+    {
+      "path": "dist/apps/web/src/modules/planning/PlanDialogs.js",
+      "bytes": 7567,
+      "sha256": "7cad2a2f80001238c330ce8605e14e4bca174024f594756a04734019a16a3330"
+    },
+    {
+      "path": "dist/apps/web/src/modules/planning/PlanQueue.js",
+      "bytes": 23832,
+      "sha256": "561bb58f2dde0f0230d0ffbca8afdab930d51f7c699a3715775b06ec5acd61ae"
+    },
+    {
+      "path": "dist/apps/web/src/modules/planning/PlanningCenterScreen.js",
+      "bytes": 15775,
+      "sha256": "680c3934f29eb842c1b054c9956ad14b9eef310d5cda4ad20ba6b2934b1ed059"
+    },
+    {
+      "path": "dist/apps/web/src/modules/planning/machineQueueApi.js",
+      "bytes": 1286,
+      "sha256": "b2d4ee174cc19933a63ad42fc5b8c8c9e3ff4f57320a7685cd8262a393962504"
+    },
+    {
+      "path": "dist/apps/web/src/modules/planning/machineQueueModel.js",
+      "bytes": 596,
+      "sha256": "3dd64a8f4b44ea250d2428092f33eae9bd77d962cb9eb19629d1f09ab39ee0f0"
+    },
+    {
+      "path": "dist/apps/web/src/modules/planning/planCss.js",
+      "bytes": 5878,
+      "sha256": "d5efbd3f7e1a61a0626348587eda3bd6a8a22ab8242f16a6c88a41ab1dcd2700"
+    },
+    {
+      "path": "dist/apps/web/src/modules/planning/planData.js",
+      "bytes": 4404,
+      "sha256": "cc08d720c2ad91b6d9d1729e7fe5aa51256e1526ba9225cd15b8e265df4db1e7"
+    },
+    {
+      "path": "dist/apps/web/src/modules/planning/planSliceApi.js",
+      "bytes": 3306,
+      "sha256": "ac502aa0242da3be8ebc85581f6708d1f879eca43e94114bc5b8dbc2ba549602"
+    },
+    {
+      "path": "dist/apps/web/src/modules/planning/planText.js",
+      "bytes": 6731,
+      "sha256": "7b8fd3f23e37b860ea0fc7523f9e3368125e0f44871d9366b771a85d87b7a7ef"
+    },
+    {
+      "path": "dist/apps/web/src/modules/production/quantityLedger.js",
+      "bytes": 2462,
+      "sha256": "bbaef1a87d4f71c5d95c539eb6e1a892bd0a90425ca2eac0fc20da7008119a05"
+    },
+    {
       "path": "dist/apps/web/src/nav.js",
-      "bytes": 17765,
-      "sha256": "35cd446f1bba201d4bc401bffcf632f37697b5579806fd0a0a554189fc80034f"
+      "bytes": 17851,
+      "sha256": "edac696d6267f38a7db910a8619a4496d1728016ffc8f232f971c1885e7650cc"
     },
     {
       "path": "dist/apps/web/src/objectCard.js",
@@ -1842,5 +1897,6 @@
       "bytes": 1938,
       "sha256": "1c200c5f0b618c2feeaebdaf65834ff7b390c9b7424ae030debcc17cdb0f6c36"
     }
-  ]
+  ],
+  "overlay": "planning-center"
 }
