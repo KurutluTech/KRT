@@ -5,6 +5,7 @@ import { errorText } from '../../errorText.js';
 import { machineStateOf, DATA_SOURCE_TR, HEADLINE_TR, STALE_TR, displayKey } from '../../../../../packages/domain/src/machineState.js';
 import { spindleForState } from '../../spindle.js';
 import { describeBlocker } from '../../woReadiness.js';
+import { camRevText } from '../../../../../packages/domain/src/camRevision.js';
 const EVENT_TR = { CREATED: 'İş emri açıldı', MACHINE_ASSIGNED: 'Makine atandı', PLAN_CHANGED: 'Plan / atama değişti', START: 'START — üretim başladı', RESUME: 'Devam (HOLD kalktı)', CONTINUE_AFTER_FIRST_PIECE: 'İlk parça sonrası devam',
     HOLD: 'HOLD / duruş', FIRST_PIECE_REQUESTED: 'İlk parça kaliteye gönderildi', FIRST_PIECE_APPROVED: 'İlk parça onaylandı', FINISH: 'FINISH — üretim bitti', FINAL_RELEASE: 'Nihai onay', CANCELLED: 'İptal', PRODUCTION_DECLARED: 'Üretim beyanı', CORRECTION: 'Düzeltme (bağlantılı kayıt)', STATUS_CHANGE: 'Durum değişti',
     OP_STARTED: 'Operasyon başladı', OP_FIRST_PIECE_APPROVED: 'Operasyon ilk parça onayı', OP_FIRST_PIECE_REJECTED: 'Operasyon ilk parça reddi', OP_OUTPUT_DECLARED: 'Operasyon beyanı', OP_RUN_FINISHED: 'Operasyon üretimi bitti', OP_QC_PASSED: 'Operasyon kalite GEÇTİ', OP_QC_FAILED: 'Operasyon kalite KALDI',
@@ -126,7 +127,7 @@ export function workOrderTopics(ctx, w) {
                     const secs = list.length ? [
                         kv(`Güncel künye · sürüm ${cur.versionNo}`, [['Kaydedilme', dt(cur.capturedAt)], ['Kaynak', cur.captureKind === 'PLAN_DECISION' ? 'Plan kararı (otomatik)' : 'Elle kayıt'], ['Gerekçe', orNA(cur.reason)], ...basisRows(cur.basis)]),
                         ...(prev ? [kv(`Önceki sürüm ${prev.versionNo} ile fark`, diffRows(prev.basis, cur.basis), 'Önceki sürümler silinmez ve değişmez.')] : []),
-                        table('Tüm sürümler', ['Sürüm', 'Zaman', 'Tür', 'Makine', 'Operatör', 'Vardiya', 'CAM'], list.map((s) => [`v${s.versionNo}`, dt(s.capturedAt), s.captureKind === 'PLAN_DECISION' ? 'Plan kararı' : 'Elle', orNA(s.basis.machine?.code), orNA(s.basis.operator?.name), orNA(s.basis.shift?.code ?? s.basis.planned?.shiftCode), s.basis.camProgram ? `${s.basis.camProgram.programNo} r${s.basis.camProgram.revision}` : NA]), 'Künye yok')
+                        table('Tüm sürümler', ['Sürüm', 'Zaman', 'Tür', 'Makine', 'Operatör', 'Vardiya', 'CAM'], list.map((s) => [`v${s.versionNo}`, dt(s.capturedAt), s.captureKind === 'PLAN_DECISION' ? 'Plan kararı' : 'Elle', orNA(s.basis.machine?.code), orNA(s.basis.operator?.name), orNA(s.basis.shift?.code ?? s.basis.planned?.shiftCode), s.basis.camProgram ? `${s.basis.camProgram.programNo} ${camRevText(s.basis.camProgram.revision)}` : NA]), 'Künye yok')
                     ] : [note('Künye yok', 'Bu iş emri için henüz künye kaydedilmedi. Plan kararı verildiğinde otomatik, ya da yetkili kişi elle kaydeder. Eksik künye 0 veya tahmin ile doldurulmaz.')];
                     const box = h('div', { class: 'ps-page', 'data-testid': 'kunye' }, banner ? h('div', { class: 'ps-banner ok', 'data-testid': 'kunye-banner' }, banner) : null, ...secs.map((s) => sectionNode(s, ctx.hrefOf)));
                     if (planner(ctx)) {
@@ -169,9 +170,9 @@ export function workOrderTopics(ctx, w) {
                 table('Operasyon bazlı operatörler', ['Op', 'Operatör', 'Makine'], o.map((x) => [`OP${x.opNo}`, link('PERSONNEL', x.operatorId, x.operatorId ? pm.get(x.operatorId) : null), link('MACHINE', x.machineId, x.machineId ? 'Makine' : null)]), 'Operasyon yok'),
                 table('Atama kararları', ['Zaman', 'Operatör', 'Vardiya', 'Öneriye uyuldu mu'], (dec ?? []).map((d) => [dt(d.decidedAt), link('PERSONNEL', d.operatorId, d.operatorId ? pm.get(d.operatorId) : null), orNA(d.plannedShiftCode), d.followedSuggestion === null ? NA : d.followedSuggestion ? 'Evet' : 'Hayır']), 'Atama kararı yok')];
         }),
-        R('cam', 'CAM programı ve revizyonu', 'chip', 'Teknik', w.camProgram ? `${w.camProgram.programNo} r${w.camProgram.revision}` : 'Bağlı değil', async () => {
+        R('cam', 'CAM programı ve revizyonu', 'chip', 'Teknik', w.camProgram ? `${w.camProgram.programNo} ${camRevText(w.camProgram.revision)}` : 'Bağlı değil', async () => {
             const tl = w.camProgram ? await opt(ctx.sel('cam_program_tools', 'tool_type,qty', { cam_program_id: `eq.${w.camProgram.id}` }, 'tool_type', 100)) : [];
-            return [kv('CAM programı', w.camProgram ? [['Program', w.camProgram.programNo], ['Revizyon', w.camProgram.revision], ['Durum', w.camProgram.status], ['İdeal çevrim', w.camProgram.idealCycleSeconds === null ? NA : nf(w.camProgram.idealCycleSeconds, 'sn')], ['Ürün', link('PRODUCT', w.product?.id, w.product?.code)]] : [['Durum', 'Bu iş emrine CAM programı bağlı değil']]),
+            return [kv('CAM programı', w.camProgram ? [['Program', w.camProgram.programNo], ['Revizyon', camRevText(w.camProgram.revision)], ['Durum', w.camProgram.status], ['İdeal çevrim', w.camProgram.idealCycleSeconds === null ? NA : nf(w.camProgram.idealCycleSeconds, 'sn')], ['Ürün', link('PRODUCT', w.product?.id, w.product?.code)]] : [['Durum', 'Bu iş emrine CAM programı bağlı değil']]),
                 table('Programın takım türleri', ['Takım türü', 'Adet'], (tl ?? []).map((t) => [t.toolType, nf(t.qty)]), 'Takım listesi yok')];
         }),
         R('takim', 'Takım listesi ve revizyonu', 'wrench', 'Teknik', 'Hazırlık ve hareket', async () => {
@@ -236,7 +237,7 @@ const KEYS = [
     ['Makine', (b) => (b.machine ? `${b.machine.code} · ${b.machine.name}` : NA)], ['Operatör', (b) => b.operator?.name ?? NA], ['Vardiya', (b) => (b.shift ? `${b.shift.code} · ${b.shift.label}` : (b.planned?.shiftCode ?? NA))],
     ['Plan günü', (b) => (b.planned?.date ? day(b.planned.date) : NA)], ['Planlı dk', (b) => (b.planned?.minutes == null ? NA : nf(b.planned.minutes))],
     ['Ürün / revizyon', (b) => (b.productRevision ? `${b.productRevision.productCode} rev ${b.productRevision.revision} (${b.productRevision.status})` : NA)],
-    ['CAM programı', (b) => (b.camProgram ? `${b.camProgram.programNo} r${b.camProgram.revision} (${b.camProgram.status})` : NA)],
+    ['CAM programı', (b) => (b.camProgram ? `${b.camProgram.programNo} ${camRevText(b.camProgram.revision)} (${b.camProgram.status})` : NA)],
     ['Takım listesi', (b) => (b.camProgram?.toolList?.length ? b.camProgram.toolList.map((t) => `${t.toolType}×${t.qty}`).join(', ') : NA)],
     ['Operasyonlar', (b) => (b.operations?.length ? b.operations.map((o) => `OP${o.opNo} (rota v${o.routingVersionNo ?? '?'} · ${o.cycleSecondsTarget ?? '?'} sn · hazırlık ${o.setupMinutesTarget ?? '?'} dk)`).join(' · ') : NA)],
     ['Hammadde', (b) => (b.materials?.length ? b.materials.map((m) => `${m.materialCode}: gereken ${m.required}, rezerve ${m.reserved}`).join(' · ') : NA)],

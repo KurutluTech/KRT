@@ -4,6 +4,7 @@
 import { chooseProduct, rememberProduct } from '../lastProduct.js';
 import { h, mount } from '../../../../packages/ui/src/h.js';
 import { errorText } from '../errorText.js';
+import { camRevText } from '../../../../packages/domain/src/camRevision.js';
 const CSS = `
 .eng{font-family:system-ui,-apple-system,"Segoe UI",sans-serif;font-size:14px;line-height:1.5;padding:16px;max-width:1240px;margin:0 auto;box-sizing:border-box;color:#e2e8f0}
 .eng *{box-sizing:border-box}
@@ -84,7 +85,7 @@ export async function renderEngineeringScreen(container, api, state = {}) {
             const tType = h('input', { type: 'text', 'data-testid': 'eng-tool-type', placeholder: 'Takım tipi (örn. FREZE-D10)' });
             const tQty = h('input', { type: 'text', inputmode: 'numeric', 'data-testid': 'eng-tool-qty', placeholder: 'Adet' });
             const cyc = h('input', { type: 'text', inputmode: 'decimal', 'data-testid': 'eng-cycle', placeholder: 'İdeal çevrim süresi (sn / adet)', value: c.idealCycleSeconds ? String(c.idealCycleSeconds) : '' });
-            return h('div', { class: 'card', 'data-testid': 'eng-program', 'data-program': c.programNo, 'data-status': c.status }, h('div', { class: 'row', style: 'justify-content:space-between' }, h('strong', {}, `${c.programNo} · rev ${c.revision}`), h('span', { class: `chip ${c.status === 'RELEASED' ? 'ok' : 'warn'}` }, ST_TR[c.status])), tools.length ? h('div', {}, ...tools.map((t) => h('span', { class: 'chip info', 'data-testid': 'eng-tool' }, `${t.toolType} × ${t.qty}`))) : h('div', { class: 'chip warn', 'data-testid': 'eng-tools-empty' }, 'Takım listesi boş'), h('div', { class: 'note' }, c.idealCycleSeconds ? `İdeal çevrim ${c.idealCycleSeconds} sn` : 'İdeal çevrim süresi yok — OEE performansı “bilinmiyor” kalır'), c.status === 'DRAFT'
+            return h('div', { class: 'card', 'data-testid': 'eng-program', 'data-program': c.programNo, 'data-status': c.status }, h('div', { class: 'row', style: 'justify-content:space-between' }, h('strong', {}, `${c.programNo} · ${camRevText(c.revision)}`), h('span', { class: `chip ${c.status === 'RELEASED' ? 'ok' : 'warn'}` }, ST_TR[c.status])), tools.length ? h('div', {}, ...tools.map((t) => h('span', { class: 'chip info', 'data-testid': 'eng-tool' }, `${t.toolType} × ${t.qty}`))) : h('div', { class: 'chip warn', 'data-testid': 'eng-tools-empty' }, 'Takım listesi boş'), h('div', { class: 'note' }, c.idealCycleSeconds ? `İdeal çevrim ${c.idealCycleSeconds} sn` : 'İdeal çevrim süresi yok — OEE performansı “bilinmiyor” kalır'), c.status === 'DRAFT'
                 ? h('div', { class: 'grid' }, tType, tQty, h('button', { type: 'button', class: 'ghost', 'data-testid': 'eng-tool-add', onClick: () => {
                         const q = Number(tQty.value);
                         if (!tType.value.trim() || !(Number.isInteger(q) && q > 0))

@@ -1,4 +1,6 @@
 // Rota değişiklik geçmişi — okunur gösterim (saf fonksiyonlar; ağ/DOM yok). Nesne asla doğrudan metne çevrilmez ("[object Object]" yok).
+import { camRevText } from './camRevision.js';
+export { camRevText };
 export const KEY_TR = {
     name: 'Ad', op_code: 'Operasyon kodu', op_no: 'Sıra no', active: 'Etkin', allowed_machine_ids: 'Makineler', primary_machine_id: 'Öncelikli makine',
     cam_program_id: 'CAM programı', cycle_seconds_target: 'Çevrim (sn)', setup_minutes_target: 'Hazırlık (dk)', first_piece_required: 'İlk parça kontrolü',
@@ -21,8 +23,8 @@ export function machineText(id, ctx) {
 export function camText(id, ctx) {
     const c = ctx?.cams?.get(id);
     if (!c) return `CAM kaydı okunamadı (${short(id)})`;
-    const no = pick(c, 'program_no') ?? 'CAM', rev = pick(c, 'revision');
-    return rev == null ? String(no) : `${no} · sürüm ${rev}`;
+    const no = pick(c, 'program_no') ?? 'CAM', rev = camRevText(pick(c, 'revision'));
+    return rev ? `${no} · ${rev}` : String(no);
 }
 const paramLine = (k, p) => {
     const v = isObj(p) ? pick(p, 'value') : p, u = isObj(p) ? pick(p, 'unit') : null;
@@ -56,11 +58,18 @@ export function valueText(key, v, ctx) {
     return String(v).length > 120 ? `${String(v).slice(0, 117)}…` : String(v);
 }
 const same = (a, b) => JSON.stringify(a ?? null) === JSON.stringify(b ?? null);
+/** Aynı standardın iki kaydı: operasyon sütunu ve süre parametresi. Değerleri aynıysa ekranda tek satır gösterilir; kaynak kayıtlar ve geçmiş değişmez. */
+export const TWIN = { cycle_seconds_target: 'OP_CYCLE_SEC', setup_minutes_target: 'OP_SETUP_MIN' };
+const pval = (st, pk) => { const p = pick(pick(st, 'params') ?? {}, pk); return isObj(p) ? pick(p, 'value') : p; };
+const numEq = (a, b) => (a == null && b == null) || (a != null && b != null && Number(a) === Number(b));
 const empty = (v) => v === null || v === undefined || (Array.isArray(v) && !v.length) || (isObj(v) && !Object.keys(v).length) || v === '';
 /** Bir sürüm kaydı için satırlar: [{label, from, to}] — yalnız gerçekten değişenler; parametreler tek tek. */
 export function diffRows(row, ctx) {
     const keys = (row.changedKeys ?? []).filter((k) => !NOISE.has(k));
     const out = [];
+    const twinShown = (k) => TWIN[k] && keys.includes('params')
+        && numEq(pick(row.afterState, k), pval(row.afterState, TWIN[k])) && numEq(pick(row.beforeState, k), pval(row.beforeState, TWIN[k]))
+        && !numEq(pval(row.beforeState, TWIN[k]), pval(row.afterState, TWIN[k]));
     for (const k of keys) {
         const b = pick(row.beforeState, k), a = pick(row.afterState, k);
         if (k === 'params') {
@@ -73,6 +82,7 @@ export function diffRows(row, ctx) {
             continue;
         }
         if (same(b, a) || (empty(b) && empty(a))) continue;
+        if (twinShown(k)) continue; // aynı değer "Süre standartları" satırında birimiyle zaten gösteriliyor
         out.push({ label: KEY_TR[k] ?? k, from: valueText(k, b, ctx), to: valueText(k, a, ctx) });
     }
     return out;

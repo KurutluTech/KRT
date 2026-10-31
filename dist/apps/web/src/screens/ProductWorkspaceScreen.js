@@ -16,6 +16,7 @@ import { drawToolistMap } from './toolistMapPanel.js';
 import { drawPrepFlow, PREP_CSS } from './prepFlowPanel.js';
 import { drawBarStock, fmtMm } from './barStockPanel.js';
 import { drawRouteChanges } from './routeChangePanel.js';
+import { drawOpPrep } from './opPrepPanel.js';
 import { barPlanPreview, DEFAULT_KERF_MM, DEFAULT_STEEL_DENSITY } from '../../../../packages/domain/src/barStock.js';
 import { KX_CSS, NA, card, chip, emptyState, field, fmt, fold, fromBase64, invalid, isChecked, kvItem, showFile, toBase64, val, when } from '../kx.js';
 const PW_CSS = `
@@ -524,6 +525,8 @@ export async function renderProductWorkspaceScreen(container, api, state = {}) {
         drawOps();
         if (rev && api.changeHistory && api.changeImpact)
             routingCard.append(drawRouteChanges(h('div'), api, { revisionId: rev.id, status: rev.status }));
+        if (rev && api.opPrepList)
+            routingCard.append(drawOpPrep(h('div'), api, { revisionId: rev.id }));
         void drawChainPanel(chainHost, api, ws, { act: !!(can.editRouting || can.manageDocuments) && editable }, (m) => reload(m), (e) => fail(e), (c) => {
             chainNow = c;
             if (!opsHost.querySelector('input:focus, textarea:focus, select:focus'))
