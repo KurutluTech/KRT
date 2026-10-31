@@ -1,0 +1,36 @@
+PASS anon RPC çağıramaz
+PASS authenticated tabloyu doğrudan OKUYAMAZ
+PASS authenticated tabloya doğrudan YAZAMAZ
+PASS yardımcı fonksiyonlar dışarı kapalı
+PASS oturumsuz çağrı reddedilir
+PASS yetkisiz kullanıcı okuyabilir ama düzenleyemez
+PASS OBSOLETE revizyona yazılamaz
+PASS rotadaki OP30 için taslak açılamaz
+PASS geçersiz slot reddedilir
+PASS bilinmeyen alan reddedilir (status/approved_by istemciden yazılamaz)
+PASS başka ürünün belgesi seçilemez
+PASS geri çekilmiş belge seçilemez
+PASS yanlış tür belge seçilemez (takım listesi NC yerine)
+PASS başka revizyonun CAM kaydı seçilemez
+PASS pilot makine / bilinmeyen yetkinlik reddedilir
+PASS negatif/sıfır süre reddedilir
+PASS OP10 kısmi taslak: DRAFT + eksik listesi (otomatik belge ataması YOK)
+PASS CUT_PREP için NC/CAM ve takım listesi aranmaz
+PASS eksik varken TEKNİK İNCELEMEYE HAZIR yapılamaz
+PASS eşzamanlı düzenleme koruması (eski sürüm reddedilir)
+PASS tüm alanlar dolu: eksik 0
+PASS değişiklik yoksa sürüm artmaz, geçmişe yazılmaz
+PASS editör ONAYLAYAMAZ (PRODUCT_REV_APPROVE yok)
+PASS onaylayıcı TEKNİK İNCELEMEYE HAZIR taslağı onaylar
+PASS TASLAK doğrudan onaylanamaz
+PASS onaylı taslak düzenlenince TASLAK'a döner, onay silinir
+PASS ONAYLI rotaya operasyon EKLEMEZ, iş emri/stok/belge/revizyon değişmez
+PASS değişiklik geçmişi sunucuda: eski/yeni değer + kullanıcı
+PASS geçmiş değiştirilemez (audit_log append-only)
+PASS ürün zaman çizelgesine olay yazılır; APPROVED "rota RELEASE değildir" ibaresiyle
+PASS liste: taslaklar + seçilebilir belgeler + OP30 bağlantı bilgisi
+PASS OP30 belgesi AÇIKÇA seçilirse kabul edilir (otomatik değil, kullanıcı kararı)
+PASS geri dönüş: tablo/fonksiyonlar kalkar, son hal audit_log'da kalır, kaynaklar değişmez
+PASS geri dönüşten sonra migration yeniden uygulanabilir
+
+34/34 PASS
