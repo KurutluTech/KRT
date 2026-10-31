@@ -125,7 +125,7 @@ export async function renderPlanningScreen(container, api, opts, banner, typedMi
                 const rows = await api.suggestOperators(b.workOrderId, machineSel.value, dateIn.value, shiftSel.value);
                 saBox.replaceChildren(h('div', { class: 'mut', style: 'font-size:10px;text-transform:uppercase' }, 'Akıllı Atama — öneri, karar yöneticinin'), ...rows.map((r) => h('div', { 'data-testid': 'plan-sa-cand', 'data-person': r.personnelId, 'data-rank': String(r.rank), 'data-eligible': String(r.eligible),
                     style: `padding:2px 0;${r.eligible ? '' : 'opacity:.6'}` }, `${r.rank}. ${r.name} — `, r.eligible
-                    ? `yetkinlik ${r.skillScore}${r.qualification === 'NO_REQUIREMENT_DEFINED' ? ' (makinede şart tanımlı değil)' : ''} · ${r.productExperience} iş · fire ${r.scrapRate === null ? 'geçmiş yok' : `%${(r.scrapRate * 100).toFixed(1)}`} · yük ${r.loadMinutes} dk${r.presence === 'UNKNOWN' ? '' : ` · ${r.presence === 'INSIDE' ? 'içeride' : 'dışarıda'}`}`
+                    ? `yetkinlik ${r.skillScore}${r.qualification === 'NO_REQUIREMENT_DEFINED' ? ' · ŞART TANIMLANMAMIŞ (yetkin sayılmaz; atama yönetici kararıdır)' : ''} · ${r.productExperience} iş · fire ${r.scrapRate === null ? 'geçmiş yok' : `%${(r.scrapRate * 100).toFixed(1)}`} · yük ${r.loadMinutes} dk${r.presence === 'UNKNOWN' ? '' : ` · ${r.presence === 'INSIDE' ? 'içeride' : 'dışarıda'}`}`
                     : h('span', { 'data-testid': 'plan-sa-refusal' }, refusalLabelTr(r.refusal ?? '')), r.eligible ? h('button', { type: 'button', 'data-testid': 'plan-sa-pick', class: 'ghost', style: 'margin-left:6px', onClick: () => { opSel.value = r.personnelId; } }, 'Seç') : null)));
             }
             catch (err) {

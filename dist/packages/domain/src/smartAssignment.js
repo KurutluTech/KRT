@@ -77,6 +77,8 @@ export function scrapRate(good, scrap) {
 export const SA_REASON_TR = {
     PERSON_INACTIVE: 'pasif',
     PERSON_NOT_OPERATOR: 'operatör değil',
+    OPERATOR_REMOVAL_NOT_ALLOWED_IN_STATUS: 'üretimdeki iş emrinde operatör ataması kaldırılamaz',
+    OPERATOR_NOT_FOUND_OR_INACTIVE: 'personel bulunamadı veya pasif',
     OPERATOR_NOT_IN_SHIFT: 'bu vardiyada değil',
     HARD_CAP_EXCEEDED: 'en fazla 3 makine',
     MULTI_MACHINE_AUTHORIZATION_INSUFFICIENT: 'çoklu makine yetkisi yetersiz',
