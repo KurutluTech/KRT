@@ -1,0 +1,17 @@
+PASS açılışta CUT/PREP, OP10, OP20, OP40 görünür; rotadaki OP30 forma girmez
+PASS kapsam notu: rota/iş emri/üretim oluşturmaz, ONAYLI ≠ RELEASE/GO
+PASS CUT/PREP kartında NC/CAM/takım listesi alanı yok
+PASS OP10'da OP30 belgeleri otomatik seçili DEĞİL; seçilince "OP30'a bağlı" uyarısı
+PASS referans belgeler KMI kayıtlarından seçilebilir (başka ürün/geri çekilmiş yok)
+PASS kısmi kayıt: yalnız doldurulan alanlar gönderilir → EKSİK
+PASS hatalı sayı sunucuya gitmez
+PASS tüm alanlar → TASLAK, incelemeye gönder → TEKNİK İNCELEMEYE HAZIR
+PASS virgüllü çevrim süresi doğru kaydedildi (120,5 → 120.5)
+PASS onaylayıcı → ONAYLI, notta "RELEASE değildir"
+PASS salt okunur kullanıcı: alanlar kilitli, kaydet/onay yok
+PASS değişiklik geçmişi panelde görünür
+PASS başka operasyon ekle (OP50) ve rotadaki OP30 eklenemez
+PASS veritabanı güncellemesi yoksa sakin uyarı (hata değil)
+PASS sunucu hatası kullanıcıya gösterilir
+
+15/15 PASS

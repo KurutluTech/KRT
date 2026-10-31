@@ -94,6 +94,11 @@ export function createProductWorkspaceApi(client, session) {
         opHistory: async (o) => (await rpc('routing_op_history', { p_op: o })).versions,
         changeHistory: (rev) => rpc('routing_change_history', { p_revision: rev }),
         changeImpact: (rev) => rpc('routing_change_impact', { p_revision: rev }),
+        // m0183 operasyon hazırlık taslağı (rotada olmayan operasyonlar) — yalnız sunucu RPC'leri
+        opPrepList: (rev) => rpc('op_prep_list', { p_revision: rev }),
+        opPrepSave: (rev, slot, data, ver) => rpc('op_prep_save', { p_revision: rev, p_slot: slot, p_data: data, p_expected_version: ver }),
+        opPrepSetStatus: (rev, slot, status, ver, note) => rpc('op_prep_set_status', { p_revision: rev, p_slot: slot, p_status: status, p_expected_version: ver, p_note: note }),
+        opPrepHistory: (rev, slot) => rpc('op_prep_history', { p_revision: rev, p_slot: slot }),
         camPrograms: (rev) => client.select('cam_programs', { columns: 'id,program_no,revision,status', filters: { product_revision_id: `eq.${rev}` }, limit: 200 }, session),
         estimate: (r, q) => rpc('routing_estimate', { p_revision: r, p_qty: q, p_on: null }),
         runCalc: (r, q, why) => rpc('calc_run_routing', { p_revision: r, p_qty: q, p_reason: why }),
