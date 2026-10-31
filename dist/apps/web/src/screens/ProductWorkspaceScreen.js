@@ -15,6 +15,7 @@ import { nextText } from '../stageText.js';
 import { drawToolistMap } from './toolistMapPanel.js';
 import { drawPrepFlow, PREP_CSS } from './prepFlowPanel.js';
 import { drawBarStock, fmtMm } from './barStockPanel.js';
+import { drawRouteChanges } from './routeChangePanel.js';
 import { barPlanPreview, DEFAULT_KERF_MM, DEFAULT_STEEL_DENSITY } from '../../../../packages/domain/src/barStock.js';
 import { KX_CSS, NA, card, chip, emptyState, field, fmt, fold, fromBase64, invalid, isChecked, kvItem, showFile, toBase64, val, when } from '../kx.js';
 const PW_CSS = `
@@ -118,8 +119,9 @@ export async function renderProductWorkspaceScreen(container, api, state = {}) {
             machines = [];
         }
         const rev = ws.revision;
-        const can = ws.can;
         const editable = !!rev && rev.status !== 'OBSOLETE';
+        // m0181: rota yapısı (operasyon ekle/sırala/pasifle/ön koşul) DRAFT ve RELEASED revizyonda yetkili kullanıcıya açık; sunucu aynı kuralı uygular (OBSOLETE reddedilir). BOM taslak-only kalır (manageBom).
+        const can = { ...ws.can, editStructure: !!(ws.can.editStructure || (ws.can.editRouting && rev && (rev.status === 'DRAFT' || rev.status === 'RELEASED'))) };
         // Ayrı nedenler: revizyon yok / revizyon kapalı / yükleme yetkisi yok / veri yok — hiçbiri "VERİ YOK" arkasına gizlenmez.
         const whyNoUpload = !rev ? 'NO_REV' : rev.status === 'OBSOLETE' ? 'CLOSED' : !can.manageDocuments ? 'NO_PERM' : null;
         const WHY_TR = { NO_REV: 'Bu ürün için revizyon yok — dosya eklemek için önce taslak revizyon açılmalı.', CLOSED: 'Revizyon kapalı (geçersiz) — yeni revizyon süreci kullanılmalı.', NO_PERM: 'Yükleme yetkiniz yok.' };
@@ -520,6 +522,8 @@ export async function renderProductWorkspaceScreen(container, api, state = {}) {
         const routingCard = card({ title: 'Rota ve operasyonlar', testid: 'pw-card-routing', span: 12, id: 'card-routing', chip: stateChip(ws.routing.length ? (rev?.state ?? 'MISSING') : 'MISSING'),
             actions: [can.editStructure ? btn('primary', 'pw-op-add', '+ Operasyon ekle', addOp) : null] }, checks.length ? E('div', { class: 'row', style: 'gap:6px;margin-bottom:10px' }, ...checks.map((c) => chip(`${c.label}: ${c.detail}`, c.status === 'OK' ? 'ok' : c.status === 'NA' ? '' : 'warn', { 'data-testid': 'pw-route-check', 'data-code': c.code, 'data-status': c.status, title: c.detail, style: 'white-space:normal' }))) : null, can.editRouting && editable ? E('div', { class: 'row', style: 'margin-bottom:6px' }, E('div', { class: 'grow' }, field(rev?.status === 'DRAFT' ? 'Not (isteğe bağlı — boşsa işlemin açıklaması kaydedilir)' : 'Hızlı işlem gerekçesi', quickReason, 'Sırala, pasife al, bağımlılık, kaynak ve kalite noktası işlemleri bu gerekçeyi kullanır.'))) : null, chainHost, opsHost, can.editRouting && rev?.status === 'RELEASED' ? E('div', { class: 'mut', style: 'margin-top:10px' }, 'Yürürlükteki revizyonda operasyon ekleme, sıralama ve pasife alma yapılmaz; makine, süre, kaynak ve talimat güncellenir (sürümlenir). Yapısal değişiklik için taslak revizyon açın.') : null);
         drawOps();
+        if (rev && api.changeHistory && api.changeImpact)
+            routingCard.append(drawRouteChanges(h('div'), api, { revisionId: rev.id, status: rev.status }));
         void drawChainPanel(chainHost, api, ws, { act: !!(can.editRouting || can.manageDocuments) && editable }, (m) => reload(m), (e) => fail(e), (c) => {
             chainNow = c;
             if (!opsHost.querySelector('input:focus, textarea:focus, select:focus'))

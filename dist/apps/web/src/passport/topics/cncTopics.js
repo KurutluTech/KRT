@@ -4,6 +4,7 @@ import { machineStateOf } from '../../../../../packages/domain/src/machineState.
 import { SEG_KINDS, SEG_TR, SEG_COLOR, INSUFFICIENT_TR, aiStatus, fmtDur, fmtPct, layoutTimeline, pct, } from '../../../../../packages/domain/src/cncActivity.js';
 import { isDenied } from './common.js';
 import { renderActivityCenter } from './cncActivityCenter.js';
+import { cycleTopic } from './cycleAnalysis.js';
 const TR_OFFSET = '+03:00'; // Türkiye: sabit UTC+3 (yaz/kış saati yok)
 const NUM = new Intl.NumberFormat('tr-TR');
 const dtf = new Intl.DateTimeFormat('tr-TR', { timeZone: 'Europe/Istanbul', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
@@ -129,5 +130,5 @@ export function liveTopic(ctx, m) {
         },
     };
 }
-export const cncTopics = (ctx, m) => (m.machineClass === 'MACHINING' ? [liveTopic(ctx, m), historyTopic(ctx, m)] : []);
+export const cncTopics = (ctx, m) => (m.machineClass === 'MACHINING' ? [liveTopic(ctx, m), historyTopic(ctx, m), cycleTopic(ctx, m)] : []);
 void pct;

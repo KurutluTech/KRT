@@ -92,6 +92,8 @@ export function createProductWorkspaceApi(client, session) {
         setParameter: (d, s, v, from, to, r) => rpc('param_set', { p_def: d, p_scope: s, p_value: v, p_valid_from: from, p_valid_to: to, p_reason: r }),
         parameterHistory: (d, s) => rpc('param_history', { p_def: d, p_scope: s }),
         opHistory: async (o) => (await rpc('routing_op_history', { p_op: o })).versions,
+        changeHistory: (rev) => rpc('routing_change_history', { p_revision: rev }),
+        changeImpact: (rev) => rpc('routing_change_impact', { p_revision: rev }),
         estimate: (r, q) => rpc('routing_estimate', { p_revision: r, p_qty: q, p_on: null }),
         runCalc: (r, q, why) => rpc('calc_run_routing', { p_revision: r, p_qty: q, p_reason: why }),
         reevaluate: (run, r) => rpc('calc_reevaluate', { p_run: run, p_reason: r }),
