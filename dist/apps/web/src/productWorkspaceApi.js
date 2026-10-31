@@ -96,8 +96,12 @@ export function createProductWorkspaceApi(client, session) {
         changeImpact: (rev) => rpc('routing_change_impact', { p_revision: rev }),
         // m0183 operasyon hazırlık taslağı (rotada olmayan operasyonlar) — yalnız sunucu RPC'leri
         opPrepList: (rev) => rpc('op_prep_list', { p_revision: rev }),
+        competencyMatrix: () => rpc('competency_matrix', {}),
+        machineClearances: () => client.select('operator_machine_clearances', { columns: 'personnel_id,machine_id,valid_until,revoked_at', filters: { revoked_at: 'is.null' }, limit: 2000 }, session),
         opPrepSave: (rev, slot, data, ver) => rpc('op_prep_save', { p_revision: rev, p_slot: slot, p_data: data, p_expected_version: ver }),
         opPrepSetStatus: (rev, slot, status, ver, note) => rpc('op_prep_set_status', { p_revision: rev, p_slot: slot, p_status: status, p_expected_version: ver, p_note: note }),
+        opPrepTransfer: (rev, slot, ver, reason, apply) => rpc('op_prep_transfer', { p_revision: rev, p_slot: slot, p_expected_version: ver, p_reason: reason, p_apply: apply }),
+        competencyCoverage: (codes, machine, shift) => rpc('competency_coverage', { p_skill_codes: codes, p_machine: machine ?? null, p_shift: shift ?? null }),
         opPrepHistory: (rev, slot) => rpc('op_prep_history', { p_revision: rev, p_slot: slot }),
         camPrograms: (rev) => client.select('cam_programs', { columns: 'id,program_no,revision,status', filters: { product_revision_id: `eq.${rev}` }, limit: 200 }, session),
         estimate: (r, q) => rpc('routing_estimate', { p_revision: r, p_qty: q, p_on: null }),
