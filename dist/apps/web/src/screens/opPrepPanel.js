@@ -1,6 +1,7 @@
 // KMI-013 Teknik operasyon hazırlık formu (m0183: op_prep_list / op_prep_save / op_prep_set_status / op_prep_history).
 // Rotada henüz olmayan operasyonlar (CUT/PREP, OP10, OP20, OP40 …) için tek, doldurulabilir hazırlık taslağı.
 // Taslak; rota operasyonu, iş emri veya üretim kaydı DEĞİLDİR. Yetki, eksik hesabı, geçmiş ve belge ilişkileri sunucuda.
+import { skillCoverage, COVERAGE_TR } from '../../../../packages/domain/src/skillCoverage.js';
 import { h } from '../../../../packages/ui/src/h.js';
 import { errorText, isSetupPending } from '../errorText.js';
 import { camRevText } from '../../../../packages/domain/src/camRevision.js';
@@ -44,6 +45,34 @@ function slotCard(slot, draft, L, api, revisionId, reload) {
     inp.firstPieceRequired = h('select', { disabled: ro, 'data-testid': `opp-${slot}-fp` }, opt('', '— karar verilmedi —', d.firstPieceRequired == null), opt('true', 'Evet, ilk parça onayı gerekli', d.firstPieceRequired === true), opt('false', 'Hayır', d.firstPieceRequired === false));
     inp.firstPieceNote = h('input', { value: d.firstPieceNote ?? '', disabled: ro, placeholder: 'örn. kalite ölçüm cihazında tam ölçüm', 'data-testid': `opp-${slot}-fpnote` });
     const skillBoxes = (L.skills ?? []).map((s) => h('label', {}, h('input', { type: 'checkbox', value: s.code, checked: (d.skillCodes ?? []).includes(s.code), disabled: ro }), `${s.name}`));
+    const covBox = h('div', { class: 'mut', 'data-testid': `opp-${slot}-cov` });
+    const updCov = async () => {
+        const codes = skillBoxes.map((l) => l.querySelector('input')).filter((x) => x.checked).map((x) => x.value);
+        if (!codes.length) { covBox.textContent = 'Yetkinlik şartı seçilmedi — atama yetkinlikten kontrol edilmez.'; return; }
+        // Dar kapsamlı sunucu RPC'si (yalnız sayılar; kişi verisi dönmez): makine + vardiya (TeamK1/TeamK2) bazında
+        if (api.competencyCoverage) {
+            try {
+                const machineId0 = inp.machineId?.value || null, nm0 = new Map((L.skills ?? []).map((x) => [x.code, x.name]));
+                const per = [];
+                for (const sh of [null, 'TeamK1', 'TeamK2']) { const r = await api.competencyCoverage(codes, machineId0, sh); per.push([sh, r]); }
+                const line = ([sh, r]) => `${sh ?? 'tüm vardiyalar'}: ${(r.skills ?? []).map((x) => `${nm0.get(x.skill) ?? x.skill} ${x.qualifiedActive} yetkin aktif, ${x.assignable} görevlendirilebilir, ${x.backup ? 'yedek var' : 'yedek yok'} (${COVERAGE_TR[{ NO_ONE: 'NO_ONE', NO_ASSIGNABLE: 'NO_ASSIGNABLE', THIN: 'THIN', OK: 'OK' }[x.state]] ?? x.state})`).join('; ')}`;
+                covBox.textContent = `Kapsama${machineId0 ? ' (seçili makine)' : ' (makine seçilmedi)'} — ` + per.map(line).join(' | ');
+                return;
+            } catch { /* RPC yok/yetki yok: eski yola düş */ }
+        }
+        try {
+            api._cm = api._cm ?? api.competencyMatrix?.();
+            const matrix = (await api._cm) ?? [];
+            let clearances = [];
+            const machineId = inp.machineId?.value || null;
+            if (machineId) { try { api._cl = api._cl ?? api.machineClearances?.(); clearances = (await api._cl) ?? []; } catch { clearances = []; } }
+            const cov = skillCoverage(codes, matrix, { machineId, clearances });
+            const nm = new Map((L.skills ?? []).map((x) => [x.code, x.name]));
+            const part = (x) => `${nm.get(x.code) ?? x.code}: ${x.qualified} yetkin aktif${x.assignable === null ? '' : `, ${x.assignable} görevlendirilebilir`}${x.backup ? ', yedek var' : ', yedek yok'}`;
+            covBox.textContent = `Kapsama: ${COVERAGE_TR[cov.state]} — ${cov.skills.map(part).join('; ')}${cov.machineKnown ? ' (seçili makinede geçerli yetkiye göre)' : ' — makine seçilirse görevlendirilebilirlik de hesaplanır'}`;
+        } catch { covBox.textContent = 'Kapsama okunamadı (yetkinlik matrisi görme yetkisi gerekebilir).'; }
+    };
+    skillBoxes.forEach((l) => l.querySelector('input').addEventListener('change', updCov)); inp.machineId?.addEventListener?.('change', updCov); void updCov();
     const refDocs = docsOfType(L.documents, REF_TYPES);
     const refBoxes = refDocs.map((x) => h('label', {}, h('input', { type: 'checkbox', value: x.id, checked: (d.referenceDocumentIds ?? []).includes(x.id), disabled: ro }), `${DOC_TYPE_TR[x.docType] ?? x.docType}: ${x.title}`));
     inp.note = h('textarea', { rows: 2, disabled: ro, 'data-testid': `opp-${slot}-note` }, d.note ?? '');
@@ -69,11 +98,25 @@ function slotCard(slot, draft, L, api, revisionId, reload) {
         catch (e) { busy(false); say(errorText(e), true); }
     };
     const pending = () => buildPayload(formValues(), draft).changed;
+    // ONAYLI taslağı gerçek rotaya aktar: önce etki raporu (yazmaz), sonra gerekçeli tek işlem. Otomatik değişiklik yok.
+    const trBox = h('div', { class: 'mut', 'data-testid': `opp-${slot}-transfer-box` }), trReason = h('input', { placeholder: 'Aktarım gerekçesi (en az 10 karakter)', 'data-testid': `opp-${slot}-transfer-reason`, style: 'min-width:240px' });
+    const transferReport = async () => {
+        try {
+            const r = await api.opPrepTransfer(revisionId, slot, draft.rowVersion, trReason.value || 'etki raporu', false), i = r.impact ?? {};
+            trBox.textContent = `Etki: revizyon ${i.revisionStatus}, açık iş emri ${i.openWorkOrders}, HOLD'daki ${i.onHoldWorkOrders}, başlamış operasyon ${i.startedOperations}. ${i.effect ?? ''} Aktarılmayacaklar: ${(r.notTransferred ?? []).join(' | ') || 'yok'}`;
+        } catch (e) { trBox.textContent = errorText(e); }
+    };
+    const transferApply = async () => {
+        busy(true);
+        try { await api.opPrepTransfer(revisionId, slot, draft.rowVersion, trReason.value, true); await reload(slot, 'Rotaya aktarıldı (iş emirleri değişmedi; yeniden eşitleme ayrı işlemdir).'); }
+        catch (e) { busy(false); say(errorText(e), true); }
+    };
     const actions = h('div', { class: 'act' },
         can.edit ? h('button', { class: 'pbtn', type: 'button', 'data-testid': `opp-${slot}-save`, onClick: () => void save() }, draft ? 'Kaydet' : 'Taslağı başlat / kaydet') : null,
         can.edit && draft && st.code === 'DRAFT' ? h('button', { class: 'pbtn ghost', type: 'button', 'data-testid': `opp-${slot}-submit`, onClick: () => (pending() ? say('Önce değişiklikleri kaydedin.', true) : void setStatus('READY_FOR_REVIEW')) }, 'Teknik incelemeye gönder') : null,
         can.approve && draft && st.code === 'READY' ? h('button', { class: 'pbtn', type: 'button', 'data-testid': `opp-${slot}-approve`, onClick: () => (pending() ? say('Kaydedilmemiş değişiklik var.', true) : void setStatus('APPROVED')) }, 'Teknik olarak onayla') : null,
         can.edit && draft && (st.code === 'READY' || st.code === 'APPROVED') ? h('button', { class: 'pbtn ghost', type: 'button', 'data-testid': `opp-${slot}-back`, onClick: () => void setStatus('DRAFT') }, 'Taslağa geri al') : null);
+    if (draft && st.code === 'APPROVED' && slot !== 'CUT_PREP' && api.opPrepTransfer) actions.append(h('div', { style: 'flex-basis:100%;margin-top:6px' }, h('b', {}, 'Rotaya aktar'), ' ', trReason, ' ', h('button', { class: 'pbtn ghost', type: 'button', 'data-testid': `opp-${slot}-transfer-report`, onClick: () => void transferReport() }, 'Etki raporu'), ' ', h('button', { class: 'pbtn', type: 'button', 'data-testid': `opp-${slot}-transfer`, onClick: () => void transferApply() }, 'Rotaya aktar'), trBox));
     const hist = draft ? h('details', { class: 'mut', style: 'margin-top:8px', 'data-testid': `opp-${slot}-history` }, h('summary', {}, 'Değişiklik geçmişi')) : null;
     if (hist) hist.addEventListener('toggle', async () => {
         if (!hist.open || hist.dataset.loaded) return; hist.dataset.loaded = '1';
@@ -93,7 +136,7 @@ function slotCard(slot, draft, L, api, revisionId, reload) {
             slot === 'CUT_PREP' ? null : fld('Takım listesi', inp.toolListDocumentId, tlHint), fld('Fikstür / bağlama', inp.fixture),
             fld('Hazırlık süresi (dk)', inp.setupMinutes), fld('Çevrim süresi (sn/parça)', inp.cycleSeconds),
             fld('Kalite kontrol planı', inp.controlPlanNote, null, true), fld('İlk parça (First Piece)', inp.firstPieceRequired), fld('İlk parça notu', inp.firstPieceNote),
-            fld('Gerekli operatör yetkinlikleri', h('div', { class: 'ck', 'data-testid': `opp-${slot}-skills` }, ...(skillBoxes.length ? skillBoxes : [h('span', { class: 'mut' }, 'Yetkinlik kataloğu boş')])), null, true),
+            fld('Gerekli operatör yetkinlikleri', h('div', {}, h('div', { class: 'ck', 'data-testid': `opp-${slot}-skills` }, ...(skillBoxes.length ? skillBoxes : [h('span', { class: 'mut' }, 'Yetkinlik kataloğu boş')])), covBox), null, true),
             fld('Referans belgeler (KMI\'de kayıtlı)', h('div', { class: 'ck', 'data-testid': `opp-${slot}-refs` }, ...(refBoxes.length ? refBoxes : [h('span', { class: 'mut' }, 'Bu ürüne kayıtlı teknik resim/STEP/fotoğraf yok')])), 'Belgeler tekrar yüklenmez; KMI\'deki kayıtlardan seçilir.', true),
             fld('Not', inp.note, null, true)),
         actions, msg, hist);

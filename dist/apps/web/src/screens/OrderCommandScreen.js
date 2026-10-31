@@ -3,6 +3,7 @@
 import { h, mount } from '../../../../packages/ui/src/h.js';
 import { canTransitionOrderStatus } from '../../../../packages/domain/src/order.js';
 import { errorText, isSetupPending } from '../errorText.js';
+import { drawOrderToShip } from './orderToShipPanel.js';
 const CSS = `
 .oc{font-family:system-ui,-apple-system,"Segoe UI",sans-serif;padding:12px;max-width:1100px;margin:0 auto;box-sizing:border-box;color:#e2e8f0}
 .oc h1{color:#fff;font-size:20px;margin:6px 0}.oc h2{color:#fff;font-size:16px;margin:0 0 6px}
@@ -106,7 +107,8 @@ export async function renderOrderCommandScreen(container, api, state = {}) {
         const trans = [['CONFIRMED', 'Siparişi onayla', 'primary'], ['CANCELLED', 'Siparişi iptal et', 'danger']];
         const transBtns = trans.filter(([to]) => canTransitionOrderStatus(st, to).ok && (to === 'CANCELLED' ? p.canCancel : p.canConfirm)).map(([to, label, cls]) => h('button', { type: 'button', class: cls, 'data-testid': `oc-to-${to}`, onClick: act(async () => { const r = reasonOf(`${label}: gerekçe (en az 5 karakter)`); if (!r)
                 throw new Error('REASON_REQUIRED'); await api.transition(id, to, r); }) }, label));
-        const itemCard = (it) => {
+        const itemCard = (it) => { const c = itemCard0(it); c.append(drawOrderToShip(it, st, api)); return c; };
+        const itemCard0 = (it) => {
             const editable = p.canChange && ['DRAFT', 'CONFIRMED', 'IN_PRODUCTION'].includes(st);
             const qty = h('input', { type: 'text', inputmode: 'decimal', 'data-testid': `oc-qty-${it.lineNo}`, value: String(it.qty) });
             const due = h('input', { type: 'date', 'data-testid': `oc-due-${it.lineNo}`, value: it.dueDate });
