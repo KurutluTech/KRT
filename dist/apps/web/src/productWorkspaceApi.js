@@ -94,6 +94,7 @@ export function createProductWorkspaceApi(client, session) {
         opHistory: async (o) => (await rpc('routing_op_history', { p_op: o })).versions,
         changeHistory: (rev) => rpc('routing_change_history', { p_revision: rev }),
         changeImpact: (rev) => rpc('routing_change_impact', { p_revision: rev }),
+        camPrograms: (rev) => client.select('cam_programs', { columns: 'id,program_no,revision,status', filters: { product_revision_id: `eq.${rev}` }, limit: 200 }, session),
         estimate: (r, q) => rpc('routing_estimate', { p_revision: r, p_qty: q, p_on: null }),
         runCalc: (r, q, why) => rpc('calc_run_routing', { p_revision: r, p_qty: q, p_reason: why }),
         reevaluate: (run, r) => rpc('calc_reevaluate', { p_run: run, p_reason: r }),
