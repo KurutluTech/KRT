@@ -7,6 +7,7 @@ import { fetchPilotFlags, pilotText, selReal } from './pilotMark.js';
 import { loadMaintenanceTests } from './approvalsInboxApi.js';
 import { buildInbox, rpcCall } from '../../../packages/domain/src/approvalsInbox.js';
 import { KINDS, canOpenPassport } from './passport/registry.js';
+import { camRevText } from '../../../packages/domain/src/camRevision.js';
 const inList = (ids) => `in.(${ids.join(',')})`;
 const uniq = (a) => [...new Set(a.filter((x) => !!x))];
 const ts = (iso) => formatStamp(iso);
@@ -263,7 +264,7 @@ export function createObjectPassportApi(client, session, access, myUserId = sess
                     const w = await one('work_orders', 'created_at,planned_date,planned_shift_code,planned_minutes,product_revision_id,cam_program_id', id);
                     const rev = w.productRevisionId ? (await sel('product_revisions', 'revision,status', { id: `eq.${w.productRevisionId}` }, undefined, 1))[0] : undefined;
                     const cam = w.camProgramId ? (await sel('cam_programs', 'program_no,revision', { id: `eq.${w.camProgramId}` }, undefined, 1))[0] : undefined;
-                    return [{ title: 'Kimlik', kv: [['İş emri referansı', `İE-${id.slice(0, 8).toUpperCase()}`], ['Açılış', ts(w.createdAt)], ['Planlanan gün', w.plannedDate ?? '—'], ['Planlanan vardiya', w.plannedShiftCode ?? '—'], ['Planlanan süre', w.plannedMinutes === null ? 'BİLİNMİYOR' : `${w.plannedMinutes} dk`], ['Ürün revizyonu', rev ? `${rev.revision} (${rev.status})` : 'atanmadı'], ['CAM programı', cam ? `${cam.programNo} rev ${cam.revision}` : 'atanmadı']],
+                    return [{ title: 'Kimlik', kv: [['İş emri referansı', `İE-${id.slice(0, 8).toUpperCase()}`], ['Açılış', ts(w.createdAt)], ['Planlanan gün', w.plannedDate ?? '—'], ['Planlanan vardiya', w.plannedShiftCode ?? '—'], ['Planlanan süre', w.plannedMinutes === null ? 'BİLİNMİYOR' : `${w.plannedMinutes} dk`], ['Ürün revizyonu', rev ? `${rev.revision} (${rev.status})` : 'atanmadı'], ['CAM programı', cam ? `${cam.programNo} ${camRevText(cam.revision)}` : 'atanmadı']],
                             note: 'Ayrıntılı izlenebilirlik zinciri (eksik halkalar, as-built, malzeme, parti, sevkiyat) bu pasaportun "İzlenebilirlik zinciri" sekmesinde.' }];
                 }
                 if (key === 'operasyonlar') {

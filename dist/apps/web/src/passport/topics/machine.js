@@ -5,6 +5,7 @@ import { pctOf } from './util.js';
 import { pilotText } from '../../pilotMark.js';
 import { cncTopics } from './cncTopics.js';
 import { h } from '../../../../../packages/ui/src/h.js';
+import { camRevText } from '../../../../../packages/domain/src/camRevision.js';
 export const MACHINE_COLS = 'id,code,name,category,status,down_since,total_down_minutes,machine_class,updated_at';
 const ACTIVE = ['IN_PROGRESS', 'FIRST_PIECE_PENDING', 'FIRST_PIECE_APPROVED'];
 export function machineTopics(ctx, m) {
@@ -55,7 +56,7 @@ export function machineTopics(ctx, m) {
             const ops = await ctx.sel('routing_operations', 'id,product_revision_id,op_no,name,cam_program_id,cycle_seconds_target,setup_minutes_target,primary_machine_id', { active: 'eq.true', or: `(primary_machine_id.eq.${m.id},allowed_machine_ids.cs.{${m.id}})` }, 'op_no', 100);
             const progs = ops.some((o) => o.camProgramId) ? await opt(ctx.sel('cam_programs', 'id,program_no,revision,status', { id: inList(ops.map((o) => o.camProgramId).filter((x) => !!x)) })) : [];
             const pm = new Map((progs ?? []).map((p) => [p.id, p]));
-            return [table('Operasyonlar', ['Op', 'Ad', 'CAM programı', 'Çevrim (sn)', 'Hazırlık (dk)', 'Birincil makine'], ops.map((o) => { const p = o.camProgramId ? pm.get(o.camProgramId) : undefined; return [`${o.opNo}`, o.name, p ? `${p.programNo} rev ${p.revision} · ${p.status}` : NA, o.cycleSecondsTarget === null ? NA : nf(o.cycleSecondsTarget), o.setupMinutesTarget === null ? NA : nf(o.setupMinutesTarget), o.primaryMachineId === m.id ? pill('Evet', 'ok') : 'Hayır']; }), 'Bu makineye tanımlı operasyon yok')];
+            return [table('Operasyonlar', ['Op', 'Ad', 'CAM programı', 'Çevrim (sn)', 'Hazırlık (dk)', 'Birincil makine'], ops.map((o) => { const p = o.camProgramId ? pm.get(o.camProgramId) : undefined; return [`${o.opNo}`, o.name, p ? `${p.programNo} ${camRevText(p.revision)} · ${p.status}` : NA, o.cycleSecondsTarget === null ? NA : nf(o.cycleSecondsTarget), o.setupMinutesTarget === null ? NA : nf(o.setupMinutesTarget), o.primaryMachineId === m.id ? pill('Evet', 'ok') : 'Hayır']; }), 'Bu makineye tanımlı operasyon yok')];
         }),
         { ...T('bakim', 'Bakım, arıza ve müdahaleler', 'wrench', 'Bakım ve test', { summary: MACHINE_TR[m.status] ?? m.status, tone: m.status === 'DOWN' ? 'bad' : m.status === 'MAINTENANCE' ? 'info' : m.status === 'HOLD' ? 'warn' : 'ok' }),
             render: async (host) => {
