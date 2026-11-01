@@ -6,14 +6,18 @@ export function renderOpPlanPanel(root, wo, matrix, machineName) {
     const slots = matrix?.slots ?? [];
     const rows = slots.map((s) => {
         const defined = s.routeStatus === 'IN_ROUTE_ACTIVE';
-        const miss = (s.blockReasons ?? []).length + (s.missing ?? []).filter((m) => !['fixture', 'eligible_operator', 'machine_skill_requirements', 'material_stock'].includes(m)).length;
+        // aynı eksik iki yerde sayılmasın: "rota iş emrine uygulanmadı" ve "kontrol planı" zaten iş emri seviyesinde / ayrı satırda; fixture yalnız bilgi
+        const dupBlock = (b) => b === 'ROUTE_NOT_APPLIED_TO_WORK_ORDER' || /^QC_PASS_WILL_BLOCK:/.test(b);
+        const miss = (s.blockReasons ?? []).filter((b) => !dupBlock(b)).length + (s.missing ?? []).filter((m) => !['fixture', 'eligible_operator', 'machine_skill_requirements', 'material_stock'].includes(m)).length;
+        const notApplied = (s.blockReasons ?? []).includes('ROUTE_NOT_APPLIED_TO_WORK_ORDER');
+        const draftSlot = !defined && s.slot !== 'CUT_PREP';   // onaysız OP10/20/40: zorunluluk değil, öneri
         return h('tr', { 'data-testid': 'opplan-row', 'data-slot': s.slot },
             h('td', {}, s.slot === 'CUT_PREP' ? 'CUT/PREP (OP numarası dışı)' : s.slot),
             h('td', {}, RS[s.routeStatus] ?? s.routeStatus ?? '—'),
             h('td', {}, `${s.expectedMachine ?? '—'}${defined ? '' : ' (ÖNERİ — kesinleşmedi)'}`),
             h('td', {}, s.camProgram ? 'Bağlı' : (s.slot === 'CUT_PREP' ? 'Gerekmiyor' : 'Bağlı değil')),
             h('td', {}, String(s.eligibleOperators ?? 0)),
-            h('td', {}, miss ? `${miss} eksik` : 'Tamam'));
+            h('td', {}, draftSlot ? 'Onaysız öneri — rota tanımlanınca denetlenir' : miss ? `${miss} eksik` : (notApplied ? 'Tamam (rota iş emrine uygulanmadı)' : 'Tamam')));
     });
     root.replaceChildren(h('section', { 'data-testid': 'opplan', class: 'woc-panel' },
         h('h3', {}, 'Rota ve operasyon makineleri'),
