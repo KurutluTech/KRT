@@ -87,7 +87,7 @@ import { renderShipmentReturnScreen } from './screens/ShipmentReturnScreen.js';
 import { createShipmentReturnApi } from './shipmentReturnApi.js';
 import { createPairingApi } from './pairingApi.js';
 // m0191–m0200 production'a uygulanınca true yapılır (yeni 3 ekranın menü girişi); rota her durumda tanımlı.
-const NEW_BACKEND_LIVE = false;
+const NEW_BACKEND_LIVE = true;
 import { renderRoutePrepScreen } from './screens/RoutePrepScreen.js';
 import { createRoutePrepApi } from './routePrepApi.js';
 import { renderBadgesScreen } from './screens/BadgesScreen.js';
