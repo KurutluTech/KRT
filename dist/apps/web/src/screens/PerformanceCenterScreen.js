@@ -105,6 +105,7 @@ const SEV_TR = { CRITICAL: 'KRİTİK', HIGH: 'YÜKSEK', MEDIUM: 'ORTA', ADVISORY
 const CLS_TONE = { DOWN: 'var(--crit)', MAINTENANCE: 'var(--risk)', HOLD: 'var(--risk)', ACTIVE_WORK_ORDER: 'var(--live)', FIRST_PIECE: 'var(--gold)', READY_IDLE: 'var(--ok)', READY_UNKNOWN: 'var(--unk)', UNKNOWN: 'var(--unk)', CNC_RUNNING: 'var(--live)', CNC_FEED_HOLD: 'var(--risk)', CNC_ALARM: 'var(--crit)', CNC_STALE: 'var(--unk)' };
 const LOSS_COLORS = ['#5cc8e6', '#c9a24a', '#f0645a', '#e8b04a', '#a98bf0', '#7d8ba3'];
 const timers = new WeakMap();
+const lastInputs = new WeakMap();
 const svgEl = (markup, label, cls = 'chart') => { const d = document.createElement('span'); d.style.display = 'block'; d.innerHTML = markup.replace('<svg ', `<svg class="${cls}" role="img" aria-label="${esc(label)}" `); return d; };
 const unknownBox = (title, reason, testid) => h('div', { class: 'unknownbox', 'data-testid': testid }, h('b', {}, `${title}: `, h('span', { class: 'uk' }, 'UNKNOWN / '), NEEDS_DATA), h('div', {}, reason));
 const block = (title, testid, ...kids) => h('section', { class: 'blk', 'data-testid': testid }, h('header', {}, h('h2', {}, title)), ...kids);
@@ -301,7 +302,14 @@ export async function renderPerformanceCenter(container, sources, opts) {
         clearTimeout(prev);
     const nowIso = opts.nowIso ?? new Date().toISOString();
     const range = opts.sourcesRange ?? { from: shiftDate(opts.today, -6), to: opts.today, monthFrom: shiftDate(opts.today, -29) };
-    const inputs = await loadPerformanceCenter(sources, range, nowIso);
+    // P1: __cachedInputs = re-evaluate the data already on screen locally (no network wait). A failed re-read keeps the previous CNC rows (they keep ageing) instead of dropping CNC.
+    const inputs = opts.__cachedInputs ?? await loadPerformanceCenter(sources, range, nowIso);
+    if (!opts.__cachedInputs) {
+        const before = lastInputs.get(container);
+        if (before?.board && !inputs.board)
+            inputs.board = before.board;
+    }
+    lastInputs.set(container, inputs);
     const model = buildPerformanceCenter(inputs);
     const refresh = () => void renderPerformanceCenter(container, sources, opts);
     const domain = parseDomain(opts.dept ?? null);
@@ -315,8 +323,10 @@ export async function renderPerformanceCenter(container, sources, opts) {
             attachCncAge(el, r.cnc);
     }
     bindCncAges(container);
-    watchCncExpiry(container, () => cncRows.map((x) => x.cnc), refresh);
-    if (opts.refreshMs && opts.refreshMs > 0)
+    // at the 45 s threshold: FIRST re-evaluate every card from the data already on screen, THEN re-read in the background
+    if (!opts.__cachedInputs)
+        watchCncExpiry(container, () => cncRows.map((x) => x.cnc), () => { void renderPerformanceCenter(container, sources, { ...opts, __cachedInputs: lastInputs.get(container), refreshMs: 0 }).then(refresh); });
+    if (opts.refreshMs && opts.refreshMs > 0 && !opts.__cachedInputs)
         timers.set(container, setTimeout(refresh, opts.refreshMs));
 }
 const shiftDate = (iso, n) => { const d = new Date(`${iso}T00:00:00Z`); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); };

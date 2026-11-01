@@ -1,6 +1,6 @@
 // KMI — CNC freshness plumbing shared by every screen that shows CNC state. The CALCULATION lives in packages/domain/src/cncTelemetry.js
 // (adjustCnc, 45 s = production cnc_link_of); this file only decides WHEN a screen re-evaluates or re-reads. Nothing here writes anything.
-import { adjustCnc, msUntilCncExpiry, CNC_STALE_S } from '../../../packages/domain/src/cncTelemetry.js';
+import { adjustCnc, cncDisplay, msUntilCncExpiry, CNC_STALE_S } from '../../../packages/domain/src/cncTelemetry.js';
 const visible = () => typeof document === 'undefined' || document.visibilityState !== 'hidden';
 /** LIVE panels (passport CNC Canlı İzleme, embedded live block): local re-evaluation every second, read-only re-read every pollMs while the tab is visible,
  *  immediate re-read when the tab comes back. A failed read never refreshes the row: it keeps ageing and turns BAYAT by itself. */
@@ -57,6 +57,17 @@ export function paintCncAge(el) {
     el.textContent = s === null ? 'CNC verisi: yaş BİLİNMİYOR' : live ? `CNC verisi: ${s} sn önce` : `CNC verisi BAYAT · ${s} sn`;
     el.title = `Sunucuya ulaşmadan beri geçen süre; ${CNC_STALE_S} sn'den eskisi BAYAT sayılır. CNC örnek saati değildir.`;
     el.setAttribute('data-live', String(live));
+    // P1: a not-live row keeps its LAST KNOWN E-STOP / alarm visible, labelled as history (never as the current fact)
+    let lk = el.__lk;
+    const known = !live && a ? cncDisplay(el.__cncRow).lastKnown : null;
+    const line = known?.safetyLine ? String(known.safetyLine).split(' (')[0] : null;
+    if (line) {
+        if (!lk) { lk = document.createElement('div'); lk.className = 'mc-lk'; lk.setAttribute('data-testid', 'mc-cnc-lastknown'); el.after(lk); el.__lk = lk; }
+        const at = known.receivedAt ? new Date(known.receivedAt).toLocaleTimeString('tr-TR') : '—';
+        lk.textContent = `SON BİLİNEN — GÜNCEL DEĞİL: ${line} · ${at}`;
+        lk.title = `${known.safetyLine} — bu bilgi ${at} itibarıyla son bilinen değerdir; şu an doğru olduğu doğrulanamaz.`;
+    }
+    else if (lk) { lk.remove(); el.__lk = null; }
 }
 export function bindCncAges(container, everyMs = 5000) {
     if (container.__cncAgeTimer) clearInterval(container.__cncAgeTimer);

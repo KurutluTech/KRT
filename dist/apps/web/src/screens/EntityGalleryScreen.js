@@ -25,15 +25,20 @@ export async function renderEntityGalleryScreen(container, deps, opts) {
     const [title, sub] = TITLE[kind];
     const dataKind = kind === 'MEASUREMENT' ? 'MACHINE' : kind;
     const root = h('div', { class: 'kx eg', 'data-testid': 'eg-root', 'data-kind': kind }, h('style', {}, ENTITY_CARD_CSS + MACHINE_CARD_CSS), h('h1', { class: 'eg-h1' }, title), h('p', { class: 'eg-note' }, 'Yükleniyor…'));
-    mount(container, root);
+    // P1: __cached = re-evaluate the SAME data locally (no network); __silent = keep the current cards on screen while re-reading
+    const cachedIn = opts.__cached ?? null;
+    if (!opts.__silent)
+        mount(container, root);
     let faces;
     let board = null;
     try {
-        faces = (await deps.faces(dataKind)).map((f) => ({ ...f, extra: withSnake(f.extra ?? {}) }));
+        faces = cachedIn ? cachedIn.faces : (await deps.faces(dataKind)).map((f) => ({ ...f, extra: withSnake(f.extra ?? {}) }));
         if (kind === 'MEASUREMENT')
             faces = faces.filter((f) => f.extra.machine_class === 'MEASUREMENT');
     }
     catch (e) {
+        if (opts.__silent)
+            return; // background re-read failed: the cards on screen stay (and keep ageing locally)
         const denied = /FORBIDDEN|42501|403/.test(String(e instanceof Error ? e.message : e));
         const msg = denied && kind === 'CUSTOMER' ? 'Müşteri kartlarını görme yetkiniz yok. Müşteri yönetimi veya müşteri iletişim görüntüleme yetkisi gerekir; gerekliyse sistem sahibine başvurun.' : denied && kind === 'SUPPLIER' ? 'Tedarikçi kartlarını görme yetkiniz yok. Satınalma, muhasebe veya yönetim yetkisi gerekir.' : errorText(e);
         mount(container, h('div', { class: 'kx eg', 'data-testid': 'eg-root', 'data-kind': kind }, h('h1', { class: 'eg-h1' }, title), h('div', { class: denied ? 'banner' : 'banner bad', role: 'alert', 'data-testid': 'eg-error', 'data-denied': String(denied) }, msg)));
@@ -48,14 +53,19 @@ export async function renderEntityGalleryScreen(container, deps, opts) {
             activeWork = null;
         }
     }
-    if (kind === 'MACHINE' && deps.board) {
+    if (kind === 'MACHINE' && cachedIn)
+        board = cachedIn.board;
+    else if (kind === 'MACHINE' && deps.board) {
         try {
             board = await deps.board();
         }
         catch {
-            board = null;
+            // a failed silent re-read never swaps good cards for a blank/"no CNC" view: keep the previous rows, which keep ageing locally
+            board = opts.__silent && container.__egCache ? container.__egCache.board : null;
         }
     }
+    if (kind === 'MACHINE')
+        container.__egCache = { faces, board };
     const nowIso = board?.generatedAt ?? new Date().toISOString();
     const hrefOf = (f) => `#/kart?t=${dataKind}&id=${f.id}`;
     const build = (f) => {
@@ -194,7 +204,11 @@ export async function renderEntityGalleryScreen(container, deps, opts) {
     paint();
     if (kind === 'MACHINE' && board) {
         bindCncAges(container);
-        watchCncExpiry(container, () => (board.machines ?? []).map((m) => m.cnc).filter(Boolean), () => void renderEntityGalleryScreen(container, deps, opts));
+        // at the 45 s threshold: FIRST re-evaluate the cards from the data already on screen (no network wait), THEN re-read in the background
+        watchCncExpiry(container, () => (board.machines ?? []).map((m) => m.cnc).filter(Boolean), () => {
+            void renderEntityGalleryScreen(container, deps, { ...opts, __cached: container.__egCache, __silent: true })
+                .then(() => renderEntityGalleryScreen(container, deps, { ...opts, __silent: true }));
+        });
     }
     // photos: after first paint, 4 at a time; a failure leaves the initials (never a broken image)
     const queue = rows.filter((r) => r.built.photo && r.built.fill);

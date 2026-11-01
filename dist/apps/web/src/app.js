@@ -305,7 +305,7 @@ export const ROUTES = [
     },
     { path: '/terminal', label: 'Makine Terminali', group: 'Saha', inMenu: true, render: (el, c, s) => renderTerminalScreen(el, createTerminalApi(c, s), { machineId: rememberedMachine() }, { icon: (n, z) => icon(n, z), cncOf: async (code) => { try {
                 const r = (await createLiveApi(c, s).cncStates()).find((x) => x.machineCode === code);
-                return r ? (() => { const a = adjustCnc(r); return { link: a.link, state: a.link === 'UP' ? a.state : 'CNC_UNKNOWN' }; })() : null;
+                return r ? (() => { const a = adjustCnc(r); return { ...a, link: a.link, state: a.link === 'UP' ? a.state : 'CNC_UNKNOWN' }; })() : null;
             }
             catch {
                 return null;
