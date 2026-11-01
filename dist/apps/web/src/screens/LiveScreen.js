@@ -15,6 +15,7 @@ import { passportHref } from '../passport/registry.js';
 import { initials } from '../ds.js';
 import { errorText as sharedErrorText } from '../errorText.js';
 import { distributionBar, CHART_CSS } from '../charts.js';
+import { MACHINE_NAME_CSS } from '../machineCard.js';
 import { STATE_VISUAL } from '../spindle.js';
 const liveDist = (b) => {
     const cnt = {};
@@ -24,7 +25,7 @@ const liveDist = (b) => {
     }
     return distributionBar({ title: 'Durum dağılımı', unit: 'makine', period: 'şu an (CNC bağlı makinelerde kontrol sinyali, diğerlerinde elle girilen kayıt)', source: 'Canlı pano · makine durum kaydı + CNC canlı veri' }, Object.keys(cnt).map((k) => ({ label: STATE_VISUAL[k].label, value: cnt[k], meaning: 'info', color: STATE_VISUAL[k].color, icon: '●' })));
 };
-const CSS = CHART_CSS + `
+const CSS = CHART_CSS + MACHINE_NAME_CSS + `
 .live{--card:#111c2e;--card2:#0f172a;--line:#1e293b;--line2:#334155;--txt:#e6edf7;--mut:#94a3b8;--red:#ef4444;--amber:#f59e0b;--green:#22c55e;--cyan:#22d3ee;--violet:#a78bfa;
   padding:0;box-sizing:border-box;max-width:100%;font-variant-numeric:tabular-nums;color:var(--txt);display:flex;flex-direction:column;gap:12px}
 .live *{box-sizing:border-box}
@@ -39,18 +40,18 @@ const CSS = CHART_CSS + `
 .live .tabs{display:flex;gap:6px;flex-wrap:wrap;margin:0 0 10px}
 .live .tab{background:var(--card2);color:var(--txt);border:1px solid var(--line2);border-radius:999px;padding:6px 12px;font-weight:700;font-size:12px;cursor:pointer}
 .live .tab[aria-pressed="true"]{background:#1d4ed8;border-color:#1d4ed8;color:#fff}
-.live .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:10px}
+.live .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(240px,100%),1fr));gap:10px}
 .live .m{border-radius:14px;padding:12px;background:linear-gradient(160deg,#0f172a,#111c2e);border:1px solid var(--line2);min-width:0;display:flex;flex-direction:column;gap:6px;border-top:4px solid #475569}
 .live .m[hidden]{display:none}
 .live .m[data-headline="ACTIVE_WORK_ORDER"]{border-top-color:var(--cyan)}.live .m[data-headline="FIRST_PIECE"]{border-top-color:var(--amber)}.live .m[data-headline="READY_IDLE"]{border-top-color:#3b82f6}
 .live .m[data-headline="DOWN"]{border-top-color:var(--red)}.live .m[data-headline="MAINTENANCE"]{border-top-color:var(--violet)}.live .m[data-headline="HOLD"]{border-top-color:var(--amber)}
-.live .mh{display:flex;gap:10px;align-items:center}.live .ico{color:var(--cyan);flex:none}.live .m[data-headline="DOWN"] .ico{color:var(--red)}
+.live .mh{display:flex;gap:10px;align-items:center;min-width:0}.live .mid{min-width:0;flex:1}.live .ico{color:var(--cyan);flex:none}.live .m[data-headline="DOWN"] .ico{color:var(--red)}
 .live .opr{display:flex;gap:8px;align-items:center;margin-top:4px}.live .photo{width:30px;height:30px;border-radius:50%;background:#1e293b;border:1px solid #334155;color:#67e8f9;font-weight:800;font-size:11px;display:flex;align-items:center;justify-content:center;flex:none}.live .photo.anon{color:#b3bfd2}
 .live .qty{display:flex;gap:10px;flex-wrap:wrap;font-size:12px;margin-top:4px}.live .qty b{font-size:15px}.live .down{font-size:12px;font-weight:800;color:#fca5a5}
-.live .code{font-size:24px;font-weight:900;letter-spacing:.02em;overflow-wrap:anywhere;min-width:0}
+.live .code{font-size:24px;font-weight:900;letter-spacing:.02em;min-width:0}
 .live .code.long{font-size:17px;letter-spacing:0}
 .live .num.unk{font-size:12px;color:var(--mut);line-height:1.6}
-.live .st{margin-left:auto;font-size:10px;font-weight:800;padding:3px 8px;border-radius:6px;background:#1e3a8a;color:#bfdbfe;white-space:nowrap}
+.live .st{align-self:flex-start;max-width:100%;box-sizing:border-box;overflow:hidden;text-overflow:ellipsis;font-size:10px;font-weight:800;padding:3px 8px;border-radius:6px;background:#1e3a8a;color:#bfdbfe;white-space:nowrap}
 .live .m[data-headline="ACTIVE_WORK_ORDER"] .st{background:#164e63;color:#a5f3fc}.live .m[data-headline="DOWN"] .st{background:#7f1d1d;color:#fecaca}
 .live .m[data-headline="MAINTENANCE"] .st{background:#4c1d95;color:#ddd6fe}.live .m[data-headline="HOLD"] .st,.live .m[data-headline="FIRST_PIECE"] .st{background:#78350f;color:#fde68a}
 .live .small{font-size:11px;color:var(--mut);overflow-wrap:anywhere}.live .num{font-size:18px;font-weight:800}
@@ -157,7 +158,7 @@ export async function renderLiveScreen(container, api, state) {
         const mi = info.get(m.code);
         const cls = mi?.machineClass ?? null;
         const clsTr = cls && cls in MACHINE_CLASS_TR ? MACHINE_CLASS_TR[cls] : MACHINE_CLASS_UNKNOWN_TR;
-        return h('div', { class: 'm', 'data-testid': 'live-machine', 'data-code': m.code, 'data-status': m.status, 'data-headline': ms.headline, 'data-class': cls ?? 'UNKNOWN' }, h('div', { class: 'mh' }, h('span', { class: 'ico' }, spindleForState(ms, 44)), h('div', { style: 'min-width:0' }, h('div', { class: m.code.length > 5 ? 'code long' : 'code' }, m.code), mi ? h('div', { class: 'small', 'data-testid': 'live-name' }, mi.name) : null), h('span', { class: 'st', 'data-testid': 'live-status', title: AVAILABILITY_TR[ms.availability] }, ms.stale ? STALE_TR : HEADLINE_TR[ms.headline])), h('div', { class: 'small', 'data-testid': 'live-datasource', 'data-source': ms.dataSource }, `Veri kaynağı: ${DATA_SOURCE_TR[ms.dataSource]}`), cncBlock(m.code, ms), h('div', { class: 'small' }, h('span', { 'data-testid': 'live-class' }, clsTr), mi?.id && state.mode === 'APP' ? [' · ', h('a', { class: 'pp', href: passportHref('MACHINE', mi.id), 'data-testid': 'live-passport' }, 'Pasaport →')] : null), ms.conflict ? h('div', { class: 'conflict', 'data-testid': 'live-conflict' }, `Kayıt: ${AVAILABILITY_TR[ms.availability]} — ama aktif iş emri var`) : null, h('div', { class: 'small', 'data-testid': 'live-since' }, `Durum kaydı: ${fmt(m.since)}`), ...m.active.map((a) => {
+        return h('div', { class: 'm', 'data-testid': 'live-machine', 'data-code': m.code, 'data-status': m.status, 'data-headline': ms.headline, 'data-class': cls ?? 'UNKNOWN' }, h('div', { class: 'mh' }, h('span', { class: 'ico' }, spindleForState(ms, 44)), h('div', { class: 'mid' }, h('div', { class: m.code.length > 5 ? 'code long mcx-code' : 'code mcx-code', title: m.code }, m.code), mi ? h('div', { class: 'small mcx-name', 'data-testid': 'live-name', title: mi.name }, mi.name) : null)), h('span', { class: 'st', 'data-testid': 'live-status', title: AVAILABILITY_TR[ms.availability] }, ms.stale ? STALE_TR : HEADLINE_TR[ms.headline]), h('div', { class: 'small', 'data-testid': 'live-datasource', 'data-source': ms.dataSource }, `Veri kaynağı: ${DATA_SOURCE_TR[ms.dataSource]}`), cncBlock(m.code, ms), h('div', { class: 'small' }, h('span', { 'data-testid': 'live-class' }, clsTr), mi?.id && state.mode === 'APP' ? [' · ', h('a', { class: 'pp', href: passportHref('MACHINE', mi.id), 'data-testid': 'live-passport' }, 'Pasaport →')] : null), ms.conflict ? h('div', { class: 'conflict', 'data-testid': 'live-conflict' }, `Kayıt: ${AVAILABILITY_TR[ms.availability]} — ama aktif iş emri var`) : null, h('div', { class: 'small', 'data-testid': 'live-since' }, `Durum kaydı: ${fmt(m.since)}`), ...m.active.map((a) => {
             const d = detailFor(m.code, a.productCode);
             const opName = a.operator !== undefined ? a.operator : d?.operatorName ?? null;
             const named = a.operator !== undefined || d !== null;

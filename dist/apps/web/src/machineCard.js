@@ -36,9 +36,9 @@ export function machineIdentityCard(i) {
     const opTxt = i.wo ? (i.wo.operator === undefined ? 'BİLİNMİYOR' : i.wo.operator ?? 'atanmamış') : null;
     const body = [
         // 1) STATE first: one pill (icon + text) + since
-        h('div', { class: 'mc-st', style: `color:${v.color}`, 'data-testid': 'mc-state', 'data-headline': i.headline }, h('b', { class: 'mc-pill', style: `border-color:${v.color};background:${v.soft}` }, v.label), i.sinceLabel || !compact ? h('span', { class: 'mc-since' }, i.sinceLabel ?? 'süre bilinmiyor') : null),
+        h('div', { class: 'mc-st', style: `color:${v.color}`, 'data-testid': 'mc-state', 'data-headline': i.headline }, h('b', { class: 'mc-pill', title: v.label, style: `border-color:${v.color};background:${v.soft}` }, v.label), i.sinceLabel || !compact ? h('span', { class: 'mc-since' }, i.sinceLabel ?? 'süre bilinmiyor') : null),
         // 2) then identity
-        h('div', { class: 'mc-top' }, h('span', { class: 'mc-ico', ...(i.photo ? { 'data-testid': 'mc-photo' } : {}) }, i.photo ?? spindleIcon(vk, compact ? 40 : 80, i.fresh === false)), h('div', { class: 'mc-id' }, h('div', { class: 'mc-code', 'data-testid': 'mc-code' }, i.code), i.name ? h('div', { class: 'mc-name' }, i.name) : null, compact ? null : h('div', { class: 'mc-sub' }, i.brandModel ?? 'Marka/model kaydı yok', i.classTr ? ` · ${i.classTr}` : ''))),
+        h('div', { class: 'mc-top' }, h('span', { class: 'mc-ico', ...(i.photo ? { 'data-testid': 'mc-photo' } : {}) }, i.photo ?? spindleIcon(vk, compact ? 40 : 80, i.fresh === false)), h('div', { class: 'mc-id' }, h('div', { class: 'mc-code', 'data-testid': 'mc-code', title: i.code }, i.code), i.name ? h('div', { class: 'mc-name', title: i.name }, i.name) : null, compact ? null : h('div', { class: 'mc-sub' }, i.brandModel ?? 'Marka/model kaydı yok', i.classTr ? ` · ${i.classTr}` : ''))),
         i.conflictNote ? h('div', { class: 'mc-warn', 'data-testid': 'mc-conflict' }, i.conflictNote) : null,
         i.wo ? h('div', { class: 'mc-wo', 'data-testid': 'mc-wo' }, h('div', { class: 'mc-job' }, h('b', {}, i.wo.product ?? 'Ürün: BİLİNMİYOR'), h('span', {}, ` · İE ${i.wo.no}`, i.woCount && i.woCount > 1 ? ` (+${i.woCount - 1} iş daha)` : '')), h('div', { class: 'mc-facts' }, fact('Operatör', `${opTxt}`), i.shift ? fact('Vardiya', i.shift) : null, i.wo.scrap ? fact('Hurda', NUM.format(i.wo.scrap), 'warn') : null), pct === null
             ? h('div', { class: 'mc-prog unk', 'data-testid': 'mc-progress', 'data-known': 'false', title: 'Plan veya üretim kaydı okunamadı' }, compact ? 'İlerleme: BİLİNMİYOR' : 'İlerleme: BİLİNMİYOR (plan/üretim kaydı okunamadı)')
@@ -51,15 +51,20 @@ export function machineIdentityCard(i) {
         'aria-label': `Makine ${i.code}: ${HEADLINE_TR[i.headline]}${i.passportHref ? ' — pasaportu aç' : ''}` };
     return (i.passportHref ? h('a', { ...attrs, href: i.passportHref }, ...body) : h('div', attrs, ...body));
 }
-export const MACHINE_CARD_CSS = `
+/** Shared by every machine card (KMI LIVE, Bakım Makineler, Performance Center): code is one unbreakable line, the name is at most two lines (full name in the title tooltip). */
+export const MACHINE_NAME_CSS = `
+.mcx-code{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%;min-width:0;overflow-wrap:normal;word-break:keep-all}
+.mcx-name{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;line-clamp:2;overflow:hidden;min-width:0;overflow-wrap:break-word;word-break:normal;hyphens:manual;line-height:1.3}
+`;
+export const MACHINE_CARD_CSS = MACHINE_NAME_CSS + `
 .mc{position:relative;display:flex;flex-direction:column;gap:12px;padding:18px;border-radius:16px;color:var(--kmi-text);text-decoration:none;min-width:0;
   background:linear-gradient(180deg,var(--kmi-panel2),var(--kmi-panel));border:1px solid var(--kmi-line);box-shadow:0 6px 18px rgba(2,6,23,.28);transition:transform .15s,border-color .15s}
 .mc.s-DOWN{border-color:var(--kmi-bad)}.mc.s-HOLD{border-color:var(--kmi-hold)}
 a.mc:hover{border-color:var(--mc);transform:translateY(-1px)}a.mc:focus-visible{outline:3px solid var(--kmi-focus);outline-offset:2px}
 .mc-st{display:flex;flex-wrap:wrap;align-items:center;gap:6px 12px}.mc-pill{font-size:13px;letter-spacing:.02em;padding:4px 12px;border-radius:999px;border:1px solid;font-weight:800}.mc-since{font-size:13px;color:var(--kmi-mut);font-weight:600}
 .mc-top{display:flex;align-items:center;gap:14px;min-width:0}.mc-id{min-width:0;flex:1;display:flex;flex-direction:column;gap:2px}
-.mc-code{font-size:28px;line-height:1.05;font-weight:800;color:var(--kmi-text);overflow-wrap:anywhere}.mc.compact .mc-code{font-size:26px}
-.mc-name{font-size:14px;color:var(--kmi-text2)}.mc-sub{font-size:13px;color:var(--kmi-mut)}
+.mc-code{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%;overflow-wrap:normal;font-size:28px;line-height:1.05;font-weight:800;color:var(--kmi-text)}.mc.compact .mc-code{font-size:26px}
+.mc-name{font-size:14px;color:var(--kmi-text2);display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;line-clamp:2;overflow:hidden;overflow-wrap:break-word;word-break:normal;line-height:1.3;min-width:0}.mc-sub{font-size:13px;color:var(--kmi-mut)}
 .mc-warn{font-size:13px;padding:8px 10px;border-radius:10px;background:var(--kmi-warn-soft);color:var(--kmi-warn)}
 .mc-wo{display:flex;flex-direction:column;gap:10px;padding-top:12px;border-top:1px solid var(--kmi-line)}.mc-wo.idle{font-size:14px;color:var(--kmi-mut)}
 .mc-job{font-size:16px;color:var(--kmi-text);overflow-wrap:anywhere}.mc-job span{color:var(--kmi-mut);font-size:14px}
@@ -70,8 +75,8 @@ a.mc:hover{border-color:var(--mc);transform:translateY(-1px)}a.mc:focus-visible{
 .mc-go{align-self:flex-start;font-size:13px;font-weight:700;color:var(--kmi-cyan2);padding:4px 0;border-bottom:1px solid transparent}
 a.mc:hover .mc-go{border-bottom-color:currentColor}
 /* compact (Performance Center park, 3 columns on 1440 px): state pill shares the identity row; no divider, short unknown text, whole card is the passport link */
-.mc.compact{display:grid;grid-template-columns:auto minmax(0,1fr) auto;grid-template-areas:"ico id st" "wo wo wo" "warn warn warn" "alert alert alert";gap:6px 12px;padding:12px 14px;border-radius:14px;align-items:center}
-.mc.compact .mc-st{grid-area:st;align-self:start}.mc.compact .mc-since{display:none}.mc.compact .mc-top{display:contents}.mc.compact .mc-ico{grid-area:ico}.mc.compact .mc-id{grid-area:id}
+.mc.compact{display:grid;grid-template-columns:auto minmax(0,1fr);grid-template-areas:"ico id" "st st" "wo wo" "warn warn" "alert alert";gap:6px 12px;padding:12px 14px;border-radius:14px;align-items:center}
+.mc.compact .mc-st{grid-area:st;align-self:start;min-width:0}.mc.compact .mc-pill{font-size:11.5px;padding:3px 10px;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;box-sizing:border-box}.mc.compact .mc-since{display:none}.mc.compact .mc-top{display:contents}.mc.compact .mc-ico{grid-area:ico}.mc.compact .mc-id{grid-area:id}
 .mc.compact .mc-wo{grid-area:wo;padding-top:0;border-top:0;gap:5px}.mc.compact .mc-warn{grid-area:warn}.mc.compact .mc-alert{grid-area:alert}
 .mc.compact .mc-code{font-size:22px}.mc.compact .mc-job{font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.mc.compact .mc-job span{font-size:13px}
 .mc.compact .mc-facts{gap:2px 16px}.mc.compact .mc-f{flex-direction:row;gap:5px;align-items:baseline}.mc.compact .mc-fv{font-size:14px}.mc.compact .mc-fl{font-size:13px}
