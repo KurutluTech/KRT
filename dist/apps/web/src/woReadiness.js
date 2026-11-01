@@ -61,7 +61,12 @@ function entryLink(code, ctx) {
 export function checklistBlockers(rows, ctx = {}) {
     return (rows ?? []).filter((r) => r.state === 'BLOCKED').map((r) => {
         const l = entryLink(r.code, ctx);
-        return { code: r.code + (r.opLabel ? `@${r.opLabel}` : ''), title: `${r.area}${r.opLabel ? ` · ${r.opLabel}` : ''}`, detail: r.detail ?? null,
-            fix: FIX[r.code] ?? (l ? { type: 'link', href: l.href } : null), fixLabel: FIXL[r.code] ?? l?.label ?? null, screen: r.resolveScreen, who: r.who, kind: KIND_TR[r.gapKind] ?? r.gapKind, pass: r.passCheck };
+        const notPaired = r.code === 'OPERATOR_NOT_PAIRED' || /OPERATOR_NOT_PAIRED/.test(r.detail ?? '');
+        const noEligible = r.code === 'NO_ELIGIBLE_OPERATOR' || /NO_ELIGIBLE_OPERATOR/.test(r.detail ?? '');
+        // teknik kod yerine açıklama; operatör sabit değil: yönetici ya operatörü değiştirir ya eşleştirmeye gider
+        const human = notPaired ? 'Bu iş emrinin atanmış operatörü, ilgili makineyle eşleştirilmemiş.' : noEligible ? 'Bu operasyonun makinesiyle eşleştirilmiş uygun personel yok.' : null;
+        return { code: r.code + (r.opLabel ? `@${r.opLabel}` : ''), title: `${r.area}${r.opLabel ? ` · ${r.opLabel}` : ''}`, detail: human ?? r.detail ?? null,
+            fix2: (notPaired || noEligible) ? { type: 'focus', id: 'operator', label: 'Operatörü Değiştir' } : null,
+            fix: FIX[r.code] ?? (l ? { type: 'link', href: l.href } : null), fixLabel: (notPaired || noEligible) ? 'Personel–Makine Eşleştirmesine Git' : (FIXL[r.code] ?? l?.label ?? null), screen: r.resolveScreen, who: r.who, kind: KIND_TR[r.gapKind] ?? r.gapKind, pass: r.passCheck };
     });
 }

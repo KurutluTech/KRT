@@ -83,6 +83,7 @@ export const NAV_TREE = [
             { path: '/urun-master', label: 'Ürün Kartları', icon: 'book' },
             { path: '/muhendislik', label: 'CAM / Programlama', icon: 'gear' },
             { path: '/rota', label: 'Rota / Operasyon', icon: 'link' },
+            { path: '/rota-hazirlik', label: 'Rota Hazırlık (CUT/PREP · uç payı)', icon: 'link' },
         ] },
     { id: 'tool', short: 'Takımhane', title: 'TAKIMHANE', icon: 'spindle', items: [
             { path: '/takimhane', label: 'Takım Odası', icon: 'wrench' },
@@ -107,12 +108,14 @@ export const NAV_TREE = [
         ] },
     { id: 'ship', short: 'Sevkiyat', title: 'LOJİSTİK & SEVKİYAT', icon: 'truck', items: [
             { path: '/sevkiyat', label: 'Sevkiyat / Lojistik', icon: 'truck' },
+            { path: '/sevkiyat-iade', label: 'Sevkiyat İadesi / Sevk Geri Alma', icon: 'truck' },
         ] },
     { id: 'hr', short: 'İK', title: 'İNSAN KAYNAKLARI', icon: 'users', items: [
             { path: '/personel', label: 'Personel / İK', icon: 'users' },
             { path: '/puantaj', label: 'Puantaj & Prim Havuzu', icon: 'calc' },
             { path: '/zirvedekiler', label: 'Zirvedekiler', icon: 'badge' },
             { path: '/personel-yetki', label: 'Personel Erişimi', icon: 'shield' },
+            { path: '/personel-makine', label: 'Personel – Makine Eşleştirme', icon: 'users' },
             { path: '/giris-cikis', label: 'Giriş-Çıkış (GEÇKO)', icon: 'clock' },
             { path: '/akademi', label: 'KMI Academy', icon: 'cap' },
             { path: '/giris-cikislarim', label: 'Giriş-çıkışlarım', icon: 'clock', personal: true },
