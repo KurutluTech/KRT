@@ -1,6 +1,7 @@
 // İş Emri Aç — ön kontrol modeli (saf fonksiyonlar, DOM yok). Veriyi sunucudan okunan satırlardan KURAR; hiçbir değer uydurmaz.
 // Üç işlem AYRI kapılardır: (1) yeni ana iş emri aç  (2) mevcut iş emrine rota uygula  (3) üretim START. Bu ekran yalnız (1) ve (2)'yi yapar; START burada YAPILMAZ.
-import { physicalState } from '../../../../../packages/domain/src/cncPhysical.js';
+import { physicalState, cncOperationalHold } from '../../../../../packages/domain/src/cncPhysical.js';
+import { cncDisplay } from '../../../../../packages/domain/src/cncTelemetry.js';
 
 export const OWNER = {
   revision: 'Mühendislik / CAM', bom: 'Mühendislik', material: 'Planlama / Teknik', route: 'CAM / Planlama', cam: 'CAM', tools: 'Takımhane / CAM',
@@ -65,12 +66,18 @@ export function buildPrecheck(i) {
   checks.push(routing.length ? C('quality', 'Kalite / ilk parça kontrolü', qcOps.length ? 'WARN' : 'OK', qcOps.length ? `${qcOps.map(opLabel).join(', ')}: ilk parça/kalite onayı üretimde ZORUNLU (START sonrası kalite onayı gerekir).` : 'Kalite zorunluluğu tanımlı değil.', OWNER.quality, 'Kalite kontrol noktalarını ve ilk parça kriterini doğrula') : C('quality', 'Kalite / ilk parça kontrolü', 'UNKNOWN', 'Rota yok.', OWNER.quality, 'Önce rotayı tamamla'));
   // 8 Makine uygunluğu (kayıt + fiziksel CNC; ayrı kavramlar)
   const mById = new Map((i.machines ?? []).map((m) => [m.id, m])); const ids = [...new Set((applied ? woOps.map((o) => o.plannedMachineId) : routing.map((r) => r.primaryMachineId ?? (r.allowedMachineIds?.length === 1 ? r.allowedMachineIds[0] : null))).filter(Boolean))];
-  const mrows = ids.map((id) => { const m = mById.get(id); const phys = physicalState(i.cnc?.[m?.code] ?? null); return { id, code: m?.code ?? id.slice(0, 8), status: m?.status ?? null, phys }; });
-  const alarm = mrows.filter((m) => m.phys.key === 'ALARM_ESTOP'); const down = mrows.filter((m) => m.status && m.status !== 'UP');
+  // 2N-1: görüntülenen fiziksel durum (phys) ile OPERASYONEL ENGEL (hold) AYRI. Bayat veri fiziksel durumu BİLİNMİYOR yapar ama mevcut engeli KALDIRMAZ ve uygunluk kanıtı sayılmaz.
+  const fmtAt = (v) => { const d = v ? new Date(v) : null; return d && !Number.isNaN(d.getTime()) ? d.toLocaleString('tr-TR', { timeZone: 'Europe/Istanbul', hour12: false }) : null; };
+  const mrows = ids.map((id) => { const m = mById.get(id); const row = i.cnc?.[m?.code] ?? null; const phys = physicalState(row); const hold = cncOperationalHold(row);
+    const lk = phys.key === 'OFFLINE' && cncDisplay(row).link !== 'NEVER' ? cncDisplay(row).lastKnown : null;   // hiç veri gelmemişse "son bilinen" yoktur
+    const lastKnown = lk ? { safetyLine: lk.safetyLine, at: fmtAt(lk.receivedAt) } : null;
+    return { id, code: m?.code ?? id.slice(0, 8), status: m?.status ?? null, phys, hold, lastKnown, interrupted: phys.key === 'OFFLINE' && cncDisplay(row).link !== 'NEVER' }; });
+  const alarm = mrows.filter((m) => m.phys.key === 'ALARM_ESTOP' || m.hold.hold); const down = mrows.filter((m) => m.status && m.status !== 'UP');
+  const alarmText = (m) => (m.phys.key === 'ALARM_ESTOP' ? m.code : `${m.code} (SON BİLİNEN ALARM / E-STOP${m.lastKnown?.at ? ` · ${m.lastKnown.at}` : ''} — veri bayatladı, giderildiği DOĞRULANMADI)`);
   if (!mrows.length) checks.push(C('machine', 'Makine uygunluğu', 'UNKNOWN', 'Operasyonlara atanmış makine yok.', OWNER.machine, 'Rotada makine ata'));
-  else if (alarm.length) checks.push({ ...C('machine', 'Makine uygunluğu', 'BLOCKED', `${alarm.map((m) => m.code).join(', ')}: gerçek ALARM / E-STOP — giderilmeden START YOK.`, OWNER.machine, 'Bakım: alarmı gider, test et, yetkili RELEASE ver'), machines: mrows });
+  else if (alarm.length) checks.push({ ...C('machine', 'Makine uygunluğu', 'BLOCKED', `${alarm.map(alarmText).join(', ')}: gerçek ALARM / E-STOP — giderilmeden START YOK.`, OWNER.machine, 'Bakım: alarmı gider, test et, yetkili RELEASE ver'), machines: mrows });
   else if (down.length) checks.push({ ...C('machine', 'Makine uygunluğu', 'BLOCKED', `Kayıtta kullanılamaz: ${down.map((m) => `${m.code} (${m.status})`).join(', ')}.`, OWNER.machine, 'Makine kaydını güncelle / bakımı bitir'), machines: mrows });
-  else checks.push({ ...C('machine', 'Makine uygunluğu', mrows.some((m) => m.phys.key !== 'RUNNING' && m.phys.key !== 'IDLE_STOPPED') ? 'WARN' : 'OK', mrows.map((m) => `${m.code}: kayıt ${m.status ?? '?'}, ${m.phys.key === 'UNKNOWN' ? 'fiziksel durum bilinmiyor' : 'fiziksel ' + m.phys.label}`).join(' · '), OWNER.machine, 'Fiziksel durumu doğrula (CNC verisi olmayan makine "bilinmiyor" kalır)'), machines: mrows });
+  else checks.push({ ...C('machine', 'Makine uygunluğu', mrows.some((m) => m.phys.key !== 'RUNNING' && m.phys.key !== 'IDLE_STOPPED') ? 'WARN' : 'OK', mrows.map((m) => `${m.code}: kayıt ${m.status ?? '?'}, ${m.phys.key === 'UNKNOWN' ? 'fiziksel durum bilinmiyor' : 'fiziksel ' + m.phys.label}${m.lastKnown ? ` · SON BİLİNEN — GÜNCEL DEĞİL: ${m.lastKnown.safetyLine}${m.lastKnown.at ? ` (${m.lastKnown.at})` : ''} — bayat veri çalışmaya uygunluk kanıtı DEĞİLDİR` : ''}`).join(' · '), OWNER.machine, 'Fiziksel durumu doğrula (CNC verisi olmayan makine "bilinmiyor" kalır)'), machines: mrows });
   // 9 Operatör ve vardiya
   const ops = applied ? woOps : [];
   const unassigned = ops.filter((o) => !o.assignedOperatorId);
@@ -102,7 +109,10 @@ export function buildPrecheck(i) {
   for (const c of checks) if (['BLOCKED', 'MISSING'].includes(c.status) && !['hold'].includes(c.key)) startBlock.push(`${c.title}: ${c.label}`);
   for (const c of checks) if (c.status === 'UNKNOWN' && ['route', 'tools', 'machine'].includes(c.key)) startBlock.push(`${c.title}: doğrulanamadı`);
   gates.start = { allowed: false, performedHere: false, reasons: [...new Set(startBlock)], note: 'START bu ekranda yapılmaz; yetkili release sonrası atanmış operatör kendi operasyonunda başlatır.' };
-  if (!startBlock.length && wo) gates.start.note = 'Tüm kapılar açık görünüyor; START yine bu ekranda değil, operasyon ekranından, atanmış operatörle yapılır.';
+  if (!startBlock.length && wo) {
+    const unverified = mrows.filter((m) => m.interrupted).map((m) => m.code);   // CNC verisi kesik/bayat: "tüm kapılar açık" DEMEZ (yeni engel de eklenmez)
+    gates.start.note = unverified.length ? `Engel görünmüyor; ancak ${unverified.join(', ')} için CNC verisi bayat/kesik — fiziksel durum BİLİNMİYOR ve bu çalışmaya uygunluk kanıtı DEĞİLDİR. START yine bu ekranda değil, operasyon ekranından, atanmış operatörle yapılır.` : 'Tüm kapılar açık görünüyor; START yine bu ekranda değil, operasyon ekranından, atanmış operatörle yapılır.';
+  }
   return { checks, gates, existing: wo, openNeed, applied, ppb, summary: { total: checks.length, ok: checks.filter((c) => c.status === 'OK').length, blocked: checks.filter((c) => c.status === 'BLOCKED').length, missing: checks.filter((c) => c.status === 'MISSING').length } };
 }
 
