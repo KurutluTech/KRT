@@ -82,6 +82,14 @@ import { renderCompetencyImportScreen } from './screens/CompetencyImportScreen.j
 import { createCompetencyImportApi } from './competencyImportApi.js';
 import { renderRoutingScreen } from './screens/RoutingScreen.js';
 import { createRoutingApi } from './routingApi.js';
+import { renderPersonnelMachinePairScreen } from './screens/PersonnelMachinePairScreen.js';
+import { renderShipmentReturnScreen } from './screens/ShipmentReturnScreen.js';
+import { createShipmentReturnApi } from './shipmentReturnApi.js';
+import { createPairingApi } from './pairingApi.js';
+// m0191–m0200 production'a uygulanınca true yapılır (yeni 3 ekranın menü girişi); rota her durumda tanımlı.
+const NEW_BACKEND_LIVE = false;
+import { renderRoutePrepScreen } from './screens/RoutePrepScreen.js';
+import { createRoutePrepApi } from './routePrepApi.js';
 import { renderBadgesScreen } from './screens/BadgesScreen.js';
 import { createBadgesApi } from './badgesApi.js';
 import { createEconomicsApi } from './economicsApi.js';
@@ -352,6 +360,9 @@ export const ROUTES = [
     { path: '/depo', label: 'Depo / Stok / Malzeme', group: 'Satınalma / Depo', inMenu: true, render: (el, c, s) => renderDepartmentScreen(el, createDepartmentApi(c, s, createWorkOrderHubApi(c, s)), 'DEPO') },
     { path: '/takimhane', label: 'Takımhane', group: 'Saha', inMenu: true, render: (el, c, s) => { const dc = createDocumentControlApi(c, s); return renderToolroomScreen(el, { api: createToolroomApi(c, s), lists: { pw: createProductWorkspaceApi(c, s), load: async () => (await dc.list('', '', true)).filter((r) => r.docType === 'TOOL_LIST' && r.status === 'ACTIVE').map((r) => ({ docNo: r.docNo, title: r.title, productId: r.productId, productCode: r.productCode, productName: r.productName, revision: r.revision, revisionId: r.revisionId, state: r.state, versionNo: r.latestVersionNo, opLinks: r.opLinks, awaiting: r.awaiting })) } }); } },
     { path: '/komuta', label: 'Performance Center', group: 'Yönetim', inMenu: true, render: (el, c, s, q) => renderPerformanceCenter(el, createPerformanceCenterSources(c, s), { today: istanbulToday(), dept: q.get('birim'), refreshMs: 60_000 }) },
+    { path: '/sevkiyat-iade', label: 'Sevkiyat iadesi / sevk geri alma', group: 'Saha', inMenu: NEW_BACKEND_LIVE, render: (el, c, s) => renderShipmentReturnScreen(el, { api: createShipmentReturnApi(c, s) }, {}) },
+    { path: '/personel-makine', label: 'Personel – Makine / Ekipman eşleştirme', group: 'Yönetim', inMenu: NEW_BACKEND_LIVE, render: (el, c, s, q, a) => renderPersonnelMachinePairScreen(el, { api: createPairingApi(c, s), canManage: a.actions.includes('MACHINE_SKILL_VERIFY') || a.roles.some((r) => ['ADMIN', 'MANAGEMENT'].includes(r)) }, { mode: q.get('yon') === 'makine' ? 'machine' : 'person', selected: q.get('kisi') ?? q.get('makine') ?? undefined }) },
+    { path: '/rota-hazirlik', label: 'Rota hazırlık (CUT/PREP · operasyon · uç payı)', group: 'Yönetim', inMenu: NEW_BACKEND_LIVE, render: (el, c, s, q) => renderRoutePrepScreen(el, { api: createRoutePrepApi(c, s) }, { rev: q.get('rev') ?? undefined }) },
     { path: '/rota', label: 'Rota / Operasyonlar', group: 'Yönetim', inMenu: true, render: (el, c, s, q) => { const pw = createProductWorkspaceApi(c, s); return renderRoutingScreen(el, createRoutingApi(c, s), { productId: q.get('urun') ?? q.get('product'), embed: { list: () => pw.search(''), render: (host, productId) => renderProductWorkspaceScreen(host, pw, { product: productId, only: ['routing'] }) } }); } },
     { path: '/is-emri-ac', label: 'İş Emri Aç', group: 'Yönetim', inMenu: true, render: (el, c, s, q, a) => renderWorkOrderOpen(el, { client: c, session: s, query: q, access: a }) },
     { path: '/planlama-merkezi', label: 'Planlama Merkezi', group: 'Yönetim', inMenu: true, render: (el, c, s, q) => renderPlanningCenter(el, { client: c, session: s, query: q, today: istanbulToday() }) },

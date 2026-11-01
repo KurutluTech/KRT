@@ -35,6 +35,23 @@ export function createObjectPassportApi(client, session, access, myUserId = sess
             throw new Error(NOT_FOUND);
         return r[0];
     };
+    /** m0191: sicil no yalnız yetkili RPC ile gelir; reddedilirse boş (ekran bozulmaz). */
+    const withPrivate = async (p, id) => {
+        try {
+            const priv = await client.rpc('personnel_private_get', { p_id: id }, session);
+            return { ...p, employeeNo: priv?.employeeNo ?? null };
+        }
+        catch (e) {
+            if (e?.status === 404 || e?.code === 'PGRST202' || /PGRST202|Could not find the function/i.test(e?.message ?? '')) {
+                try {
+                    const r = (await sel('personnel', 'employee_no', { id: `eq.${id}` }, undefined, 1))[0];
+                    return { ...p, employeeNo: r?.employeeNo ?? null };
+                }
+                catch { /* yetkisiz: boş */ }
+            }
+            return { ...p, employeeNo: null };
+        }
+    };
     const guard = async (fn) => {
         try {
             return { sections: await fn() };
@@ -147,7 +164,7 @@ export function createObjectPassportApi(client, session, access, myUserId = sess
                     kpis: [{ label: 'Revizyon', value: String(revs.length) }, { label: 'İş emri', value: String(wos.length) }, { label: 'Sağlam', value: num(good) }, { label: 'Hurda', value: num(scrap) }, { label: 'Hurda oranı', value: good + scrap > 0 ? `%${((scrap / (good + scrap)) * 100).toFixed(1)}` : 'BİLİNMİYOR' }] };
             }
             case 'PERSONNEL': {
-                const p = await one('personnel', 'id,name,employee_no,department,roles,active,shift_code,skills,created_at', id);
+                const p = await withPrivate(await one('personnel', 'id,name,department,roles,active,shift_code,created_at', id), id);
                 const [skills, awards] = await Promise.all([
                     sel('personnel_skills', 'skill_code', { personnel_id: `eq.${id}` }, undefined, 200),
                     sel('badge_awards', 'id', { personnel_id: `eq.${id}` }, undefined, 200).catch(() => []),
@@ -309,7 +326,7 @@ export function createObjectPassportApi(client, session, access, myUserId = sess
                 return [{ title: 'Geçmiş uygunsuzluklar', table: tbl(['NCR', 'Adet', 'Neden', 'Durum', 'Açılış'], ncrs.map((x) => [lnk('QUALITY_NCR', x.id, x.id.slice(0, 8).toUpperCase()), num(x.qty), x.reason, x.status, ts(x.openedAt)]), 'Bu ürün için uygunsuzluk kaydı yok.') }];
             });
             case 'PERSONNEL:genel': return guard(async () => {
-                const p = await one('personnel', 'name,employee_no,department,roles,shift_code,active,created_at', id);
+                const p = await withPrivate(await one('personnel', 'id,name,department,roles,shift_code,active,created_at', id), id);
                 return [{ title: 'Kimlik', kv: [['Ad soyad', p.name], ['Sicil', p.employeeNo ?? '—'], ['Departman', p.department ?? '—'], ['Roller', (p.roles ?? []).join(', ') || '—'], ['Vardiya', p.shiftCode ?? '—'], ['Durum', p.active ? 'Aktif' : 'Pasif'], ['Kayıt', ts(p.createdAt)]],
                         note: 'Puantaj/prim ve ekonomik alanlar bu pasaportta gösterilmez (sütun yetkisiyle kapalı; 0073 olmadan puantaj hesabı yok). Fotoğraf alanı yok (BLOCKED).' }];
             });

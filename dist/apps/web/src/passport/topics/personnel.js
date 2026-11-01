@@ -3,7 +3,26 @@ import { h } from '../../../../../packages/ui/src/h.js';
 import { NA, dt, day, nf, link, pill, orNA, inList, kv, table, note, tabTopic, linkTopic, opt, pilotIdSet, MACHINE_TR, WO_TR, TASK_TR, floorTasks, canManageTasks } from './common.js';
 import { ymNow } from './util.js';
 import { pilotText } from '../../pilotMark.js';
-export const PERSON_COLS = 'id,name,roles,department,active,skills,shift_code,auth_user_id,employee_no,created_at,updated_at';
+export const PERSON_COLS = 'id,name,roles,department,active,shift_code,auth_user_id,created_at,updated_at';   // m0191: employee_no/skills tablodan okunmaz
+/** Özel alanlar (sicil, yetkinlik dizisi) yalnız yetkili RPC ile gelir; reddedilirse alanlar boş kalır (ekran bozulmaz). */
+export async function mergePrivate(io, p) {
+    if (!p) return p;
+    try {
+        const priv = await io.rpc('personnel_private_get', { p_id: p.id });
+        return { ...p, employeeNo: priv?.employeeNo ?? null, skills: priv?.skills ?? [] };
+    }
+    catch (e) {
+        // RPC henüz yoksa (migration öncesi) eski doğrudan okuma; yetki reddi ve diğer hatalarda alanlar boş (sızıntı yok).
+        if (e?.status === 404 || e?.code === 'PGRST202' || /PGRST202|Could not find the function/i.test(e?.message ?? '')) {
+            try {
+                const r = (await io.sel('personnel', 'employee_no,skills', { id: `eq.${p.id}` }, undefined, 1))[0];
+                return { ...p, employeeNo: r?.employeeNo ?? null, skills: r?.skills ?? [] };
+            }
+            catch { /* yetkisiz: boş */ }
+        }
+        return { ...p, employeeNo: null, skills: [] };
+    }
+}
 const ROLE_TR = { ADMIN: 'Yönetici (sistem)', MANAGEMENT: 'Yönetim', OPERATOR: 'Operatör', CAM: 'CAM', QUALITY: 'Kalite', MAINTENANCE: 'Bakım', PURCHASING: 'Satın alma', ACCOUNTING: 'Muhasebe', WAREHOUSE: 'Depo', SHIPPING: 'Sevkiyat', SALES: 'Satış' };
 /** Private personnel file: the data subject, the system OWNER, management/accounting and PERSONNEL_MANAGE holders. The server enforces the same; this only keeps the UI honest. */
 export const canSeePrivate = (ctx) => ctx.own || ctx.access.owner || ctx.access.roles.some((r) => r === 'ADMIN' || r === 'MANAGEMENT' || r === 'ACCOUNTING') || ctx.access.actions.includes('PERSONNEL_MANAGE');
@@ -34,9 +53,11 @@ export function personnelTopics(ctx, p) {
                     opt(ctx.sel('operator_multi_machine_authorizations', 'max_concurrent_machines,reason,granted_at,revoked_at', { person_id: `eq.${p.id}` }, 'granted_at.desc')),
                     authId && mgr ? opt(ctx.sel('permission_grants', 'module,verb,record_scope,reason,granted_at,revoked_at', { user_id: `eq.${authId}` }, 'granted_at.desc')) : Promise.resolve(null),
                 ]);
-                const ms = await machineNames(ctx, (cl ?? []).map((c) => c.machineId));
+                const pairs = await opt(ctx.sel('personnel_machine_pairs', 'machine_id,trained,updated_at', { personnel_id: `eq.${p.id}` }, 'updated_at.desc', 200));
+                const ms = await machineNames(ctx, [...(cl ?? []).map((c) => c.machineId), ...(pairs ?? []).map((c) => c.machineId)]);
                 const now = ctx.nowIso();
-                return [kv('Rol', [['Sistem rolü', (p.roles ?? []).map((r) => ROLE_TR[r] ?? r).join(', ') || NA], ['Hesap bağlı mı', authId ? pill('Bağlı', 'ok') : pill('Hesap yok', 'warn')]]),
+                return [table('Kullanabildiği makine / ekipman (Personel – Makine eşleştirme kaydı)', ['Makine / ekipman', 'Eğitimi var (beyan)', 'Son güncelleme'], (pairs ?? []).map((c) => [link('MACHINE', c.machineId, ms[c.machineId]), c.trained ? 'Evet' : 'Hayır', dt(c.updatedAt)]), 'Eşleştirilmiş makine yok — Yönetim › Personel – Makine eşleştirme'),
+                    kv('Rol', [['Sistem rolü', (p.roles ?? []).map((r) => ROLE_TR[r] ?? r).join(', ') || NA], ['Hesap bağlı mı', authId ? pill('Bağlı', 'ok') : pill('Hesap yok', 'warn')]]),
                     table('Makine yetkileri', ['Makine', 'Veriliş', 'Geçerlilik', 'Durum', 'Gerekçe'], (cl ?? []).map((c) => [link('MACHINE', c.machineId, ms[c.machineId]), dt(c.grantedAt), c.validUntil ? day(c.validUntil) : 'Süresiz', c.revokedAt ? pill('İptal', 'bad') : c.validUntil && c.validUntil < now ? pill('Süresi doldu', 'warn') : pill('Geçerli', 'ok'), orNA(c.reason)]), cl === null ? 'Bu kayıt okunamadı' : 'Makine yetkisi yok'),
                     table('Çoklu makine yetkisi', ['En çok eşzamanlı makine', 'Veriliş', 'Durum', 'Gerekçe'], (multi ?? []).map((m) => [m.maxConcurrentMachines, dt(m.grantedAt), m.revokedAt ? pill('İptal', 'bad') : pill('Geçerli', 'ok'), orNA(m.reason)]), 'Çoklu makine yetkisi yok (varsayılan: tek makine)'),
                     ...(grants ? [table('Modül yetkileri', ['Modül', 'Eylem', 'Kapsam', 'Veriliş', 'Durum'], grants.map((g) => [g.module, g.verb, orNA(g.recordScope), dt(g.grantedAt), g.revokedAt ? pill('İptal', 'bad') : pill('Geçerli', 'ok')]), 'Modül yetkisi kaydı yok')] : [])];

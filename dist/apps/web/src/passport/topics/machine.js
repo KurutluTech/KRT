@@ -47,8 +47,10 @@ export function machineTopics(ctx, m) {
                 ctx.sel('operator_machine_clearances', 'personnel_id,granted_at,valid_until,revoked_at', { machine_id: `eq.${m.id}`, revoked_at: 'is.null' }, 'granted_at.desc', 100),
                 opt(ctx.sel('work_orders', 'operator_id,planned_shift_code,planned_date', { machine_id: `eq.${m.id}`, status: `in.(${ACTIVE.join(',')})` }, undefined, 50)),
             ]);
-            const names = await opNames(ctx, [...cl.map((c) => c.personnelId), ...(wos ?? []).map((w) => w.operatorId)]);
-            return [table('Bu makinede yetkili operatörler', ['Operatör', 'Veriliş', 'Geçerlilik'], cl.map((c) => [link('PERSONNEL', c.personnelId, names[c.personnelId]), dt(c.grantedAt), c.validUntil ? day(c.validUntil) : 'Süresiz']), 'Makineye özel operatör yetkisi kaydı yok'),
+            const pairs = await opt(ctx.sel('personnel_machine_pairs', 'personnel_id,trained,updated_at', { machine_id: `eq.${m.id}` }, 'updated_at.desc', 200));
+            const names = await opNames(ctx, [...cl.map((c) => c.personnelId), ...(pairs ?? []).map((c) => c.personnelId), ...(wos ?? []).map((w) => w.operatorId)]);
+            return [table('Bu makineyle eşleştirilmiş personel (Personel – Makine eşleştirme kaydı)', ['Personel', 'Eğitimi var (beyan)', 'Son güncelleme'], (pairs ?? []).map((c) => [link('PERSONNEL', c.personnelId, names[c.personnelId]), c.trained ? 'Evet' : 'Hayır', dt(c.updatedAt)]), 'Bu makineyle eşleştirilmiş personel yok — Yönetim › Personel – Makine eşleştirme'),
+                table('Bu makinede yetkili operatörler (eski makine izni kaydı)', ['Operatör', 'Veriliş', 'Geçerlilik'], cl.map((c) => [link('PERSONNEL', c.personnelId, names[c.personnelId]), dt(c.grantedAt), c.validUntil ? day(c.validUntil) : 'Süresiz']), 'Makineye özel operatör yetkisi kaydı yok'),
                 table('Şu an çalışan atamalar', ['Operatör', 'Vardiya', 'Gün'], (wos ?? []).map((w) => [link('PERSONNEL', w.operatorId, w.operatorId ? names[w.operatorId] : null), orNA(w.plannedShiftCode), w.plannedDate ? day(w.plannedDate) : NA]), 'Aktif atama yok'),
                 note('Kural', 'Bir makinede aynı anda tek aktif üretim oturumu olur; bir operatör birden çok makineyi yönetebilir (çoklu makine yetkisi gerekir).')];
         }),

@@ -11,7 +11,9 @@ import { renderShipmentScreen } from './ShipmentScreen.js';
 import { renderCommercialApprovalScreen } from './CommercialApprovalScreen.js';
 import { machineSpindle } from '../machineStateLoader.js';
 import { errorText } from '../errorText.js';
-import { collectBlockers, readinessHeadline } from '../woReadiness.js';
+import { renderHoldPanel } from '../holdPanel.js';
+import { renderOpPlanPanel } from '../opPlanPanel.js';
+import { collectBlockers, readinessHeadline, checklistBlockers } from '../woReadiness.js';
 import { camRevText } from '../../../../packages/domain/src/camRevision.js';
 export const WO_STATUS_TR = { PLANNED: 'Plana alındı', MACHINE_ASSIGNED: 'Makine atandı', PRODUCTION_DONE: 'Üretim bitti · onay bekliyor', IN_PROGRESS: 'Üretimde', FIRST_PIECE_PENDING: 'İlk parça bekliyor',
     FIRST_PIECE_APPROVED: 'İlk parça onaylı', COMPLETED: 'Tamamlandı', ON_HOLD: 'Bekletmede (HOLD)', CANCELLED: 'İptal' };
@@ -114,7 +116,10 @@ export async function renderWorkOrderHubScreen(container, deps, view = {}) {
         catch {
             rows = null;
         }
-        const blockers = ready ? collectBlockers(w.id, rows, ready.startRefusal) : null;
+        let clRows = null;
+        try { clRows = deps.hub.checklist ? await deps.hub.checklist(w.id) : null; } catch { clRows = null; }
+        // m0196: checklist varsa TEK canonical değerlendirme odur (eski panel yalnız malzeme+takım+ilk ret gösteriyordu)
+        const blockers = clRows && clRows.length ? checklistBlockers(clRows, { revisionId: ready?.revisionId, woId: w.id }) : ready ? collectBlockers(w.id, rows, ready.startRefusal) : null;
         const editable = w.status === 'PLANNED' || w.status === 'MACHINE_ASSIGNED';
         const rSel = h('select', { 'data-testid': 'hub-revision', 'aria-label': 'Ürün revizyonu' }, h('option', { value: '' }, 'Yayınlı revizyon seçin'), ...(ready?.revisions ?? []).map((r) => h('option', { value: r.id, ...(r.id === ready?.revisionId ? { selected: true } : {}) }, `Rev ${r.revision}`)));
         const cSel = h('select', { 'data-testid': 'hub-cam', 'aria-label': 'CAM programı' }, h('option', { value: '' }, 'Yayınlı CAM programı seçin'), ...(ready?.programs ?? []).map((r) => h('option', { value: r.id, ...(r.id === ready?.camProgramId ? { selected: true } : {}) }, `${r.programNo} · ${camRevText(r.revision)}`)));
@@ -123,7 +128,7 @@ export async function renderWorkOrderHubScreen(container, deps, view = {}) {
             ? h('a', { href: b.fix.href, class: 'woc-link', 'data-testid': 'hub-fix' }, `${b.fixLabel} →`)
             : h('button', { type: 'button', 'data-testid': 'hub-fix', 'data-focus': b.fix.id, onClick: () => { const el = focusMap[b.fix.id]; el?.scrollIntoView({ block: 'center' }); el?.focus(); } }, `${b.fixLabel}`);
         const head = blockers ? readinessHeadline(blockers.length) : readinessHeadline(null);
-        const readyCard = h('section', { 'data-testid': 'hub-readiness', class: `woc-ready ${head.tone}` }, h('h3', { 'data-testid': 'hub-ready-headline' }, head.text), h('div', { 'data-testid': 'hub-ready-state', 'data-ready': ready ? (ready.startRefusal ? 'no' : 'yes') : 'unknown' }, ...(blockers ?? []).map((b) => h('div', { class: 'woc-block', 'data-testid': 'hub-blocker', 'data-code': b.code }, h('div', {}, h('b', {}, b.title), b.detail ? h('span', {}, b.detail) : null), fixBtn(b))), ready && !blockers?.length ? h('div', { class: 'woc-meta' }, 'Makine, operatör, revizyon, CAM, malzeme ve takım kontrolleri sunucuda geçti.') : null, !ready ? h('div', { class: 'woc-meta' }, 'Hazırlık sunucudan okunamadı; durum bilinmiyor.') : null, blockers?.length ? h('details', {}, h('summary', {}, 'Teknik ayrıntı (destek için)'), h('div', {}, blockers.map((b) => b.code).join(' · '))) : null));
+        const readyCard = h('section', { 'data-testid': 'hub-readiness', class: `woc-ready ${head.tone}` }, h('h3', { 'data-testid': 'hub-ready-headline' }, head.text), h('div', { 'data-testid': 'hub-ready-state', 'data-ready': ready ? (ready.startRefusal ? 'no' : 'yes') : 'unknown' }, ...(blockers ?? []).map((b) => h('div', { class: 'woc-block', 'data-testid': 'hub-blocker', 'data-code': b.code }, h('div', {}, h('b', {}, b.title), b.detail ? h('span', {}, b.detail) : null, b.screen ? h('div', { class: 'woc-meta', 'data-testid': 'hub-blocker-meta' }, `Nerede: ${b.screen} · Kim: ${b.who} · Tür: ${b.kind} · Geçince: ${b.pass}`) : null), fixBtn(b))), ready && !blockers?.length ? h('div', { class: 'woc-meta' }, 'Makine, operatör, revizyon, CAM, malzeme ve takım kontrolleri sunucuda geçti.') : null, !ready ? h('div', { class: 'woc-meta' }, 'Hazırlık sunucudan okunamadı; durum bilinmiyor.') : null, blockers?.length ? h('details', {}, h('summary', {}, 'Teknik ayrıntı (destek için)'), h('div', {}, blockers.map((b) => b.code).join(' · '))) : null));
         const startBlocked = !!blockers && blockers.length > 0;
         const exemptions = (ready?.exemptions ?? []).map((x) => {
             const why = h('input', { type: 'text', placeholder: 'İptal gerekçesi (en az 10 karakter)', 'data-testid': 'hub-exempt-reason', 'aria-label': 'Muafiyet iptal gerekçesi' });
@@ -157,6 +162,23 @@ export async function renderWorkOrderHubScreen(container, deps, view = {}) {
             lots.append(...(ls.length ? ls.map((l) => h('div', { 'data-testid': 'hub-lot', class: 'woc-meta' }, `${l.qty} adet · ${l.state} · `, link(`?lot=${l.id}`, 'Ticari onay ve sevkiyat →', 'hub-lot-link'))) : [h('div', { class: 'woc-meta' }, 'Henüz stok lotu yok.')]));
         }
         catch { /* shown by stock screen */ }
+        // m0195: HOLD yönetimi paneli (kanonik ON_HOLD mekanizması; yalnız ON_HOLD iş emrinde görünür)
+        if (w.status === 'ON_HOLD' && deps.workOrders?.holdInfo) {
+            const hp = h('div', { 'data-testid': 'hold-slot' });
+            const anchor = container.querySelector('[data-testid="hub-readiness"]');
+            if (anchor?.parentNode) anchor.parentNode.insertBefore(hp, anchor); else container.querySelector('.woc')?.append(hp);
+            await renderHoldPanel(hp, w, { api: deps.workOrders, onDone: (m) => redo({ wo: w.id, message: m }) });
+        }
+        // m0196: operasyon bazlı makine/hazırlık görünümü (iş emri ana makinesinden ayrı)
+        if (deps.hub.opMatrix && ready?.revisionId) {
+            try {
+                const mx = await deps.hub.opMatrix(w.id, ready.revisionId);
+                const opSlot = h('div', { 'data-testid': 'opplan-slot' });
+                const anchor2 = container.querySelector('[data-testid="hub-readiness"]');
+                if (anchor2?.parentNode) anchor2.parentNode.insertBefore(opSlot, anchor2.nextSibling);
+                renderOpPlanPanel(opSlot, w, mx, mName?.code ?? mName?.name);
+            } catch { /* panel optional */ }
+        }
         await renderProductionScreen(prod, w.id, { api: deps.production, getWorkOrder: () => deps.hub.snapshot(w.id) });
         await renderStockScreen(stock, w.id, { api: deps.stock, getWorkOrder: () => deps.hub.snapshot(w.id) });
         // embedded screens print the raw work-order id in their headings: inside the hub the header card already names the order

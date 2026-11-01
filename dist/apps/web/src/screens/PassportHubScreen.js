@@ -13,7 +13,7 @@ import { photoSlot, UNKNOWN } from '../passport/kit.js';
 import { errorText } from '../errorText.js';
 import { STORE_KINDS, makeIo, isDenied, dt, day, nf, WO_TR, MACHINE_TR, MACHINE_TONE, TASK_TR, floorTasks, canManageTasks, pilotIdSet } from '../passport/topics/common.js';
 import { pilotText } from '../pilotMark.js';
-import { personnelTopics, PERSON_COLS, canSeePrivate } from '../passport/topics/personnel.js';
+import { personnelTopics, PERSON_COLS, canSeePrivate, mergePrivate } from '../passport/topics/personnel.js';
 import { machineTopics, MACHINE_COLS } from '../passport/topics/machine.js';
 import { productTopics } from '../passport/topics/product.js';
 import { workOrderTopics, loadWoPassport } from '../passport/topics/workOrder.js';
@@ -92,7 +92,7 @@ export async function renderPassportHubScreen(container, deps, state) {
     try {
         switch (kind) {
             case 'PERSONNEL': {
-                const p = (await io.sel('personnel', PERSON_COLS, { id: `eq.${id}` }, undefined, 1))[0];
+                const p = await mergePrivate(io, (await io.sel('personnel', PERSON_COLS, { id: `eq.${id}` }, undefined, 1))[0]);
                 if (!p) {
                     msg('Kayıt bulunamadı.', 'ps-notfound');
                     return;
