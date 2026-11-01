@@ -261,7 +261,7 @@ function galleryDeps(c, s, withBoard = false) {
                 m[r.operatorId] = (m[r.operatorId] ?? 0) + 1;
         return m;
     };
-    return { faces: (t) => pc.faces(t), content: (v) => pc.content(v), activeWork, ...(withBoard ? { board: () => createLiveApi(c, s).board('OFFICE') } : {}) };
+    return { faces: (t) => pc.faces(t), content: (v) => pc.content(v), activeWork, ...(withBoard ? { board: () => createLiveApi(c, s).board('OFFICE'), cncStates: () => createLiveApi(c, s).cncStates() } : {}) };
 }
 export const ROUTES = [
     {

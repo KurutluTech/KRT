@@ -7,6 +7,7 @@ export function createPerformanceCenterSources(client, session) {
     return {
         snapshot: () => cc.snapshot(),
         board: () => live.board('OFFICE'),
+        cncStates: () => live.cncStates(), // 2M: the SAME canonical authorised CNC read, alone (light refresh; never waits for the heavy reads)
         machineInfo: async () => (await live.machineInfo()).map((m) => ({ id: m.id, code: m.code, name: m.name, machineClass: m.machineClass })),
         oee: (from, to, group) => oee.rollup(from, to, group),
         nba: () => intel.nextActions(),

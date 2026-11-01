@@ -5,7 +5,7 @@ import { h, mount } from '../../../../packages/ui/src/h.js';
 import { machineStateOf, HEADLINE_TR, MACHINE_CLASS_TR } from '../../../../packages/domain/src/machineState.js';
 import { ENTITY_CARD_CSS, dateTr, entityCard, initialsOf, photoSlot } from '../cardKit.js';
 import { MACHINE_CARD_CSS, machineIdentityCard, sinceText } from '../machineCard.js';
-import { watchCncExpiry, attachCncAge, bindCncAges } from '../cncLive.js';
+import { watchCncExpiry, attachCncAge, bindCncAges, startCncLightPoll, pickNewerCnc, cncSig } from '../cncLive.js';
 import { errorText } from '../errorText.js';
 import { DEPT_TR, ROLE_TR } from '../ds.js';
 const TITLE = { SUPPLIER: ['Tedarikçi kartları', 'Her kart tedarikçinin dijital kartına açılır (yalnız satınalma / muhasebe / yönetim).'], TOOL: ['Takım kartları', 'Her kart takımın pasaportuna ve hareket geçmişine açılır. Kayıtlar elle girilendir; LockCell bağlı değildir.'],
@@ -27,6 +27,10 @@ export async function renderEntityGalleryScreen(container, deps, opts) {
     const root = h('div', { class: 'kx eg', 'data-testid': 'eg-root', 'data-kind': kind }, h('style', {}, ENTITY_CARD_CSS + MACHINE_CARD_CSS), h('h1', { class: 'eg-h1' }, title), h('p', { class: 'eg-note' }, 'Yükleniyor…'));
     // P1: __cached = re-evaluate the SAME data locally (no network); __silent = keep the current cards on screen while re-reading
     const cachedIn = opts.__cached ?? null;
+    // 2M: automatic (expiry / poll driven) renders belong to the screen that scheduled them: once the shared content host shows another screen they do nothing
+    const alive = () => container.__egRoot?.isConnected === true;
+    if (opts.__auto && !alive())
+        return;
     if (!opts.__silent)
         mount(container, root);
     let faces;
@@ -66,6 +70,8 @@ export async function renderEntityGalleryScreen(container, deps, opts) {
     }
     if (kind === 'MACHINE')
         container.__egCache = { faces, board };
+    if (opts.__auto && !alive())
+        return; // the user left while this read was in flight
     const nowIso = board?.generatedAt ?? new Date().toISOString();
     const hrefOf = (f) => `#/kart?t=${dataKind}&id=${f.id}`;
     const build = (f) => {
@@ -184,8 +190,8 @@ export async function renderEntityGalleryScreen(container, deps, opts) {
         counts.set('PASSIVE', 0);
     }
     rows.forEach((r) => counts.set(r.state, (counts.get(r.state) ?? 0) + 1));
-    let filter = cat?.initialFilter ?? null;
-    let q = norm((cat?.initialQuery ?? '').trim());
+    let filter = opts.__ui ? opts.__ui.filter : (cat?.initialFilter ?? null);
+    let q = opts.__ui ? opts.__ui.q : norm((cat?.initialQuery ?? '').trim());
     const grid = h('div', { class: 'eg-grid', 'data-testid': 'eg-grid' });
     const count = h('div', { class: 'eg-note', 'data-testid': 'eg-count' });
     const chipRow = h('div', { class: 'eg-bar', 'data-testid': 'eg-filters' });
@@ -197,18 +203,53 @@ export async function renderEntityGalleryScreen(container, deps, opts) {
         count.setAttribute('data-total', String(rows.length));
         chipRow.querySelectorAll('button.eg-chip').forEach((b) => b.setAttribute('aria-pressed', String((b.getAttribute('data-f') || null) === filter)));
     };
-    const chip = (label, f, n) => h('button', { type: 'button', class: 'eg-chip', 'data-f': f ?? '', 'data-testid': `eg-filter-${f ?? 'ALL'}`, 'aria-pressed': 'false', onClick: () => { filter = f; paint(); cat?.onChange?.(q, filter); } }, `${label} (${n})`);
-    const search = h('input', { type: 'search', placeholder: 'Ara: kod, ad…', 'aria-label': 'Kart ara', 'data-testid': 'eg-search', value: cat?.initialQuery ?? '', onInput: (e) => { q = norm(e.target.value.trim()); paint(); cat?.onChange?.(q, filter); } });
+    const chip = (label, f, n) => h('button', { type: 'button', class: 'eg-chip', 'data-f': f ?? '', 'data-testid': `eg-filter-${f ?? 'ALL'}`, 'aria-pressed': 'false', onClick: () => { filter = f; container.__egUi = { ...(container.__egUi ?? {}), filter, q }; paint(); cat?.onChange?.(q, filter); } }, `${label} (${n})`);
+    const search = h('input', { type: 'search', placeholder: 'Ara: kod, ad…', 'aria-label': 'Kart ara', 'data-testid': 'eg-search', value: opts.__ui?.raw ?? cat?.initialQuery ?? '', onInput: (e) => { q = norm(e.target.value.trim()); container.__egUi = { filter, q, raw: e.target.value }; paint(); cat?.onChange?.(q, filter); } });
     chipRow.append(search, chip('Tümü', null, rows.length), ...[...counts.entries()].sort((a, b) => (cat ? (a[0] === 'ACTIVE' ? -1 : 1) : b[1] - a[1])).map(([k, n]) => chip(STATE_LABEL(k), k, n)));
     mount(container, h('div', { class: 'kx eg', 'data-testid': 'eg-root', 'data-kind': kind }, h('style', {}, ENTITY_CARD_CSS + MACHINE_CARD_CSS), opts.embedded ? null : h('h1', { class: 'eg-h1' }, title), opts.embedded ? null : h('p', { class: 'eg-note' }, sub, opts.listHref ? [' ', h('a', { href: opts.listHref, 'data-testid': 'eg-list-link' }, opts.listLabel ?? 'Liste görünümü')] : null), chipRow, count, kind === 'MACHINE' ? h('p', { class: 'eg-note', 'data-testid': 'eg-physical-note' }, 'Durum kayıtlı (elle girilen) durumdur; CNC bağlantısı olmadığından fiziksel çalışma doğrulanmaz.') : null, grid));
     paint();
+    container.__egRoot = container.firstElementChild;
     if (kind === 'MACHINE' && board) {
         bindCncAges(container);
-        // at the 45 s threshold: FIRST re-evaluate the cards from the data already on screen (no network wait), THEN re-read in the background
-        watchCncExpiry(container, () => (board.machines ?? []).map((m) => m.cnc).filter(Boolean), () => {
-            void renderEntityGalleryScreen(container, deps, { ...opts, __cached: container.__egCache, __silent: true })
-                .then(() => renderEntityGalleryScreen(container, deps, { ...opts, __silent: true }));
-        });
+        const ui = () => container.__egUi ?? { filter, q };
+        const localRender = () => void renderEntityGalleryScreen(container, deps, { ...opts, __cached: container.__egCache, __silent: true, __auto: true, __ui: ui() });
+        const paintAges = () => {
+            for (const el of container.querySelectorAll('[data-testid="eg-card"]')) {
+                const m = (board.machines ?? []).find((x) => x.code === (el.getAttribute('data-code') ?? ''));
+                if (m?.cnc)
+                    attachCncAge(el, m.cnc);
+            }
+        };
+        const armExpiry = () => watchCncExpiry(container, () => (board.machines ?? []).map((m) => m.cnc).filter(Boolean), localRender);
+        // at the 45 s threshold the cards re-evaluate LOCALLY from the data on screen (no network wait); the light poll below brings new data
+        armExpiry();
+        // 2M: LIGHT CNC refresh (cnc_live_states only) every 10 s while this screen is shown — not the whole gallery
+        if (!cachedIn && deps.cncStates && board.cncRead !== 'DENIED' && ((board.machines ?? []).some((m) => m.cnc) || board.cncRead === 'FAILED')) {
+            container.__egPoll?.stop();
+            container.__egPoll = startCncLightPoll({
+                alive, read: deps.cncStates,
+                apply: (rows) => {
+                    const b = container.__egCache?.board;
+                    if (!b)
+                        return;
+                    const by = new Map((rows ?? []).filter((r) => r?.machineCode).map((r) => [r.machineCode, r]));
+                    const before = cncSig(b.machines);
+                    for (const m of b.machines ?? []) {
+                        const r = by.get(m.code);
+                        if (r)
+                            m.cnc = pickNewerCnc(m.cnc, r);
+                    }
+                    b.cncRead = 'OK';
+                    if (cncSig(b.machines) !== before)
+                        localRender();
+                    else {
+                        paintAges();
+                        armExpiry();
+                    }
+                },
+                onDenied: () => { const b = container.__egCache?.board; if (b) { for (const m of b.machines ?? []) delete m.cnc; b.cncRead = 'DENIED'; localRender(); } },
+            });
+        }
     }
     // photos: after first paint, 4 at a time; a failure leaves the initials (never a broken image)
     const queue = rows.filter((r) => r.built.photo && r.built.fill);

@@ -4,7 +4,7 @@
 // (command_center, live_board, oee_rollup, next_best_actions, process_mining). No demo data exists in this file: a missing source renders as
 // UNKNOWN / VERİ GEREKLİ with its reason. Colour is never the only carrier of meaning (every state also has a word and a glyph).
 import { machineIdentityCard, MACHINE_CARD_CSS } from '../machineCard.js';
-import { watchCncExpiry, attachCncAge, bindCncAges } from '../cncLive.js';
+import { watchCncExpiry, attachCncAge, bindCncAges, startCncLightPoll, mergeBoardCnc, pickNewerCnc, cncSig } from '../cncLive.js';
 import { SPINDLE_CSS } from '../spindle.js';
 import { h, mount } from '../../../../packages/ui/src/h.js';
 import { buildPerformanceCenter, departmentSlice, parseDomain, NEEDS_DATA } from '../../../../packages/domain/src/performanceCenter.js';
@@ -106,6 +106,7 @@ const CLS_TONE = { DOWN: 'var(--crit)', MAINTENANCE: 'var(--risk)', HOLD: 'var(-
 const LOSS_COLORS = ['#5cc8e6', '#c9a24a', '#f0645a', '#e8b04a', '#a98bf0', '#7d8ba3'];
 const timers = new WeakMap();
 const lastInputs = new WeakMap();
+const gens = new WeakMap();
 const svgEl = (markup, label, cls = 'chart') => { const d = document.createElement('span'); d.style.display = 'block'; d.innerHTML = markup.replace('<svg ', `<svg class="${cls}" role="img" aria-label="${esc(label)}" `); return d; };
 const unknownBox = (title, reason, testid) => h('div', { class: 'unknownbox', 'data-testid': testid }, h('b', {}, `${title}: `, h('span', { class: 'uk' }, 'UNKNOWN / '), NEEDS_DATA), h('div', {}, reason));
 const block = (title, testid, ...kids) => h('section', { class: 'blk', 'data-testid': testid }, h('header', {}, h('h2', {}, title)), ...kids);
@@ -300,33 +301,84 @@ export async function renderPerformanceCenter(container, sources, opts) {
     const prev = timers.get(container);
     if (prev)
         clearTimeout(prev);
+    // 2M: timer/expiry-driven renders belong to the screen that scheduled them; once the user has left (the shared content host shows
+    // another screen) they must not read anything or draw over it. Full reads also carry a generation: an older, slower answer is dropped.
+    const alive = () => container.__pcRoot?.isConnected === true;
+    if (opts.__auto && !alive())
+        return;
+    const gen = opts.__cachedInputs ? gens.get(container) : (gens.get(container) ?? 0) + 1;
+    if (!opts.__cachedInputs)
+        gens.set(container, gen);
     const nowIso = opts.nowIso ?? new Date().toISOString();
     const range = opts.sourcesRange ?? { from: shiftDate(opts.today, -6), to: opts.today, monthFrom: shiftDate(opts.today, -29) };
     // P1: __cachedInputs = re-evaluate the data already on screen locally (no network wait). A failed re-read keeps the previous CNC rows (they keep ageing) instead of dropping CNC.
     const inputs = opts.__cachedInputs ?? await loadPerformanceCenter(sources, range, nowIso);
     if (!opts.__cachedInputs) {
+        if (gens.get(container) !== gen)
+            return; // a newer full read started meanwhile: this older answer must not overwrite it
+        if (opts.__auto && !alive())
+            return;
         const before = lastInputs.get(container);
         if (before?.board && !inputs.board)
             inputs.board = before.board;
+        else if (before?.board && inputs.board)
+            mergeBoardCnc(before.board, inputs.board); // newest server ingest wins per machine (a slow full read never regresses the light-poll state)
     }
     lastInputs.set(container, inputs);
     const model = buildPerformanceCenter(inputs);
-    const refresh = () => void renderPerformanceCenter(container, sources, opts);
+    const { __cachedInputs, __auto, ...baseOpts } = opts;
+    const refresh = () => void renderPerformanceCenter(container, sources, { ...baseOpts, __auto: true });
+    const localRender = () => void renderPerformanceCenter(container, sources, { ...baseOpts, __cachedInputs: lastInputs.get(container), __auto: true, refreshMs: 0 });
     const domain = parseDomain(opts.dept ?? null);
     const crumb = domain ? h('div', { class: 'crumb', 'data-testid': 'pc-crumb' }, h('a', { href: '#/komuta' }, 'Özet'), ` › ${PULSE_DOMAIN_TR[domain]} › kayıtlar`) : null;
-    mount(container, h('div', { class: 'pc', 'data-testid': 'pc-root', 'data-level': domain ? 'department' : 'overview' }, h('style', {}, SPINDLE_CSS + MACHINE_CARD_CSS + CSS), mast(model, refresh, crumb), ...(domain ? departmentView(model, domain) : overview(model))));
-    // CNC freshness: data age on each park card, and ONE re-render when the soonest live CNC row passes the 45 s rule (no polling)
-    const cncRows = (inputs.board?.machines ?? []).filter((x) => x.cnc);
-    for (const el of container.querySelectorAll('[data-testid="pc-machine"]')) {
-        const r = cncRows.find((x) => x.code === el.getAttribute('data-code'));
-        if (r)
-            attachCncAge(el, r.cnc);
-    }
+    const root = h('div', { class: 'pc', 'data-testid': 'pc-root', 'data-level': domain ? 'department' : 'overview' }, h('style', {}, SPINDLE_CSS + MACHINE_CARD_CSS + CSS), mast(model, refresh, crumb), ...(domain ? departmentView(model, domain) : overview(model)));
+    mount(container, root);
+    container.__pcRoot = root;
+    const boardOf = () => lastInputs.get(container)?.board ?? null;
+    // CNC freshness: data age on each park card; the cards re-evaluate LOCALLY at the 45 s rule (no network wait)
+    const paintAges = () => {
+        const machines = boardOf()?.machines ?? [];
+        for (const el of container.querySelectorAll('[data-testid="pc-machine"]')) {
+            const r = machines.find((x) => x.code === el.getAttribute('data-code'));
+            if (r?.cnc)
+                attachCncAge(el, r.cnc);
+        }
+    };
+    paintAges();
     bindCncAges(container);
-    // at the 45 s threshold: FIRST re-evaluate every card from the data already on screen, THEN re-read in the background
-    if (!opts.__cachedInputs)
-        watchCncExpiry(container, () => cncRows.map((x) => x.cnc), () => { void renderPerformanceCenter(container, sources, { ...opts, __cachedInputs: lastInputs.get(container), refreshMs: 0 }).then(refresh); });
+    const armExpiry = () => watchCncExpiry(container, () => (boardOf()?.machines ?? []).map((x) => x.cnc).filter(Boolean), localRender);
+    armExpiry();
+    // 2M: LIGHT CNC refresh — only cnc_live_states (the canonical authorised read), every 10 s while the screen is shown; never waits for the heavy reads
+    if (!opts.__cachedInputs) {
+        container.__pcPoll?.stop();
+        const b0 = inputs.board;
+        const needed = !!sources.cncStates && b0 && b0.cncRead !== 'DENIED' && (b0.machines ?? []).some((m) => m.cnc) || (!!sources.cncStates && b0?.cncRead === 'FAILED');
+        if (needed)
+            container.__pcPoll = startCncLightPoll({
+                alive, read: sources.cncStates,
+                apply: (rows) => {
+                    const b = boardOf();
+                    if (!b)
+                        return;
+                    const by = new Map((rows ?? []).filter((r) => r?.machineCode).map((r) => [r.machineCode, r]));
+                    const before = cncSig(b.machines);
+                    for (const m of b.machines ?? []) {
+                        const r = by.get(m.code);
+                        if (r)
+                            m.cnc = pickNewerCnc(m.cnc, r);
+                    }
+                    b.cncRead = 'OK';
+                    if (cncSig(b.machines) !== before)
+                        localRender(); // headline / pill / physical state / alarm change together, from the same canonical calculation
+                    else {
+                        paintAges(); // same state, newer data: only the age moves
+                        armExpiry();
+                    }
+                },
+                onDenied: () => { const b = boardOf(); if (b) { for (const m of b.machines ?? []) delete m.cnc; b.cncRead = 'DENIED'; localRender(); } },
+            });
+    }
     if (opts.refreshMs && opts.refreshMs > 0 && !opts.__cachedInputs)
-        timers.set(container, setTimeout(refresh, opts.refreshMs));
+        timers.set(container, setTimeout(() => { if (alive()) refresh(); }, opts.refreshMs)); // a screen that is no longer shown stops refreshing itself
 }
 const shiftDate = (iso, n) => { const d = new Date(`${iso}T00:00:00Z`); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); };
