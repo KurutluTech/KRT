@@ -21,8 +21,8 @@ export async function renderRoutePrepScreen(container, { api, goto = (href) => {
     const head = [h('style', {}, CSS), h('h1', { 'data-testid': 'rp-heading' }, 'Rota hazırlık — CUT/PREP · operasyonlar · uç payı'), msg, revSel];
     if (!view.rev) { mount(container, h('div', { class: 'rp' }, ...head)); return; }
     const rev = revs.find((r) => r.id === view.rev);
-    let ops = [], lines = [], specs = [], cams = [], wos = [];
-    try { [ops, lines, cams, wos] = await Promise.all([api.routeOps(view.rev), api.bomLines(view.rev), api.camPrograms(view.rev), api.workOrders()]); specs = await api.barSpecs(lines.map((l) => l.id)); }
+    let ops = [], lines = [], specs = [], cams = [], wos = [], specsState = 'ok', specsMsg = '';
+    try { [ops, lines, cams, wos] = await Promise.all([api.routeOps(view.rev), api.bomLines(view.rev), api.camPrograms(view.rev), api.workOrders()]); { const r = await api.barSpecs(view.rev); if (Array.isArray(r)) specs = r; else { specs = r.rows ?? []; specsState = r.state ?? 'ok'; specsMsg = r.message ?? ''; } } }
     catch (e) { mount(container, h('div', { class: 'rp' }, ...head, h('div', { 'data-testid': 'rp-load-error', class: 'rp-msg error', role: 'alert' }, errorText(e)))); return; }
     const mname = (id) => machines.find((m) => m.id === id)?.code ?? '?';
     const m101 = machines.find((m) => m.code === '101');
@@ -78,6 +78,8 @@ export async function renderRoutePrepScreen(container, { api, goto = (href) => {
     const woSel = h('select', { 'data-testid': 'ap-wo', 'aria-label': 'İş emri' }, h('option', { value: '' }, 'İş emri seçin'), ...wos.filter((w) => w.productRevisionId === view.rev).map((w) => h('option', { value: w.id }, `${w.id.slice(0, 8)} · ${w.qtyPlanned} adet · ${w.status}`)));
     const apBtn = h('button', { type: 'button', 'data-testid': 'ap-apply', onClick: () => { if (!woSel.value) return redo({ message: { kind: 'error', text: 'Önce iş emri seçin.' } }); void run(() => api.applyRoute(woSel.value), 'Rota iş emrine uygulandı (operasyonlar BEKLEMEDE doğdu; üretim başlamadı).'); } }, 'Rotayı iş emrine uygula');
     mount(container, h('div', { class: 'rp' }, ...head,
+        specsState !== 'ok' ? h('div', { 'data-testid': 'rp-specs-unreadable', 'data-state': specsState, class: 'rp-msg error', role: 'alert' }, specsState === 'denied' ? 'Kesim ölçüsünü görme yetkiniz yok (BOM_RELEASE veya ROUTING_MANAGE gerekir). Bu "kayıt yok" anlamına gelmez; uç payı bölümü kapalı.' : specsState === 'setup_pending' ? 'Kesim ölçüsü okuması sunucuda henüz kurulu değil (m0201 bekleniyor). Uç payı "tanımsız" DEĞİL, okunamadı; bölüm kapalı. Rota ve CUT/PREP girişi çalışır.' : `Kesim ölçüsü okunamadı: ${specsMsg}. Uç payı bölümü kapalı; boş veya sıfır kabul edilmedi.`) : null,
+        specsState === 'ok' && !specs.length && lines.length ? h('div', { 'data-testid': 'rp-specs-empty', class: 'rp-msg' }, 'Bu revizyonda kesim ölçüsü kaydı yok (sunucu okudu, kayıt bulunmadı). Önce çubuk/kesim kaydı girilmeli.') : null,
         rev?.status === 'RELEASED' ? h('div', { class: 'woc-meta', 'data-testid': 'rp-released-note' }, 'Yayınlı revizyon: rota ve hazırlık değişiklikleri sunucu kurallarıyla, gerekçe + denetim kaydıyla yapılır; yeni revizyon (Rev B) AÇILMAZ.') : null,
         h('h2', {}, 'Mevcut rota'), table,
         h('h2', {}, '101 CUT/PREP (OP numarası dışı)'), h('div', { class: 'rp-panel' }, h('div', { class: 'rp-row' }, 'Makine: 101 (sabit) · CAM gerekmez'), h('div', { class: 'rp-row' }, cpSetup, cpCycle), h('div', { class: 'rp-row' }, cpReason, cpBtn)),
