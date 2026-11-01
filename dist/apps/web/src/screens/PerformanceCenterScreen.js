@@ -4,6 +4,7 @@
 // (command_center, live_board, oee_rollup, next_best_actions, process_mining). No demo data exists in this file: a missing source renders as
 // UNKNOWN / VERİ GEREKLİ with its reason. Colour is never the only carrier of meaning (every state also has a word and a glyph).
 import { machineIdentityCard, MACHINE_CARD_CSS } from '../machineCard.js';
+import { watchCncExpiry, attachCncAge, bindCncAges } from '../cncLive.js';
 import { SPINDLE_CSS } from '../spindle.js';
 import { h, mount } from '../../../../packages/ui/src/h.js';
 import { buildPerformanceCenter, departmentSlice, parseDomain, NEEDS_DATA } from '../../../../packages/domain/src/performanceCenter.js';
@@ -306,6 +307,15 @@ export async function renderPerformanceCenter(container, sources, opts) {
     const domain = parseDomain(opts.dept ?? null);
     const crumb = domain ? h('div', { class: 'crumb', 'data-testid': 'pc-crumb' }, h('a', { href: '#/komuta' }, 'Özet'), ` › ${PULSE_DOMAIN_TR[domain]} › kayıtlar`) : null;
     mount(container, h('div', { class: 'pc', 'data-testid': 'pc-root', 'data-level': domain ? 'department' : 'overview' }, h('style', {}, SPINDLE_CSS + MACHINE_CARD_CSS + CSS), mast(model, refresh, crumb), ...(domain ? departmentView(model, domain) : overview(model))));
+    // CNC freshness: data age on each park card, and ONE re-render when the soonest live CNC row passes the 45 s rule (no polling)
+    const cncRows = (inputs.board?.machines ?? []).filter((x) => x.cnc);
+    for (const el of container.querySelectorAll('[data-testid="pc-machine"]')) {
+        const r = cncRows.find((x) => x.code === el.getAttribute('data-code'));
+        if (r)
+            attachCncAge(el, r.cnc);
+    }
+    bindCncAges(container);
+    watchCncExpiry(container, () => cncRows.map((x) => x.cnc), refresh);
     if (opts.refreshMs && opts.refreshMs > 0)
         timers.set(container, setTimeout(refresh, opts.refreshMs));
 }

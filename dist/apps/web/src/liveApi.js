@@ -1,3 +1,4 @@
+import { stampCnc } from '../../../packages/domain/src/cncTelemetry.js';
 import { periodFetchFrom } from '../../../packages/domain/src/liveKpi.js';
 import { selReal } from './pilotMark.js';
 export function createLiveApi(client, session) {
@@ -17,7 +18,7 @@ export function createLiveApi(client, session) {
                         for (const m of b.machines) {
                             const r = by.get(m.code);
                             if (r)
-                                m.cnc = r;
+                                m.cnc = stampCnc(r);
                         }
                         b.cncRead = 'OK';
                     }
@@ -52,7 +53,7 @@ export function createLiveApi(client, session) {
             return { rows, truncated: rows.length >= CAP, assigned };
         },
         workDetail: async () => (await client.rpc('command_center', {}, session)).liveWorkOrders ?? [],
-        cncStates: () => client.rpc('cnc_live_states', {}, session),
+        cncStates: async () => (await client.rpc('cnc_live_states', {}, session)).map(stampCnc),
         listDisplays: () => client.rpc('list_live_displays', {}, session),
         createDisplay: (name) => client.rpc('create_live_display', { p_name: name }, session),
         revokeDisplay: async (id, reason) => { await client.rpc('revoke_live_display', { p_id: id, p_reason: reason }, session); },

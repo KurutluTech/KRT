@@ -1,3 +1,4 @@
+import { adjustCnc } from '../../../packages/domain/src/cncTelemetry.js';
 // KMI NEXT — application shell (PWA): login, hash router, navigation, service worker.
 // No framework, no bundler (docs/ARCHITECTURE.md). Every screen gets its real adapter over the
 // data-client; authorization is decided by the server on every call, the menu only navigates.
@@ -304,7 +305,7 @@ export const ROUTES = [
     },
     { path: '/terminal', label: 'Makine Terminali', group: 'Saha', inMenu: true, render: (el, c, s) => renderTerminalScreen(el, createTerminalApi(c, s), { machineId: rememberedMachine() }, { icon: (n, z) => icon(n, z), cncOf: async (code) => { try {
                 const r = (await createLiveApi(c, s).cncStates()).find((x) => x.machineCode === code);
-                return r ? { link: r.link, state: r.state } : null;
+                return r ? (() => { const a = adjustCnc(r); return { link: a.link, state: a.link === 'UP' ? a.state : 'CNC_UNKNOWN' }; })() : null;
             }
             catch {
                 return null;

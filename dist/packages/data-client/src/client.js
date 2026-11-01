@@ -1,3 +1,4 @@
+import { stampCnc, cncNowMs, cncWallMs } from '../../domain/src/cncTelemetry.js';
 // KMI NEXT — dependency-free Supabase REST/RPC/Auth client.
 //
 // Why this exists: @supabase/supabase-js is not installable in this sandbox (no npm registry
@@ -292,6 +293,7 @@ export class KmiNextClient {
         throw new AuthError('PIN şu anda kaydedilemedi.', res.status);
     }
     async rpc(fnName, args, session) {
+        const sentAt = fnName === 'cnc_live_states' ? { mono: cncNowMs(), wall: cncWallMs() } : null; // ONE stamping point for every CNC read, taken when the request is SENT
         let res;
         try {
             res = await this.authed(() => this.fetchImpl(`${this.url}/rest/v1/rpc/${fnName}`, {
@@ -320,7 +322,8 @@ export class KmiNextClient {
             const err = body;
             throw new PostgrestError(String(err?.['message'] ?? res.statusText), res.status, err?.['code'], err?.['details'], err?.['hint']);
         }
-        return camelizeKeys(body);
+        const out = camelizeKeys(body);
+        return sentAt && Array.isArray(out) ? out.map((r) => stampCnc(r, sentAt)) : out;
     }
     /** Reads from a kmi_next.* table. Never writes — writes are RPC-only by design (see header). */
     async select(table, options, session) {

@@ -5,6 +5,7 @@ import { h, mount } from '../../../../packages/ui/src/h.js';
 import { machineStateOf, HEADLINE_TR, MACHINE_CLASS_TR } from '../../../../packages/domain/src/machineState.js';
 import { ENTITY_CARD_CSS, dateTr, entityCard, initialsOf, photoSlot } from '../cardKit.js';
 import { MACHINE_CARD_CSS, machineIdentityCard, sinceText } from '../machineCard.js';
+import { watchCncExpiry, attachCncAge, bindCncAges } from '../cncLive.js';
 import { errorText } from '../errorText.js';
 import { DEPT_TR, ROLE_TR } from '../ds.js';
 const TITLE = { SUPPLIER: ['Tedarikçi kartları', 'Her kart tedarikçinin dijital kartına açılır (yalnız satınalma / muhasebe / yönetim).'], TOOL: ['Takım kartları', 'Her kart takımın pasaportuna ve hareket geçmişine açılır. Kayıtlar elle girilendir; LockCell bağlı değildir.'],
@@ -77,6 +78,8 @@ export async function renderEntityGalleryScreen(container, deps, opts) {
                 alert: open > 0 ? `${open} açık bakım / arıza kaydı` : null });
             fill = (src) => { const ico = node.querySelector('.mc-ico'); if (!ico)
                 return; ico.replaceChildren(h('img', { src, alt: f.title, loading: 'lazy', style: 'width:100%;height:100%;object-fit:cover;border-radius:10px;display:block', 'data-testid': 'ec-photo-img' })); ico.setAttribute('data-has-photo', 'true'); };
+            if (live?.cnc)
+                attachCncAge(node, live.cnc);
             node.setAttribute('data-id', f.id);
             node.setAttribute('data-headline', ms.headline);
             node.setAttribute('data-registered-status', f.state);
@@ -189,6 +192,10 @@ export async function renderEntityGalleryScreen(container, deps, opts) {
     chipRow.append(search, chip('Tümü', null, rows.length), ...[...counts.entries()].sort((a, b) => (cat ? (a[0] === 'ACTIVE' ? -1 : 1) : b[1] - a[1])).map(([k, n]) => chip(STATE_LABEL(k), k, n)));
     mount(container, h('div', { class: 'kx eg', 'data-testid': 'eg-root', 'data-kind': kind }, h('style', {}, ENTITY_CARD_CSS + MACHINE_CARD_CSS), opts.embedded ? null : h('h1', { class: 'eg-h1' }, title), opts.embedded ? null : h('p', { class: 'eg-note' }, sub, opts.listHref ? [' ', h('a', { href: opts.listHref, 'data-testid': 'eg-list-link' }, opts.listLabel ?? 'Liste görünümü')] : null), chipRow, count, kind === 'MACHINE' ? h('p', { class: 'eg-note', 'data-testid': 'eg-physical-note' }, 'Durum kayıtlı (elle girilen) durumdur; CNC bağlantısı olmadığından fiziksel çalışma doğrulanmaz.') : null, grid));
     paint();
+    if (kind === 'MACHINE' && board) {
+        bindCncAges(container);
+        watchCncExpiry(container, () => (board.machines ?? []).map((m) => m.cnc).filter(Boolean), () => void renderEntityGalleryScreen(container, deps, opts));
+    }
     // photos: after first paint, 4 at a time; a failure leaves the initials (never a broken image)
     const queue = rows.filter((r) => r.built.photo && r.built.fill);
     let next = 0;

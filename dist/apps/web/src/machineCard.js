@@ -72,6 +72,7 @@ a.mc:hover{border-color:var(--mc);transform:translateY(-1px)}a.mc:focus-visible{
 .mc-prog{display:flex;flex-direction:column;gap:6px;color:var(--kmi-text2)}.mc-prog.unk{color:var(--kmi-mut);font-size:13px}.mc-pct{display:flex;align-items:baseline;gap:10px}.mc-pct b{font-size:24px;color:var(--kmi-text);font-variant-numeric:tabular-nums}.mc-pct span{font-size:14px}
 .mc-prog .bar{height:10px;border-radius:99px;background:rgba(148,163,184,.22);overflow:hidden}.mc-prog .bar i{display:block;height:100%;border-radius:99px}
 .mc-alert{font-size:14px;font-weight:700;color:var(--kmi-bad);background:var(--kmi-bad-soft);border-radius:10px;padding:9px 12px;border:1px solid rgba(248,113,113,.4)}
+.mc-age{flex-basis:100%;font-size:11.5px;color:var(--kmi-mut);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}.mc-age[data-live=false]{color:var(--kmi-warn)}
 .mc-go{align-self:flex-start;font-size:13px;font-weight:700;color:var(--kmi-cyan2);padding:4px 0;border-bottom:1px solid transparent}
 a.mc:hover .mc-go{border-bottom-color:currentColor}
 /* compact (Performance Center park, 3 columns on 1440 px): state pill shares the identity row; no divider, short unknown text, whole card is the passport link */

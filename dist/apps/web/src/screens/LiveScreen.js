@@ -16,6 +16,7 @@ import { initials } from '../ds.js';
 import { errorText as sharedErrorText } from '../errorText.js';
 import { distributionBar, CHART_CSS } from '../charts.js';
 import { MACHINE_NAME_CSS } from '../machineCard.js';
+import { watchCncExpiry } from '../cncLive.js';
 import { STATE_VISUAL } from '../spindle.js';
 const liveDist = (b) => {
     const cnt = {};
@@ -151,7 +152,7 @@ export async function renderLiveScreen(container, api, state) {
         const col = CNC_TONE_CSS[d.tone];
         const notes = cncNotes(ms, d);
         const when = d.lastDataAt ? fmt(d.lastDataAt) : 'hiç';
-        return h('div', { class: 'cnc', 'data-testid': 'live-cnc', 'data-link': d.link, 'data-state': d.state, 'data-tone': d.tone, style: `border-left:3px solid ${col};padding:4px 8px;margin:6px 0;background:rgba(2,6,23,.35)` }, h('div', { class: 'small', 'data-testid': 'live-cnc-source' }, 'CNC (otomatik sinyal) · Kaynak: CNC — operatör beyanı değil · "çalışıyor" = program koşuyor, talaş kaldırma süresi DEĞİL'), h('div', { 'data-testid': 'live-cnc-link', style: `font-size:12px;font-weight:800;color:${d.link === 'UP' ? '#34d399' : '#fbbf24'}` }, d.linkTr), h('div', { 'data-testid': 'live-cnc-state', style: `font-weight:800;color:${col}` }, `Gerçek durum: ${d.stateTr}`), h('div', { class: 'small', 'data-testid': 'live-cnc-fields' }, d.link === 'UP' ? `Mil: ${d.spindleRpm === null ? 'BİLİNMİYOR' : `${NUM.format(d.spindleRpm)} dev/dk`} · Program: ${d.program ?? 'BİLİNMİYOR'} · Son çevrim: ${d.lastCycleS === null ? 'BİLİNMİYOR' : `${NUM.format(d.lastCycleS)} sn`}` : 'Mil / program / çevrim: güncel değil — gösterilmiyor'), d.link === 'UP' ? h('div', { class: 'small', 'data-testid': 'live-cnc-safety', 'data-alarm-known': String(d.alarmKnown), 'data-estop': d.estop }, d.safetyLine) : null, h('div', { class: 'small', 'data-testid': 'live-cnc-when' }, `Son veri: ${when}`), d.staleWarning ? h('div', { class: 'conflict', 'data-testid': 'live-cnc-stale' }, d.staleWarning) : null, ...notes.map((n) => h('div', { class: 'conflict', 'data-testid': 'live-cnc-note' }, n)));
+        return h('div', { class: 'cnc', 'data-testid': 'live-cnc', 'data-link': d.link, 'data-state': d.state, 'data-tone': d.tone, style: `border-left:3px solid ${col};padding:4px 8px;margin:6px 0;background:rgba(2,6,23,.35)` }, h('div', { class: 'small', 'data-testid': 'live-cnc-source' }, 'CNC (otomatik sinyal) · Kaynak: CNC — operatör beyanı değil · "çalışıyor" = program koşuyor, talaş kaldırma süresi DEĞİL'), h('div', { 'data-testid': 'live-cnc-link', style: `font-size:12px;font-weight:800;color:${d.link === 'UP' ? '#34d399' : '#fbbf24'}` }, d.linkTr), h('div', { 'data-testid': 'live-cnc-state', style: `font-weight:800;color:${col}` }, `Gerçek durum: ${d.stateTr}`), h('div', { class: 'small', 'data-testid': 'live-cnc-fields' }, d.link === 'UP' ? `Mil: ${d.spindleRpm === null ? 'BİLİNMİYOR' : `${NUM.format(d.spindleRpm)} dev/dk`} · Program: ${d.program ?? 'BİLİNMİYOR'} · Son çevrim: ${d.lastCycleS === null ? 'BİLİNMİYOR' : `${NUM.format(d.lastCycleS)} sn`}` : 'Mil / program / çevrim: güncel değil — gösterilmiyor'), d.link === 'UP' ? h('div', { class: 'small', 'data-testid': 'live-cnc-safety', 'data-alarm-known': String(d.alarmKnown), 'data-estop': d.estop }, d.safetyLine) : null, h('div', { class: 'small', 'data-testid': 'live-cnc-when' }, `Sunucuya ulaşma: ${when} · Veri yaşı: ${d.ageSecondsNow === null ? 'BİLİNMİYOR' : `${Math.round(d.ageSecondsNow)} sn`} (eşik ${d.staleAfterS} sn)`), d.link !== 'UP' && (d.lastKnown.estop !== 'UNKNOWN' || d.lastKnown.alarm) ? h('div', { class: 'small', 'data-testid': 'live-cnc-lastknown' }, `Son bilinen (güncel DEĞİL): ${d.lastKnown.safetyLine}${d.lastKnown.program ? ` · program ${d.lastKnown.program}` : ''}${d.lastKnown.receivedAt ? ` — ${fmt(d.lastKnown.receivedAt)} itibarıyla` : ''}`) : null, d.staleWarning ? h('div', { class: 'conflict', 'data-testid': 'live-cnc-stale' }, d.staleWarning) : null, ...notes.map((n) => h('div', { class: 'conflict', 'data-testid': 'live-cnc-note' }, n)));
     };
     const machineTile = (m) => {
         const ms = machineStateOf(m);
@@ -274,4 +275,18 @@ export async function renderLiveScreen(container, api, state) {
     };
     if (ms > 0)
         setTimeout(tick, ms);
+    // a fetched "live" CNC fact must not outlive the freshness rule: ONE re-render when the soonest UP row passes the threshold (shared helper, no polling)
+    const renderedAt = Date.now();
+    watchCncExpiry(container, () => [...cncByCode.values()], () => {
+        if (container.isConnected && container.querySelector('[data-testid="live"]') && renderSeq.get(container) === seq)
+            void renderLiveScreen(container, api, { ...state, message: null, error: null, newToken: null });
+    });
+    // returning to a tab that sat in the background: re-read at once if the screen is older than 10 s (timers are throttled while hidden)
+    if (typeof document !== 'undefined') {
+        const onVis = () => {
+            if (!container.isConnected || renderSeq.get(container) !== seq) { document.removeEventListener('visibilitychange', onVis); return; }
+            if (document.visibilityState === 'visible' && Date.now() - renderedAt > 10000) { document.removeEventListener('visibilitychange', onVis); void renderLiveScreen(container, api, { ...state, message: null, error: null, newToken: null }); }
+        };
+        document.addEventListener('visibilitychange', onVis);
+    }
 }

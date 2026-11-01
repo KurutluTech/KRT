@@ -1,8 +1,9 @@
 import { h } from '../../../../../packages/ui/src/h.js';
-import { cncDisplay, cncNotes, CNC_TONE_CSS } from '../../../../../packages/domain/src/cncTelemetry.js';
+import { cncDisplay, cncNotes, CNC_TONE_CSS, stampCnc, CNC_STALE_S } from '../../../../../packages/domain/src/cncTelemetry.js';
 import { machineStateOf } from '../../../../../packages/domain/src/machineState.js';
 import { SEG_KINDS, SEG_TR, SEG_COLOR, INSUFFICIENT_TR, aiStatus, fmtDur, fmtPct, layoutTimeline, pct, } from '../../../../../packages/domain/src/cncActivity.js';
 import { isDenied } from './common.js';
+import { startCncRefresh } from '../../cncLive.js';
 import { renderActivityCenter } from './cncActivityCenter.js';
 import { cycleTopic } from './cycleAnalysis.js';
 const TR_OFFSET = '+03:00'; // Türkiye: sabit UTC+3 (yaz/kış saati yok)
@@ -20,7 +21,7 @@ export const isCncMachine = (m, row) => m.machineClass === 'MACHINING' || !!row;
 async function liveRow(ctx, code) {
     try {
         const rows = await ctx.rpc('cnc_live_states', {});
-        return { row: rows.find((r) => r.machineCode === code) ?? null, denied: false };
+        return { row: stampCnc(rows.find((r) => r.machineCode === code) ?? null), denied: false };
     }
     catch (e) {
         if (isDenied(e))
@@ -29,7 +30,14 @@ async function liveRow(ctx, code) {
     }
 }
 /** Section "CNC Canlı İzleme": the standard block of every CNC machine passport. Unsupported fields say BİLGİ YOK; an unconnected machine says so. */
-export function liveBlock(m, row, denied, activeWo) {
+/** repaints a live block into `hostEl` (the CNC Canlı İzleme panel, or the live block embedded in CNC Faaliyet Geçmişi) with the shared refresh policy */
+export function mountLiveBlock(ctx, m, hostEl, initialRow, activeWo) {
+    if (!initialRow)
+        return null;
+    return startCncRefresh({ initial: initialRow, alive: () => hostEl.isConnected, read: () => liveRow(ctx, m.code),
+        paint: (st) => hostEl.replaceChildren(liveBlock(m, st.row, st.denied, activeWo, { pollFailedAt: st.failedAt })) });
+}
+export function liveBlock(m, row, denied, activeWo, opts = {}) {
     if (denied)
         return panel('CNC Canlı İzleme', 'cnc-live', small('CNC canlı verisini görme yetkiniz yok.', 'cnc-live-denied'));
     if (!row)
@@ -40,20 +48,25 @@ export function liveBlock(m, row, denied, activeWo) {
     const notes = cncNotes(ms, d);
     const up = d.link === 'UP';
     const NI = 'BİLGİ YOK';
-    return panel('CNC Canlı İzleme', 'cnc-live', h('div', { style: `border-left:3px solid ${col};padding:2px 10px` }, h('div', { 'data-testid': 'cnc-live-link', style: `font-weight:800;color:${up ? '#34d399' : '#fbbf24'}` }, d.linkTr), h('div', { 'data-testid': 'cnc-live-state', style: `font-weight:800;color:${col};margin:2px 0` }, `Gerçek durum: ${d.stateTr}`)), d.staleWarning ? small(d.staleWarning, 'cnc-live-stale', 'color:#fbbf24;font-weight:700') : null, kvTable([
+    return panel('CNC Canlı İzleme', 'cnc-live', h('div', { style: `border-left:3px solid ${col};padding:2px 10px` }, h('div', { 'data-testid': 'cnc-live-link', style: `font-weight:800;color:${up ? '#34d399' : '#fbbf24'}` }, d.linkTr), h('div', { 'data-testid': 'cnc-live-state', style: `font-weight:800;color:${col};margin:2px 0` }, `Gerçek durum: ${d.stateTr}`)), d.staleWarning ? small(d.staleWarning, 'cnc-live-stale', 'color:#fbbf24;font-weight:700') : null, opts.pollFailedAt ? small(`CNC verisi yenilenemedi (son deneme ${fmt(new Date(opts.pollFailedAt).toISOString())}) — son alınan veri yaşlanıyor; ${CNC_STALE_S} sn aşılınca VERİ BAYAT olur.`, 'cnc-live-pollfail', 'color:#fbbf24;font-weight:700') : null, kvTable([
         ['Execution', up ? (row.state ? String(row.state).replace('CNC_', '') : NI) : 'güncel değil', 'cnc-f-exec'],
         ['Mil devri', up ? (d.spindleRpm === null ? NI : `${NUM.format(Math.round(d.spindleRpm))} dev/dk`) : 'güncel değil', 'cnc-f-rpm'],
-        ['Çalışan NC programı', up ? d.program ?? NI : 'güncel değil', 'cnc-f-program'],
+        ['Çalışan NC programı', up ? d.program ?? NI : (d.lastKnown.program ? `Son bilinen: ${d.lastKnown.program} (güncel program DEĞİL)` : 'güncel değil'), 'cnc-f-program'],
         ['Kontrol modu', up ? row.mode ?? NI : 'güncel değil', 'cnc-f-mode'],
         ['Availability', up ? row.availability ?? NI : 'güncel değil', 'cnc-f-avail'],
         ['Son çevrim süresi', up ? (d.lastCycleS === null ? NI : `${NUM.format(d.lastCycleS)} sn`) : 'güncel değil', 'cnc-f-cycle'],
         ['M30 sayacı', up ? (d.m30Count === null ? NI : `${NUM.format(d.m30Count)} (program çevrimi bitti sayacı — sağlam parça değildir)`) : 'güncel değil', 'cnc-f-m30'],
-        ['Acil stop / alarm', up ? d.safetyLine : 'güncel değil', 'cnc-f-safety'],
+        ['Acil stop / alarm', up ? d.safetyLine : `Son bilinen (güncel DEĞİL): ${d.lastKnown.safetyLine}${d.lastKnown.receivedAt ? ` — ${fmt(d.lastKnown.receivedAt)} itibarıyla` : ''}`, 'cnc-f-safety'],
+        ['CNC cihazı', row.deviceSerial ? `tanımlı · seri ${row.deviceSerial}${row.bound === false ? ' (makineye bağlı değil)' : ''}` : 'tanımlı değil', 'cnc-f-device'],
+        ['Toplayıcı (collector)', row.collectorCode ? `${row.collectorCode} · son veri ulaşma: ${fmt(row.lastIngestedAt)}` : 'BİLİNMİYOR', 'cnc-f-collector'],
+        ['CNC verisi', up ? `CANLI (≤ ${CNC_STALE_S} sn)` : d.link === 'NEVER' ? 'hiç veri gelmedi' : 'BAYAT — güncel sayılmaz', 'cnc-f-fresh'],
+        ['Aktif iş emri', activeWo > 0 ? `${activeWo} kayıt (iş emri kaydı — CNC programı, M30 veya mil hareketi sağlam parça kanıtı değildir)` : 'yok', 'cnc-f-wo'],
+        ['Veri yaşı', d.ageSecondsNow === null ? 'BİLİNMİYOR' : `${Math.round(d.ageSecondsNow)} sn (sunucuya ulaşmadan beri; eşik ${CNC_STALE_S} sn — bundan eskisi VERİ BAYAT)`, 'cnc-f-age'],
         ['Besleme hızı / override\'lar', 'Veri yok — bu CNC bağlantısı iletmiyor', 'cnc-f-feed'],
         ['Güç / enerji', 'Veri yok — ölçülmüyor, tahmin edilmez', 'cnc-f-power'],
         ['Talaş kaldırma', 'Doğrulanmadı — mil devri veya program koşması talaş kaldırma kanıtı değildir', 'cnc-f-chip'],
-        ['Son veri zamanı', fmt(row.lastSourceTs), 'cnc-f-lastdata'],
-        ['Alım zamanı (sunucu)', fmt(row.lastIngestedAt)],
+        ['CNC örnek zamanı (cihaz saati)', fmt(row.lastSourceTs), 'cnc-f-lastdata'],
+        ['Sunucuya ulaşma zamanı (tazelik ölçüsü)', fmt(row.lastIngestedAt), 'cnc-f-received'],
         ['Veri kaynağı', `CNC — operatör beyanı değil · cihaz ${row.deviceSerial}${row.collectorCode ? ` · toplayıcı ${row.collectorCode}` : ''}`, 'cnc-f-source'],
     ]), ...notes.map((n) => small(n, 'cnc-live-note', 'color:#fbbf24')));
 }
@@ -116,7 +129,9 @@ export function historyTopic(ctx, m) {
                 return;
             }
             const wo = await ctx.sel('work_orders', 'id', { machine_id: `eq.${m.id}`, status: 'in.(IN_PROGRESS,FIRST_PIECE_PENDING,FIRST_PIECE_APPROVED)' }, undefined, 10).catch(() => []);
-            await renderActivityCenter(ctx, m, host, lv.row.deviceSerial, liveBlock(m, lv.row, false, wo.length));
+            const liveHost = h('div', { 'data-testid': 'cnc-live-embedded' }, liveBlock(m, lv.row, false, wo.length));
+            await renderActivityCenter(ctx, m, host, lv.row.deviceSerial, liveHost);
+            mountLiveBlock(ctx, m, liveHost, lv.row, wo.length);
         },
     };
 }
@@ -127,6 +142,7 @@ export function liveTopic(ctx, m) {
             const lv = await liveRow(ctx, m.code);
             const wo = await ctx.sel('work_orders', 'id', { machine_id: `eq.${m.id}`, status: 'in.(IN_PROGRESS,FIRST_PIECE_PENDING,FIRST_PIECE_APPROVED)' }, undefined, 10).catch(() => []);
             host.replaceChildren(liveBlock(m, lv.row, lv.denied, wo.length));
+            mountLiveBlock(ctx, m, host, lv.row, wo.length);
         },
     };
 }

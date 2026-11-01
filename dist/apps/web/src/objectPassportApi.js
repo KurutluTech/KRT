@@ -1,3 +1,4 @@
+import { stampCnc } from '../../../packages/domain/src/cncTelemetry.js';
 // Universal object passport adapter (KMI-RECOVERY-004). Reads ONLY canonical tables / existing RPCs through RLS; writes ONLY through existing canonical RPCs.
 // It creates no table, no cache, no second audit: the timeline is kmi_next.audit_log + the existing per-object event tables.
 import { machineStateOf, displayKey } from '../../../packages/domain/src/machineState.js';
@@ -114,7 +115,7 @@ export function createObjectPassportApi(client, session, access, myUserId = sess
                 let cncRow = null;
                 try {
                     const rows = await client.rpc('cnc_live_states', {}, session);
-                    cncRow = rows.find((r) => r.machineCode === m.code) ?? null;
+                    cncRow = stampCnc(rows.find((r) => r.machineCode === m.code) ?? null);
                 }
                 catch {
                     cncRow = null;
