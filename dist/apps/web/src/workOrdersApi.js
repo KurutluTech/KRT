@@ -24,6 +24,10 @@ export function createWorkOrdersApi(client, session) {
         async assignOperator(workOrderId, personId) {
             return client.rpc('assign_work_order_operator', { p_work_order_id: workOrderId, p_person_id: personId }, session);
         },
+        /** m0195: canonical HOLD view (status, who/when, reason, history, release authority) — read-only. */
+        async holdInfo(workOrderId) {
+            return client.rpc('work_order_hold_info', { p_work_order_id: workOrderId }, session);
+        },
         async transition(workOrderId, toStatus, reason) {
             return client.rpc('transition_work_order_status', { p_work_order_id: workOrderId, p_to_status: toStatus, p_reason: reason }, session);
         },

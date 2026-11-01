@@ -1,7 +1,8 @@
+import { auditedRpc } from './auditedRpc.js';
 // CNC routing + D-012 matrix adapter — migration 0039.
 import { fetchPilotFlags } from './pilotMark.js';
 export function createRoutingApi(client, session) {
-    const call = async (fn, args) => { await client.rpc(fn, args, session); };
+    const call = async (fn, args) => { await auditedRpc(client, fn, args, session); };
     return {
         matrix: () => client.rpc('machine_skill_matrix', {}, session),
         suggestAssignment: (op) => client.rpc('suggest_operation_assignment', { p_operation_id: op }, session),

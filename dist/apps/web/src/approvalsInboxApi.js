@@ -1,3 +1,4 @@
+import { auditedRpc } from './auditedRpc.js';
 // KMI-MANAGEMENT-001 Onaylar adapter. NO new data source and NO new writer: it READS the canonical tables (commercial_approvals, purchase_requests,
 // purchase_orders, tasks) under their existing RLS and CALLS the existing canonical RPCs (grant_management_release / decide_commercial_approval /
 // decide_purchase_request / approve_purchase_order / transition_purchase_order_status / approve_task / reopen_task). Each RPC re-checks the permission,
@@ -163,7 +164,7 @@ export function createApprovalsInboxApi(client, session, opts = {}) {
         },
         async decide(item, decision, reason) {
             const call = rpcCall(item, decision, reason);
-            await client.rpc(call.fn, call.params, session);
+            await auditedRpc(client, call.fn, call.params, session);
         },
     };
 }

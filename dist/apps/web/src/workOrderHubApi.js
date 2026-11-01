@@ -38,6 +38,9 @@ export function createWorkOrderHubApi(client, session) {
             }
             return { revisionId: wo.productRevisionId, camProgramId: wo.camProgramId, revisions, programs, exemptions, startRefusal };
         },
+        /** m0196 canonical START checklist (all gates; read-only) */
+        async checklist(id) { return client.rpc('work_order_start_checklist', { p_work_order_id: id }, session); },
+        async opMatrix(id, revId) { return client.rpc('op_prep_matrix', { p_revision: revId, p_work_order: id }, session); },
         async readinessRows(id) { return client.rpc('work_order_readiness', { p_work_order_id: id }, session); },
         async setRevision(id, rev) { await client.rpc('set_work_order_revision', { p_work_order_id: id, p_revision_id: rev }, session); },
         async setCamProgram(id, prog) { await client.rpc('set_work_order_cam_program', { p_work_order_id: id, p_program_id: prog }, session); },

@@ -1,3 +1,4 @@
+import { auditedRpc } from './auditedRpc.js';
 const inList = (ids) => `in.(${ids.join(',')})`;
 export function createAccountingQueueApi(client, session) {
     const LOT_COLS = 'id,work_order_id,qty,state';
@@ -23,7 +24,7 @@ export function createAccountingQueueApi(client, session) {
         async lots(ids) { return ids.length ? withProducts(await client.select('stock_lots', { columns: LOT_COLS, filters: { id: inList(ids) } }, session)) : []; },
         async availableLots() { return withProducts(await client.select('stock_lots', { columns: LOT_COLS, filters: { state: 'in.(AVAILABLE,RESERVED)' }, order: 'created_at.desc', limit: 200 }, session)); },
         async request(stockLotId) { await client.rpc('request_commercial_approval', { p_stock_lot_id: stockLotId }, session); },
-        async grantManagementRelease(approvalId, reason) { await client.rpc('grant_management_release', { p_approval_id: approvalId, p_reason: reason }, session); },
-        async decide(approvalId, decision, reason) { await client.rpc('decide_commercial_approval', { p_approval_id: approvalId, p_decision: decision, p_reason: reason }, session); },
+        async grantManagementRelease(approvalId, reason) { await auditedRpc(client, 'grant_management_release', { p_approval_id: approvalId, p_reason: reason }, session); },
+        async decide(approvalId, decision, reason) { await auditedRpc(client, 'decide_commercial_approval', { p_approval_id: approvalId, p_decision: decision, p_reason: reason }, session); },
     };
 }

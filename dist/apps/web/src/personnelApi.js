@@ -2,7 +2,15 @@
 export function createPersonnelApi(client, session) {
     return {
         async list() {
-            return client.select('personnel', { columns: 'id,name,roles,department,active,skills,employee_no,shift_code', order: 'name.asc' }, session);
+            // m0191: sicil/yetkinlik artık tablodan değil, yetkili RPC'den. RPC henüz yoksa (migration öncesi) eski doğrudan okumaya düşer: yayın sırası güvenli.
+            try {
+                return await client.rpc('personnel_private_list', {}, session);
+            }
+            catch (e) {
+                if (e?.status === 404 || /PGRST202|Could not find the function/i.test(e?.message ?? ''))
+                    return client.select('personnel', { columns: 'id,name,roles,department,active,skills,employee_no,shift_code', order: 'name.asc' }, session);
+                throw e;
+            }
         },
         async create(name, roles, department, puantajMultiplier) {
             return client.rpc('create_personnel', { p_name: name, p_roles: roles, p_department: department, p_puantaj_multiplier: puantajMultiplier }, session);
