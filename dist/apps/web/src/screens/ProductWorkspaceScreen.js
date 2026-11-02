@@ -17,6 +17,7 @@ import { drawPrepFlow, PREP_CSS } from './prepFlowPanel.js';
 import { drawBarStock, fmtMm } from './barStockPanel.js';
 import { drawRouteChanges } from './routeChangePanel.js';
 import { drawOpPrep } from './opPrepPanel.js';
+import { drawCutMethod } from './cutMethodPanel.js';
 import { drawOpBoxes, isCutPrep, movableOps } from './opBoxes.js';
 import { barPlanPreview, DEFAULT_KERF_MM, DEFAULT_STEEL_DENSITY } from '../../../../packages/domain/src/barStock.js';
 import { KX_CSS, NA, card, chip, emptyState, field, fmt, fold, fromBase64, invalid, isChecked, kvItem, showFile, toBase64, val, when } from '../kx.js';
@@ -544,13 +545,8 @@ export async function renderProductWorkspaceScreen(container, api, state = {}) {
         }
         const checks = Array.isArray(ws.routingCheck) ? ws.routingCheck : ws.routingCheck?.checks ?? [];
         const addOp = () => { clearBanner(); insertAt = null; openOp = 'NEW'; drawOps(); scrollTo(opsHost.lastElementChild); };
-        // CUT/PREP kesim yöntemi: yalnız SUNUCUDA VAR OLAN gerçeği gösterir. İç kesim = mevcut Makine 101 hesabı. Dış/karma için kayıt altyapısı (tablo/RPC) yoktur → seçilemez, çalışıyormuş gibi gösterilmez.
-        const cutMethod = ws.routing.some((x) => x.active && isCutPrep(x)) ? E('details', { class: 'mut', style: 'margin:4px 0', 'data-testid': 'pw-cut-method' }, E('summary', { style: 'cursor:pointer;font-weight:600' }, 'Kesim yöntemi (CUT/PREP): İÇ KESİM · DIŞ KESİM · KARMA'),
-            E('div', { role: 'radiogroup', 'aria-label': 'Kesim yöntemi', class: 'stack', style: 'gap:4px;margin-top:6px' },
-                E('label', {}, h('input', { type: 'radio', name: 'cutm', checked: true, disabled: true, 'data-testid': 'pw-cut-inner' }), ' İÇ KESİM — Makine 101; mevcut testere hazırlık/çevrim, kapasite ve maliyet hesabı geçerli (bu ekrandan değişmez).'),
-                E('label', {}, h('input', { type: 'radio', name: 'cutm', disabled: true, 'data-testid': 'pw-cut-outer' }), ' DIŞ KESİM — kullanılamıyor'),
-                E('label', {}, h('input', { type: 'radio', name: 'cutm', disabled: true, 'data-testid': 'pw-cut-mixed' }), ' KARMA KESİM — kullanılamıyor'),
-                E('div', { class: 'banner', 'data-testid': 'pw-cut-unavailable', role: 'status' }, 'Dış ve karma kesim için sunucuda kayıt altyapısı yok (tedarikçi, adet, birim bedel, iç/dış miktar ve maliyet kalemleri saklanamıyor). Bu seçenekler, sunucu tarafı geliştirmesi onaylanıp uygulanana kadar kapalıdır; hiçbir kayıt yazılmaz, Makine 101 yükü ve BOM değişmez.'))) : null;
+        // CUT/PREP kesim yöntemi (iç/dış/karma): hesap ve kayıt sunucuda (0090); sunucu güncellemesi yoksa panel 'bekliyor' der.
+        const cutMethod = ws.routing.some((x) => x.active && isCutPrep(x)) && api.cutPlanGet ? drawCutMethod(h('div'), api, { revisionId: rev.id, canEdit: !!can.editRouting }) : null;
         const routingCard = card({ title: 'Rota ve operasyonlar', testid: 'pw-card-routing', span: 12, id: 'card-routing', chip: stateChip(ws.routing.length ? (rev?.state ?? 'MISSING') : 'MISSING'),
             actions: [can.editStructure ? btn('primary', 'pw-op-add', '+ Operasyon ekle', addOp) : null] }, null, can.editRouting && editable ? E('div', { class: 'row', style: 'margin-bottom:6px' }, E('div', { class: 'grow' }, field(rev?.status === 'DRAFT' ? 'Not (isteğe bağlı — boşsa işlemin açıklaması kaydedilir)' : 'Hızlı işlem gerekçesi', quickReason, 'Sırala, pasife al, bağımlılık, kaynak ve kalite noktası işlemleri bu gerekçeyi kullanır.'))) : null, boxHost, cutMethod, E('div', { class: 'row', style: 'justify-content:flex-end' }, btn('ghost sm', 'pw-list-toggle', 'Liste ⇄ Kutular', () => { listView = !listView; drawOps(); })), opsHost, can.editRouting && rev?.status === 'RELEASED' ? E('div', { class: 'mut', style: 'margin-top:10px' }, 'Yürürlükteki revizyonda operasyon ekleme, sıralama ve pasife alma yapılmaz; makine, süre, kaynak ve talimat güncellenir (sürümlenir). Yapısal değişiklik için taslak revizyon açın.') : null);
         drawOps();

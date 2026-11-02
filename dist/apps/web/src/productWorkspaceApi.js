@@ -96,6 +96,14 @@ export function createProductWorkspaceApi(client, session) {
         changeImpact: (rev) => rpc('routing_change_impact', { p_revision: rev }),
         // m0183 operasyon hazırlık taslağı (rotada olmayan operasyonlar) — yalnız sunucu RPC'leri
         opPrepList: (rev) => rpc('op_prep_list', { p_revision: rev }),
+        // m0090 dış/karma kesim — yalnız sunucu RPC'leri (hesap ve yetki sunucuda)
+        cutWorkOrders: (rev) => selReal(client, 'work_orders', { columns: 'id,qty_planned,status', filters: { product_revision_id: `eq.${rev}` }, order: 'id.asc', limit: 50 }, session),
+        suppliers: () => client.select('suppliers', { columns: 'id,name,active', order: 'name.asc' }, session),
+        cutPlanGet: (wo) => rpc('wo_cut_plan_get', { p_wo: wo }),
+        cutPlanSet: (i) => rpc('wo_cut_plan_set', { p_wo: i.wo, p_method: i.method, p_inner: i.inner, p_outer: i.outer, p_supplier: i.supplier ?? null, p_unit_fee: i.unitFee ?? null, p_currency: i.currency ?? null, p_freight: i.freight ?? null, p_doc_ref: i.docRef ?? null, p_note: i.note ?? null, p_reason: i.reason, p_expected_version: i.version ?? null }),
+        cutReceiptAdd: (wo, qty, ref, cri) => rpc('wo_cut_receipt_add', { p_wo: wo, p_qty: qty, p_ref: ref ?? null, p_client_request_id: cri ?? null }),
+        cutReceiptDecide: (id, decision, reason) => rpc('wo_cut_receipt_decide', { p_receipt: id, p_decision: decision, p_reason: reason ?? null }),
+        cutCalc: (wo) => rpc('wo_cut_calc', { p_wo: wo }),
         competencyMatrix: () => rpc('competency_matrix', {}),
         machineClearances: () => client.select('operator_machine_clearances', { columns: 'personnel_id,machine_id,valid_until,revoked_at', filters: { revoked_at: 'is.null' }, limit: 2000 }, session),
         opPrepSave: (rev, slot, data, ver) => rpc('op_prep_save', { p_revision: rev, p_slot: slot, p_data: data, p_expected_version: ver }),
