@@ -17,6 +17,7 @@ import { drawPrepFlow, PREP_CSS } from './prepFlowPanel.js';
 import { drawBarStock, fmtMm } from './barStockPanel.js';
 import { drawRouteChanges } from './routeChangePanel.js';
 import { drawOpPrep } from './opPrepPanel.js';
+import { drawOpBoxes, isCutPrep, movableOps } from './opBoxes.js';
 import { barPlanPreview, DEFAULT_KERF_MM, DEFAULT_STEEL_DENSITY } from '../../../../packages/domain/src/barStock.js';
 import { KX_CSS, NA, card, chip, emptyState, field, fmt, fold, fromBase64, invalid, isChecked, kvItem, showFile, toBase64, val, when } from '../kx.js';
 const PW_CSS = `
@@ -405,6 +406,15 @@ export async function renderProductWorkspaceScreen(container, api, state = {}) {
                     const r = await api.saveOperation({ revisionId: rev.id, opNo: no, name: val(name).trim(), machineIds: ids, primaryId: val(primary) || null, skillCode: val(skill).trim() || null, skillLevel: num(val(level)),
                         camId: op?.camProgramId ?? null, setup: setupV, cycle: cycleV, firstPiece: isChecked(fp), qc: isChecked(qc), instructions: val(ins).trim() || null, reason: val(reason).trim() });
                     openOp = r.operationId;
+                    if (!op && insertAt !== null && r.created) {
+                        // araya ekleme: yeni operasyon sona kaydedildi, şimdi seçilen konuma yerleştir (aynı gerekçe, aynı sunucu kuralı)
+                        const ids = movableOps(ws.routing).map((x) => x.id); ids.splice(Math.min(insertAt, ids.length), 0, r.operationId);
+                        try { await api.reorder(rev.id, ids, val(reason).trim()); }
+                        catch (e2) { insertAt = null; await reload(`${r.opCode} eklendi (sona), ama istenen konuma yerleştirilemedi: ${errorText(e2)} Sırayı kutulardan düzeltebilirsiniz.`, 'error', { openOp: r.operationId }); return; }
+                        insertAt = null;
+                        await reload(`Operasyon araya eklendi ve sıra güncellendi (OP numaraları yeniden hesaplandı).`, 'ok', { openOp: r.operationId });
+                        return;
+                    }
                     await reload(`${r.opCode} ${r.created ? 'eklendi' : 'kaydedildi'} (sürüm ${r.versionNo}).${diffs.length ? ' ' + diffs.join(' · ') + '.' : ''}${r.recalculatedRuns ? ` ${r.recalculatedRuns} etkilenen hesap yeniden değerlendirildi (eski hesaplar korunur).` : ''}`, 'ok', { openOp: r.operationId });
                 }
                 catch (e) {
@@ -453,6 +463,18 @@ export async function renderProductWorkspaceScreen(container, api, state = {}) {
         let chainNow = null; // filled by the technical-chain panel (0136); null = not readable → no chips, nothing invented
         const chainOf = (o) => chainNow?.operations.find((x) => x.opNo === o.opNo) ?? null;
         const opsHost = E('div', { 'data-testid': 'pw-ops' });
+        // Kutu görünümü: aynı ws.routing verisi; sürükleme/ok yalnız önizleme, kayıt açık gerekçeli tek routing_reorder.
+        let pendingOrder = null; let insertAt = null; let listView = false;
+        const boxHost = E('div', { 'data-testid': 'pw-boxes' });
+        const drawBoxes = () => {
+            if (!ws.routing.length) { boxHost.replaceChildren(); return; }
+            drawOpBoxes(boxHost, { ops: ws.routing, chainOf: (o) => chainNow?.operations.find((x) => x.opNo === o.opNo) ?? null, chainChips, stateChip, chip,
+                canEdit: !!(can.editStructure && editable), canAdd: !!(can.editStructure && editable), openId: openOp,
+                pending: pendingOrder, setPending: (v) => { pendingOrder = v; },
+                onOpen: (id) => { insertAt = null; const cp = ws.routing.find((x) => x.id === id); if (cp && isCutPrep(cp)) { const tab = container.querySelector('[data-testid="opp-tab-CUT_PREP"]'); if (tab) { tab.click(); scrollTo(container.querySelector('[data-testid="opp-slot-CUT_PREP"]')); return; } } if (openOp === id) { openOp = null; drawOps(); } else { toggleOp(id); } },
+                onInsert: (pos) => { clearBanner(); insertAt = pos; openOp = 'NEW'; drawOps(); scrollTo(opsHost.lastElementChild); },
+                onSave: async (ids, why) => { try { await api.reorder(rev.id, ids, why); pendingOrder = null; await reload('Operasyon sırası kaydedildi; OP numaraları yeniden hesaplandı (kimlikler, NC/CAM/takım ve kalite bağları korundu).'); } catch (e) { fail(e); } } });
+        };
         const move = async (o, dir) => {
             const ids = activeOps.map((x) => x.id);
             const i = ids.indexOf(o.id);
@@ -509,6 +531,8 @@ export async function renderProductWorkspaceScreen(container, api, state = {}) {
         };
         const chainHost = E('div', { 'data-testid': 'pw-chain-host' });
         function drawOps() {
+            drawBoxes();
+            opsHost.classList.toggle('opsbox', !listView && ws.routing.length > 0);
             queueMicrotask(() => {
                 const op = ws.routing.find((x) => x.id === openOp);
                 const host = opsHost.querySelector('[data-testid="pw-op-chain-host"]');
@@ -516,17 +540,30 @@ export async function renderProductWorkspaceScreen(container, api, state = {}) {
                     void drawChainPanel(host, api, ws, { act: !!(can.editRouting || can.manageDocuments) && editable }, (m) => reload(m), (e) => fail(e), undefined, op.opNo);
             });
             opsHost.replaceChildren(...(ws.routing.length ? [E('div', { class: 'oph' }, E('span', {}, 'OP'), E('span', {}, 'Operasyon'), E('span', {}, 'Makine'), E('span', {}, 'Hazırlık'), E('span', {}, 'Çevrim'), E('span', {}, 'Muayene'), E('span', {}, 'CAM'), E('span', { class: 'acts' }, 'İşlem')), ...ws.routing.map(opCard)]
-                : [emptyState(`${NA} — bu revizyonda operasyon yok`, can.editStructure ? '“+ Operasyon ekle” ile ilk operasyonu tanımlayın.' : 'Operasyon tanımı için taslak revizyon gerekir.', 'pw-route-empty')]), ...(can.editStructure && openOp === 'NEW' ? [E('div', { class: 'opc open', style: 'margin-top:8px' }, E('div', { class: 'opb' }, E('b', {}, 'Yeni operasyon'), E('div', { style: 'margin-top:10px' }, opEditor(null)), E('div', { class: 'row', style: 'margin-top:8px' }, btn('ghost sm', null, 'Vazgeç', () => { openOp = null; drawOps(); }))))] : []));
+                : [emptyState(`${NA} — bu revizyonda operasyon yok`, can.editStructure ? '“+ Operasyon ekle” ile ilk operasyonu tanımlayın.' : 'Operasyon tanımı için taslak revizyon gerekir.', 'pw-route-empty')]), ...(can.editStructure && openOp === 'NEW' ? [E('div', { class: 'opc open', style: 'margin-top:8px' }, E('div', { class: 'opb' }, E('b', {}, insertAt === null ? 'Yeni operasyon (sona eklenir)' : `Yeni operasyon — kayıttan sonra ${insertAt === 0 ? 'CUT/PREP’in hemen ardına' : `${insertAt}. sıraya`} yerleşir`), E('div', { style: 'margin-top:10px' }, opEditor(null)), E('div', { class: 'row', style: 'margin-top:8px' }, btn('ghost sm', null, 'Vazgeç', () => { openOp = null; drawOps(); }))))] : []));
         }
         const checks = Array.isArray(ws.routingCheck) ? ws.routingCheck : ws.routingCheck?.checks ?? [];
-        const addOp = () => { clearBanner(); openOp = 'NEW'; drawOps(); scrollTo(opsHost.lastElementChild); };
+        const addOp = () => { clearBanner(); insertAt = null; openOp = 'NEW'; drawOps(); scrollTo(opsHost.lastElementChild); };
+        // CUT/PREP kesim yöntemi: yalnız SUNUCUDA VAR OLAN gerçeği gösterir. İç kesim = mevcut Makine 101 hesabı. Dış/karma için kayıt altyapısı (tablo/RPC) yoktur → seçilemez, çalışıyormuş gibi gösterilmez.
+        const cutMethod = ws.routing.some((x) => x.active && isCutPrep(x)) ? E('details', { class: 'mut', style: 'margin:4px 0', 'data-testid': 'pw-cut-method' }, E('summary', { style: 'cursor:pointer;font-weight:600' }, 'Kesim yöntemi (CUT/PREP): İÇ KESİM · DIŞ KESİM · KARMA'),
+            E('div', { role: 'radiogroup', 'aria-label': 'Kesim yöntemi', class: 'stack', style: 'gap:4px;margin-top:6px' },
+                E('label', {}, h('input', { type: 'radio', name: 'cutm', checked: true, disabled: true, 'data-testid': 'pw-cut-inner' }), ' İÇ KESİM — Makine 101; mevcut testere hazırlık/çevrim, kapasite ve maliyet hesabı geçerli (bu ekrandan değişmez).'),
+                E('label', {}, h('input', { type: 'radio', name: 'cutm', disabled: true, 'data-testid': 'pw-cut-outer' }), ' DIŞ KESİM — kullanılamıyor'),
+                E('label', {}, h('input', { type: 'radio', name: 'cutm', disabled: true, 'data-testid': 'pw-cut-mixed' }), ' KARMA KESİM — kullanılamıyor'),
+                E('div', { class: 'banner', 'data-testid': 'pw-cut-unavailable', role: 'status' }, 'Dış ve karma kesim için sunucuda kayıt altyapısı yok (tedarikçi, adet, birim bedel, iç/dış miktar ve maliyet kalemleri saklanamıyor). Bu seçenekler, sunucu tarafı geliştirmesi onaylanıp uygulanana kadar kapalıdır; hiçbir kayıt yazılmaz, Makine 101 yükü ve BOM değişmez.'))) : null;
         const routingCard = card({ title: 'Rota ve operasyonlar', testid: 'pw-card-routing', span: 12, id: 'card-routing', chip: stateChip(ws.routing.length ? (rev?.state ?? 'MISSING') : 'MISSING'),
-            actions: [can.editStructure ? btn('primary', 'pw-op-add', '+ Operasyon ekle', addOp) : null] }, checks.length ? E('div', { class: 'row', style: 'gap:6px;margin-bottom:10px' }, ...checks.map((c) => chip(`${c.label}: ${c.detail}`, c.status === 'OK' ? 'ok' : c.status === 'NA' ? '' : 'warn', { 'data-testid': 'pw-route-check', 'data-code': c.code, 'data-status': c.status, title: c.detail, style: 'white-space:normal' }))) : null, can.editRouting && editable ? E('div', { class: 'row', style: 'margin-bottom:6px' }, E('div', { class: 'grow' }, field(rev?.status === 'DRAFT' ? 'Not (isteğe bağlı — boşsa işlemin açıklaması kaydedilir)' : 'Hızlı işlem gerekçesi', quickReason, 'Sırala, pasife al, bağımlılık, kaynak ve kalite noktası işlemleri bu gerekçeyi kullanır.'))) : null, chainHost, opsHost, can.editRouting && rev?.status === 'RELEASED' ? E('div', { class: 'mut', style: 'margin-top:10px' }, 'Yürürlükteki revizyonda operasyon ekleme, sıralama ve pasife alma yapılmaz; makine, süre, kaynak ve talimat güncellenir (sürümlenir). Yapısal değişiklik için taslak revizyon açın.') : null);
+            actions: [can.editStructure ? btn('primary', 'pw-op-add', '+ Operasyon ekle', addOp) : null] }, null, can.editRouting && editable ? E('div', { class: 'row', style: 'margin-bottom:6px' }, E('div', { class: 'grow' }, field(rev?.status === 'DRAFT' ? 'Not (isteğe bağlı — boşsa işlemin açıklaması kaydedilir)' : 'Hızlı işlem gerekçesi', quickReason, 'Sırala, pasife al, bağımlılık, kaynak ve kalite noktası işlemleri bu gerekçeyi kullanır.'))) : null, boxHost, cutMethod, E('div', { class: 'row', style: 'justify-content:flex-end' }, btn('ghost sm', 'pw-list-toggle', 'Liste ⇄ Kutular', () => { listView = !listView; drawOps(); })), opsHost, can.editRouting && rev?.status === 'RELEASED' ? E('div', { class: 'mut', style: 'margin-top:10px' }, 'Yürürlükteki revizyonda operasyon ekleme, sıralama ve pasife alma yapılmaz; makine, süre, kaynak ve talimat güncellenir (sürümlenir). Yapısal değişiklik için taslak revizyon açın.') : null);
         drawOps();
-        if (rev && api.changeHistory && api.changeImpact)
-            routingCard.append(drawRouteChanges(h('div'), api, { revisionId: rev.id, status: rev.status }));
+        // Sadeleştirme: hazırlık formu (NC/CAM/takım/makine/bağlama/süre/kalite) operasyon listesinin hemen altında;
+        // zincir, durum rozetleri, uyarılar ve değişiklik geçmişi aynı veriden beslenen açılır panellerde. Yeni kayıt/kaynak yok.
         if (rev && api.opPrepList)
             routingCard.append(drawOpPrep(h('div'), api, { revisionId: rev.id }));
+        const secondary = E('details', { class: 'mut', style: 'margin-top:12px', 'data-testid': 'pw-route-more' }, E('summary', { style: 'cursor:pointer;font-weight:600' }, 'Operasyon zinciri, durum rozetleri ve uyarılar'),
+            checks.length ? E('div', { class: 'row', style: 'gap:6px;margin:8px 0' }, ...checks.map((c) => chip(`${c.label}: ${c.detail}`, c.status === 'OK' ? 'ok' : c.status === 'NA' ? '' : 'warn', { 'data-testid': 'pw-route-check', 'data-code': c.code, 'data-status': c.status, title: c.detail, style: 'white-space:normal' }))) : null, chainHost);
+        routingCard.append(secondary);
+        if (rev && api.changeHistory && api.changeImpact) {
+            routingCard.append(drawRouteChanges(h('div'), api, { revisionId: rev.id, status: rev.status })); // kendi açılır paneli var
+        }
         void drawChainPanel(chainHost, api, ws, { act: !!(can.editRouting || can.manageDocuments) && editable }, (m) => reload(m), (e) => fail(e), (c) => {
             chainNow = c;
             if (!opsHost.querySelector('input:focus, textarea:focus, select:focus'))

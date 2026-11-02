@@ -7,7 +7,7 @@ import { errorText, isSetupPending } from '../errorText.js';
 import { camRevText } from '../../../../packages/domain/src/camRevision.js';
 import { DEFAULT_SLOTS, DOC_TYPE_TR, REF_TYPES, buildPayload, docsOfType, historyActionText, historyChanges, linkedNote, missingText, slotLabel, slotValid, slotsToShow, statusView } from '../../../../packages/domain/src/opPrep.js';
 export { DEFAULT_SLOTS };
-const CSS = '.opp{border:1px solid var(--line,#334155);border-radius:10px;padding:10px 12px;margin:10px 0}.opp .hd{display:flex;flex-wrap:wrap;gap:6px 12px;align-items:center}.opp .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:10px 14px;margin-top:10px}.opp label.f{display:flex;flex-direction:column;gap:4px}.opp label.f>span.l{font-size:12px;color:var(--mut,#94a3b8)}.opp input,.opp select,.opp textarea{width:100%;box-sizing:border-box}.opp .hint{font-size:12px;color:var(--warn,#d97706)}.opp .wide{grid-column:1/-1}.opp .ck{display:flex;flex-wrap:wrap;gap:4px 14px}.opp .ck label{display:flex;gap:6px;align-items:center}.opp .act{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}.opp .stat{font-weight:700;padding:2px 8px;border-radius:999px;border:1px solid currentColor}.opp .stat.ok{color:var(--ok,#16a34a)}.opp .stat.warn{color:var(--warn,#d97706)}.opp .stat.bad{color:var(--bad,#dc2626)}.opp .miss{color:var(--bad,#dc2626);font-size:13px;margin-top:4px}';
+const CSS = '.opp-tabs-x{}.ptab{border:1px solid var(--line,#334155);background:transparent;color:inherit;border-radius:8px;padding:5px 10px;cursor:pointer;font:inherit}.ptab[aria-selected=true]{background:var(--accent,#2563eb);color:#fff;border-color:transparent}[data-testid=opp-tabs]{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0}.opp[hidden]{display:none}.opp{border:1px solid var(--line,#334155);border-radius:10px;padding:10px 12px;margin:10px 0}.opp .hd{display:flex;flex-wrap:wrap;gap:6px 12px;align-items:center}.opp .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:10px 14px;margin-top:10px}.opp label.f{display:flex;flex-direction:column;gap:4px}.opp label.f>span.l{font-size:12px;color:var(--mut,#94a3b8)}.opp input,.opp select,.opp textarea{width:100%;box-sizing:border-box}.opp .hint{font-size:12px;color:var(--warn,#d97706)}.opp .wide{grid-column:1/-1}.opp .ck{display:flex;flex-wrap:wrap;gap:4px 14px}.opp .ck label{display:flex;gap:6px;align-items:center}.opp .act{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}.opp .stat{font-weight:700;padding:2px 8px;border-radius:999px;border:1px solid currentColor}.opp .stat.ok{color:var(--ok,#16a34a)}.opp .stat.warn{color:var(--warn,#d97706)}.opp .stat.bad{color:var(--bad,#dc2626)}.opp .miss{color:var(--bad,#dc2626);font-size:13px;margin-top:4px}';
 const dtf = new Intl.DateTimeFormat('tr-TR', { timeZone: 'Europe/Istanbul', day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false });
 const when = (iso) => (iso ? dtf.format(new Date(iso)) : '—');
 const opt = (value, label, sel) => h('option', { value, ...(sel ? { selected: 'selected' } : {}) }, label);
@@ -130,15 +130,18 @@ function slotCard(slot, draft, L, api, revisionId, reload) {
         h('div', { class: 'hd' }, h('b', {}, slotLabel(slot)), h('span', { class: `stat ${st.tone}`, 'data-testid': `opp-${slot}-status` }, st.label),
             draft ? h('span', { class: 'mut' }, `sürüm ${draft.rowVersion} · son kayıt ${when(draft.updatedAt)}`) : null),
         h('div', { class: st.code === 'INCOMPLETE' ? 'miss' : 'mut', style: 'margin-top:4px' }, st.note),
-        h('div', { class: 'grid' },
-            fld('Operasyon adı', inp.opName), fld('Makine', inp.machineId),
+        h('div', { class: 'grid', 'data-testid': `opp-${slot}-main` },
+            fld('Makine', inp.machineId),
             slot === 'CUT_PREP' ? null : fld('NC programı', inp.ncDocumentId, ncHint), slot === 'CUT_PREP' ? null : fld('CAM kaydı', inp.camProgramId, camHint),
             slot === 'CUT_PREP' ? null : fld('Takım listesi', inp.toolListDocumentId, tlHint), fld('Fikstür / bağlama', inp.fixture),
             fld('Hazırlık süresi (dk)', inp.setupMinutes), fld('Çevrim süresi (sn/parça)', inp.cycleSeconds),
-            fld('Kalite kontrol planı', inp.controlPlanNote, null, true), fld('İlk parça (First Piece)', inp.firstPieceRequired), fld('İlk parça notu', inp.firstPieceNote),
+            fld('Kalite kontrol planı', inp.controlPlanNote, null, true), fld('İlk parça (First Piece)', inp.firstPieceRequired)),
+        h('details', { class: 'mut', style: 'margin-top:8px', 'data-testid': `opp-${slot}-more` }, h('summary', {}, 'Diğer alanlar: operasyon adı, ilk parça notu, yetkinlikler, referans belgeler, not'),
+          h('div', { class: 'grid' },
+            fld('Operasyon adı', inp.opName), fld('İlk parça notu', inp.firstPieceNote),
             fld('Gerekli operatör yetkinlikleri', h('div', {}, h('div', { class: 'ck', 'data-testid': `opp-${slot}-skills` }, ...(skillBoxes.length ? skillBoxes : [h('span', { class: 'mut' }, 'Yetkinlik kataloğu boş')])), covBox), null, true),
             fld('Referans belgeler (KMI\'de kayıtlı)', h('div', { class: 'ck', 'data-testid': `opp-${slot}-refs` }, ...(refBoxes.length ? refBoxes : [h('span', { class: 'mut' }, 'Bu ürüne kayıtlı teknik resim/STEP/fotoğraf yok')])), 'Belgeler tekrar yüklenmez; KMI\'deki kayıtlardan seçilir.', true),
-            fld('Not', inp.note, null, true)),
+            fld('Not', inp.note, null, true))),
         actions, msg, hist);
     return card;
 }
@@ -153,20 +156,29 @@ export function drawOpPrep(host, api, { revisionId }) {
             const drafts = new Map((L.drafts ?? []).map((d) => [d.slot, d]));
             const slots = slotsToShow(L.drafts, L.routingOps);
             const reload = (s, n) => load(s, n);
+            // kompakt sekmeler: tüm kartlar DOM'da kalır (yazılan değer kaybolmaz), yalnız seçili olan görünür
+            const cardEls = slots.map((s) => slotCard(s, drafts.get(s) ?? null, L, api, revisionId, reload));
+            const tabBar = h('div', { class: 'tabs', role: 'tablist', 'data-testid': 'opp-tabs' });
+            const tabBtns = new Map();
+            const pick = (s) => { for (const el of body.querySelectorAll('[data-testid="opp-cards"] > .opp')) el.hidden = el.dataset.testid !== `opp-slot-${s}`; for (const [k, b] of tabBtns) b.setAttribute('aria-selected', String(k === s)); };
+            const addTab = (s, st) => { const b = h('button', { type: 'button', role: 'tab', class: 'ptab', 'data-testid': `opp-tab-${s}`, title: st?.label ?? '', onClick: () => pick(s) }, `${slotLabel(s)}${st ? ` · ${st.label}` : ''}`); tabBtns.set(s, b); tabBar.append(b); };
+            slots.forEach((s) => addTab(s, statusView(drafts.get(s) ?? null)));
             const extra = h('input', { placeholder: 'örn. OP50', style: 'width:110px', 'data-testid': 'opp-add-slot' });
             const addRow = L.can?.edit ? h('div', { class: 'act' }, extra, h('button', { class: 'pbtn ghost', type: 'button', 'data-testid': 'opp-add-btn', onClick: () => {
                 const s = extra.value.trim().toUpperCase();
                 if (!slotValid(s)) { extra.setCustomValidity?.('OP10 biçiminde yazın'); extra.reportValidity?.(); return; }
                 if (slots.includes(s) || (L.routingOps ?? []).some((o) => `OP${o.opNo}` === s)) { extra.value = ''; return; }
-                body.querySelector('[data-testid="opp-cards"]')?.append(slotCard(s, null, L, api, revisionId, reload));
+                const nc = slotCard(s, null, L, api, revisionId, reload);
+                body.querySelector('[data-testid="opp-cards"]')?.append(nc); addTab(s, null); pick(s);
                 extra.value = '';
             } }, 'Başka operasyon ekle')) : null;
             const routeNote = (L.routingOps ?? []).length ? `Rotada olan operasyonlar (${L.routingOps.map((o) => `OP${o.opNo}`).join(', ')}) bu formda değil, rota ekranında yönetilir.` : '';
-            body.replaceChildren(
-                h('div', { class: 'banner', style: 'margin:8px 0', 'data-testid': 'opp-scope-note' }, 'Bu form rotada henüz olmayan operasyonların teknik hazırlık taslağıdır. Kaydetmek veya onaylamak rotaya operasyon eklemez, iş emri, stok veya üretim kaydı oluşturmaz. ONAYLI = teknik inceleme tamam; rota RELEASE veya üretim GO değildir. ', routeNote),
+            body.replaceChildren(...[
+                h('details', { class: 'mut', style: 'margin:6px 0', 'data-testid': 'opp-scope-note' }, h('summary', {}, 'Bu form nedir? (kapsam ve sınırlar)'), 'Bu form rotada henüz olmayan operasyonların teknik hazırlık taslağıdır. Kaydetmek veya onaylamak rotaya operasyon eklemez, iş emri, stok veya üretim kaydı oluşturmaz. ONAYLI = teknik inceleme tamam; rota RELEASE veya üretim GO değildir. ', routeNote),
                 L.can?.edit ? null : h('div', { class: 'mut', 'data-testid': 'opp-readonly' }, 'Salt okunur: düzenleme için rota tanımlama yetkisi gerekir.'),
                 notice ? h('div', { class: 'banner', 'data-testid': 'opp-notice' }, notice) : null,
-                h('div', { 'data-testid': 'opp-cards' }, ...slots.map((s) => slotCard(s, drafts.get(s) ?? null, L, api, revisionId, reload))), addRow);
+                tabBar, h('div', { 'data-testid': 'opp-cards' }, ...cardEls), addRow].filter(Boolean));
+            pick(focusSlot && slots.includes(focusSlot) ? focusSlot : slots[0]);
             if (focusSlot) body.querySelector(`[data-testid="opp-slot-${focusSlot}"]`)?.scrollIntoView?.({ block: 'nearest' });
         }
         catch (e) {
@@ -177,7 +189,7 @@ export function drawOpPrep(host, api, { revisionId }) {
     };
     const det = h('details', { 'data-testid': 'opp-panel', style: 'margin-top:12px' }, h('style', {}, CSS),
         h('summary', { style: 'cursor:pointer;font-weight:700' }, 'Operasyon hazırlık formu — rotada olmayan operasyonlar (CUT/PREP, OP10, OP20, OP40)'), body);
-    if (/[?&]hazirlik=1/.test(globalThis.location?.hash ?? '')) { det.open = true; loaded = true; void load(); }
+    det.open = true; loaded = true; void load(); // asıl çalışma alanı: varsayılan açık
     det.addEventListener('toggle', () => { if (det.open && !loaded) { loaded = true; void load(); } });
     return det;
 }
