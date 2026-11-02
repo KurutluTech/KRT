@@ -376,7 +376,9 @@ export async function renderProductWorkspaceScreen(container, api, state = {}) {
         const opEditor = (o) => {
             const op = o;
             const structural = !op || !op.active;
-            const noIn = h('input', { 'data-testid': 'pw-op-no', type: 'number', min: 1, value: op ? String(op.opNo) : String((activeOps.at(-1)?.opNo ?? 0) + 10), disabled: !!op });
+            // OP numarası kullanıcıdan istenmez: sistem sıradan türetir (m0205). Yeni operasyonda sunucuya yalnız KONUM İPUCU gider (10'un katı olmayan sayı → hiçbir mevcut numarayla çakışmaz).
+            const noIn = h('input', { 'data-testid': 'pw-op-no', type: 'text', value: op ? op.opCode : 'Otomatik (sıraya göre)', disabled: true, 'aria-label': 'Operasyon numarası otomatik atanır' });
+            const newOpHint = () => { const mv = movableOps(ws.routing); return insertAt === null || insertAt >= mv.length ? 989 : (insertAt <= 0 ? 5 : mv[insertAt - 1].opNo + 5); };
             const name = h('input', { 'data-testid': 'pw-op-name', value: op?.name ?? '' });
             const mach = machines.map((m) => ({ m, box: h('input', { type: 'checkbox', 'data-testid': `pw-op-m-${m.code}`, checked: !!op?.machines.some((x) => x.id === m.id) }) }));
             const primary = h('select', { 'data-testid': 'pw-op-primary' }, h('option', { value: '' }, '— öncelikli makine yok —'), ...machines.map((m) => h('option', { value: m.id, selected: !!op?.machines.some((x) => x.id === m.id && x.primary) }, m.code)));
@@ -399,7 +401,7 @@ export async function renderProductWorkspaceScreen(container, api, state = {}) {
                 const ids = mach.filter((x) => isChecked(x.box)).map((x) => x.m.id);
                 const setupV = num(val(setup));
                 const cycleV = num(val(cycle));
-                const no = Number(val(noIn));
+                const no = op ? op.opNo : newOpHint();
                 if (!val(name).trim()) {
                     invalid(name, true);
                     return fail(new Error('Eksik alan: operasyon adı'));
@@ -422,13 +424,10 @@ export async function renderProductWorkspaceScreen(container, api, state = {}) {
                     const r = await api.saveOperation({ revisionId: rev.id, opNo: no, name: val(name).trim(), machineIds: ids, primaryId: val(primary) || null, skillCode: val(skill).trim() || null, skillLevel: num(val(level)),
                         camId: op?.camProgramId ?? null, setup: setupV, cycle: cycleV, firstPiece: isChecked(fp), qc: isChecked(qc), instructions: val(ins).trim() || null, reason: val(reason).trim() });
                     openOp = r.operationId;
-                    if (!op && insertAt !== null && r.created) {
-                        // araya ekleme: yeni operasyon sona kaydedildi, şimdi seçilen konuma yerleştir (aynı gerekçe, aynı sunucu kuralı)
-                        const ids = movableOps(ws.routing).map((x) => x.id); ids.splice(Math.min(insertAt, ids.length), 0, r.operationId);
-                        try { await api.reorder(rev.id, ids, val(reason).trim()); }
-                        catch (e2) { insertAt = null; await reload(`${r.opCode} eklendi (sona), ama istenen konuma yerleştirilemedi: ${errorText(e2)} Sırayı kutulardan düzeltebilirsiniz.`, 'error', { openOp: r.operationId }); return; }
+                    if (!op && r.created) {
+                        // m0205: sunucu yeni operasyonu aynı işlemde sıraya yerleştirir ve numaraları yeniden hesaplar (tek atomik çağrı; ikinci istek yok)
                         insertAt = null;
-                        await reload(`Operasyon araya eklendi ve sıra güncellendi (OP numaraları yeniden hesaplandı).`, 'ok', { openOp: r.operationId });
+                        await reload(`${r.opCode} eklendi; sonraki operasyonların OP numaraları sıraya göre yeniden hesaplandı (kimlikler, NC/CAM/takım ve kalite bağları korundu).`, 'ok', { openOp: r.operationId });
                         return;
                     }
                     await reload(`${r.opCode} ${r.created ? 'eklendi' : 'kaydedildi'} (sürüm ${r.versionNo}).${diffs.length ? ' ' + diffs.join(' · ') + '.' : ''}${r.recalculatedRuns ? ` ${r.recalculatedRuns} etkilenen hesap yeniden değerlendirildi (eski hesaplar korunur).` : ''}`, 'ok', { openOp: r.operationId });
@@ -489,7 +488,7 @@ export async function renderProductWorkspaceScreen(container, api, state = {}) {
                 pending: pendingOrder, setPending: (v) => { pendingOrder = v; },
                 onOpen: (id) => { insertAt = null; const cp = ws.routing.find((x) => x.id === id); if (cp && isCutPrep(cp)) { const tab = container.querySelector('[data-testid="opp-tab-CUT_PREP"]'); if (tab) { tab.click(); scrollTo(container.querySelector('[data-testid="opp-slot-CUT_PREP"]')); return; } } if (openOp === id) { openOp = null; drawOps(); } else { toggleOp(id); } },
                 onInsert: (pos) => { clearBanner(); insertAt = pos; openOp = 'NEW'; drawOps(); scrollTo(opsHost.lastElementChild); },
-                onSave: async (ids, why) => { try { await api.reorder(rev.id, ids, why); pendingOrder = null; await reload('Operasyon sırası kaydedildi; OP numaraları yeniden hesaplandı (kimlikler, NC/CAM/takım ve kalite bağları korundu).'); } catch (e) { fail(e); } } });
+                onSave: async (ids, why) => { try { await api.reorder(rev.id, ids, why); pendingOrder = null; await reload('Operasyon sırası kaydedildi; OP numaraları yeniden hesaplandı (kimlikler, NC/CAM/takım ve kalite bağları korundu).'); } catch (e) { pendingOrder = null; drawBoxes(); fail(e); } } });
         };
         const move = async (o, dir) => {
             const ids = activeOps.map((x) => x.id);
@@ -563,7 +562,7 @@ export async function renderProductWorkspaceScreen(container, api, state = {}) {
         // CUT/PREP kesim yöntemi (iç/dış/karma): hesap ve kayıt sunucuda (0090); sunucu güncellemesi yoksa panel 'bekliyor' der.
         const cutMethod = ws.routing.some((x) => x.active && isCutPrep(x)) && api.cutPlanGet ? drawCutMethod(h('div'), api, { revisionId: rev.id, canEdit: !!can.editRouting }) : null;
         const routingCard = card({ title: 'Rota ve operasyonlar', testid: 'pw-card-routing', span: 12, id: 'card-routing', chip: stateChip(ws.routing.length ? (rev?.state ?? 'MISSING') : 'MISSING'),
-            actions: [can.editStructure ? btn('primary', 'pw-op-add', '+ Operasyon ekle', addOp) : null] }, null, can.editRouting && editable ? E('div', { class: 'row', style: 'margin-bottom:6px' }, E('div', { class: 'grow' }, field(rev?.status === 'DRAFT' ? 'Not (isteğe bağlı — boşsa işlemin açıklaması kaydedilir)' : 'Hızlı işlem gerekçesi', quickReason, 'Sırala, pasife al, bağımlılık, kaynak ve kalite noktası işlemleri bu gerekçeyi kullanır.'))) : null, boxHost, cutMethod, E('div', { class: 'row', style: 'justify-content:flex-end' }, btn('ghost sm', 'pw-list-toggle', 'Liste ⇄ Kutular', () => { listView = !listView; drawOps(); })), opsHost, can.editRouting && rev?.status === 'RELEASED' ? E('div', { class: 'mut', style: 'margin-top:10px' }, 'Yürürlükteki revizyonda operasyon ekleme, sıralama ve pasife alma yapılmaz; makine, süre, kaynak ve talimat güncellenir (sürümlenir). Yapısal değişiklik için taslak revizyon açın.') : null);
+            actions: [can.editStructure ? btn('primary', 'pw-op-add', '+ Operasyon ekle', addOp) : null] }, null, can.editRouting && editable ? E('div', { class: 'row', style: 'margin-bottom:6px' }, E('div', { class: 'grow' }, field(rev?.status === 'DRAFT' ? 'Not (isteğe bağlı — boşsa işlemin açıklaması kaydedilir)' : 'Hızlı işlem gerekçesi', quickReason, 'Sırala, pasife al, bağımlılık, kaynak ve kalite noktası işlemleri bu gerekçeyi kullanır.'))) : null, boxHost, cutMethod, E('div', { class: 'row', style: 'justify-content:flex-end' }, btn('ghost sm', 'pw-list-toggle', 'Liste ⇄ Kutular', () => { listView = !listView; drawOps(); })), opsHost, can.editRouting && rev?.status === 'RELEASED' ? E('div', { class: 'mut', style: 'margin-top:10px' }, 'Yürürlükteki revizyon: operasyon ekleme/sıralama yetkili kişiyle ve yazılı gerekçeyle yapılır; her değişiklik sürümlenir ve denetim kaydına yazılır (revizyon kimliği ve geçmiş onaylar değişmez). OP numaraları sıradan otomatik hesaplanır.') : null);
         drawOps();
         // Sadeleştirme: hazırlık formu (NC/CAM/takım/makine/bağlama/süre/kalite) operasyon listesinin hemen altında;
         // zincir, durum rozetleri, uyarılar ve değişiklik geçmişi aynı veriden beslenen açılır panellerde. Yeni kayıt/kaynak yok.

@@ -46,7 +46,7 @@ export async function renderRoutePrepScreen(container, { api, goto = (href) => {
         void run(() => api.saveCutPrep({ revisionId: view.rev, machineId: m101.id, setup: s, cycle: c, reason: cpReason.value.trim() }), 'CUT/PREP kaydedildi (101).'); } }, cp ? 'CUT/PREP güncelle' : 'CUT/PREP tanımla');
     // --- operasyon
     const eo = view.editOp != null ? ops.find((o) => o.opNo === view.editOp && o.opKind !== 'CUT_PREP') : null;
-    const f = { no: h('input', { type: 'number', min: '10', step: '10', 'data-testid': 'op-no', placeholder: 'Op no (10,20,30…)', 'aria-label': 'Operasyon no', value: eo?.opNo ?? '' }),
+    const f = { no: h('input', { type: 'text', disabled: true, 'data-testid': 'op-no', placeholder: 'Otomatik', 'aria-label': 'Operasyon numarası otomatik atanır (sıraya göre OP10, OP20…)', value: eo ? `OP${eo.opNo}` : 'Otomatik (sona eklenir)' }),
         name: h('input', { type: 'text', 'data-testid': 'op-name', placeholder: 'Operasyon adı', 'aria-label': 'Operasyon adı', value: eo?.name ?? '' }),
         setup: h('input', { type: 'number', step: 'any', min: '0', 'data-testid': 'op-setup', placeholder: 'Kurulum (dk)', 'aria-label': 'Kurulum dk', value: eo?.setupMinutesTarget ?? '' }),
         cycle: h('input', { type: 'number', step: 'any', min: '0', 'data-testid': 'op-cycle', placeholder: 'Çevrim (sn/parça)', 'aria-label': 'Çevrim sn', value: eo?.cycleSecondsTarget ?? '' }),
@@ -57,12 +57,11 @@ export async function renderRoutePrepScreen(container, { api, goto = (href) => {
         reason: reason('op-reason') };
     const mchk = machines.filter((m) => m.code !== '101').map((m) => h('label', { class: 'rp-row' }, h('input', { type: 'checkbox', 'data-testid': 'op-machine', value: m.id, ...(eo?.allowedMachineIds?.includes(m.id) ? { checked: true } : {}) }), `${m.code} ${m.name ?? ''}`));
     const opBtn = h('button', { type: 'button', 'data-testid': 'op-save', onClick: () => {
-        const no = num(f.no.value), s = num(f.setup.value), c = num(f.cycle.value); const ids = [...container.querySelectorAll('[data-testid="op-machine"]:checked')].map((x) => x.value);
-        if (!Number.isInteger(no) || no < 10) return redo({ message: { kind: 'error', text: 'Operasyon no 10 veya üstü olmalı (CUT/PREP ayrı tanımlanır).' }, editOp: view.editOp });
-        if (!f.name.value.trim() || !ids.length) return redo({ message: { kind: 'error', text: 'Ad ve en az bir makine gerekli.' }, editOp: view.editOp });
+        const no = eo ? eo.opNo : 989, s = num(f.setup.value), c = num(f.cycle.value); const ids = [...container.querySelectorAll('[data-testid="op-machine"]:checked')].map((x) => x.value);
+                if (!f.name.value.trim() || !ids.length) return redo({ message: { kind: 'error', text: 'Ad ve en az bir makine gerekli.' }, editOp: view.editOp });
         if (Number.isNaN(s) || Number.isNaN(c)) return redo({ message: { kind: 'error', text: 'Süre değerleri geçersiz.' }, editOp: view.editOp });
         if (f.reason.value.trim().length < 10) return redo({ message: { kind: 'error', text: 'Gerekçe en az 10 karakter olmalı.' }, editOp: view.editOp });
-        void run(() => api.saveOp({ revisionId: view.rev, opNo: no, name: f.name.value.trim(), machineIds: ids, primary: f.primary.value || (ids.length === 1 ? ids[0] : null), camId: f.cam.value || null, setup: s, cycle: c, firstPiece: f.fp.checked, qc: f.qc.checked, reason: f.reason.value.trim() }), `OP${no} kaydedildi.`, { editOp: null }); } }, eo ? `OP${eo.opNo} güncelle` : 'Operasyon ekle');
+        void run(() => api.saveOp({ revisionId: view.rev, opNo: no, name: f.name.value.trim(), machineIds: ids, primary: f.primary.value || (ids.length === 1 ? ids[0] : null), camId: f.cam.value || null, setup: s, cycle: c, firstPiece: f.fp.checked, qc: f.qc.checked, reason: f.reason.value.trim() }), eo ? `OP${no} kaydedildi.` : 'Operasyon rotanın sonuna eklendi; OP numarası sıraya göre otomatik atandı.', { editOp: null }); } }, eo ? `OP${eo.opNo} güncelle` : 'Operasyon ekle');
     // --- uç payı
     const specRows = lines.map((l) => ({ l, s: specs.find((x) => x.bomLineId === l.id) })).filter((x) => x.s);
     const et = specRows.map(({ l, s }) => {
