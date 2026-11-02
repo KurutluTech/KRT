@@ -1,11 +1,11 @@
 // KMI NEXT — Akademi & Yetkinlik (matrix items 32/33). Migration 0031.
-// Rozet merdiveni: her kişinin yetkinlikleri seviye rozetiyle (ÖĞRENCİ → USTA), süresi dolan
+// Rozet merdiveni: her kişinin yetkinlikleri seviye rozetiyle (Aday → Usta Eğitici), süresi dolan
 // yetkinlik gri/çarpılı. Seviyeyi yalnız yetkili onaylayıcı değiştirir (gerekçeli, kayıtlı);
 // Akademi yolu: modül → kayıt → eğitim → değerlendirme → BAŞARILI ise seviye yükselir.
 // "Onaylı yetkinlik" sayısı bilgi amaçlıdır; puantaj formülüne bağlı DEĞİLDİR (D-001).
 import { h, mount } from '../../../../packages/ui/src/h.js';
 import { masteryBadgeSvg } from '../../../../packages/ui/src/badge.js';
-import { ENROLLMENT_TR, MASTERY_TR, approvedSkillCount, canAdvanceEnrollment, canChangeSkillLevel, canRecordAssessment, } from '../../../../packages/domain/src/competency.js';
+import { ENROLLMENT_TR, MASTERY_TR, masteryLabel, approvedSkillCount, canAdvanceEnrollment, canChangeSkillLevel, canRecordAssessment, } from '../../../../packages/domain/src/competency.js';
 import { errorText as sharedErrorText } from '../errorText.js';
 function istanbulToday() {
     return new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Istanbul', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
@@ -52,13 +52,13 @@ export async function renderAcademyScreen(container, api, state = {}) {
         const icon = h('span', {});
         icon.innerHTML = masteryBadgeSvg(r.level, r.state, 28, r.skillName); // label is escaped inside
         span.appendChild(icon);
-        span.appendChild(document.createTextNode(`${r.skillName} · ${MASTERY_TR[r.level]}${STATE_TR[r.state] ? ` (${STATE_TR[r.state]})` : ''}`));
+        span.appendChild(document.createTextNode(`${r.skillName} · ${masteryLabel(r.level)}${STATE_TR[r.state] ? ` (${STATE_TR[r.state]})` : ''}`));
         return span;
     };
     // ---- level form ----
     const lvPerson = sel('ac-level-person', activePeople.map((p) => [p.id, p.name]), '— personel —');
     const lvSkill = sel('ac-level-skill', skills.filter((s) => s.active).map((s) => [s.code, s.name]), '— yetkinlik —');
-    const lvLevel = sel('ac-level-level', [['1', MASTERY_TR[1]], ['2', MASTERY_TR[2]], ['3', MASTERY_TR[3]], ['4', MASTERY_TR[4]], ['REVOKE', 'Kaldır']]);
+    const lvLevel = sel('ac-level-level', [...[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((n) => [String(n), `${n} · ${masteryLabel(n)}`]), ['REVOKE', 'Kaldır']]);
     const lvUntil = input('ac-level-until', { type: 'date' });
     const lvReason = input('ac-level-reason', { placeholder: 'Gerekçe (en az 10 karakter)' });
     const saveLevel = () => {
@@ -79,7 +79,7 @@ export async function renderAcademyScreen(container, api, state = {}) {
     // ---- requirement form ----
     const rqMachine = sel('ac-req-machine', machines.map((m) => [m.id, `${m.code} ${m.name}`]), '— makine —');
     const rqSkill = sel('ac-req-skill', skills.filter((s) => s.active).map((s) => [s.code, s.name]), '— yetkinlik —');
-    const rqLevel = sel('ac-req-level', [['3', `en az ${MASTERY_TR[3]}`], ['4', `en az ${MASTERY_TR[4]}`], ['2', `en az ${MASTERY_TR[2]}`], ['REMOVE', 'Şartı kaldır']]);
+    const rqLevel = sel('ac-req-level', [['3', `en az ${MASTERY_TR[3]}`], ['4', `en az ${MASTERY_TR[4]}`], ['2', `en az ${MASTERY_TR[2]}`], ...[5, 6, 7, 8, 9, 10].map((n) => [String(n), `en az ${masteryLabel(n)}`]), ['REMOVE', 'Şartı kaldır']]);
     const rqReason = input('ac-req-reason', { placeholder: 'Gerekçe' });
     const saveReq = () => {
         if (!rqMachine.value || !rqSkill.value)

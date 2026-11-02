@@ -1,6 +1,6 @@
 // KMI NEXT — Yetkinlik geçmişi aktarımı (D-011, migration 0038). The old KMI kept skills only in a
 // browser; nothing is moved by guessing. A verifiable source is pasted, every row is checked by the
-// server (person ONLY by id — a name is never matched; known skill; level 1–4; evidence; not expired)
+// server (person ONLY by id — a name is never matched; known skill; level 1–10; evidence; not expired)
 // and waits as DOĞRULAMA BEKLİYOR until a second approver (not the one who loaded it, not the person)
 // verifies or rejects — in bulk, with a note. Rows with problems stay ÇÖZÜLEMEDİ.
 import { h, mount } from '../../../../packages/ui/src/h.js';

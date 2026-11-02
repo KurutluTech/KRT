@@ -109,6 +109,7 @@ export async function renderProductWorkspaceScreen(container, api, state = {}) {
     async function renderWorkspace(productId) {
         let ws;
         let machines = [];
+        let skills = [];
         try {
             ws = await api.load(productId, state.rev ?? null);
         }
@@ -120,6 +121,12 @@ export async function renderProductWorkspaceScreen(container, api, state = {}) {
         }
         catch {
             machines = [];
+        }
+        try {
+            skills = (await api.skills()).filter((x) => x.active !== false);
+        }
+        catch {
+            skills = [];
         }
         const rev = ws.revision;
         const editable = !!rev && rev.status !== 'OBSOLETE';
@@ -373,8 +380,14 @@ export async function renderProductWorkspaceScreen(container, api, state = {}) {
             const name = h('input', { 'data-testid': 'pw-op-name', value: op?.name ?? '' });
             const mach = machines.map((m) => ({ m, box: h('input', { type: 'checkbox', 'data-testid': `pw-op-m-${m.code}`, checked: !!op?.machines.some((x) => x.id === m.id) }) }));
             const primary = h('select', { 'data-testid': 'pw-op-primary' }, h('option', { value: '' }, '— öncelikli makine yok —'), ...machines.map((m) => h('option', { value: m.id, selected: !!op?.machines.some((x) => x.id === m.id && x.primary) }, m.code)));
-            const skill = h('input', { 'data-testid': 'pw-op-skill', value: op?.skillCode ?? '', placeholder: 'Yeterlilik kodu' });
-            const level = h('input', { 'data-testid': 'pw-op-level', type: 'number', min: 1, max: 5, value: op?.skillLevel != null ? String(op.skillLevel) : '' });
+            // Yeterlilik İK / Personel Yetkinlikleri listesinden (skill_catalog) SEÇİLİR; serbest yazı katalogda olmadığı için SKILL_NOT_FOUND veriyordu. Seviye ölçeği 1–10 (m0204; migration uygulanmadan 5–10 sunucuda INVALID_LEVEL verir).
+            const curSkill = op?.skillCode ?? '';
+            const skill = skills.length
+                ? h('select', { 'data-testid': 'pw-op-skill' }, h('option', { value: '' }, '— yeterlilik gerekmiyor —'),
+                    ...(curSkill && !skills.some((x) => x.code === curSkill) ? [h('option', { value: curSkill, selected: true }, `${curSkill} (listede yok / pasif)`)] : []),
+                    ...skills.map((x) => h('option', { value: x.code, selected: x.code === curSkill }, `${x.name} (${x.code})`)))
+                : h('input', { 'data-testid': 'pw-op-skill', value: curSkill, placeholder: 'Yeterlilik kodu' });
+            const level = h('select', { 'data-testid': 'pw-op-level' }, h('option', { value: '' }, '— seviye —'), ...[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((n) => h('option', { value: String(n), selected: op?.skillLevel === n }, `Seviye ${n}`)));
             const setup = h('input', { 'data-testid': 'pw-op-setup', inputmode: 'decimal', value: op?.setupMinutes != null ? String(op.setupMinutes) : '' });
             const cycle = h('input', { 'data-testid': 'pw-op-cycle', inputmode: 'decimal', value: op?.cycleSeconds != null ? String(op.cycleSeconds) : '' });
             const fp = h('input', { type: 'checkbox', 'data-testid': 'pw-op-fp', checked: op?.firstPieceRequired ?? true });
@@ -392,6 +405,8 @@ export async function renderProductWorkspaceScreen(container, api, state = {}) {
                     return fail(new Error('Eksik alan: operasyon adı'));
                 }
                 invalid(name, false);
+                if (!!val(skill).trim() !== !!val(level).trim())
+                    return fail(new Error('Yeterlilik ve seviye birlikte seçilmeli (ya da ikisi de boş bırakılmalı).'));
                 const diffs = [];
                 if (op) {
                     if (setupV !== op.setupMinutes)
@@ -422,7 +437,7 @@ export async function renderProductWorkspaceScreen(container, api, state = {}) {
                     fail(e);
                 }
             };
-            return E('div', { class: 'stack', 'data-testid': op ? 'pw-op-edit' : 'pw-op-new' }, E('fieldset', { class: 'fsec' }, h('legend', {}, 'Genel'), E('div', { class: 'fgrid' }, field('Operasyon no', noIn), field('Ad', name), field('Öncelikli makine', primary), field('Yeterlilik', skill), field('Seviye (1-5)', level))), E('fieldset', { class: 'fsec' }, h('legend', {}, 'Süreler'), E('div', { class: 'fgrid' }, field('Hazırlık (dk)', setup), field('Çevrim (sn/adet)', cycle))), E('fieldset', { class: 'fsec' }, h('legend', {}, 'İzinli makineler'), E('div', { class: 'row', style: 'gap:4px 16px' }, ...mach.map((x) => h('label', { class: 'chk' }, x.box, x.m.code))), machines.length ? null : E('div', { class: 'mut' }, 'Makine listesi okunamadı.')), E('div', { class: 'row', style: 'gap:4px 20px' }, h('label', { class: 'chk' }, fp, 'İlk parça kontrolü şart'), h('label', { class: 'chk' }, qc, 'Kalite kontrolü şart')), field('Operatör talimatı', ins), !can.editStructure && structural ? E('div', { class: 'mut' }, 'Yeni operasyon eklemek için taslak revizyon gerekir.') : null, E('div', { class: 'row', style: 'align-items:flex-end' }, E('div', { class: 'grow' }, field(rev?.status === 'DRAFT' ? 'Not (isteğe bağlı)' : 'Değişiklik gerekçesi', reason, rev?.status === 'DRAFT' ? 'Boş bırakırsanız yapılan işlemin açıklaması kaydedilir. Her kayıt sürümlenir.' : 'Her kayıt sürümlenir; eski hâli korunur.')), btn('primary', 'pw-op-save', 'Kaydet', () => void save())));
+            return E('div', { class: 'stack', 'data-testid': op ? 'pw-op-edit' : 'pw-op-new' }, E('fieldset', { class: 'fsec' }, h('legend', {}, 'Genel'), E('div', { class: 'fgrid' }, field('Operasyon no', noIn), field('Ad', name), field('Öncelikli makine', primary), field('Yeterlilik', skill), field('Seviye (1-10)', level))), E('fieldset', { class: 'fsec' }, h('legend', {}, 'Süreler'), E('div', { class: 'fgrid' }, field('Hazırlık (dk)', setup), field('Çevrim (sn/adet)', cycle))), E('fieldset', { class: 'fsec' }, h('legend', {}, 'İzinli makineler'), E('div', { class: 'row', style: 'gap:4px 16px' }, ...mach.map((x) => h('label', { class: 'chk' }, x.box, x.m.code))), machines.length ? null : E('div', { class: 'mut' }, 'Makine listesi okunamadı.')), E('div', { class: 'row', style: 'gap:4px 20px' }, h('label', { class: 'chk' }, fp, 'İlk parça kontrolü şart'), h('label', { class: 'chk' }, qc, 'Kalite kontrolü şart')), field('Operatör talimatı', ins), !can.editStructure && structural ? E('div', { class: 'mut' }, 'Yeni operasyon eklemek için taslak revizyon gerekir.') : null, E('div', { class: 'row', style: 'align-items:flex-end' }, E('div', { class: 'grow' }, field(rev?.status === 'DRAFT' ? 'Not (isteğe bağlı)' : 'Değişiklik gerekçesi', reason, rev?.status === 'DRAFT' ? 'Boş bırakırsanız yapılan işlemin açıklaması kaydedilir. Her kayıt sürümlenir.' : 'Her kayıt sürümlenir; eski hâli korunur.')), btn('primary', 'pw-op-save', 'Kaydet', () => void save())));
         };
         const opExtras = (o) => {
             const insp = h('input', { 'data-testid': 'pw-insp-value', inputmode: 'decimal', placeholder: 'sn/adet', value: o.inspectionSeconds != null ? String(o.inspectionSeconds) : '' });

@@ -146,7 +146,7 @@ export async function renderRoutingScreen(container, api, state = {}) {
         const opNo = h('input', { type: 'number', 'data-testid': 'def-opno', placeholder: 'Op no (10, 20…)', style: 'width:7em' });
         const name = h('input', { type: 'text', 'data-testid': 'def-name', placeholder: 'Operasyon adı', style: 'flex:1 1 140px;min-width:0' });
         const skill = h('input', { type: 'text', 'data-testid': 'def-skill', placeholder: 'Yetkinlik kodu (boş = yok)', style: 'width:12em' });
-        const level = h('input', { type: 'number', min: '1', max: '4', 'data-testid': 'def-level', placeholder: 'seviye', style: 'width:5em' });
+        const level = h('input', { type: 'number', min: '1', max: '10', 'data-testid': 'def-level', placeholder: 'seviye', style: 'width:5em' });
         const fp = h('input', { type: 'checkbox', 'data-testid': 'def-fp', checked: 'checked' });
         const qc = h('input', { type: 'checkbox', 'data-testid': 'def-qc', checked: 'checked' });
         const reason = h('input', { type: 'text', 'data-testid': 'def-reason', placeholder: 'Gerekçe', style: 'flex:1 1 140px;min-width:0' });

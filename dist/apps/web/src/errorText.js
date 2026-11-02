@@ -225,6 +225,7 @@ const BUSINESS_TR = [
     [/^OPERATION_INACTIVE/, 'Operasyon pasif. Önce etkinleştirin (yalnız taslak revizyonda).'],
     [/^PRIMARY_MACHINE_NOT_ALLOWED/, 'Öncelikli makine, izinli makineler arasında olmalı.'],
     [/^MACHINE_REQUIRED/, 'En az bir makine seçilmeli.'],
+    [/^SKILL_NOT_FOUND/, 'Seçilen yeterlilik İK yetkinlik listesinde yok veya pasif. Listeden seçin; listede yoksa önce İK / Personel Yetkinlikleri’nde tanımlanmalı. Hiçbir kayıt yapılmadı.'], [/^INVALID_LEVEL/, 'Yeterlilik seviyesi 1 ile 10 arasında olmalı (5 ve üstü, veritabanı genişletmesi m0204 uygulanmadan reddedilir). Hiçbir kayıt yapılmadı.'], [/^SKILL_AND_LEVEL_TOGETHER/, 'Yeterlilik ve seviye birlikte seçilmeli (ya da ikisi de boş bırakılmalı). Hiçbir kayıt yapılmadı.'],
     [/^HAS_DEPENDENTS/, 'Bu operasyona bağlı aktif operasyon var; önce bağımlılığı kaldırın.'],
     [/^DEPENDENCY_ORDER_VIOLATED|^DEPENDENCY_ORDER/, 'Ön koşul operasyon, bağlı operasyondan önce gelmeli (daha küçük OP numarası).'],
     [/^DEPENDENCY_OTHER_REVISION/, 'Bağımlılık yalnız aynı revizyonun operasyonları arasında kurulabilir.'],

@@ -9,8 +9,12 @@
 //
 // Twin of migration 0031 (same codes, same order of checks). Puantaj: the approved-skill count is
 // shown for information only and is NOT wired into the locked V47 formula (D-001).
-export const MASTERY_LEVELS = [1, 2, 3, 4];
-export const MASTERY_TR = { 1: 'ÖĞRENCİ', 2: 'GÖZETİMLİ', 3: 'BAĞIMSIZ', 4: 'USTA' };
+// Teknik yeterlilik ölçeği 1–10 (m0204). Seviye adları sahip kararıdır (2026-11-02). Eski 4=USTA gösterimi kaldırıldı; kayıtlı seviyeler değişmedi.
+export const MASTERY_LEVELS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+export const MASTERY_TR = { 1: 'Aday', 2: 'Çırak', 3: 'Yardımcı Operatör', 4: 'Operatör', 5: 'Yetkin Operatör', 6: 'Deneyimli Operatör', 7: 'Kıdemli Operatör', 8: 'Uzman', 9: 'Usta', 10: 'Usta Eğitici' };
+export function masteryLabel(level) {
+    return MASTERY_TR[level] ?? `Seviye ${level}`;
+}
 /** Level from which a person may work alone on that skill (and counts as "approved"). */
 export const QUALIFIED_LEVEL = 3;
 /** Level required to train others in a skill. */
