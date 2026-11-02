@@ -104,6 +104,7 @@ export function createProductWorkspaceApi(client, session) {
         cutReceiptAdd: (wo, qty, ref, cri) => rpc('wo_cut_receipt_add', { p_wo: wo, p_qty: qty, p_ref: ref ?? null, p_client_request_id: cri ?? null }),
         cutReceiptDecide: (id, decision, reason) => rpc('wo_cut_receipt_decide', { p_receipt: id, p_decision: decision, p_reason: reason ?? null }),
         cutCalc: (wo) => rpc('wo_cut_calc', { p_wo: wo }),
+        canEconomics: async () => { try { return (await rpc('can_view_economics', {})) === true; } catch { return false; } },   // yalnız görünürlük için; asıl yetki sunucuda (yanıt belirsizse tutar gizli)
         competencyMatrix: () => rpc('competency_matrix', {}),
         machineClearances: () => client.select('operator_machine_clearances', { columns: 'personnel_id,machine_id,valid_until,revoked_at', filters: { revoked_at: 'is.null' }, limit: 2000 }, session),
         opPrepSave: (rev, slot, data, ver) => rpc('op_prep_save', { p_revision: rev, p_slot: slot, p_data: data, p_expected_version: ver }),

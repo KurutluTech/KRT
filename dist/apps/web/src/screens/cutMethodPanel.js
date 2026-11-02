@@ -7,7 +7,7 @@ const METHODS = [['INNER', 'İÇ KESİM — Makine 101 (testere süresi, kapasit
 const num = (v) => { const n = Number(String(v ?? '').replace(',', '.')); return Number.isFinite(n) ? n : NaN; };
 
 export function drawCutMethod(host, api, { revisionId, canEdit }) {
-    let woId = null; let plan = null; let calc = null;
+    let woId = null; let plan = null; let money = false; let calc = null;
     const noteHost = h('div', { 'aria-live': 'polite' });
     const body = h('div', { 'data-testid': 'cut-body', class: 'stack', style: 'gap:6px;margin-top:6px' });
     const say = (kind, text) => { noteHost.replaceChildren(...(text ? [h('div', { class: 'banner', role: 'status', 'data-testid': kind === 'error' ? 'cut-error' : 'cut-note' }, text)] : [])); };
@@ -26,6 +26,7 @@ export function drawCutMethod(host, api, { revisionId, canEdit }) {
     async function loadPlan(wos) {
         window.__wos = wos;
         plan = await api.cutPlanGet(woId);
+        money = plan.plan ? plan.moneyVisible === true : (api.canEconomics ? (await api.canEconomics()) === true : false);   // belirsizse tutar alanları GİZLİ
         try { calc = await api.cutCalc(woId); } catch (e) { calc = null; if (!isSetupPending(e)) say('error', errorText(e)); }
         draw(wos);
     }
@@ -44,20 +45,19 @@ export function drawCutMethod(host, api, { revisionId, canEdit }) {
         const why = h('input', { 'data-testid': 'cut-reason', placeholder: 'Gerekçe (en az 10 karakter)', maxlength: 400 });
         const sup = h('select', { 'data-testid': 'cut-supplier' }, h('option', { value: '' }, '— tedarikçi seç —'));
         void api.suppliers().then((rows) => { sup.replaceChildren(h('option', { value: '' }, '— tedarikçi seç —'), ...rows.filter((r) => r.active !== false).map((r) => h('option', { value: r.id, selected: r.id === plan.supplierId }, r.name))); }).catch(() => {});
-        const moneyHidden = plan.plan && plan.moneyVisible === false;
-        if (moneyHidden) { fee.disabled = true; cur.disabled = true; frt.disabled = true; }
+        const moneyHidden = !money;
         const outerBox = h('div', { 'data-testid': 'cut-outer-box', class: 'stack', style: 'gap:4px' },
-            h('label', {}, 'Tedarikçi ', sup), h('label', {}, 'Birim hizmet bedeli ', fee, ' ', cur), h('label', {}, 'Nakliye (toplam) ', frt), h('label', {}, 'Belge/irsaliye ', ref), moneyHidden ? h('div', { class: 'mut', 'data-testid': 'cut-money-hidden' }, 'Hizmet bedeli, para birimi ve nakliye yalnız ekonomi yetkisi olanlara görünür ve onlar tarafından değiştirilir.') : null);
+            h('label', {}, 'Tedarikçi ', sup), ...(moneyHidden ? [] : [h('label', {}, 'Birim hizmet bedeli ', fee, ' ', cur), h('label', {}, 'Nakliye (toplam) ', frt)]), h('label', {}, 'Belge/irsaliye ', ref), moneyHidden ? h('div', { class: 'mut', 'data-testid': 'cut-money-hidden' }, 'Hizmet bedeli, para birimi ve nakliye yalnız ekonomi yetkisi olanlara görünür ve onlar tarafından değiştirilir.') : null);
         const sync = () => {
             const m = method; inner.disabled = m !== 'MIXED' || !canEdit; outer.disabled = m !== 'MIXED' || !canEdit;
             if (m === 'INNER') { inner.value = total; outer.value = 0; } else if (m === 'OUTER') { inner.value = 0; outer.value = total; }
             else if (m === 'MIXED' && Number(inner.value) + Number(outer.value) !== total) { outer.value = Math.max(total - Number(inner.value), 0); }
             outerBox.style.display = m === 'INNER' ? 'none' : '';
         };
-        const radios = METHODS.map(([v, t]) => h('label', {}, h('input', { type: 'radio', name: 'cutm', value: v, checked: v === method, disabled: !canEdit, 'data-testid': `pw-cut-${v === 'INNER' ? 'inner' : v === 'OUTER' ? 'outer' : 'mixed'}`, onChange: () => { method = v; sync(); } }), ` ${t}`));
+        const radios = METHODS.map(([v, t]) => h('label', {}, h('input', { type: 'radio', name: 'cutm', value: v, checked: v === method, disabled: !canEdit || (!money && v !== 'INNER'), 'data-testid': `pw-cut-${v === 'INNER' ? 'inner' : v === 'OUTER' ? 'outer' : 'mixed'}`, onChange: () => { method = v; sync(); } }), ` ${t}`));
         inner.addEventListener('input', () => { if (method === 'MIXED') outer.value = Math.max(total - Number(inner.value), 0); });
         outer.addEventListener('input', () => { if (method === 'MIXED') inner.value = Math.max(total - Number(outer.value), 0); });
-        const save = h('button', { type: 'button', class: 'primary', 'data-testid': 'cut-save', disabled: !canEdit, onClick: async () => {
+        const save = h('button', { type: 'button', class: 'primary', 'data-testid': 'cut-save', disabled: !canEdit || (!money && method !== 'INNER'), onClick: async () => {
             const i = num(inner.value); const o = num(outer.value); const reason = why.value.trim();
             if (!(i >= 0) || !(o >= 0)) return fail(new Error('Miktarlar geçersiz.'));
             if (i + o !== total) return fail(new Error(`İç + dış miktar iş emri miktarına (${total}) eşit olmalı.`));
