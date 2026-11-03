@@ -230,7 +230,7 @@ const BUSINESS_TR = [
     [/^DEPENDENCY_ORDER_VIOLATED|^DEPENDENCY_ORDER/, 'Ön koşul operasyon, bağlı operasyondan önce gelmeli (daha küçük OP numarası).'],
     [/^DEPENDENCY_OTHER_REVISION/, 'Bağımlılık yalnız aynı revizyonun operasyonları arasında kurulabilir.'],
     [/^ORDER_MISMATCH/, 'Sıralama listesi güncel değil (başka biri değiştirmiş olabilir). Sayfa yenilendi, tekrar deneyin.'],
-    [/^FORBIDDEN_RELEASED_ROUTE_EDIT/, 'Yürürlükteki revizyonda operasyon ekleme, sıralama ve pasife alma yalnız yönetici (ADMIN) hesaplarıyla yapılır. Hiçbir kayıt yapılmadı.'],
+    [/^FORBIDDEN_RELEASED_ROUTE_EDIT/, 'Yürürlükteki revizyonda operasyon ekleme, sıralama ve pasife alma yalnız bu yetkisi tanımlı kişilerce yapılır (rota değişikliği yetkisi). Hiçbir kayıt yapılmadı.'],
     [/^OP_STARTED_ON_WORKORDER/, 'Açık bir iş emrinde bu operasyon başlamış; numarası değiştirilemez (devam eden kayıt korunur). Önce iş emri tamamlanmalı veya ilgili kayıt ele alınmalı. Hiçbir kayıt yapılmadı.'],
     [/^OP_RULE_REFERENCED/, 'Bu operasyon numarasına bağlı ürün düzeyinde belge kapısı kuralı veya hurda eşiği var; numara değiştirilemez. Hiçbir kayıt yapılmadı.'],
     [/^RECHECK_OPEN/, 'Bu operasyon için açık takım yeniden-kontrol kaydı var; önce kapatılmalı. Hiçbir kayıt yapılmadı.'],
