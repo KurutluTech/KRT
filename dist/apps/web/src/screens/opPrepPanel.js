@@ -1,5 +1,5 @@
 // KMI-013 Teknik operasyon hazırlık formu (m0183: op_prep_list / op_prep_save / op_prep_set_status / op_prep_history).
-// Rotada henüz olmayan operasyonlar (CUT/PREP, OP10, OP20, OP40 …) için tek, doldurulabilir hazırlık taslağı.
+// Rotada henüz olmayan operasyonlar (CUT/PREP ve rotaya aktarılmamış OP’ler) için tek, doldurulabilir hazırlık taslağı.
 // Taslak; rota operasyonu, iş emri veya üretim kaydı DEĞİLDİR. Yetki, eksik hesabı, geçmiş ve belge ilişkileri sunucuda.
 import { skillCoverage, COVERAGE_TR } from '../../../../packages/domain/src/skillCoverage.js';
 import { h } from '../../../../packages/ui/src/h.js';
@@ -188,7 +188,7 @@ export function drawOpPrep(host, api, { revisionId }) {
         }
     };
     const det = h('details', { 'data-testid': 'opp-panel', style: 'margin-top:12px' }, h('style', {}, CSS),
-        h('summary', { style: 'cursor:pointer;font-weight:700' }, 'Operasyon hazırlık formu — rotada olmayan operasyonlar (CUT/PREP, OP10, OP20, OP40)'), body);
+        h('summary', { style: 'cursor:pointer;font-weight:700' }, 'Operasyon hazırlık formu — rotada olmayan operasyonlar (slot elle eklenir)'), body);
     det.open = true; loaded = true; void load(); // asıl çalışma alanı: varsayılan açık
     det.addEventListener('toggle', () => { if (det.open && !loaded) { loaded = true; void load(); } });
     return det;

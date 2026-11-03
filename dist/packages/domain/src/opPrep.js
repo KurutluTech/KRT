@@ -1,6 +1,7 @@
 // KMI-013 operasyon hazırlık formu — saf fonksiyonlar (ağ/DOM yok). Sunucu (m0183) karar verir; burası yalnız gösterim ve
 // gönderilecek alanları hazırlar. Taslak = rotada olmayan operasyonun hazırlığı; rota operasyonu/iş emri/üretim kaydı değildir.
-export const DEFAULT_SLOTS = ['CUT_PREP', 'OP10', 'OP20', 'OP40'];
+// m0206: sabit OP10/OP20/OP40 yok — hangi operasyonların hazırlık kartı olacağı rotadan ve mevcut taslaklardan gelir; yeni slot elle eklenir.
+export const DEFAULT_SLOTS = ['CUT_PREP'];
 export const slotLabel = (s) => (s === 'CUT_PREP' ? 'CUT/PREP · kesim/hazırlık' : s);
 export const slotValid = (s) => /^(CUT_PREP|OP[1-9][0-9]{1,2})$/.test(String(s ?? ''));
 /** Alanlar: [sunucu anahtarı, istemci (camel) anahtarı, etiket, tür] */

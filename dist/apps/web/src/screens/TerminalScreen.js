@@ -78,6 +78,7 @@ const REFUSAL_TR = [
     [/^TOOL_NOT_READY/, 'Takım bağlı değil'],
     [/MULTI_MACHINE|HARD_CAP/, 'Operatör çok-makine yetkisi yetersiz'],
     [/^OPERATOR_REQUIRED_FOR_QUALIFIED_MACHINE/, 'Bu makinede adı belli, yetkin operatör atanmalı'],
+    [/^OPERATOR_NOT_TRAINED/, 'Operatörün bu makine için eğitimi yok'],
     [/^OPERATOR_NOT_QUALIFIED/, 'Operatörün bu makine için yetkinliği yok'],
     [/^OPERATOR_QUALIFICATION_EXPIRED/, 'Operatörün yetkinlik süresi dolmuş'],
     [/^PREVIOUS_OPERATION_NOT_DONE/, 'Önceki operasyon bitmedi'],
