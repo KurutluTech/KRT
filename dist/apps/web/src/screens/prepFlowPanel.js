@@ -1,5 +1,6 @@
 // KMI Ürün Çalışma Alanı V2 — tek akışlı "Üretime hazırlık" katmanı: A başlık/sipariş · B yedi adım · C malzeme ve süre · D sürükle-bırak rota · E iş emri kapısı.
 // Bu katman KARAR VERMEZ ve veri YAZMAZ (rota sırası ve revizyon yayını hariç, ikisi de mevcut sunucu işlevidir); her şeyi mevcut kanonik kayıtlardan okur, ayrıntılı düzenleme mevcut kartlardadır.
+import { safeChain } from './productChainPanel.js';
 import { h } from '../../../../packages/ui/src/h.js';
 import { buildSteps, cncTime, remainingActions, materialSummary, moveId, overallStatus, renumber, reorderErrorText, sameOrder, workOrderGate } from '../prepLogic.js';
 import { chip, fmt } from '../kx.js';
@@ -47,7 +48,8 @@ export async function drawPrepFlow(host, c) {
     catch {
         return null;
     } };
-    const [chain, orders] = await Promise.all([rev ? safe(() => api.techChain(rev.id)) : Promise.resolve(null), api.orderLines ? safe(() => api.orderLines(ws.product.id)) : Promise.resolve(null)]);
+    const [chain0, orders] = await Promise.all([rev ? safe(() => api.techChain(rev.id)) : Promise.resolve(null), api.orderLines ? safe(() => api.orderLines(ws.product.id)) : Promise.resolve(null)]);
+    const chain = safeChain(chain0, ws); // aynı canonical belge uygunluk kuralı (başka operasyona ait belge bu operasyonun kaynağı sayılmaz)
     // CAM record older than the NC in force (same read-only comparison as the chain panel; unknown = no claim)
     const staleOps = [];
     for (const op of chain?.operations ?? []) {

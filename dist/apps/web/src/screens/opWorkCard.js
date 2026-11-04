@@ -247,23 +247,21 @@ export function buildOpWorkCard(ctx, o) {
     const chainHost = E('div', { 'data-testid': 'pw-op-chain-host', 'data-op-chain': String(o.opNo) });
     const candHost = E('div', { 'data-testid': 'owc-doc-candidates' });
     const drawCandidates = () => {
-        const chain = ctx.chainNow?.();
-        const mine = chain?.operations.find((x) => x.opNo === o.opNo);
+        // kaynak: ürün çalışma alanındaki GERÇEK belge-operasyon bağları (ws.routing[].documents); zincir cevabına güvenilmez
         const myMachines = o.machines.map((m) => m.code);
+        const own = new Set((o.documents ?? []).map((d) => d.docNo));
         const rows = [];
-        for (const x of chain?.operations ?? []) {
-            if (x.opNo === o.opNo)
+        for (const x of ws.routing) {
+            if (x.opNo === o.opNo || x.active === false)
                 continue;
-            const src = ws.routing.find((r) => r.opNo === x.opNo);
-            const from = { fromOpNo: x.opNo, fromOpCode: src?.opCode ?? `OP${x.opNo}`, fromMachines: (src?.machines ?? []).map((m) => m.code) };
-            for (const [kind, it] of [['NC programı', x.nc], ['Takım listesi', x.toolList]])
-                if (it?.documentId && it.docNo && !(kind === 'NC programı' ? mine?.nc?.documentId === it.documentId : mine?.toolList?.documentId === it.documentId))
-                    rows.push({ kind, it, from, verdict: docVerdict(from, o, myMachines) });
+            const from = { fromOpNo: x.opNo, fromOpCode: x.opCode ?? `OP${x.opNo}`, fromMachines: (x.machines ?? []).map((m) => m.code) };
+            for (const d of x.documents ?? [])
+                if (d.docNo && !own.has(d.docNo))
+                    rows.push({ d, from, verdict: docVerdict(from, o, myMachines) });
         }
         candHost.replaceChildren(...(rows.length ? [E('div', { class: 'mut' }, 'Aynı ürünün başka operasyonlara ait belgeleri (bilgi amaçlı; bu operasyona bağlanamaz):'),
-                ...rows.map((r) => {
-                    return E('div', { class: 'row owc-cand', style: 'align-items:center;gap:8px;flex-wrap:wrap' }, E('b', {}, r.it.docNo), E('span', { class: 'mut' }, `${r.kind} · ${r.it.controlState ?? r.it.status ?? ''}`), E('span', { class: `chip ${r.verdict.tone}`, 'data-testid': 'owc-blocked' }, r.verdict.text));
-                })] : [E('div', { class: 'mut' }, 'Başka operasyonlara ait belge yok. NC için “yükle” satırını kullanın.')]));
+                ...rows.map((r) => E('div', { class: 'row owc-cand', style: 'align-items:center;gap:8px;flex-wrap:wrap' }, E('b', {}, r.d.docNo), E('span', { class: 'mut' }, `${r.d.docType ?? ''} · ${r.d.controlState ?? ''}`), E('span', { class: `chip ${r.verdict.tone}`, 'data-testid': 'owc-blocked' }, r.verdict.text)))]
+            : [E('div', { class: 'mut' }, 'Başka operasyonlara ait belge yok. NC için “yükle” satırını kullanın.')]));
     };
     queueMicrotask(() => setTimeout(drawCandidates, 400));
     const gapMachines = !base.skill && ctx.machineReqs ? o.machines.filter((m) => !ctx.machineReqs.some((r) => r.machineId === m.id)).map((m) => m.code) : [];

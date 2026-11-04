@@ -15,6 +15,29 @@ export function ncToolComments(text) {
         out.push({ tNo: Number(m[1]), descr: m[2].trim().toLowerCase() });
     return out;
 }
+/** m0211.1: sunucunun zincir cevabı, bu operasyona bağlı OLMAYAN ama ürün revizyonunda bulunan bir NC/takım listesini 'OPERASYONA BAĞLI DEĞİL' diye aday gösterebilir.
+ *  Belge BAŞKA bir operasyona bağlıysa (ws.routing[].documents) o belge bu operasyonun kaynağı SAYILMAZ: NC/takım listesi YOK kabul edilir; bağla / CAM oluştur eylemleri sunulmaz.
+ *  Salt okunur ve KISITLAYICI: hiçbir kapıyı gevşetmez, yalnız yanlış eşleştirme yolunu kapatır. */
+export function sanitizeChainOp(op, ws) {
+    const owners = new Map();
+    for (const r of ws?.routing ?? [])
+        if (r.opNo !== op.opNo)
+            for (const d of r.documents ?? [])
+                if (d.docNo)
+                    owners.set(d.docNo, r.opCode ?? `OP${r.opNo}`);
+    const own = new Set((ws?.routing ?? []).filter((r) => r.opNo === op.opNo).flatMap((r) => (r.documents ?? []).map((d) => d.docNo)));
+    const fix = (it, label) => {
+        if (!it?.docNo || own.has(it.docNo) || !owners.has(it.docNo))
+            return it;
+        return { ...it, status: 'YOK', docNo: null, documentId: null, versionId: null, controlState: null, foreignDocNo: it.docNo, foreignOf: owners.get(it.docNo), detail: `${it.docNo} ${owners.get(it.docNo)} operasyonuna ait; bu operasyon için ${label} yüklenmeli` };
+    };
+    const nc = fix(op.nc, 'NC programı'), toolList = fix(op.toolList, 'takım listesi');
+    return nc === op.nc && toolList === op.toolList ? op : { ...op, nc, toolList };
+}
+/** Tüm görünümler için TEK giriş: sunucunun zincir cevabını (op_technical_chain) bu operasyonlara göre temizlenmiş hâliyle döndürür. Sunucu m0212 uygulandığında zaten temiz gelir; bu katman savunma amaçlıdır ve idempotenttir. */
+export function safeChain(chain, ws) {
+    return chain ? { ...chain, operations: (chain.operations ?? []).map((x) => sanitizeChainOp(x, ws)) } : chain;
+}
 export const CHAIN_TONE = { 'YOK': 'bad', 'BELGE VAR': 'warn', 'OPERASYONA BAĞLI DEĞİL': 'warn', 'TEKNİK ONAY BEKLİYOR': 'warn', 'YÜRÜRLÜKTE': 'ok' };
 const word = (label, it, testid) => E('span', { class: `chip ${CHAIN_TONE[it.status] ?? 'warn'}`, 'data-testid': testid, 'data-status': it.status, title: it.detail ?? '' }, `${label}: ${it.status}${it.docNo ? ` · ${it.docNo}` : ''}${it.programNo && label === 'CAM' ? ` · ${it.programNo}` : ''}`);
 /** Compact NC · CAM · takım listesi chips for one operation (same words as the chain panel, same source). Pure DOM, no decisions. */
@@ -77,7 +100,7 @@ export async function drawChainPanel(host, api, ws, can, reload, showErr, onChai
         return;
     } // 0136 not installed / no access: no panel, nothing invented
     onChain?.(chain);
-    const shown = onlyOpNo == null ? chain.operations : chain.operations.filter((x) => x.opNo === onlyOpNo);
+    const shown = (onlyOpNo == null ? chain.operations : chain.operations.filter((x) => x.opNo === onlyOpNo)).map((x) => sanitizeChainOp(x, ws));
     if (!shown.length)
         return;
     // NC in force is newer than the one the CAM record was made from (hash differs): offer to rebuild the CAM record. Read-only comparison of real records; any read error = no claim.

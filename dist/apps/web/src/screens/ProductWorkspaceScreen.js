@@ -8,7 +8,7 @@ import { CARD_STATE_TR, changeText } from '../../../../packages/domain/src/param
 import { bytesToHex } from '../../../../packages/domain/src/documents.js';
 import { guessMime } from './DocumentsScreen.js';
 import { errorText } from '../errorText.js';
-import { chainChips, chainGapText, drawChainPanel, orderReadiness } from './productChainPanel.js';
+import { chainChips, chainGapText, drawChainPanel, orderReadiness, sanitizeChainOp, safeChain } from './productChainPanel.js';
 import { buildOpWorkCard, autoWhy } from './opWorkCard.js';
 import { drawToolistWork } from './toolistWorkPanel.js';
 import { drawControlPlan } from './controlPlanPanel.js';
@@ -306,7 +306,7 @@ export async function renderProductWorkspaceScreen(container, api, state = {}) {
                     for (const v of d.versions.slice(0, 3)) {
                         const holder = E('div', { 'data-testid': 'pw-tools-checkhost' });
                         const workHost = E('div', { 'data-testid': 'pw-tools-workhost' });
-                        const ncTexts = async () => { const ch = await api.techChain(rev.id); const ids = [...new Set(ch.operations.map((o) => o.nc.versionId).filter((x) => !!x))]; const out = []; for (const id of ids) {
+                        const ncTexts = async () => { const ch = safeChain(await api.techChain(rev.id), ws); const ids = [...new Set(ch.operations.map((o) => o.nc.versionId).filter((x) => !!x))]; const out = []; for (const id of ids) {
                             const f = await api.toolistFile(id);
                             out.push(new TextDecoder().decode(fromBase64(f.contentBase64)));
                         } return out; };
@@ -481,14 +481,14 @@ export async function renderProductWorkspaceScreen(container, api, state = {}) {
             return E('div', { class: 'stack', 'data-testid': op ? 'pw-op-edit' : 'pw-op-new' }, copyBox, E('fieldset', { class: 'fsec' }, h('legend', {}, 'Genel'), E('div', { class: 'fgrid' }, field('Operasyon no', noIn), field('Ad', name), field('Ana makine', primary), field('Yeterlilik', skill), field('Seviye (1-10)', level))), E('fieldset', { class: 'fsec' }, h('legend', {}, 'Süreler'), E('div', { class: 'fgrid' }, field('Hazırlık (dk)', setup), field('Çevrim (sn/adet)', cycle))), h('details', { class: 'fsec', 'data-testid': 'pw-op-alt', open: mach.some((x) => isChecked(x.box)) }, h('summary', {}, 'Alternatif makine ekle (isteğe bağlı)'), E('div', { class: 'row', style: 'gap:4px 16px;margin-top:6px' }, ...mach.map((x) => h('label', { class: 'chk' }, x.box, x.m.code))), E('div', { class: 'mut' }, 'Alternatif makine tanımlamak START izni vermez: operatör yeterliliği, clearance, NC/CAM ve aparat kapıları o makine için ayrıca doğrulanır.'), machines.length ? null : E('div', { class: 'mut' }, 'Makine listesi okunamadı.')), E('div', { class: 'row', style: 'gap:4px 20px' }, h('label', { class: 'chk' }, fp, 'İlk parça kontrolü şart'), h('label', { class: 'chk' }, qc, 'Kalite kontrolü şart')), field('Operatör talimatı', ins), !can.editStructure && structural ? E('div', { class: 'mut' }, 'Yeni operasyon eklemek için taslak revizyon gerekir.') : null, E('div', { class: 'row', style: 'align-items:flex-end' }, btn('primary', 'pw-op-save', 'Kaydet', () => void save())));
         };
         let chainNow = null; // filled by the technical-chain panel (0136); null = not readable → no chips, nothing invented
-        const chainOf = (o) => chainNow?.operations.find((x) => x.opNo === o.opNo) ?? null;
+        const chainOf = (o) => { const c = chainNow?.operations.find((x) => x.opNo === o.opNo); return c ? sanitizeChainOp(c, ws) : null; };
         const opsHost = E('div', { 'data-testid': 'pw-ops' });
         // Kutu görünümü: aynı ws.routing verisi; sürükleme/ok yalnız önizleme, kayıt açık gerekçeli tek routing_reorder.
         let pendingOrder = null; let insertAt = null; let listView = false;
         const boxHost = E('div', { 'data-testid': 'pw-boxes' });
         const drawBoxes = () => {
             if (!ws.routing.length) { boxHost.replaceChildren(); return; }
-            drawOpBoxes(boxHost, { ops: ws.routing, chainOf: (o) => chainNow?.operations.find((x) => x.opNo === o.opNo) ?? null, chainChips, stateChip, chip,
+            drawOpBoxes(boxHost, { ops: ws.routing, chainOf, chainChips, stateChip, chip,
                 canEdit: !!(can.editStructure && editable), canAdd: !!(can.editStructure && editable), openId: openOp,
                 pending: pendingOrder, setPending: (v) => { pendingOrder = v; },
                 onOpen: (id) => { insertAt = null; const cp = ws.routing.find((x) => x.id === id); if (cp && isCutPrep(cp)) { const tab = container.querySelector('[data-testid="opp-tab-CUT_PREP"]'); if (tab) { tab.click(); scrollTo(container.querySelector('[data-testid="opp-slot-CUT_PREP"]')); return; } } if (openOp === id) { openOp = null; drawOps(); } else { toggleOp(id); } },
@@ -584,7 +584,7 @@ export async function renderProductWorkspaceScreen(container, api, state = {}) {
             routingCard.append(drawRouteChanges(h('div'), api, { revisionId: rev.id, status: rev.status })); // kendi açılır paneli var
         }
         void drawChainPanel(chainHost, api, ws, { act: !!(can.editRouting || can.manageDocuments) && editable }, (m) => reload(m), (e) => fail(e), (c) => {
-            chainNow = c;
+            chainNow = c ? { ...c, operations: c.operations.map((x) => sanitizeChainOp(x, ws)) } : c;
             if (!opsHost.querySelector('input:focus, textarea:focus, select:focus'))
                 drawOps(); // never wipe a field the user is typing in
             const o = orderReadiness(ws.readiness?.overall, c, ws.bom.length);
