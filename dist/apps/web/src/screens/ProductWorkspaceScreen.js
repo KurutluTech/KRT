@@ -151,7 +151,7 @@ export async function renderProductWorkspaceScreen(container, api, state = {}) {
         // Ayrı nedenler: revizyon yok / revizyon kapalı / yükleme yetkisi yok / veri yok — hiçbiri "VERİ YOK" arkasına gizlenmez.
         const whyNoUpload = !rev ? 'NO_REV' : rev.status === 'OBSOLETE' ? 'CLOSED' : !can.manageDocuments ? 'NO_PERM' : null;
         const WHY_TR = { NO_REV: 'Bu ürün için revizyon yok — dosya eklemek için önce taslak revizyon açılmalı.', CLOSED: 'Revizyon kapalı (geçersiz) — yeni revizyon süreci kullanılmalı.', NO_PERM: 'Yükleme yetkiniz yok.' };
-        let openOp = state.openOp ?? null;
+        let openOp = state.openOp ?? (state.openOpNo ? (ws.routing.find((x) => x.opNo === Number(state.openOpNo))?.id ?? null) : null);
         let opOpenHook = null;
         const reload = async (text, kind = 'ok', extra = {}) => {
             const y = window.scrollY;

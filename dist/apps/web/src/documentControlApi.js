@@ -16,6 +16,7 @@ export function createDocumentControlApi(client, session) {
         printBegin: (v, purpose, reason) => rpc('document_print_begin', { p_version: v, p_purpose: purpose, p_reason: reason }),
         verify: (ref) => rpc('document_verify', { p_ref: ref }),
         content: (v) => rpc('document_version_content', { p_version_id: v }),
+        toolistChecks: (v) => rpc('toolist_checks', { p_version: v }),
         upload: (i) => rpc('upload_document', { p_doc_type: i.docType, p_entity_type: i.entityType, p_entity_id: i.entityId, p_title: i.title, p_file_name: i.fileName, p_mime_type: i.mimeType,
             p_content_base64: i.contentBase64, p_valid_until: i.validUntil, p_note: i.note, p_document_id: i.documentId }),
         products: (q) => rpc('product_search', { p_q: q || null, p_family: null, p_status: 'ACTIVE', p_limit: 30 }),

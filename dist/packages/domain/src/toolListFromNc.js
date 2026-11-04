@@ -14,6 +14,7 @@ export function draftRows(analysis, kmiTools = []) {
             holder: d.holderText && d.holderText !== d.description ? d.holderText : '', offset, type: d.typeGuess ?? '', code: d.libraryRef ?? '',
             inferredType: !!d.typeGuess, usedInProgram: !!d.usedInProgram, match: matches[i].status, cardCode: matches[i].cardCode,
             ambiguousOffset: !d.lathe && hs.length > 1,
+            holderSuggestion: holderSuggestion(d.description ?? ''), taper: taperOf(d.description ?? ''),
         };
     });
 }
@@ -36,3 +37,47 @@ export function diffContent(oldCsv, rows) {
     return { added: nw.filter((r) => !oldBy.has(r.t)).map((r) => r.t), removed: o.filter((r) => !newBy.has(r.t)).map((r) => r.t), changed: nw.filter((r) => oldBy.has(r.t) && key(oldBy.get(r.t)) !== key(r)).map((r) => r.t) };
 }
 export { csvFromRows };
+
+/** NC açıklamasından TUTUCU / bağlama bilgisi önerisi (yalnız metinde yazan; doğrulanmamıştır). BT40/CAT40/SK/HSK/ER… ile başlayan kısım; "BOY nn" kuyruğu atılır. */
+export function holderSuggestion(desc) {
+    const t = String(desc ?? '').replace(/\s+/g, ' ').trim();
+    const m = /(?:^|\s)((?:CAT|BT|SK|HSK|ISO)\s?-?\d{2,3}[A-Z]?\b|ER\s?-?\d{1,2}\b)/i.exec(t);
+    if (!m) return '';
+    let s = t.slice(m.index).trim().replace(/\s+BOY\s+\d+(?:[.,]\d+)?\s*$/i, '').trim();
+    return s.length >= 3 ? s : '';
+}
+/** Makine bağlantı standardı (açıklamadaki BT/CAT/SK/HSK + boyut). Yoksa null. */
+export function taperOf(text) {
+    const m = /\b(CAT|BT|SK|HSK|ISO)\s?-?(\d{2,3})([A-Z])?\b/i.exec(String(text ?? ''));
+    return m ? `${m[1].toUpperCase()}${m[2]}` : null;
+}
+/** Sunucudaki CONTENT_STRUCTURE kuralının aynısı: satır başına eksik/geçersiz alan. Satır no = dosyadaki satır (başlık=1). */
+export function rowProblems(rows) {
+    const out = []; const seen = new Map();
+    const num = (v) => /^[0-9]+(\.[0-9]+)?$/.test(String(v).trim().replace(',', '.')) && Number(String(v).trim().replace(',', '.')) > 0;
+    rows.forEach((r, i) => {
+        const missing = []; const bad = [];
+        if (!String(r.t ?? '').trim() || !/\d/.test(r.t)) missing.push('T no');
+        for (const [k, lbl] of [['dia', 'çap'], ['len', 'boy'], ['holder', 'tutucu'], ['offset', 'offset']]) if (!String(r[k] ?? '').trim()) missing.push(lbl);
+        if (String(r.dia ?? '').trim() && !num(r.dia)) bad.push('çap sayı değil');
+        if (String(r.len ?? '').trim() && !num(r.len)) bad.push('boy sayı değil');
+        if (String(r.offset ?? '').trim() && !/\d/.test(r.offset)) bad.push('offset sayı içermiyor');
+        const tn = /\d+/.exec(r.t ?? '')?.[0]; const key = tn != null ? Number(tn) : null;
+        if (key != null) { if (seen.has(key)) bad.push(`tekrarlı T${key} (satır ${seen.get(key)})`); else seen.set(key, i + 2); }
+        if (missing.length || bad.length) out.push({ t: r.t, rowNo: i + 2, missing, bad });
+    });
+    return out;
+}
+/** Listedeki bağlantı standartları: 1'den çoksa uyumsuzluk uyarısı. Makine mil standardı KMI'de tanımlı olmadığı için makineyle karşılaştırılmaz. */
+export function taperMix(rows) {
+    const set = new Map();
+    for (const r of rows) { const t = taperOf(r.holder) ?? r.taper ?? taperOf(r.desc); if (t) set.set(t, [...(set.get(t) ?? []), r.t]); }
+    return { tapers: [...set.keys()], by: Object.fromEntries(set), mixed: set.size > 1 };
+}
+/** Kayıtlı takım listesi içeriğinden (CSV) düzenlenebilir satırlar — açıklama ve kod sütunları korunur. */
+export function rowsFromCsv(csv, kmiTools = []) {
+    const g = readCsvGrid(csv ?? ''); const m = guessMapping(g); const n = normalizeSheet(g, m);
+    const draft = n.rows.map((r) => ({ t: r.t, libraryRef: r.code || null }));
+    const mt = matchKmiTools(draft, kmiTools ?? []);
+    return n.rows.map((r, i) => ({ t: r.t, desc: r.desc ?? '', dia: r.dia, len: r.len, holder: r.holder, offset: r.offset, type: r.type, code: r.code ?? '', inferredType: false, match: mt[i].status, cardCode: mt[i].cardCode, ambiguousOffset: false, holderSuggestion: r.holder ? '' : holderSuggestion(r.desc ?? ''), taper: taperOf(r.desc ?? '') }));
+}
