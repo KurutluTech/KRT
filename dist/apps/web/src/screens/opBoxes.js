@@ -5,6 +5,10 @@ import { h } from '../../../../packages/ui/src/h.js';
 
 // Sunucu product_workspace çıktısı CUT/PREP için op_code'u 'OP1' verir ve op_kind göndermez; op_no=1 CUT/PREP'e AYRILMIŞTIR (routing_cut_prep_save / routing_reorder). Yanlış sürükleme riskine karşı üçü de kontrol edilir.
 export const isCutPrep = (o) => o.opKind === 'CUT_PREP' || o.opCode === 'CUT/PREP' || o.opNo === 1;
+/** Görünen ad: CUT/PREP numaralı CNC operasyonu değildir — hayalet "OP1" gösterilmez. Kimlik (id) değişmez; ön koşullar kalıcı operasyon kimliğiyle tutulur. */
+export const opLabel = (o) => (o && isCutPrep(o) ? 'CUT/PREP' : (o?.opCode ?? ''));
+/** Geçmiş/olay metinlerinde "OP1" → CUT/PREP (yalnız tam kelime). */
+export const fixCutPrepText = (t) => (typeof t === 'string' ? t.replace(/\bOP0?1\b/g, 'CUT/PREP') : t);
 /** Sürüklenebilir (CUT/PREP dışı, aktif) operasyonlar — mevcut sırayla. */
 export const movableOps = (ops) => ops.filter((o) => o.active && !isCutPrep(o)).slice().sort((a, b) => a.opNo - b.opNo);
 /** from → to taşıma; yeni dizi döner (girdi değişmez). */

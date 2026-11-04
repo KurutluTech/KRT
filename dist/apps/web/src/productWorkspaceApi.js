@@ -47,6 +47,17 @@ export function createProductWorkspaceApi(client, session) {
         makeEffective: (v, label) => dc.makeEffective(v, label),
         async versionState(documentId, versionId) { const lc = await dc.lifecycle(documentId); const v = lc.versions.find((x) => x.id === versionId); return { state: v?.control?.state ?? null, validity: v?.validity ?? null }; },
         async docMakeEffective(documentId, label) { const lc = await dc.lifecycle(documentId); const v = [...lc.versions].sort((a, b) => b.versionNo - a.versionNo)[0]; if (!v?.control) throw new Error('DOCUMENT_VERSION_NOT_FOUND'); return dc.makeEffective(v.id, label || null); },
+        /** NC metni (salt okunur): sürüm verilmişse o, yoksa belgenin yürürlükteki / en yeni sürümü. */
+        async ncText(ref) {
+            let vid = typeof ref === 'string' ? ref : ref?.versionId ?? null;
+            if (!vid && ref?.documentId) { const lc = await dc.lifecycle(ref.documentId); const vs = [...lc.versions].sort((a, b) => b.versionNo - a.versionNo); vid = (vs.find((x) => x.control?.state === 'EFFECTIVE') ?? vs[0])?.id ?? null; }
+            if (!vid) throw new Error('DOCUMENT_VERSION_NOT_FOUND');
+            const c = await dc.content(vid);
+            const bin = atob(c.contentBase64 ?? ''); const u8 = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i += 1) u8[i] = bin.charCodeAt(i);
+            return new TextDecoder('utf-8').decode(u8);
+        },
+        /** m0213 öncesi YÜKLENDİ kayıt mı? (basit sınıf + DRAFT + sunucu otomatik yayın denemesi olayı yok) */
+        async legacyDraft(documentId) { const lc = await dc.lifecycle(documentId); const v = [...lc.versions].sort((a, b) => b.versionNo - a.versionNo)[0]; const tried = (lc.events ?? []).some((e) => e.versionNo === v?.versionNo && /^AUTO_PUBLISH/.test(e.event)); return { legacy: !!v?.control && v.control.state === 'DRAFT' && !tried, versionNo: v?.versionNo ?? null }; },
         async docReview(v, note) { await dc.review(v, true, note); },
         async docApprove(v, note) { await dc.approve(v, true, note); },
         async docPublish(v, reason) { await dc.publish(v, reason); },

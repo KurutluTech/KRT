@@ -6,6 +6,7 @@ import { h } from '../../../../packages/ui/src/h.js';
 import { changeText } from '../../../../packages/domain/src/parameters.js';
 import { field, invalid, isChecked, val } from '../kx.js';
 import { errorText } from '../errorText.js';
+import { opLabel } from './opBoxes.js';
 const E = (tag, props = null, ...kids) => h(tag, props, ...kids);
 const num = (s) => { const t = String(s).trim().replace(',', '.'); if (t === '')
     return null; const x = Number(t); return Number.isFinite(x) ? x : null; };
@@ -62,7 +63,7 @@ export function buildOpWorkCard(ctx, o) {
     const plans = ws.quality.filter((q) => q.operationNo === null || q.operationNo === o.opNo);
     const qcPlan = h('select', { 'data-testid': 'pw-qc-plan' }, h('option', { value: '' }, '— kontrol planı seçilmedi —'), ...plans.map((q) => h('option', { value: q.id }, `${q.operationNo != null ? 'OP' + q.operationNo : 'Genel'} v${q.version} (${q.status}) · ${q.characteristics} karakteristik`)));
     const qcKind = h('select', { 'data-testid': 'pw-qc-kind' }, ...['FIRST_PIECE', 'IN_PROCESS', 'FINAL'].map((k) => h('option', { value: k }, KIND_TR[k])));
-    const depSel = h('select', { 'data-testid': 'pw-dep-sel' }, h('option', { value: '' }, '— ön koşul operasyon —'), ...activeOps.filter((x) => x.opNo < o.opNo && !o.dependsOn.some((d) => d.operationId === x.id)).map((x) => h('option', { value: x.id }, x.opCode)));
+    const depSel = h('select', { 'data-testid': 'pw-dep-sel' }, h('option', { value: '' }, '— ön koşul operasyon —'), ...activeOps.filter((x) => x.opNo < o.opNo && !o.dependsOn.some((d) => d.operationId === x.id)).map((x) => h('option', { value: x.id }, opLabel(x))));
     const statusHost = E('div', { 'data-testid': 'owc-status', role: 'status', 'aria-live': 'polite' });
     const drawPend = () => {
         const chip = (txt, rm) => E('span', { class: 'chip warn owc-chip' }, txt, ' ', h('button', { type: 'button', class: 'ghost sm', 'aria-label': 'Vazgeç', onClick: rm }, '✕'));
@@ -78,9 +79,9 @@ export function buildOpWorkCard(ctx, o) {
             drawPend();
         } } }, `✕ ${KIND_TR[r.kind] ?? r.kind} ${r.code}`)));
     const existingDep = E('div', { class: 'row', style: 'flex-wrap:wrap;gap:6px;margin-top:6px' }, ...o.dependsOn.map((d) => h('button', { type: 'button', class: 'ghost sm', onClick: () => { if (!pend.dep.some((p) => p.id === d.operationId)) {
-            pend.dep.push({ id: d.operationId, code: d.opCode, on: false });
+            pend.dep.push({ id: d.operationId, code: opLabel(activeOps.find((a) => a.id === d.operationId) ?? d), on: false });
             drawPend();
-        } } }, `✕ ${d.opCode}`)));
+        } } }, `✕ ${opLabel(activeOps.find((a) => a.id === d.operationId) ?? d)}`)));
     const exQc = o.qcPoints.length ? E('div', { class: 'mut' }, `Kayıtlı: ${o.qcPoints.map((q) => `KN${q.pointNo} ${q.label}`).join('; ')}`) : null;
     const addBtn = (label, testid, fn) => h('button', { type: 'button', class: 'ghost', 'data-testid': testid, onClick: fn }, label);
     // ---- değişiklik tespiti
@@ -109,7 +110,7 @@ export function buildOpWorkCard(ctx, o) {
         return;
     } invalid(qcNo, false); invalid(qcLabel, false); pend.qc.push({ no, label, kind: val(qcKind), plan: val(qcPlan) || null }); qcNo.value = ''; qcLabel.value = ''; drawAll(); };
     const addDep = () => { const id = val(depSel); if (!id)
-        return; const x = activeOps.find((a) => a.id === id); pend.dep.push({ id, code: x?.opCode ?? id, on: true }); depSel.value = ''; drawAll(); };
+        return; const x = activeOps.find((a) => a.id === id); pend.dep.push({ id, code: x ? opLabel(x) : id, on: true }); depSel.value = ''; drawAll(); };
     // ---- tek kayıt akışı
     let saving = false;
     const save = async () => {

@@ -172,7 +172,7 @@ export function drawOpPrep(host, api, { revisionId }) {
                 body.querySelector('[data-testid="opp-cards"]')?.append(nc); addTab(s, null); pick(s);
                 extra.value = '';
             } }, 'Başka operasyon ekle')) : null;
-            const routeNote = (L.routingOps ?? []).length ? `Rotada olan operasyonlar (${L.routingOps.map((o) => `OP${o.opNo}`).join(', ')}) bu formda değil, rota ekranında yönetilir.` : '';
+            const routeNote = (L.routingOps ?? []).length ? `Rotada olan operasyonlar (${L.routingOps.map((o) => (o.opNo === 1 || o.opKind === 'CUT_PREP' ? 'CUT/PREP' : `OP${o.opNo}`)).join(', ')}) bu formda değil, rota ekranında yönetilir.` : '';
             body.replaceChildren(...[
                 h('details', { class: 'mut', style: 'margin:6px 0', 'data-testid': 'opp-scope-note' }, h('summary', {}, 'Bu form nedir? (kapsam ve sınırlar)'), 'Bu form rotada henüz olmayan operasyonların teknik hazırlık taslağıdır. Kaydetmek veya onaylamak rotaya operasyon eklemez, iş emri, stok veya üretim kaydı oluşturmaz. ONAYLI = teknik inceleme tamam; rota RELEASE veya üretim GO değildir. ', routeNote),
                 L.can?.edit ? null : h('div', { class: 'mut', 'data-testid': 'opp-readonly' }, 'Salt okunur: düzenleme için rota tanımlama yetkisi gerekir.'),
