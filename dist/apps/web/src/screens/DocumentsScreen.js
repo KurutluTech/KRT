@@ -8,6 +8,7 @@ import { h, mount } from '../../../../packages/ui/src/h.js';
 import { DOCUMENT_ENTITY_TYPES, DOCUMENT_TYPES, ENTITY_TR, MAX_DOCUMENT_BYTES, bytesToHex, canUploadDocument, documentType, } from '../../../../packages/domain/src/documents.js';
 import { CONSISTENCY_TR, EXTRACTION_FLAG_TR, GATE_TR } from '../../../../packages/domain/src/asBuilt.js';
 import { errorText as sharedErrorText } from '../errorText.js';
+import { isSimpleDocType } from '../documentControlApi.js';
 import { KX_CSS, card, chip, emptyState, fold } from '../kx.js';
 const STATE_TR = { PRESENT: 'VAR', MISSING: 'EKSİK', EXPIRED: 'SÜRESİ DOLMUŞ', NOT_EFFECTIVE: 'ONAYLI / YÜRÜRLÜKTE DEĞİL' };
 const EXPIRY_TR = { NO_EXPIRY: '', VALID: 'geçerli', EXPIRING_SOON: 'süresi doluyor', EXPIRED: 'SÜRESİ DOLDU' };
@@ -170,10 +171,10 @@ export async function renderDocumentsScreen(container, api, state = {}) {
         };
         const withdrawn = d.status === 'WITHDRAWN';
         return h('div', { 'data-testid': 'dc-doc', 'data-id': d.id, 'data-status': d.status, 'data-type': d.docType, class: 'kx-sub', style: withdrawn ? 'opacity:.6' : '' }, h('div', { class: 'row', style: 'justify-content:space-between' }, h('div', {}, h('b', { style: 'color:#fff' }, d.title), h('span', { class: 'mut' }, ` · ${typeTr(d.docType)}`)), withdrawn ? chip(`Geri çekildi${d.withdrawnReason ? ` · ${d.withdrawnReason}` : ''}`, 'bad') : chip('Etkin', 'ok')), ...d.versions.map((v) => h('div', { 'data-testid': 'dc-version', 'data-no': String(v.versionNo), 'data-expiry': v.expiry, class: 'row', style: 'margin-top:6px;font-size:13px' }, h('span', {}, `Sürüm ${v.versionNo} · ${v.fileName} · ${kb(v.sizeBytes)}`), v.validUntil ? chip(`${v.validUntil} ${EXPIRY_TR[v.expiry]}`, v.expiry === 'EXPIRED' ? 'bad' : v.expiry === 'EXPIRING_SOON' ? 'warn' : 'off') : null, v.note ? h('span', { class: 'mut' }, v.note) : null, h('button', { type: 'button', class: 'ghost sm', 'data-testid': 'dc-download', onClick: () => void download(v.id) }, 'İndir'), extractionView(v.id), h('span', { class: 'mut', title: v.sha256 }, `parmak izi ${v.sha256.slice(0, 8)}…`))), integrity, d.status === 'ACTIVE' ? fold('Yeni sürüm yükle', [uploadForm(d.id, d.docType)]) : null, d.status === 'ACTIVE' ? fold('Geri çek (neden zorunlu)', [h('div', { class: 'row' }, h('div', { class: 'grow' }, reason), h('button', { type: 'button', class: 'danger', 'data-testid': 'dc-withdraw', onClick: async () => {
-                    if (reason.value.trim().length < 5)
+                    if (reason.value.trim().length < 5 && !isSimpleDocType(d.docType))
                         return fail(new Error('REASON_REQUIRED'));
                     try {
-                        await api.withdraw(d.id, reason.value.trim());
+                        await api.withdraw(d.id, reason.value.trim() || null);
                         ok('Doküman geri çekildi (sürümler saklanır).');
                     }
                     catch (err) {

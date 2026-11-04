@@ -5,6 +5,7 @@
 import { rememberProduct } from '../lastProduct.js';
 import { h, mount } from '../../../../packages/ui/src/h.js';
 import { CARD_STATE_TR, changeText } from '../../../../packages/domain/src/parameters.js';
+import { isSimpleDocType } from '../documentControlApi.js';
 import { bytesToHex } from '../../../../packages/domain/src/documents.js';
 import { guessMime } from './DocumentsScreen.js';
 import { errorText } from '../errorText.js';
@@ -55,6 +56,7 @@ const CALC_TONE = { CURRENT: 'ok', STALE: 'warn', SUPERSEDED: 'off' };
 const KIND_TR = { FIXTURE: 'Fikstür', TOOL: 'Takım', GAUGE: 'Mastar/Ölçü', RESOURCE: 'Kaynak', FIRST_PIECE: 'İlk parça', IN_PROCESS: 'Proses içi', FINAL: 'Son kontrol' };
 const DOC_TR = { DRAWING: 'Teknik resim', CAD_MODEL: 'CAD/STEP', NC_PROGRAM: 'NC programı', CAM_SETUP_SHEET: 'CAM setup', TOOL_LIST: 'Takım listesi', CONTROL_PLAN: 'Kontrol planı', WORK_INSTRUCTION: 'İş talimatı' };
 const CTL_TR = { DRAFT: 'Taslak', IN_REVIEW: 'İncelemede', APPROVED: 'Onaylandı', EFFECTIVE: 'Yürürlükte', SUPERSEDED: 'Geçersiz', REJECTED: 'Reddedildi' };
+const ctlLabel = (state, docType) => (isSimpleDocType(docType) ? ({ DRAFT: 'Yüklendi (geçerli değil)', EFFECTIVE: 'Geçerli', SUPERSEDED: 'Eski sürüm', REJECTED: 'İptal' }[state ?? ''] ?? '—') : (CTL_TR[state ?? ''] ?? '—'));
 const CTL_TONE = { DRAFT: 'info', IN_REVIEW: 'warn', APPROVED: 'warn', EFFECTIVE: 'ok', SUPERSEDED: 'bad', REJECTED: 'bad' };
 const PARAMS = [
     { code: 'OP_SETUP_MIN', name: 'Hazırlık süresi', unit: 'dk', src: 'Rota standardı' }, { code: 'OP_CYCLE_SEC', name: 'Çevrim süresi', unit: 'sn/adet', src: 'Rota standardı' }, { code: 'OP_INSPECTION_SEC', name: 'Muayene süresi', unit: 'sn/adet', src: 'Kalite standardı' }
@@ -211,7 +213,9 @@ export async function renderProductWorkspaceScreen(container, api, state = {}) {
                 const file = h('input', { type: 'file', 'data-testid': `pw-${tid}-file`, ...(docType === 'TOOL_LIST' ? { accept: '.xlsx,.xls,.csv,.pdf' } : {}) });
                 const note = h('input', { 'data-testid': `pw-${tid}-note`, placeholder: target ? 'Bu sürümde ne değişti? (isteğe bağlı)' : 'Not (isteğe bağlı)' });
                 const ttl = multi && !target ? h('input', { 'data-testid': `pw-${tid}-title`, placeholder: 'Program adı (ör. OP10 tornalama)' }) : null;
-                const canDecide = !!(can.approveDocument && api.docSubmit && api.docReview && api.docApprove && api.docPublish);
+                const simpleType = isSimpleDocType(docType);
+                const needsLabel = docType === 'DRAWING';
+                const canDecide = !simpleType && !!(can.approveDocument && api.docSubmit && api.docReview && api.docApprove && api.docPublish);
                 const decision = canDecide ? h('select', { 'data-testid': `pw-${tid}-decision` }, h('option', { value: 'DRAFT' }, 'Yalnız yükle (TASLAK kalsın)'), h('option', { value: 'APPROVED' }, 'Yükle ve onayla (kontrol + onay, benim kararım)'), ...(docType === 'TOOL_LIST' ? [] : [h('option', { value: 'EFFECTIVE' }, 'Yükle, onayla ve yürürlüğe al (benim kararım)')])) : null;
                 const label = h('input', { 'data-testid': `pw-${tid}-label`, value: rev?.revision ?? '', placeholder: 'Belgenin üzerinde yazan revizyon (ör. A)' });
                 const upload = async () => {
@@ -222,7 +226,26 @@ export async function renderProductWorkspaceScreen(container, api, state = {}) {
                     }
                     try {
                         const bytes = new Uint8Array(await f.arrayBuffer());
+                        if (simpleType && needsLabel && !val(label).trim())
+                            throw new Error('Teknik resimde belge üzerindeki revizyonu yazın (ör. A); dosya yüklenmedi.');
                         const r = await api.upload({ docType, entityType: 'PRODUCT_REVISION', entityId: rev.id, title: target ? null : ((ttl && val(ttl).trim()) || `${title} ${ws.product.code}`), fileName: f.name, mimeType: guessMime(f.name, f.type), contentBase64: toBase64(bytes), validUntil: null, note: val(note).trim() || null, documentId: target?.id ?? null });
+                        if (simpleType) {
+                            // m0213: sade yaşam döngüsü — dosya kimlik + zaman + SHA-256 ile mühürlenir; yetkiliyse sunucu doğrudan GEÇERLİ yapar. Ayrı onay/gerekçe adımı yok.
+                            let st = await api.versionState(r.documentId, r.versionId);
+                            if (st.state === 'DRAFT' && needsLabel && val(label).trim()) {
+                                await api.makeEffective(r.versionId, val(label).trim());
+                                st = await api.versionState(r.documentId, r.versionId);
+                            }
+                            const sealed = 'Yükleyen kimliği, zaman ve SHA-256 ile mühürlendi.';
+                            await reload(st.state === 'EFFECTIVE'
+                                ? `Yüklendi ve GEÇERLİ: sürüm ${r.versionNo}. ${sealed}${docType === 'NC_PROGRAM' ? ' CAM kaydı eski NC’den ise “CAM kaydını yeni NC’den yeniden oluştur” düğmesi çıkar.' : ''}`
+                                : st.state === 'DRAFT'
+                                    ? (docType === 'TOOL_LIST' ? `Yüklendi: sürüm ${r.versionNo}. Takım listesi, kritik takım doğrulaması yapılınca otomatik GEÇERLİ olur. ${sealed}`
+                                        : needsLabel ? `Yüklendi: sürüm ${r.versionNo}. Revizyon bilgisi geçerli kılmayı tamamlamadı; yeni sürüm yükleyin. ${sealed}`
+                                            : `Yüklendi: sürüm ${r.versionNo} — otomatik geçerli olmadı (ayrıntı Doküman Kontrol > Olaylar). ${sealed}`)
+                                    : `Yüklendi: sürüm ${r.versionNo}.`);
+                            return;
+                        }
                         const want = decision ? val(decision) : 'DRAFT';
                         if (want === 'DRAFT' || !api.docSubmit || !api.docReview || !api.docApprove || !api.docPublish) {
                             await reload(`Yüklendi: sürüm ${r.versionNo} — TASLAK. Üretimde geçerli olması için Doküman Kontrol'den onay ve yürürlüğe alma gerekir.`);
@@ -254,7 +277,7 @@ export async function renderProductWorkspaceScreen(container, api, state = {}) {
                         fail(e);
                     }
                 };
-                formHost.append(E('div', { class: 'formbox' }, E('div', { class: 'mut' }, target ? `${target.docNo ?? ''} için YENİ SÜRÜM: eski sürüm silinmez ve yürürlükteki sürüm değişmez; yeni dosya TASLAK olarak eklenir.` : 'Yeni doküman TASLAK olarak eklenir; onay ve yürürlüğe alma Doküman Kontrol’dedir.'), E('div', { class: 'fgrid w2' }, ...(ttl ? [field('Program adı', ttl)] : []), field('Dosya', file), field('Not', note), ...(decision ? [field('Yüklerken karar', decision), field('Belge revizyonu (karar verilecekse)', label)] : [])), E('div', { class: 'row' }, btn('primary', `pw-${tid}-upload`, 'Yükle (TASLAK)', () => void upload()), btn('ghost', null, 'Vazgeç', () => formHost.replaceChildren()))));
+                formHost.append(E('div', { class: 'formbox' }, E('div', { class: 'mut' }, target ? `${target.docNo ?? ''} için YENİ SÜRÜM: eski sürüm silinmez (ESKİ SÜRÜM olarak saklanır); yetkiliyseniz yeni dosya doğrudan GEÇERLİ olur, ayrıca onay gerekmez.` : 'Dosya yükleyen kişinin kimliği, zamanı ve SHA-256 ile mühürlenir; yetkiliyseniz doğrudan GEÇERLİ olur — ayrıca onay gerekmez.'), E('div', { class: 'fgrid w2' }, ...(ttl ? [field('Program adı', ttl)] : []), field('Dosya', file), field('Not', note), ...(decision ? [field('Yüklerken karar', decision), field('Belge revizyonu (karar verilecekse)', label)] : needsLabel ? [field('Belge üzerindeki revizyon', label)] : [])), E('div', { class: 'row' }, btn('primary', `pw-${tid}-upload`, simpleType ? 'Yükle' : 'Yükle (TASLAK)', () => void upload()), btn('ghost', null, 'Vazgeç', () => formHost.replaceChildren()))));
             };
             const toolHost = E('div', { 'data-testid': 'pw-tools-control', style: 'margin-top:10px' });
             const STATUS_TR = { OK: 'DOĞRULANDI', FAIL: 'HATA', WARN: 'UYARI', NOT_VERIFIABLE: 'SİSTEM DOĞRULAYAMADI' };
@@ -270,7 +293,7 @@ export async function renderProductWorkspaceScreen(container, api, state = {}) {
                 catch {
                     return;
                 }
-                const stTr = { DRAFT: 'Taslak', IN_REVIEW: 'Kontrolde', APPROVED: 'Onaylı (yürürlüğe alınmadı)', EFFECTIVE: 'Yürürlükte', SUPERSEDED: 'Eski sürüm', REJECTED: 'Reddedildi' };
+                const stTr = { DRAFT: 'Yüklendi (doğrulama bekliyor)', IN_REVIEW: 'Kontrolde', APPROVED: 'Onaylı (yürürlüğe alınmadı)', EFFECTIVE: 'Geçerli', SUPERSEDED: 'Eski sürüm', REJECTED: 'Reddedildi' };
                 const showChecks = async (vid, holder, canAttest, state, attested) => {
                     holder.replaceChildren();
                     try {
@@ -283,20 +306,20 @@ export async function renderProductWorkspaceScreen(container, api, state = {}) {
                         const row = (x) => E('div', { class: 'r', 'data-testid': 'pw-tools-check', 'data-code': x.code, 'data-status': x.status }, chip(STATUS_TR[x.status] ?? x.status, STATUS_TONE[x.status] ?? ''), E('b', {}, x.label), E('span', { class: 'mut' }, x.detail));
                         const todo = c.checks.filter((x) => x.status !== 'OK');
                         const okc = c.checks.filter((x) => x.status === 'OK');
-                        const docTr = state === 'EFFECTIVE' ? 'Yürürlükte' : state === 'APPROVED' ? 'Onaylı' : state === 'IN_REVIEW' ? 'Kontrolde' : 'Taslak';
+                        const docTr = state === 'EFFECTIVE' ? 'Geçerli' : state === 'APPROVED' ? 'Onaylı' : state === 'IN_REVIEW' ? 'Kontrolde' : 'Yüklendi';
                         const prep = c.fail > 0 ? 'Hatalı madde var' : todo.length > 0 ? 'Eksik bilgiler var' : attested ? 'Hazır' : 'Elle doğrulama bekliyor';
                         const useTxt = (c.fail === 0 && todo.length === 0 && attested && state === 'EFFECTIVE') ? 'Serbest' : 'Henüz serbest değil';
                         const sumRow = (k, lbl, v, tone) => E('div', { class: 'row', style: 'gap:6px' }, E('span', { class: 'mut' }, lbl), chip(v, tone, { 'data-testid': `pw-tools-sum-${k}` }));
                         holder.append(E('div', { class: 'stack', style: 'gap:6px', 'data-testid': 'pw-tools-summary' }, sumRow('doc', 'Belge', docTr, state === 'EFFECTIVE' || state === 'APPROVED' ? 'ok' : ''), sumRow('prep', 'Takım hazırlığı', prep, c.fail > 0 ? 'bad' : todo.length > 0 ? 'warn' : attested ? 'ok' : 'info'), sumRow('use', 'Üretimde kullanım', useTxt, useTxt === 'Serbest' ? 'ok' : 'warn')), todo.length ? E('div', { class: 'rows', 'data-testid': 'pw-tools-checks' }, E('b', {}, `Yapılacaklar (${todo.length})`), ...todo.map(row)) : E('div', { class: 'mut', 'data-testid': 'pw-tools-checks' }, 'Açık madde yok.'), okc.length ? E('details', { 'data-testid': 'pw-tools-ok-fold' }, E('summary', { class: 'mut' }, `Geçen kontroller (${okc.length})`), E('div', { class: 'rows' }, ...okc.map(row))) : document.createComment(''), c.fail > 0 ? E('div', { class: 'banner bad', 'data-testid': 'pw-tools-failed' }, 'Hatalı madde var: bu sürüm yürürlüğe alınamaz. Düzeltilmiş yeni sürüm yükleyin.')
                             : attested ? E('div', { class: 'banner ok', 'data-testid': 'pw-tools-attested' }, 'Kritik alanlar yetkili kişi tarafından doğrulandı ve kaydedildi.')
-                                : (canAttest && (state === 'IN_REVIEW' || state === 'APPROVED')) ? E('details', { 'data-testid': 'pw-tools-attest-form', open: todo.length === 0 }, E('summary', {}, E('b', {}, 'Teknik doğrulama (yetkili)')), E('div', { class: 'formbox' }, ...boxes.map((b) => E('label', { class: 'row', style: 'gap:6px' }, b.el, b.t)), E('label', { class: 'row', style: 'gap:6px' }, all, 'Tümünü işaretle (hepsini kontrol ettim)'), field('Doğrulama notu', note), btn('primary', 'pw-tools-attest', 'Doğruladım, kaydet', () => void (async () => { try {
+                                : (canAttest && (state === 'IN_REVIEW' || state === 'APPROVED' || state === 'DRAFT')) ? E('details', { 'data-testid': 'pw-tools-attest-form', open: todo.length === 0 }, E('summary', {}, E('b', {}, 'Teknik doğrulama (yetkili)')), E('div', { class: 'formbox' }, ...boxes.map((b) => E('label', { class: 'row', style: 'gap:6px' }, b.el, b.t)), E('label', { class: 'row', style: 'gap:6px' }, all, 'Tümünü işaretle (hepsini kontrol ettim)'), field('Doğrulama notu', note), btn('primary', 'pw-tools-attest', 'Doğruladım, kaydet', () => void (async () => { try {
                                     await api.toolistAttest(vid, Object.fromEntries(boxes.map((b) => [b.k, b.el.checked])), val(note).trim());
-                                    await reload('Takım listesi doğrulaması kaydedildi. Yürürlüğe alma Doküman Kontrol’dedir.');
+                                    await reload('Takım listesi doğrulaması kaydedildi; liste geçerli yapıldı (yetkiniz yeterliyse).');
                                 }
                                 catch (e) {
                                     fail(e);
                                 } })())))
-                                    : E('div', { class: 'mut' }, 'Elle doğrulama bekleniyor (kontrol ve onay sürecinden sonra yetkili kişi kaydeder).'));
+                                    : E('div', { class: 'mut' }, 'Elle doğrulama bekleniyor (yetkili kişi kaydeder; kayıt sonrası liste otomatik GEÇERLİ olur).'));
                     }
                     catch (e) {
                         fail(e);
@@ -328,7 +351,7 @@ export async function renderProductWorkspaceScreen(container, api, state = {}) {
                     } })())) : null));
                 }
             };
-            const docRow = (d) => E('div', { class: 'r docg', 'data-testid': 'pw-doc', 'data-doc-no': d.docNo ?? '' }, E('div', { class: 'stack', style: 'gap:3px' }, E('div', { class: 'row', style: 'gap:6px' }, E('b', {}, d.docNo ?? '—'), chip(CTL_TR[d.controlState ?? ''] ?? '—', CTL_TONE[d.controlState ?? ''] ?? ''), E('span', { class: 'mut' }, `v${d.versionNo ?? '—'}${d.effectiveVersionNo ? ` · yürürlükte v${d.effectiveVersionNo}` : ''}`)), E('div', {}, d.title), E('div', { class: 'mut' }, `${DOC_TR[d.docType] ?? d.docType}${d.fileName ? ` · ${d.fileName}` : ''}${d.opNos.length ? ` · OP${d.opNos.join(', OP')}` : ''}`)), E('div', { class: 'acts' }, btn('ghost sm', 'pw-doc-open', 'Önizle', () => void view(d, false)), btn('ghost sm', 'pw-doc-dl', 'İndir', () => void view(d, true)), h('a', { class: 'btn ghost sm', href: `#/dokuman-kontrol?doc=${d.id}`, 'data-testid': 'pw-doc-history' }, 'Geçmiş'), canUpload ? btn('ghost sm', `pw-${tid}-newver-${d.docNo ?? ''}`, 'Yeni sürüm', () => openForm(d)) : null, (canUpload && can.approveDocument && api.docDecide && ['DRAFT', 'IN_REVIEW', 'APPROVED'].includes(d.controlState ?? '')) ? btn('primary sm', `pw-${tid}-onepass-${d.docNo ?? ''}`, docType === 'TOOL_LIST' ? 'Tek onay' : 'Tek onay + yürürlük', () => void (async () => {
+            const docRow = (d) => E('div', { class: 'r docg', 'data-testid': 'pw-doc', 'data-doc-no': d.docNo ?? '' }, E('div', { class: 'stack', style: 'gap:3px' }, E('div', { class: 'row', style: 'gap:6px' }, E('b', {}, d.docNo ?? '—'), chip(ctlLabel(d.controlState, d.docType), CTL_TONE[d.controlState ?? ''] ?? ''), E('span', { class: 'mut' }, `v${d.versionNo ?? '—'}${d.effectiveVersionNo ? ` · ${isSimpleDocType(d.docType) ? 'geçerli' : 'yürürlükte'} v${d.effectiveVersionNo}` : ''}`)), E('div', {}, d.title), E('div', { class: 'mut' }, `${DOC_TR[d.docType] ?? d.docType}${d.fileName ? ` · ${d.fileName}` : ''}${d.opNos.length ? ` · OP${d.opNos.join(', OP')}` : ''}`)), E('div', { class: 'acts' }, btn('ghost sm', 'pw-doc-open', 'Önizle', () => void view(d, false)), btn('ghost sm', 'pw-doc-dl', 'İndir', () => void view(d, true)), h('a', { class: 'btn ghost sm', href: `#/dokuman-kontrol?doc=${d.id}`, 'data-testid': 'pw-doc-history' }, 'Geçmiş'), canUpload ? btn('ghost sm', `pw-${tid}-newver-${d.docNo ?? ''}`, 'Yeni sürüm', () => openForm(d)) : null, isSimpleDocType(d.docType) ? null : (canUpload && can.approveDocument && api.docDecide && ['DRAFT', 'IN_REVIEW', 'APPROVED'].includes(d.controlState ?? '')) ? btn('primary sm', `pw-${tid}-onepass-${d.docNo ?? ''}`, docType === 'TOOL_LIST' ? 'Tek onay' : 'Tek onay + yürürlük', () => void (async () => {
                 const publish = docType !== 'TOOL_LIST';
                 const why = `Tek onay${publish ? ' ve yürürlük' : ''}: ${d.docNo ?? ''} ${d.fileName ?? ''} (sahibi kararı)`.trim();
                 try {

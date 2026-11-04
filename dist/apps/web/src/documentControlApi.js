@@ -9,7 +9,8 @@ export function createDocumentControlApi(client, session) {
         async review(v, ok, note) { await rpc('document_review', { p_version: v, p_ok: ok, p_note: note }); },
         approve: (v, ok, note) => rpc('document_approve', { p_version: v, p_ok: ok, p_note: note }),
         publish: (v, reason) => rpc('document_publish', { p_version: v, p_reason: reason }),
-        async obsolete(v, reason) { await rpc('document_obsolete', { p_version: v, p_reason: reason }); },
+        async obsolete(v, reason) { await rpc('document_obsolete', { p_version: v, p_reason: reason || null }); },
+        makeEffective: (v, label) => rpc('document_make_effective', { p_version: v, p_label: label || null }),
         async ack(d, decision, reason) { await rpc('document_ack_distribution', { p_dist: d, p_decision: decision, p_reason: reason }); },
         async linkOperation(d, opNo, on) { await rpc('document_link_operation', { p_document: d, p_op_no: opNo, p_on: on }); },
         printBegin: (v, purpose, reason) => rpc('document_print_begin', { p_version: v, p_purpose: purpose, p_reason: reason }),
@@ -22,3 +23,7 @@ export function createDocumentControlApi(client, session) {
         forWorkOrder: (wo) => rpc('dc_for_work_order', { p_wo: wo }),
     };
 }
+
+/** m0213: sade yaşam döngüsündeki normal teknik belge sınıfları (sunucudaki document_type_control.simple_lifecycle ile aynı liste). Kontrollü: CONTROL_PLAN. */
+export const SIMPLE_DOC_TYPES = ['DRAWING', 'CAD_MODEL', 'NC_PROGRAM', 'TOOL_LIST', 'CAM_SETUP_SHEET', 'WORK_INSTRUCTION'];
+export const isSimpleDocType = (t) => SIMPLE_DOC_TYPES.includes(t);
