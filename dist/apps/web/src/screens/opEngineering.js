@@ -5,6 +5,9 @@ import { h } from '../../../../packages/ui/src/h.js';
 import { analyzeNc, toolDraftCsv, matchKmiTools, engineeringGaps, fmtDuration } from '../../../../packages/domain/src/ncAnalysis.js';
 import { parseFusionExport, mapFusionToRoute, fusionTemplateCsv, qualityDraftCsv, FUSION_SOURCE_LABEL } from '../../../../packages/domain/src/fusionImport.js';
 import { errorText } from '../errorText.js';
+import { toBase64 } from '../kx.js';
+import { draftRows, rowsToCsv, normalizedContent, diffContent } from '../../../../packages/domain/src/toolListFromNc.js';
+import { opLabel } from './opBoxes.js';
 
 const E = (tag, props = null, ...kids) => h(tag, props, ...kids);
 const chip = (t, tone = '') => E('span', { class: `chip ${tone}` }, t);
@@ -15,7 +18,9 @@ export const ENG_CSS = `.pw .eng{border:1px solid #1e293b;border-radius:12px;pad
 .pw .eng .tt{display:grid;grid-template-columns:minmax(0,1fr);gap:4px;margin-top:6px}.pw .eng .tr{display:grid;grid-template-columns:54px minmax(0,2.4fr) 62px 62px minmax(0,1.4fr);gap:4px 10px;padding:5px 0;border-top:1px solid #1e293b;align-items:start;min-width:0}
 .pw .eng .tr>*{min-width:0;overflow-wrap:anywhere}.pw .eng .tr.hd{font-size:11px;color:#94a3b8;text-transform:uppercase;border-top:0}
 .pw .eng .acts{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}.pw .eng .uns{margin:6px 0 0;padding-left:18px;font-size:12px}
-@media (max-width:760px){.pw .eng .tr{grid-template-columns:48px minmax(0,1fr) 56px}.pw .eng .tr .c4,.pw .eng .tr .c5{grid-column:2/-1}.pw .eng .tr.hd{display:none}}`;
+@media (min-width:761px){.pw .eng .tr.ed{grid-template-columns:54px minmax(0,2fr) 70px 70px minmax(0,1fr)}}
+.pw .eng .tr.ed input{min-width:0;max-width:100%;box-sizing:border-box}
+@media (max-width:760px){.pw .eng .tr.ed{grid-template-columns:48px minmax(0,1fr) 64px 64px}.pw .eng .tr.ed>span{grid-column:1/-1}.pw .eng .tr{grid-template-columns:48px minmax(0,1fr) 56px}.pw .eng .tr .c4,.pw .eng .tr .c5{grid-column:2/-1}.pw .eng .tr.hd{display:none}}`;
 
 function download(name, text, mime = 'text/csv;charset=utf-8') {
     const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([text], { type: mime })); a.download = name; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 2000);
@@ -35,7 +40,7 @@ export function buildEngineeringPanel(ctx, o) {
     host.append(head, body);
     const gapsHost = E('div', { class: 'gaps', 'data-testid': 'eng-gaps' });
     const camLinked = !!(o.camProgramId || (chain?.cam?.status && chain.cam.status !== 'YOK'));
-    let analysis = null; let fusion = null; let routeMap = null;
+    let analysis = null; let fusion = null; let routeMap = null; let ncSrc = null; let kmiTools = ctx.kmiTools ?? []; let tlState = null; let plan = null; let busy = false;
     const toolListDoc = tl ? { validity: tl.controlState === 'EFFECTIVE' ? 'EFFECTIVE' : (tl.controlState ?? 'DRAFT') } : null;
     const redrawGaps = () => {
         const g = engineeringGaps({ analysis, ncDoc: nc ? { validity: nc.controlState === 'EFFECTIVE' ? 'EFFECTIVE' : (nc.controlState ?? 'DRAFT') } : null, camLinked, toolListDoc, op: o });
@@ -64,8 +69,9 @@ export function buildEngineeringPanel(ctx, o) {
         if (!nc) kids.push(E('div', { class: 'mut', 'data-testid': 'eng-nonc' }, 'NC yüklenince analiz otomatik başlar. NC yüklemek için aşağıdaki teknik zincir kartını kullanın.'));
         else if (!analysis) kids.push(E('div', { class: 'mut', 'data-testid': 'eng-loading' }, 'NC analiz ediliyor…'));
         else kids.push(...analysisView());
+        if (tlState) kids.push(tlStatusView());
         kids.push(sourcesView(), fusionView(), qualityView());
-        body.replaceChildren(...kids);
+        body.replaceChildren(...kids.filter(Boolean));
         redrawGaps();
     };
     function analysisView() {
@@ -81,9 +87,71 @@ export function buildEngineeringPanel(ctx, o) {
                 E('span', { class: 'c5' }, t.missing.length ? chip(`eksik: ${t.missing.join(', ')}`, 'warn') : chip('NC’den okundu', 'ok'), chip(matches[i].status === 'ESLESTI' ? 'KMI kartı eşleşti' : 'KMI takım kartı eşleşmesi yok', matches[i].status === 'ESLESTI' ? 'ok' : ''), t.usedInProgram ? null : chip('programda çağrılmıyor', '')))),
         ));
         if (a.toolsCalledNotCommented.length) out.push(E('div', { class: 'banner', 'data-testid': 'eng-nocomment' }, `NC’de çağrılan ama yorumu olmayan takım: ${a.toolsCalledNotCommented.join(', ')} — çap/boy NC’den çıkarılamaz, kullanıcı girmeli.`));
-        const acts = E('div', { class: 'acts' }, E('button', { type: 'button', class: 'ghost sm', 'data-testid': 'eng-tool-csv', onClick: () => download(`takim-listesi-taslak-${o.opCode}.csv`, toolDraftCsv(a.toolDraft, { footer: `NC analizinden TASLAK (${nc.docNo ?? ''}); doğrulanmadan geçerli değildir` })) }, 'Takım listesi taslağını indir (CSV)'));
-        out.push(acts, E('div', { class: 'sub' }, 'CSV, takım listesi olarak yüklendiğinde normal mühür uygulanır; kritik takım doğrulaması (kapı) ayrıca yapılır. Tutucu/uzunluk gibi NC’de olmayan alanlar boş bırakılır — uydurulmaz.'));
+        const acts = E('div', { class: 'acts' }, E('button', { type: 'button', class: 'ghost sm', 'data-testid': 'eng-tool-csv', onClick: () => download(`takim-listesi-taslak-${o.opCode}.csv`, toolDraftCsv(a.toolDraft, { footer: `NC analizinden TASLAK (${nc.docNo ?? ''}); doğrulanmadan geçerli değildir` })) }, 'Takım listesi taslağını indir (CSV)'), foreignTl() ? chip(`${tl.docNo ?? 'Takım listesi'} elle yüklenmiş; üzerine yazılmaz`, 'info') : ctx.canCreate !== false && a.toolDraft.length ? E('button', { type: 'button', class: 'primary sm', 'data-testid': 'eng-tl-create', disabled: busy, onClick: () => { plan = plan ?? draftRows(a, kmiTools ?? []); draw(); } }, tl ? 'Takım listesini güncelle (NC’den)' : 'Takım listesini oluştur') : null);
+        out.push(acts, plan ? builderView() : null, E('div', { class: 'sub' }, 'CSV, takım listesi olarak yüklendiğinde normal mühür uygulanır; kritik takım doğrulaması (kapı) ayrıca yapılır. Tutucu/uzunluk gibi NC’de olmayan alanlar boş bırakılır — uydurulmaz.'));
         return out;
+    }
+    const GEN = /^takim-listesi-/;
+    function foreignTl() { return !!tl && !(tlState && GEN.test(tlState.fileName ?? '')); }
+    function tlStatusView() {
+        const t = tlState; const ck = t.checks; const todo = ck?.checks ? ck.checks.filter((x) => x.status !== 'OK') : [];
+        const stTr = { DRAFT: 'YÜKLENDİ — kritik takım doğrulaması bekliyor', IN_REVIEW: 'Kontrolde', APPROVED: 'Onaylı (yürürlüğe alınmadı)', EFFECTIVE: 'GEÇERLİ', SUPERSEDED: 'Eski sürüm', REJECTED: 'İptal' };
+        const mt = analysis?.supported ? draftRows(analysis, kmiTools ?? []) : [];
+        const matched = mt.filter((r) => r.match === 'ESLESTI').length;
+        return E('div', { class: 'banner', 'data-testid': 'eng-tl-status' }, E('b', {}, `Takım listesi: ${t.docNo ?? ''} v${t.versionNo}`), ` · ${stTr[t.state] ?? t.state}${t.state === 'EFFECTIVE' ? '' : ' (geçerli sayılmaz)'}`,
+            analysis?.supported ? E('div', { class: 'sub', 'data-testid': 'eng-tl-counts' }, `NC’den çıkarılan benzersiz takım: ${mt.length} · KMI takım kartı: ${kmiTools == null ? 'okunamadı' : `${matched} eşleşti / ${mt.length - matched} eşleşmedi`}`) : null,
+            ck ? E('div', { class: 'sub', 'data-testid': 'eng-tl-pending' }, todo.length ? `Doğrulama bekleyen/eksik: ${todo.map((x) => x.label).join(', ')}` : 'Otomatik kontroller tamam; kritik takım doğrulaması yetkili kişiden beklenir.') : null);
+    }
+    function builderView() {
+        const rows = plan; const box = E('div', { class: 'formbox', 'data-testid': 'eng-tl-preview' });
+        const nm = (r) => r.match === 'ESLESTI' ? chip('KMI kartı: ' + r.cardCode, 'ok') : chip(kmiTools == null ? 'kart eşleşmesi bilinmiyor' : 'KMI kartı yok (kart üretilmez)', 'warn');
+        const inp = (r, k, w) => E('input', { value: r[k], 'data-testid': `eng-tl-${k}`, style: `width:${w}`, 'aria-label': `${r.t} ${k}`, onInput: (e) => { r[k] = e.target.value; r.edited = true; } });
+        const uniq = new Set(rows.map((r) => r.t)).size;
+        const df = tlState?.csv ? diffContent(tlState.csv, rows) : null;
+        if (df) box.append(E('div', { class: 'banner', 'data-testid': 'eng-tl-diff' }, `Mevcut listeye (v${tlState.versionNo}) göre fark — eklenen: ${df.added.join(', ') || '—'} · çıkan: ${df.removed.join(', ') || '—'} · değişen: ${df.changed.join(', ') || '—'}. Eski sürüm silinmez; yeni sürüm TASLAK olur ve kritik takım doğrulaması yeniden istenir.`));
+        box.append(E('div', { class: 'sub', 'data-testid': 'eng-tl-head' }, `${rows.length} takım satırı (${uniq} benzersiz T). Boş alanlar boş kalır; değer uydurulmaz. İsterseniz düzenleyin.`),
+            ...rows.map((r) => E('div', { class: 'tr ed', 'data-testid': 'eng-tl-row', 'data-t': r.t }, E('b', {}, r.t), inp(r, 'desc', '100%'), inp(r, 'dia', '60px'), inp(r, 'len', '60px'), E('span', {}, nm(r), r.inferredType ? chip('tip: açıklamadan çıkarım', '') : null, r.ambiguousOffset ? chip('birden çok H — offset boş', 'warn') : null))),
+            E('div', { class: 'acts' }, E('button', { type: 'button', class: 'primary', 'data-testid': 'eng-tl-confirm', disabled: busy, onClick: () => void run(rows, box) }, 'Onayla ve kaydet'), E('button', { type: 'button', class: 'ghost', onClick: () => { plan = null; draw(); } }, 'Vazgeç')),
+            E('div', { class: 'sub' }, 'Kayıt: dosya yükleme + operasyona bağlama + içerik eşleme tek işlemde; yükleyen kimliği, zaman, NC sürümü ve SHA-256 sunucuda kaydedilir. Liste doğrulanana kadar GEÇERLİ olmaz.'));
+        return box;
+    }
+    async function run(rows, box) {
+        if (busy) return; busy = true; box.querySelector('[data-testid=eng-tl-confirm]')?.setAttribute('disabled', '');
+        let step = 'başlangıç'; let up = null;
+        try {
+            const content = normalizedContent(rows);
+            if (content.rows.length !== rows.length) throw new Error('Takım numaraları okunamadı; kayıt yapılmadı.');
+            const title = `Takım listesi ${ws.product.code} ${opLabel(o)} (NC’den)`;
+            let target = tl ? { documentId: tl.documentId } : null;
+            if (!target) { const orphan = (ws.cards?.tools?.docs ?? []).find((d) => d.title === title); if (orphan) target = { documentId: orphan.id }; }
+            if (target) {
+                step = 'mevcut liste okunuyor';
+                const latest = await api.docLatest(target.documentId);
+                if (latest && !GEN.test(latest.fileName ?? '')) throw new Error(`${tl?.docNo ?? 'Mevcut takım listesi'} elle yüklenmiş; üzerine yazılmaz. Güncelleme için Takım listesi kartından yeni sürüm yükleyin.`);
+                if (latest) {
+                    const got = await api.toolistContentGet(latest.versionId).catch(() => null);
+                    if (got?.saved && got.csv === content.csv) { busy = false; plan = null; await reload(`Bu operasyon için aynı NC sürümünden/aynı içerikle takım listesi zaten var (v${latest.versionNo}); ikinci kayıt oluşturulmadı.`, 'ok', { openOp: o.id }); return; }
+                    if (got?.saved) { const df = diffContent(got.csv, rows); ctx.lastDiff = df; }
+                }
+            }
+            const edited = rows.filter((r) => r.edited).map((r) => r.t);
+            step = 'dosya yükleme';
+            const fileName = `takim-listesi-${opLabel(o).replace('/', '-')}-${(nc.docNo ?? 'NC').replace(/\W+/g, '')}${ncSrc?.versionNo ? '-v' + ncSrc.versionNo : ''}.csv`;
+            up = await api.upload({ docType: 'TOOL_LIST', entityType: 'PRODUCT_REVISION', entityId: ctx.rev.id, title: target ? null : title, fileName, mimeType: 'text/csv', contentBase64: toBase64(new TextEncoder().encode(rowsToCsv(rows))), validUntil: null, note: `NC’den oluşturuldu: ${nc.docNo ?? ''} ${ncSrc?.versionNo ? 'v' + ncSrc.versionNo : ''} sha256=${ncSrc?.sha256 ?? '?'}`, documentId: target?.documentId ?? null });
+            step = 'operasyona bağlama';
+            await api.linkDocumentToOp(up.documentId, o.opNo);
+            step = 'içerik eşleme';
+            const checks = await api.toolistContentSave(up.versionId, content.csv, { ...content.mapping, source: 'nc-analysis', ncDocumentId: nc.documentId, ncVersionId: ncSrc?.versionId ?? nc.versionId ?? null, ncSha256: ncSrc?.sha256 ?? null, ncDocNo: nc.docNo ?? null, ncVersionNo: ncSrc?.versionNo ?? null, operation: o.opCode, completion: { editedByUser: edited, inferredType: rows.filter((r) => r.inferredType).map((r) => r.t) } });
+            busy = false; plan = null;
+            const todo = (checks?.checks ?? []).filter((x) => x.status !== 'OK').length;
+            const mt = rows.filter((r) => r.match === 'ESLESTI').length;
+            await reload(`Takım listesi kaydedildi (${up.versionNo ? 'v' + up.versionNo : ''}): ${rows.length} takım, KMI kartı ${kmiTools == null ? 'okunamadı' : `${mt} eşleşti / ${rows.length - mt} eşleşmedi`}, otomatik kontrolde ${todo} madde bekliyor. Liste GEÇERLİ değil: kritik takım doğrulaması gerekir.`, 'ok', { openOp: o.id });
+        } catch (e) {
+            busy = false;
+            // kısmi hata: sunucudaki gerçek durum okunur (ekran yenilenir), hata nedeni mesajda
+            const why = errorText(e);
+            try { await reload(`Takım listesi işlemi “${step}” adımında durdu: ${why}${up ? ' (dosya yüklendi; kalan adımlar yapılmadı — tekrar basınca aynı belge kullanılır)' : ''}. Ekran sunucudaki gerçek durumdan yenilendi.`, 'error', { openOp: o.id }); } catch { fail(e); }
+        }
     }
     function sourcesView() {
         const e = analysis?.estimate; const wrap = E('div', { class: 'src', 'data-testid': 'eng-sources' });
@@ -125,10 +193,23 @@ export function buildEngineeringPanel(ctx, o) {
     draw();
     if (nc) {
         void (async () => {
-            try { const text = await api.ncText({ versionId: nc.versionId ?? null, documentId: nc.documentId }); analysis = analyzeNc(text, { machine: ctx.machineParams }); }
+            try { ncSrc = await api.ncSource({ versionId: nc.versionId ?? null, documentId: nc.documentId }); analysis = analyzeNc(ncSrc.text, { machine: ctx.machineParams }); }
             catch (e) { analysis = { supported: false, unsupportedReason: `NC içeriği okunamadı: ${errorText(e)}`, toolDraft: [], toolsCalledNotCommented: [], estimate: { confidence: 'HESAPLANAMADI', totalSeconds: [null, null], note: '', assumptions: [] }, unsupported: [] }; }
+            draw(); void loadTl();
+            try { const k = await api.kmiTools?.(); kmiTools = Array.isArray(k) ? k : null; } catch { kmiTools = null; }
             draw();
         })();
     }
+    async function loadTl() {
+        if (!tl) { tlState = null; return; }
+        try {
+            const v = await api.docLatest(tl.documentId); if (!v) return;
+            const checks = await api.toolistChecks(v.versionId).catch(() => null);
+            const got = await api.toolistContentGet?.(v.versionId).catch(() => null);
+            tlState = { docNo: tl.docNo, versionNo: v.versionNo, state: v.state, fileName: v.fileName, checks, csv: got?.saved ? got.csv : null };
+        } catch { tlState = null; }
+        draw();
+    }
+    if (!nc && tl) void loadTl();
     return host;
 }

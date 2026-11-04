@@ -47,6 +47,20 @@ export function createProductWorkspaceApi(client, session) {
         makeEffective: (v, label) => dc.makeEffective(v, label),
         async versionState(documentId, versionId) { const lc = await dc.lifecycle(documentId); const v = lc.versions.find((x) => x.id === versionId); return { state: v?.control?.state ?? null, validity: v?.validity ?? null }; },
         async docMakeEffective(documentId, label) { const lc = await dc.lifecycle(documentId); const v = [...lc.versions].sort((a, b) => b.versionNo - a.versionNo)[0]; if (!v?.control) throw new Error('DOCUMENT_VERSION_NOT_FOUND'); return dc.makeEffective(v.id, label || null); },
+        /** KMI takım kartları (salt okunur) — NC'den çıkan takımları eşleştirmek için. Okunamazsa null: "eşleşme bilinmiyor". */
+        async kmiTools() { try { return await client.select('tools', { columns: 'id,code,tool_type', order: 'code.asc', limit: 2000 }, session); } catch { return null; } },
+        /** Belgenin en yeni sürümü (salt okunur). */
+        async docLatest(documentId) { const lc = await dc.lifecycle(documentId); const v = [...lc.versions].sort((x, y) => y.versionNo - x.versionNo)[0]; return v ? { versionId: v.id, versionNo: v.versionNo, state: v.control?.state ?? null, fileName: v.fileName ?? null, sha256: v.sha256 ?? null } : null; },
+        /** NC metni + kaynak kimliği (sürüm, SHA-256). */
+        async ncSource(ref) {
+            let vid = typeof ref === 'string' ? ref : ref?.versionId ?? null; let vno = null;
+            if (!vid && ref?.documentId) { const lc = await dc.lifecycle(ref.documentId); const vs = [...lc.versions].sort((a, b) => b.versionNo - a.versionNo); const v = vs.find((x) => x.control?.state === 'EFFECTIVE') ?? vs[0]; vid = v?.id ?? null; vno = v?.versionNo ?? null; }
+            if (!vid) throw new Error('DOCUMENT_VERSION_NOT_FOUND');
+            const c = await dc.content(vid);
+            const bin = atob(c.contentBase64 ?? ''); const u8 = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i += 1) u8[i] = bin.charCodeAt(i);
+            let sha = c.sha256 ?? null; if (!sha && globalThis.crypto?.subtle) sha = [...new Uint8Array(await crypto.subtle.digest('SHA-256', u8))].map((b) => b.toString(16).padStart(2, '0')).join('');
+            return { text: new TextDecoder('utf-8').decode(u8), versionId: vid, versionNo: vno, sha256: sha };
+        },
         /** NC metni (salt okunur): sürüm verilmişse o, yoksa belgenin yürürlükteki / en yeni sürümü. */
         async ncText(ref) {
             let vid = typeof ref === 'string' ? ref : ref?.versionId ?? null;
