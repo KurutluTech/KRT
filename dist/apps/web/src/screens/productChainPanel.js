@@ -2,8 +2,19 @@
 // YOK · BELGE VAR · OPERASYONA BAĞLI DEĞİL · TEKNİK ONAY BEKLİYOR · YÜRÜRLÜKTE  (+ İŞ EMRİNE HAZIR for the whole operation).
 // The panel never decides anything: it shows what op_technical_chain says and offers the next real action (link, register CAM from the existing NC, release, attach). Titles / file names never count as a relation.
 import { h } from '../../../../packages/ui/src/h.js';
+import { guessMime } from './DocumentsScreen.js';
+import { toBase64 } from '../kx.js';
 const gapText = (op, stale = false) => { const t = chainGapText(op, stale); return t ? E('div', { class: 'mut', style: 'margin-top:6px', 'data-testid': 'pw-chain-gap' }, t) : null; };
 const E = (tag, props = null, ...kids) => h(tag, props, ...kids);
+/** NC başlığındaki takım yorumları: "(T01 D10 ... - açıklama)" — sunucudaki nc_tool_comment_lines ile aynı kural. Salt okunur önizleme; takım listesi YERİNE GEÇMEZ, kullanıcı doğrular. */
+export function ncToolComments(text) {
+    const out = [];
+    const re = /^\(T0*([0-9]{1,4})\s[^)]*?-\s*([^)\r\n]+)\)/gm;
+    let m;
+    while ((m = re.exec(text)) !== null)
+        out.push({ tNo: Number(m[1]), descr: m[2].trim().toLowerCase() });
+    return out;
+}
 export const CHAIN_TONE = { 'YOK': 'bad', 'BELGE VAR': 'warn', 'OPERASYONA BAĞLI DEĞİL': 'warn', 'TEKNİK ONAY BEKLİYOR': 'warn', 'YÜRÜRLÜKTE': 'ok' };
 const word = (label, it, testid) => E('span', { class: `chip ${CHAIN_TONE[it.status] ?? 'warn'}`, 'data-testid': testid, 'data-status': it.status, title: it.detail ?? '' }, `${label}: ${it.status}${it.docNo ? ` · ${it.docNo}` : ''}${it.programNo && label === 'CAM' ? ` · ${it.programNo}` : ''}`);
 /** Compact NC · CAM · takım listesi chips for one operation (same words as the chain panel, same source). Pure DOM, no decisions. */
@@ -141,7 +152,57 @@ export async function drawChainPanel(host, api, ws, can, reload, showErr, onChai
                 showErr(e);
             }
         };
-        return E('div', { class: 'r', 'data-testid': 'pw-chain-op', 'data-op': String(op.opNo), 'data-ready': String(op.workOrderReady) }, E('div', { class: 'row', style: 'gap:6px;flex-wrap:wrap' }, E('b', {}, `OP${op.opNo}`), E('span', {}, op.name), word('NC', op.nc, 'pw-chain-nc'), word('CAM', op.cam, 'pw-chain-cam'), word('Takım listesi', op.toolList, 'pw-chain-tl'), E('span', { class: `chip ${op.workOrderReady ? 'ok' : 'warn'}`, 'data-testid': 'pw-chain-ready' }, op.workOrderReady ? 'İŞ EMRİNE HAZIR' : 'İŞ EMRİNE HAZIR DEĞİL')), gapText(op, isStale), act ? E('div', { class: 'row', style: 'margin-top:6px' }, E('button', { class: 'btn primary sm', type: 'button', 'data-testid': 'pw-chain-act', 'data-kind': act.kind, onClick: (ev) => void run(ev) }, act.label)) : null);
+        const rowEl = E('div', { class: 'r', 'data-testid': 'pw-chain-op', 'data-op': String(op.opNo), 'data-ready': String(op.workOrderReady) }, E('div', { class: 'row', style: 'gap:6px;flex-wrap:wrap' }, E('b', {}, `OP${op.opNo}`), E('span', {}, op.name), word('NC', op.nc, 'pw-chain-nc'), word('CAM', op.cam, 'pw-chain-cam'), word('Takım listesi', op.toolList, 'pw-chain-tl'), E('span', { class: `chip ${op.workOrderReady ? 'ok' : 'warn'}`, 'data-testid': 'pw-chain-ready' }, op.workOrderReady ? 'İŞ EMRİNE HAZIR' : 'İŞ EMRİNE HAZIR DEĞİL')), gapText(op, isStale), act ? E('div', { class: 'row', style: 'margin-top:6px' }, E('button', { class: 'btn primary sm', type: 'button', 'data-testid': 'pw-chain-act', 'data-kind': act.kind, onClick: (ev) => void run(ev) }, act.label)) : null);
+        // Satır içi NC yükleme: NC yoksa dosya bu operasyon kartından yüklenir ve bu operasyona bağlanır. Yükleme TASLAK kalır; onay/yürürlük belge kontrolünde (görevler ayrılığı) yapılır.
+        if (can.act && op.nc.status === 'YOK' && api.upload && ws.revision) {
+            const file = E('input', { type: 'file', accept: '.nc,.txt,.tap,.mpf,.h,.ptp,.cnc,text/plain', 'data-testid': 'pw-chain-nc-file', 'aria-label': `OP${op.opNo} NC dosyası` });
+            let up = false;
+            const toolsOut = E('div', { class: 'mut', 'data-testid': 'pw-chain-nc-tools', role: 'status' });
+            file.addEventListener('change', async () => {
+                toolsOut.textContent = '';
+                const f = file.files?.[0];
+                if (!f)
+                    return;
+                try {
+                    const buf = new Uint8Array(await f.arrayBuffer());
+                    let txt;
+                    try {
+                        txt = new TextDecoder('utf-8', { fatal: true }).decode(buf);
+                    }
+                    catch {
+                        txt = new TextDecoder('windows-1254').decode(buf);
+                    }
+                    const tools = ncToolComments(txt);
+                    toolsOut.textContent = tools.length ? `NC başlığında ${new Set(tools.map((t) => t.tNo)).size} takım bulundu: ${tools.map((t) => `T${t.tNo} ${t.descr}`).join(' · ')}. Bu yalnız NC yorumlarından çıkarımdır; takım listesini doğrulayın.` : 'NC başlığında takım yorumu bulunamadı: takım listesi elle doğrulanmalı.';
+                }
+                catch {
+                    toolsOut.textContent = 'Dosya okunamadı.';
+                }
+            });
+            const ncBtn = E('button', { class: 'btn primary sm', type: 'button', 'data-testid': 'pw-chain-nc-upload', onClick: async (ev) => {
+                    const f = file.files?.[0];
+                    if (!f || up) {
+                        if (!f)
+                            showErr(new Error('Önce NC dosyasını seçin.'));
+                        return;
+                    }
+                    up = true;
+                    ev.currentTarget.disabled = true;
+                    try {
+                        const bytes = new Uint8Array(await f.arrayBuffer());
+                        const r = await api.upload({ docType: 'NC_PROGRAM', entityType: 'PRODUCT_REVISION', entityId: ws.revision.id, title: `OP${op.opNo} NC · ${f.name}`.slice(0, 120), fileName: f.name, mimeType: guessMime(f.name, f.type), contentBase64: toBase64(bytes), validUntil: null, note: null, documentId: null });
+                        await api.linkDocumentToOp(r.documentId, op.opNo);
+                        await reload(`OP${op.opNo}: ${f.name} yüklendi ve bu operasyona bağlandı (TASLAK). Yürürlüğe alma/onay belge kontrolünden yapılır; sonra CAM kaydı bu NC'den oluşturulabilir.`);
+                    }
+                    catch (e) {
+                        up = false;
+                        ev.currentTarget.disabled = false;
+                        showErr(e);
+                    }
+                } }, 'NC yükle ve bağla');
+            rowEl.append(E('div', { class: 'row', style: 'gap:6px;margin-top:6px;flex-wrap:wrap', 'data-testid': 'pw-chain-nc-row' }, file, ncBtn), toolsOut);
+        }
+        return rowEl;
     });
     host.append(E('div', { class: 'formbox', 'data-testid': 'pw-chain', style: 'margin-bottom:10px' }, E('b', {}, 'Operasyon zinciri (NC · CAM · takım listesi)'), E('div', { class: 'mut' }, 'Üç ayrı kayıt vardır: NC belgesi (dosya) · CAM kaydı (o NC\'den oluşan program kaydı) · CAM kaydının operasyona bağlantısı. Belge başlığı veya dosya adı ilişki sayılmaz; her şey gerçek kayıttan okunur. “Yürürlükte” = onaylı ve yürürlüğe alınmış. CNC tezgâhına program gönderilmez.'), E('div', { class: 'rows' }, ...rows)));
 }

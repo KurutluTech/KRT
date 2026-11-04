@@ -380,8 +380,13 @@ export async function renderProductWorkspaceScreen(container, api, state = {}) {
             const noIn = h('input', { 'data-testid': 'pw-op-no', type: 'text', value: op ? op.opCode : 'Otomatik (sıraya göre)', disabled: true, 'aria-label': 'Operasyon numarası otomatik atanır' });
             const newOpHint = () => { const mv = movableOps(ws.routing); return insertAt === null || insertAt >= mv.length ? 989 : (insertAt <= 0 ? 5 : mv[insertAt - 1].opNo + 5); };
             const name = h('input', { 'data-testid': 'pw-op-name', value: op?.name ?? '' });
-            const mach = machines.map((m) => ({ m, box: h('input', { type: 'checkbox', 'data-testid': `pw-op-m-${m.code}`, checked: !!op?.machines.some((x) => x.id === m.id) }) }));
-            const primary = h('select', { 'data-testid': 'pw-op-primary' }, h('option', { value: '' }, '— öncelikli makine yok —'), ...machines.map((m) => h('option', { value: m.id, selected: !!op?.machines.some((x) => x.id === m.id && x.primary) }, m.code)));
+            // m0210 arayüzü: Ana makine (tek seçim, zorunlu) + isteğe bağlı Alternatif makineler (varsayılan kapalı). Ana makine alternatif olamaz. Alternatif tanımlamak START izni vermez.
+            const curPrimary = op ? (op.machines.find((x) => x.primary)?.id ?? (op.machines.length === 1 ? op.machines[0].id : '')) : '';
+            const mach = machines.map((m) => ({ m, box: h('input', { type: 'checkbox', 'data-testid': `pw-op-m-${m.code}`, checked: !!op?.machines.some((x) => x.id === m.id) && m.id !== curPrimary }) }));
+            const primary = h('select', { 'data-testid': 'pw-op-primary' }, h('option', { value: '' }, '— ana makine seçin —'), ...machines.map((m) => h('option', { value: m.id, selected: m.id === curPrimary }, m.code)));
+            const syncAlt = () => { for (const x of mach) { const same = x.m.id === val(primary); if (same) x.box.checked = false; x.box.disabled = same; } };
+            primary.addEventListener('change', syncAlt);
+            syncAlt();
             // Yeterlilik İK / Personel Yetkinlikleri listesinden (skill_catalog) SEÇİLİR; serbest yazı katalogda olmadığı için SKILL_NOT_FOUND veriyordu. Seviye ölçeği 1–10 (m0204; migration uygulanmadan 5–10 sunucuda INVALID_LEVEL verir).
             const curSkill = op?.skillCode ?? '';
             const skill = skills.length
@@ -398,7 +403,14 @@ export async function renderProductWorkspaceScreen(container, api, state = {}) {
             ins.value = op?.instructions ?? '';
             const reason = reasonBox('pw-op-reason');
             const save = async () => {
-                const ids = mach.filter((x) => isChecked(x.box)).map((x) => x.m.id);
+                const prim = val(primary);
+                if (!prim) {
+                    invalid(primary, true);
+                    return fail(new Error('Eksik alan: ana makine seçilmeli'));
+                }
+                invalid(primary, false);
+                const alts = mach.filter((x) => isChecked(x.box) && x.m.id !== prim).map((x) => x.m.id);
+                const ids = [prim, ...alts];
                 const setupV = num(val(setup));
                 const cycleV = num(val(cycle));
                 const no = op ? op.opNo : newOpHint();
@@ -421,22 +433,51 @@ export async function renderProductWorkspaceScreen(container, api, state = {}) {
                 if (val(reason).trim().length < 10 && rev?.status === 'DRAFT')
                     reason.value = `Taslak düzenleme: OP${no} ${op ? 'güncellendi' : 'eklendi'}${diffs.length ? ` — ${diffs.join('; ')}` : ''}`.slice(0, 400);
                 try {
-                    const r = await api.saveOperation({ revisionId: rev.id, opNo: no, name: val(name).trim(), machineIds: ids, primaryId: val(primary) || null, skillCode: val(skill).trim() || null, skillLevel: num(val(level)),
+                    const r = await api.saveOperation({ revisionId: rev.id, opNo: no, name: val(name).trim(), machineIds: ids, primaryId: prim, skillCode: val(skill).trim() || null, skillLevel: num(val(level)),
                         camId: op?.camProgramId ?? null, setup: setupV, cycle: cycleV, firstPiece: isChecked(fp), qc: isChecked(qc), instructions: val(ins).trim() || null, reason: val(reason).trim() });
                     openOp = r.operationId;
+                    const WARN_TR = { ALT_NOT_PRODUCTION_ELIGIBLE: 'alternatif makine şu an üretime uygun değil', ALT_MACHINE_CLASS_DIFFERS: 'alternatif makine sınıfı ana makineden farklı', ALT_SKILL_REQUIREMENTS_UNKNOWN: 'alternatif makinenin beceri şartı tanımsız', ALT_NO_CAM_FOR_MACHINE: 'alternatif makine için CAM/NC kaydı yok' };
+                    const warn = alts.length ? await api.machineWarnings(r.operationId, prim, alts) : [];
+                    const wtxt = warn.length ? ` Uyarı: ${[...new Set(warn.map((w) => WARN_TR[w.code] ?? w.code))].join('; ')}.` : '';
                     if (!op && r.created) {
                         // m0205: sunucu yeni operasyonu aynı işlemde sıraya yerleştirir ve numaraları yeniden hesaplar (tek atomik çağrı; ikinci istek yok)
                         insertAt = null;
-                        await reload(`${r.opCode} eklendi; sonraki operasyonların OP numaraları sıraya göre yeniden hesaplandı (kimlikler, NC/CAM/takım ve kalite bağları korundu).`, 'ok', { openOp: r.operationId });
+                        await reload(`${r.opCode} eklendi; sonraki operasyonların OP numaraları sıraya göre yeniden hesaplandı (kimlikler, NC/CAM/takım ve kalite bağları korundu).${wtxt}`, 'ok', { openOp: r.operationId });
                         return;
                     }
-                    await reload(`${r.opCode} ${r.created ? 'eklendi' : 'kaydedildi'} (sürüm ${r.versionNo}).${diffs.length ? ' ' + diffs.join(' · ') + '.' : ''}${r.recalculatedRuns ? ` ${r.recalculatedRuns} etkilenen hesap yeniden değerlendirildi (eski hesaplar korunur).` : ''}`, 'ok', { openOp: r.operationId });
+                    await reload(`${r.opCode} ${r.created ? 'eklendi' : 'kaydedildi'} (sürüm ${r.versionNo}).${wtxt}${diffs.length ? ' ' + diffs.join(' · ') + '.' : ''}${r.recalculatedRuns ? ` ${r.recalculatedRuns} etkilenen hesap yeniden değerlendirildi (eski hesaplar korunur).` : ''}`, 'ok', { openOp: r.operationId });
                 }
                 catch (e) {
                     fail(e);
                 }
             };
-            return E('div', { class: 'stack', 'data-testid': op ? 'pw-op-edit' : 'pw-op-new' }, E('fieldset', { class: 'fsec' }, h('legend', {}, 'Genel'), E('div', { class: 'fgrid' }, field('Operasyon no', noIn), field('Ad', name), field('Öncelikli makine', primary), field('Yeterlilik', skill), field('Seviye (1-10)', level))), E('fieldset', { class: 'fsec' }, h('legend', {}, 'Süreler'), E('div', { class: 'fgrid' }, field('Hazırlık (dk)', setup), field('Çevrim (sn/adet)', cycle))), E('fieldset', { class: 'fsec' }, h('legend', {}, 'İzinli makineler'), E('div', { class: 'row', style: 'gap:4px 16px' }, ...mach.map((x) => h('label', { class: 'chk' }, x.box, x.m.code))), machines.length ? null : E('div', { class: 'mut' }, 'Makine listesi okunamadı.')), E('div', { class: 'row', style: 'gap:4px 20px' }, h('label', { class: 'chk' }, fp, 'İlk parça kontrolü şart'), h('label', { class: 'chk' }, qc, 'Kalite kontrolü şart')), field('Operatör talimatı', ins), !can.editStructure && structural ? E('div', { class: 'mut' }, 'Yeni operasyon eklemek için taslak revizyon gerekir.') : null, E('div', { class: 'row', style: 'align-items:flex-end' }, E('div', { class: 'grow' }, field(rev?.status === 'DRAFT' ? 'Not (isteğe bağlı)' : 'Değişiklik gerekçesi', reason, rev?.status === 'DRAFT' ? 'Boş bırakırsanız yapılan işlemin açıklaması kaydedilir. Her kayıt sürümlenir.' : 'Her kayıt sürümlenir; eski hâli korunur.')), btn('primary', 'pw-op-save', 'Kaydet', () => void save())));
+            // Kontrollü "öncekinden kopyala": yalnız yeni operasyonda; süre, ilk parça/kalite zorunluluğu, yeterlilik, talimat ve makineler FORMA doldurulur (kaydetmeden önce görülür/değiştirilir).
+            // NC/CAM/takım/aparat/kontrol planı KOPYALANMAZ — bunlar operasyona özeldir.
+            const copyBox = op ? null : (() => {
+                const srcOps = (ws.routing ?? []).filter((x) => x.active !== false);
+                if (!srcOps.length)
+                    return null;
+                const sel = h('select', { 'data-testid': 'pw-op-copy', 'aria-label': 'Öncekinden kopyala' }, h('option', { value: '' }, '— boş başla —'), ...srcOps.map((x) => h('option', { value: x.id }, `${x.opCode ?? 'OP' + x.opNo} · ${x.name ?? ''}`.slice(0, 60))));
+                sel.addEventListener('change', () => {
+                    const src = srcOps.find((x) => x.id === sel.value);
+                    if (!src)
+                        return;
+                    setup.value = src.setupMinutes != null ? String(src.setupMinutes) : '';
+                    cycle.value = src.cycleSeconds != null ? String(src.cycleSeconds) : '';
+                    fp.checked = !!src.firstPieceRequired;
+                    qc.checked = !!src.qcRequired;
+                    ins.value = src.instructions ?? '';
+                    skill.value = src.skillCode ?? '';
+                    level.value = src.skillLevel != null ? String(src.skillLevel) : '';
+                    const sp = src.machines?.find((m) => m.primary)?.id ?? (src.machines?.length === 1 ? src.machines[0].id : '');
+                    primary.value = sp;
+                    for (const x of mach)
+                        x.box.checked = !!src.machines?.some((m) => m.id === x.m.id) && x.m.id !== sp;
+                    syncAlt();
+                });
+                return E('div', { class: 'row', style: 'align-items:center;gap:8px' }, h('label', { for: 'pw-op-copy' }, 'Öncekinden kopyala'), sel, E('span', { class: 'mut' }, 'Yalnız süre, kontrol zorunlulukları, yeterlilik, talimat ve makineler; NC/CAM/takım/aparat/kontrol planı kopyalanmaz.'));
+            })();
+            return E('div', { class: 'stack', 'data-testid': op ? 'pw-op-edit' : 'pw-op-new' }, copyBox, E('fieldset', { class: 'fsec' }, h('legend', {}, 'Genel'), E('div', { class: 'fgrid' }, field('Operasyon no', noIn), field('Ad', name), field('Ana makine', primary), field('Yeterlilik', skill), field('Seviye (1-10)', level))), E('fieldset', { class: 'fsec' }, h('legend', {}, 'Süreler'), E('div', { class: 'fgrid' }, field('Hazırlık (dk)', setup), field('Çevrim (sn/adet)', cycle))), h('details', { class: 'fsec', 'data-testid': 'pw-op-alt', open: mach.some((x) => isChecked(x.box)) }, h('summary', {}, 'Alternatif makine ekle (isteğe bağlı)'), E('div', { class: 'row', style: 'gap:4px 16px;margin-top:6px' }, ...mach.map((x) => h('label', { class: 'chk' }, x.box, x.m.code))), E('div', { class: 'mut' }, 'Alternatif makine tanımlamak START izni vermez: operatör yeterliliği, clearance, NC/CAM ve aparat kapıları o makine için ayrıca doğrulanır.'), machines.length ? null : E('div', { class: 'mut' }, 'Makine listesi okunamadı.')), E('div', { class: 'row', style: 'gap:4px 20px' }, h('label', { class: 'chk' }, fp, 'İlk parça kontrolü şart'), h('label', { class: 'chk' }, qc, 'Kalite kontrolü şart')), field('Operatör talimatı', ins), !can.editStructure && structural ? E('div', { class: 'mut' }, 'Yeni operasyon eklemek için taslak revizyon gerekir.') : null, E('div', { class: 'row', style: 'align-items:flex-end' }, E('div', { class: 'grow' }, field(rev?.status === 'DRAFT' ? 'Not (isteğe bağlı)' : 'Değişiklik gerekçesi', reason, rev?.status === 'DRAFT' ? 'Boş bırakırsanız yapılan işlemin açıklaması kaydedilir. Her kayıt sürümlenir.' : 'Her kayıt sürümlenir; eski hâli korunur.')), btn('primary', 'pw-op-save', 'Kaydet', () => void save())));
         };
         const opExtras = (o) => {
             const insp = h('input', { 'data-testid': 'pw-insp-value', inputmode: 'decimal', placeholder: 'sn/adet', value: o.inspectionSeconds != null ? String(o.inspectionSeconds) : '' });

@@ -11,6 +11,11 @@ export function createProductWorkspaceApi(client, session) {
         machines: () => selReal(client, 'machines', { columns: 'id,code,name', order: 'code.asc' }, session),
         saveOperation: (i) => rpc('routing_op_save', { p_revision: i.revisionId, p_op_no: i.opNo, p_name: i.name, p_machine_ids: i.machineIds, p_primary: i.primaryId, p_skill_code: i.skillCode,
             p_skill_level: i.skillLevel, p_cam: i.camId, p_setup: i.setup, p_cycle: i.cycle, p_first_piece: i.firstPiece, p_qc: i.qc, p_instructions: i.instructions, p_reason: i.reason }),
+        // m0210 (uygulanmışsa): ana/alternatif makine doğrulaması ve uyarılar; fonksiyon yoksa sessizce atlanır
+        async machineWarnings(op, primaryId, alternateIds) {
+            try { const r = await rpc('routing_op_machines_set', { p_op: op, p_primary: primaryId, p_alternates: alternateIds, p_reason: null }); return r?.warnings ?? []; }
+            catch { return []; }
+        },
         async setActive(o, a, r) { await rpc('routing_op_set_active', { p_op: o, p_active: a, p_reason: r }); },
         async reorder(rev, order, r) { await rpc('routing_reorder', { p_revision: rev, p_order: order, p_reason: r }); },
         async setResource(o, kind, code, label, qty, note, active, r) { await rpc('routing_op_resource_set', { p_op: o, p_kind: kind, p_code: code, p_label: label, p_qty: qty, p_note: note, p_active: active, p_reason: r }); },
