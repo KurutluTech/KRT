@@ -112,6 +112,7 @@ export function createProductWorkspaceApi(client, session) {
         skills: () => client.select('skill_catalog', { columns: 'code,name,category,active', order: 'name.asc' }, session),   // kanonik yeterlilik kaynağı (İK / Personel Yetkinlikleri)
         canEconomics: async () => { try { return (await rpc('can_view_economics', {})) === true; } catch { return false; } },   // yalnız görünürlük için; asıl yetki sunucuda (yanıt belirsizse tutar gizli)
         competencyMatrix: () => rpc('competency_matrix', {}),
+        machineSkillReqs: () => client.select('machine_skill_requirements', { columns: 'machine_id,skill_code,min_level', limit: 500 }, session),
         machineClearances: () => client.select('operator_machine_clearances', { columns: 'personnel_id,machine_id,valid_until,revoked_at', filters: { revoked_at: 'is.null' }, limit: 2000 }, session),
         opPrepSave: (rev, slot, data, ver) => rpc('op_prep_save', { p_revision: rev, p_slot: slot, p_data: data, p_expected_version: ver }),
         opPrepSetStatus: (rev, slot, status, ver, note) => rpc('op_prep_set_status', { p_revision: rev, p_slot: slot, p_status: status, p_expected_version: ver, p_note: note }),
