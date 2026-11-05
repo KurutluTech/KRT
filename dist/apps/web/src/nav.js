@@ -131,6 +131,7 @@ export const NAV_TREE = [
     { id: 'fin', short: 'Finans', title: 'FİNANS & MALİYET ZEKÂSI', icon: 'calc', items: [
             { path: '/alacaklar', label: 'Muhasebe', icon: 'calc' },
             { path: '/onay-kuyrugu', label: 'Muhasebe Kuyruğu', icon: 'tasks' },
+            { path: '/sevkiyat-belgeleri', label: 'Sevkiyat Belgeleri (Fatura/İrsaliye)', icon: 'calc' },
             { path: '/maliyet', label: 'Maliyet Zekâsı', icon: 'chart' },
             { path: '/ekonomi', label: 'Ekonomi & Kararlar', icon: 'lock' },
         ] },

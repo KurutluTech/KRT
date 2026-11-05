@@ -243,7 +243,7 @@ export async function drawChainPanel(host, api, ws, can, reload, showErr, onChai
             const filesHost = E('div', { 'data-testid': 'opr-files-host' }), diffHost = E('div', { 'data-testid': 'opr-diffs-host' });
             const compatHost = E('div', { 'data-testid': 'omc-host' });
             rowEl.append(compatHost, filesHost, diffHost);
-            if (api.opMachineCompat && op.routingOperationId) void renderOpMachineCompat(compatHost, api.opMachineCompat, op.routingOperationId);
+            if (api.opMachineCompat && op.routingOperationId) void renderOpMachineCompat(compatHost, api.opMachineCompat, op.routingOperationId, api.opCapacityCheck);
             const fcan = { ...can, files: can.files ?? can.act };
             void drawOpFiles(filesHost, api, ws, op, fcan, reload, showErr);
             void drawRevisionDiffs(diffHost, api, ws, op, fcan, showErr);

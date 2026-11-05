@@ -11,9 +11,17 @@ export async function renderShipmentScreen(container, stockLotId, deps, banner) 
     let lotState = null;
     let shipments = [];
     let loadError = null;
+    let readiness = [];
+    let confirmations = [];
+    const val = (id, sel) => { const el = container.querySelector(`[data-ship-form="${id}"] ${sel}`); return el; };
+    const readyOf = (id) => readiness.find((r) => r.shipmentId === id && r.status === 'READY' || r.shipment_id === id && r.status === 'READY');
+    const confOf = (id) => confirmations.find((c) => (c.shipmentId ?? c.shipment_id) === id);
     try {
         lotState = await deps.getStockLotState();
         shipments = await deps.api.listForStockLot(stockLotId);
+        const ids = shipments.map((x) => x.id);
+        readiness = deps.api.readinessForShipments ? await deps.api.readinessForShipments(ids) : [];
+        confirmations = deps.api.deliveryConfirmations ? await deps.api.deliveryConfirmations(ids) : [];
     }
     catch (err) {
         loadError = errorText(err);
@@ -29,17 +37,39 @@ export async function renderShipmentScreen(container, stockLotId, deps, banner) 
     }
     async function handleDispatch(shipmentId) {
         try {
-            await deps.api.transition(shipmentId, 'DISPATCHED', `DN-${shipmentId.slice(0, 8)}`);
-            await renderShipmentScreen(container, stockLotId, deps, { kind: 'info', text: 'Sevkiyat sevk edildi (DISPATCHED) — stok lotu SHIPPED oldu.' });
+            await deps.api.transition(shipmentId, 'DISPATCHED', null); // irsaliye no sunucuda onaylı belgeden gelir
+            await renderShipmentScreen(container, stockLotId, deps, { kind: 'info', text: 'Ürün tesisten çıktı (DISPATCHED). Müşteri teslimi henüz teyit edilmedi.' });
         }
         catch (err) {
             await renderShipmentScreen(container, stockLotId, deps, { kind: 'error', text: errorText(err) });
         }
     }
     async function handleDeliver(shipmentId) {
+        const src = val(shipmentId, '[data-testid="deliver-source"]'); const ref = val(shipmentId, '[data-testid="deliver-ref"]'); const note = val(shipmentId, '[data-testid="deliver-note"]');
         try {
-            await deps.api.transition(shipmentId, 'DELIVERED');
-            await renderShipmentScreen(container, stockLotId, deps, { kind: 'info', text: 'Sevkiyat teslim edildi (DELIVERED).' });
+            await deps.api.confirmDelivery(shipmentId, src ? src.value : '', ref ? ref.value : '', note ? note.value : '');
+            await renderShipmentScreen(container, stockLotId, deps, { kind: 'info', text: 'Müşteri teslim teyidi kaydedildi; sevkiyat DELIVERED.' });
+        }
+        catch (err) {
+            await renderShipmentScreen(container, stockLotId, deps, { kind: 'error', text: errorText(err) });
+        }
+    }
+    async function handleReadiness(shipmentId) {
+        const g = (t) => val(shipmentId, `[data-testid="${t}"]`);
+        const num = Number(String(g('ready-qty').value).replace(',', '.'));
+        try {
+            await deps.api.recordReadiness(shipmentId, { packedQty: num, packagingRef: g('ready-pack').value, productOk: g('ready-product').checked, qtyOk: g('ready-qtyok').checked, packagingOk: g('ready-packok').checked, docsOk: g('ready-docs').checked, note: g('ready-note').value });
+            await renderShipmentScreen(container, stockLotId, deps, { kind: 'info', text: 'Sevkiyata hazırlık kararı kaydedildi. Stok hareketi OLUŞMADI; ürün henüz sevk edilmedi.' });
+        }
+        catch (err) {
+            await renderShipmentScreen(container, stockLotId, deps, { kind: 'error', text: errorText(err) });
+        }
+    }
+    async function handleRevokeReadiness(shipmentId, readinessId) {
+        const r = val(shipmentId, '[data-testid="ready-revoke-reason"]');
+        try {
+            await deps.api.revokeReadiness(readinessId, r ? r.value : '');
+            await renderShipmentScreen(container, stockLotId, deps, { kind: 'info', text: 'Hazırlık kararı iptal edildi.' });
         }
         catch (err) {
             await renderShipmentScreen(container, stockLotId, deps, { kind: 'error', text: errorText(err) });
@@ -71,12 +101,35 @@ export async function renderShipmentScreen(container, stockLotId, deps, banner) 
                 h("tbody", { "data-testid": "shipments-tbody" }, shipments.map((shipment) => (h("tr", { "data-testid": "shipment-row", "data-shipment-id": shipment.id },
                     h("td", { "data-testid": "shipment-status" }, shipment.status),
                     h("td", { "data-testid": "shipment-delivery-note" }, shipment.deliveryNoteNo ?? ''),
-                    h("td", { "data-testid": "shipment-actions" },
+                    h("td", { "data-testid": "shipment-actions", "data-ship-form": shipment.id },
+                        shipment.status === 'DRAFT' ? (readyOf(shipment.id)
+                            ? h(Fragment, null,
+                                h('span', { 'data-testid': 'readiness-state' }, 'Sevkiyata hazır (depo kararı verildi)'),
+                                h('input', { type: 'text', 'data-testid': 'ready-revoke-reason', placeholder: 'İptal gerekçesi' }),
+                                h('button', { type: 'button', 'data-testid': 'readiness-revoke-btn', onClick: () => handleRevokeReadiness(shipment.id, readyOf(shipment.id).id) }, 'Hazırlığı İptal Et'))
+                            : h(Fragment, null,
+                                h('span', { 'data-testid': 'readiness-state' }, 'Depo hazırlık kararı yok'),
+                                h('input', { type: 'number', 'data-testid': 'ready-qty', placeholder: 'Paketlenen adet' }),
+                                h('input', { type: 'text', 'data-testid': 'ready-pack', placeholder: 'Paket / palet referansı' }),
+                                h('label', null, h('input', { type: 'checkbox', 'data-testid': 'ready-product' }), ' Ürün doğru'),
+                                h('label', null, h('input', { type: 'checkbox', 'data-testid': 'ready-qtyok' }), ' Miktar doğru'),
+                                h('label', null, h('input', { type: 'checkbox', 'data-testid': 'ready-packok' }), ' Paketleme tamam'),
+                                h('label', null, h('input', { type: 'checkbox', 'data-testid': 'ready-docs' }), ' Fatura/irsaliye kontrol edildi'),
+                                h('input', { type: 'text', 'data-testid': 'ready-note', placeholder: 'Not' }),
+                                h('button', { type: 'button', 'data-testid': 'readiness-record-btn', onClick: () => handleReadiness(shipment.id) }, 'Sevkiyata Hazır Kararı Ver'))) : null,
                         canDispatchShipment(shipment.status).ok
-                            ? h('button', { type: 'button', 'data-testid': 'dispatch-btn', 'data-shipment-id': shipment.id, onClick: () => handleDispatch(shipment.id) }, 'Sevk Et')
+                            ? h('button', { type: 'button', 'data-testid': 'dispatch-btn', 'data-shipment-id': shipment.id, onClick: () => handleDispatch(shipment.id) }, 'Sevk Et (tesisten çıkış)')
                             : null,
                         canDeliverShipment(shipment.status).ok
-                            ? h('button', { type: 'button', 'data-testid': 'deliver-btn', 'data-shipment-id': shipment.id, onClick: () => handleDeliver(shipment.id) }, 'Teslim Edildi')
+                            ? (confOf(shipment.id) ? h('span', { 'data-testid': 'delivery-confirmed' }, 'Teslim teyit edildi') : h(Fragment, null,
+                                h('select', { 'data-testid': 'deliver-source' },
+                                    h('option', { value: 'CARRIER_POD' }, 'Taşıyıcı teslim belgesi (POD)'),
+                                    h('option', { value: 'CUSTOMER_SIGNATURE' }, 'Müşteri imzası'),
+                                    h('option', { value: 'CUSTOMER_EMAIL' }, 'Müşteri e-postası'),
+                                    h('option', { value: 'OTHER' }, 'Diğer')),
+                                h('input', { type: 'text', 'data-testid': 'deliver-ref', placeholder: 'Teyit referansı (zorunlu)' }),
+                                h('input', { type: 'text', 'data-testid': 'deliver-note', placeholder: 'Not' }),
+                                h('button', { type: 'button', 'data-testid': 'deliver-btn', 'data-shipment-id': shipment.id, onClick: () => handleDeliver(shipment.id) }, 'Müşteri Teslimini Teyit Et')))
                             : null,
                         canCancelShipment(shipment.status).ok
                             ? h('button', { type: 'button', 'data-testid': 'cancel-shipment-btn', 'data-shipment-id': shipment.id, onClick: () => handleCancel(shipment.id) }, 'İptal Et')

@@ -1,5 +1,7 @@
 const WORD_OK = 'YÜRÜRLÜKTE';
 const allOk = (ops, pick) => ops.length > 0 && ops.every((o) => pick(o) === WORD_OK);
+// m0219/m0224: makine tipi (sunucu op_technical_chain.requirements) NC/CAM/takım listesi istemiyorsa (şerit testere) o operasyon bu adımlarda aranmaz. requirements yoksa SIKI (gerekli) kabul edilir.
+const rq = (o) => ({ nc: o?.requirements?.nc !== false, cam: o?.requirements?.cam !== false, toolList: (o?.requirements?.toolList ?? o?.requirements?.tool_list) !== false });
 export function buildSteps(i) {
     const { ws, chain } = i;
     const rev = ws.revision;
@@ -44,13 +46,14 @@ export function buildSteps(i) {
         steps.push(S('route', 3, R, 'WAIT', 'Veri doğrulanamadı', 'Operasyon zinciri okunamadı.', 'CAM bağlantısını doğrula', 'routing'));
     else {
         const stale = new Set(i.staleOps ?? []);
-        const bad = ops.find((o) => !(o.nc.status === WORD_OK && o.cam.status === WORD_OK && !stale.has(o.routingOperationId)));
+        const bad = ops.find((o) => { const q = rq(o); return !((!q.nc || o.nc.status === WORD_OK) && (!q.cam || o.cam.status === WORD_OK) && !((q.nc || q.cam) && stale.has(o.routingOperationId))); });
         if (!bad)
-            steps.push(S('route', 3, R, 'DONE', 'Hazır', `${ops.length} operasyon: NC ve CAM yürürlükte.`, null, null));
+            steps.push(S('route', 3, R, 'DONE', 'Hazır', `${ops.length} operasyon: NC ve CAM yürürlükte${ops.some((o) => !rq(o).nc && !rq(o).cam) ? ' (şerit testere operasyonları NC/CAM istemez)' : ''}.`, null, null));
         else {
             const st = stale.has(bad.routingOperationId);
             const op = `OP${bad.opNo}`;
-            const nc = bad.nc.status, cam = bad.cam.status;
+            const q = rq(bad);
+            const nc = q.nc ? bad.nc.status : WORD_OK, cam = q.cam ? bad.cam.status : WORD_OK;
             if (nc === 'YOK')
                 steps.push(S('route', 3, R, 'TODO', 'Tamamlanacak', `${op}: NC programı yüklenecek.`, 'Belgeyi incele', 'routing'));
             else if (nc === 'BELGE VAR' || nc === 'TEKNİK ONAY BEKLİYOR')
@@ -59,7 +62,7 @@ export function buildSteps(i) {
                 steps.push(S('route', 3, R, 'TODO', 'Tamamlanacak', `${op}: NC yürürlükte, CAM kaydı oluşturulacak.`, 'CAM bağlantısını doğrula', 'routing'));
             else if (cam === 'TEKNİK ONAY BEKLİYOR')
                 steps.push(S('route', 3, R, 'WAIT', 'Onay bekliyor', `${op}: CAM kaydı mevcut, yayın bekliyor.`, 'CAM bağlantısını doğrula', 'routing'));
-            else if (st)
+            else if (st && (q.nc || q.cam))
                 steps.push(S('route', 3, R, 'TODO', 'Teknik kontrol gerekli', `${op}: NC değişti, CAM kaydı yeniden oluşturulacak.`, 'CAM bağlantısını doğrula', 'routing'));
             else
                 steps.push(S('route', 3, R, 'TODO', 'Teknik kontrol gerekli', `${op}: CAM kaydı mevcut, operasyon bağlantısı kontrol edilecek.`, 'CAM bağlantısını doğrula', 'routing'));
@@ -71,7 +74,9 @@ export function buildSteps(i) {
         steps.push(S('tools', 4, L, 'LOCKED', 'Tamamlanacak', 'Rota hazır olunca doğrulanır.', null, null));
     else if (!chain)
         steps.push(S('tools', 4, L, 'WAIT', 'Veri doğrulanamadı', 'Takım listesi durumu okunamadı.', 'Takım listesini yürürlüğe al', 'tools'));
-    else if (allOk(ops, (o) => o.toolList.status)) {
+    else if (!ops.some((o) => rq(o).toolList))
+        steps.push(S('tools', 4, L, 'DONE', 'Hazır', 'Bu rotada CNC takım listesi isteyen operasyon yok (şerit testere bıçağı/kesim şartları operasyon şartlarında izlenir).', null, null));
+    else if (allOk(ops.filter((o) => rq(o).toolList), (o) => o.toolList.status)) {
         const rc = i.tool?.rechecks ?? [];
         if (rc.length)
             steps.push(S('tools', 4, L, 'WAIT', 'Yeniden kontrol bekliyor', `Takım listesi yürürlükte. ${rc.map((r) => 'OP' + r.opNo).join(', ')}: takım verisi değişti; CAM/NC uygunluğu yetkili kişi tarafından kaydedilmeli (kayıt girilene kadar operasyon iş emrinde başlatılamaz).`, 'Kontrolü kaydet', 'tool-recheck'));
@@ -79,7 +84,7 @@ export function buildSteps(i) {
             steps.push(S('tools', 4, L, 'DONE', 'Hazır', `${i.toolCount != null ? `${i.toolCount} takım` : 'Takım listesi'} yürürlükte.`, null, null));
     }
     else {
-        const bad = ops.find((o) => o.toolList.status !== WORD_OK);
+        const bad = ops.filter((o) => rq(o).toolList).find((o) => o.toolList.status !== WORD_OK);
         const ts = bad.toolList.status;
         const n = i.toolCount != null ? ` (${i.toolCount} takım)` : '';
         if (ts === 'YOK')

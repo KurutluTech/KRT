@@ -183,7 +183,7 @@ export async function renderCatalogPanel(host, io, access, onDone = () => {}) {
         h('div', { class: 'mt-grid', style: 'margin-top:8px' }, fld('Tip kodu', code), fld('Ad', label), fld('Makine sınıfı', cls), fld('Eklenecek alt tipler', st), fld('Eklenecek kabiliyetler', cp), fld('Gerekçe', reason)), h('div', { class: 'mt-row', style: 'margin-top:8px' }, go), msg)));
 }
 /** OPERASYON PASAPORTU: makine tipi / profil uyumluluğu. Salt okunur bilgi; START kararı sunucu kapılarından gelir (taklit edilmez). */
-export async function renderOpMachineCompat(host, fetchCompat, opId) {
+export async function renderOpMachineCompat(host, fetchCompat, opId, fetchCapacity = null) {
     host.replaceChildren();
     let c; try { c = await fetchCompat(opId); } catch { host.append(h('div', { class: 'mut', 'data-testid': 'omc-na' }, 'Makine uyumluluğu okunamadı (kurulum bekleniyor olabilir).')); return; }
     if (!c) return;
@@ -200,4 +200,13 @@ export async function renderOpMachineCompat(host, fetchCompat, opId) {
         c.anyUntyped ? h('div', { class: 'mt-msg' }, 'Tipi girilmemiş makine var: gereksinimler SIKI uygulanır (makine pasaportundan tip seçilir).') : null,
         h('div', { class: 'mt-scroll' }, h('table', { class: 'mt-tbl' }, h('thead', {}, h('tr', {}, ...['Makine', 'Tip / alt tip', 'NC / CAM / Takım listesi', 'Uyum', '', 'Kabiliyet'].map((x) => h('th', {}, x)))), h('tbody', {}, ...rows))),
         h('div', { class: 'mt-msg' }, 'START ve iş emri hazırlık kararı bu görünümden alınmaz; aşağıdaki durum çipleri sunucu kapılarının sonucudur.'))));
+    if (typeof fetchCapacity === 'function') {   // m0224: geometrik kapasite (katalog); sunucu henüz kurulmadıysa sessizce atlanır
+        let k = null; try { k = await fetchCapacity(opId); } catch { k = null; }
+        const rowsK = (k?.machines ?? []).filter((m) => m.verdict !== 'NOT_APPLICABLE');
+        if (rowsK.length) host.append(h('div', { class: 'mt', 'data-testid': 'omc-cap-root', style: 'margin-bottom:10px' }, h('div', { class: 'mt-card' }, h('h3', {}, 'Makine kapasitesi (geometrik)'),
+            h('div', { class: 'mt-scroll' }, h('table', { class: 'mt-tbl' }, h('thead', {}, h('tr', {}, ...['Makine', 'Çubuk', 'Katalog kapasitesi', 'Sonuç'].map((x) => h('th', {}, x)))), h('tbody', {}, ...rowsK.map((m) => h('tr', { 'data-testid': 'omc-cap-row', 'data-verdict': m.verdict },
+                h('td', {}, `${m.code}${m.primary ? ' (birincil)' : ''}`), h('td', {}, m.stockDimensionMm != null ? `${m.stockProfile === 'ROUND' ? 'Ø' : ''}${m.stockDimensionMm} mm` : '—'), h('td', {}, m.catalogCapacityRound90Mm != null ? `Ø${m.catalogCapacityRound90Mm} mm (üretici kataloğu)` : '—'),
+                h('td', {}, h('span', { class: `mt-chip ${m.verdict === 'FITS_GEOMETRIC' ? 'ok' : m.verdict === 'EXCEEDS_CAPACITY' ? 'bad' : 'warn'}` }, CAP_TR[m.verdict] ?? m.verdict))))))),
+            h('div', { class: 'mt-msg' }, k.scope)))); }
 }
+const CAP_TR = { FITS_GEOMETRIC: 'Geometrik olarak uygun', EXCEEDS_CAPACITY: 'KAPASİTEYİ AŞIYOR', UNKNOWN_CAPACITY: 'Kapasite değeri girilmemiş', UNKNOWN_STOCK_DIMENSION: 'Çubuk ölçüsü yok', UNKNOWN_PROFILE: 'Profil (yuvarlak değil) — doğrulanamadı' };

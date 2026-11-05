@@ -4,12 +4,22 @@ export const ST = Object.freeze({ SAME: 'DEĞİŞMEDİ', CHANGED: 'DEĞİŞTİ',
 const num = (v) => (v === null || v === undefined || v === '' || !Number.isFinite(Number(v)) ? null : Number(v));
 const r2 = (x) => Math.round(x * 100) / 100;
 
-/** Dosya alanının durumu — "yok / henüz yüklenmedi / artık geçerli değil / bu makine için gerekmiyor" ayrı durumlardır. */
-export function fileSlotState({ required, versions = [], effectiveVersionNo = null, expired = false }) {
+/** Dosya alanının durumu — "yok / henüz yüklenmedi / artık geçerli değil / bu makine için gerekmiyor" ayrı durumlardır.
+ *  m0224: TEK KANONİK KAYNAK. Operasyon zincirinin (op_technical_chain) belge durumu `chainStatus` verilmişse O esas alınır (ürün ekranıyla aynı kaynak).
+ *  Sürüm numaraları (versionKnown=false) bilinmiyorsa "v1" UYDURULMAZ: product_workspace belge satırı sürüm numarası taşımaz, eski kod bunu 1 ve "yürürlükte değil" sanıyordu. */
+export function fileSlotState({ required, versions = [], effectiveVersionNo = null, expired = false, versionKnown = true, controlState = null, chainStatus = null }) {
     if (required === false) return { code: 'GEREKMIYOR', label: 'Bu makine için gerekmiyor', tone: 'info' };
     if (!versions.length) return { code: 'YUKLENMEDI', label: 'Henüz yüklenmedi', tone: 'warn' };
-    const latest = Math.max(...versions.map((v) => v.versionNo));
     if (expired) return { code: 'GECERSIZ', label: 'Artık geçerli değil (süresi doldu / geçersiz)', tone: 'bad' };
+    const latest = Math.max(...versions.map((v) => v.versionNo));
+    const vtxt = versionKnown ? `v${latest} ` : '';
+    if (chainStatus === 'YÜRÜRLÜKTE') return { code: 'YURURLUKTE', label: `${vtxt}yürürlükte`.trim().replace(/^./, (c) => c.toUpperCase()), tone: 'ok' };
+    if (chainStatus === 'TEKNİK ONAY BEKLİYOR' || chainStatus === 'BELGE VAR') return { code: 'TASLAK', label: `${vtxt}yüklendi — henüz yürürlükte değil (onay bekliyor)`.replace(/^./, (c) => c.toUpperCase()), tone: 'warn' };
+    if (chainStatus === 'OPERASYONA BAĞLI DEĞİL') return { code: 'BAGLI_DEGIL', label: 'Belge var ama bu operasyona bağlı değil', tone: 'warn' };
+    if (!versionKnown) {
+        if (controlState === 'EFFECTIVE') return { code: 'YURURLUKTE', label: 'Yürürlükte', tone: 'ok' };
+        return { code: 'TASLAK', label: 'Yüklendi — henüz yürürlükte değil (onay bekliyor)', tone: 'warn' };
+    }
     if (effectiveVersionNo == null) return { code: 'TASLAK', label: `v${latest} yüklendi — henüz yürürlükte değil (onay bekliyor)`, tone: 'warn' };
     if (effectiveVersionNo < latest) return { code: 'YENI_TASLAK', label: `Yürürlükte v${effectiveVersionNo}; v${latest} taslak (onay bekliyor)`, tone: 'warn' };
     return { code: 'YURURLUKTE', label: `v${latest} yürürlükte`, tone: 'ok' };

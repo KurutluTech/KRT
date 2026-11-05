@@ -34,7 +34,9 @@ function docBlock(api, ws, op, slot, doc, can, reload, showErr, reqOn) {
     let versions = null; let busy = false;
     const known = doc ? doc.versionNo ?? null : null; // ekran açılırken bilinen en yeni sürüm (eşzamanlı düzenleme koruması)
     const loadVersions = async () => { if (!doc) return []; versions = await api.docVersions(doc.id ?? doc.documentId); return versions; };
-    const st = fileSlotState({ required: reqOn === false ? false : undefined, versions: doc ? [{ versionNo: doc.versionNo ?? 1 }] : [], effectiveVersionNo: doc?.effectiveVersionNo ?? null });
+    const chainItem = slot.docType === 'NC_PROGRAM' ? op?.nc : slot.docType === 'TOOL_LIST' ? op?.toolList : null;   // m0224: NC/takım listesi durumu kanonik zincirden (ürün ekranıyla aynı kaynak)
+    const chainStatus = chainItem && (!chainItem.docNo || !doc?.docNo || chainItem.docNo === doc.docNo) ? chainItem.status : null;
+    const st = fileSlotState({ required: reqOn === false ? false : undefined, versions: doc ? [{ versionNo: doc.versionNo ?? 1 }] : [], effectiveVersionNo: doc?.effectiveVersionNo ?? null, versionKnown: doc?.versionNo != null, controlState: doc?.controlState ?? null, chainStatus });
     const head = E('div', { class: 'row', style: 'gap:6px;flex-wrap:wrap;align-items:center' }, E('b', {}, slot.label), chip(reqOn === false ? 'GEREKMİYOR' : st.code === 'YUKLENMEDI' && reqOn !== true ? 'Henüz yüklenmedi (isteğe bağlı)' : st.label, reqOn === false ? 'info' : st.code === 'YUKLENMEDI' && reqOn !== true ? 'info' : st.tone), doc ? E('span', { class: 'mut' }, `${doc.docNo ?? ''} · ${doc.fileName ?? ''}`) : null);
     host.append(head);
     const view = async (download) => {

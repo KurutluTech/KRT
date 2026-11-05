@@ -53,7 +53,8 @@ export function buildPrecheck(i) {
   else checks.push(C('route', 'Rota', 'OK', `${routing.map(opLabel).join(' → ')}${applied ? ` · iş emrine ${woOps.length} operasyon uygulanmış` : ' · henüz iş emrine uygulanmadı'}`));
   // 5 CAM
   const camBy = new Map((i.cam ?? []).map((c) => [c.routingOperationId, c]));
-  const noCam = routing.filter((r) => r.opKind !== 'CUT_PREP' && !camBy.get(r.id));
+  // m0224: makine tipi CAM istemiyorsa (şerit testere: CUT/PREP, armut kesim) CAM aranmaz; requirements okunamadıysa (null) SIKI.
+  const noCam = routing.filter((r) => r.opKind !== 'CUT_PREP' && r.requirements?.cam !== false && !camBy.get(r.id));
   if (!routing.length) checks.push(C('cam', 'CAM programı', 'UNKNOWN', 'Rota yok; CAM kontrol edilemedi.', OWNER.cam, 'Önce rotayı tamamla'));
   else if (noCam.length) checks.push(C('cam', 'CAM programı', 'MISSING', `CAM programı olmayan: ${noCam.map(opLabel).join(', ')}.`, OWNER.cam, 'Operasyona CAM programı bağla ve onayla'));
   else { const unrel = [...camBy.values()].filter((c) => c.status && c.status !== 'RELEASED'); checks.push(unrel.length ? C('cam', 'CAM programı', 'WARN', `${unrel.length} programın durumu RELEASED değil.`, OWNER.cam, 'Programı yayınla') : C('cam', 'CAM programı', 'OK', 'Tüm programlar bağlı ve yayınlı.')); }

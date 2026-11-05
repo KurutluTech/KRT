@@ -34,6 +34,7 @@ export const OPEN_RULES = {
     // KMI-012: planner screens. Navigation only — plan_blocks / plan_slot_capacity / plan_operator_load / scenarios gate on the server (operator-only users get their own work orders only, no customer, no other operator names).
     '/planlama-kokpit': { any: ['WORK_ORDER_ASSIGN_MACHINE'], roles: ['ADMIN', 'MANAGEMENT'] },
     '/vardiya-planlayici': { any: ['WORK_ORDER_ASSIGN_MACHINE'], roles: ['ADMIN', 'MANAGEMENT'] },
+    '/sevkiyat-belgeleri': { any: ['SHIPMENT_MANAGE', 'ACCOUNTING_MUTATION'], roles: ['ADMIN', 'MANAGEMENT', 'ACCOUNTING', 'SHIPPING'] },
     '/sevkiyat-iade': { any: ['SHIPMENT_MANAGE', 'WAREHOUSE_RECORD', 'QUALITY_HOLD_RELEASE', 'QUALITY_HOLD_OPEN', 'QUALITY_REJECT', 'ACCOUNTING_MUTATION'], roles: ['ADMIN', 'MANAGEMENT', 'QUALITY', 'SHIPPING', 'WAREHOUSE', 'ACCOUNTING'] },
     '/personel-makine': { any: ['MACHINE_SKILL_VERIFY', 'WORK_ORDER_ASSIGN_MACHINE'], roles: ['ADMIN', 'MANAGEMENT'] },
     '/rota-hazirlik': { any: ['ROUTING_MANAGE', 'BOM_RELEASE'], roles: ['ADMIN', 'MANAGEMENT', 'CAM'] },
@@ -50,7 +51,7 @@ export const OPEN_RULES = {
     '/cihazlar': { any: ['DEVICE_MANAGE'] },
     '/tahsis': { any: ['QUALITY_REJECT', 'OPERATION_QC_RECORD', 'FIRST_PIECE_APPROVE', 'QUALITY_HOLD_RELEASE'] },
     '/kalite': { any: ['FIRST_PIECE_APPROVE', 'QUALITY_HOLD_RELEASE', 'QUALITY_REJECT', 'OPERATION_QC_RECORD', 'FINAL_PRODUCTION_RELEASE'] },
-    '/sevkiyat': { any: ['SHIPMENT_MANAGE', 'COMMERCIAL_RELEASE', 'MANAGEMENT_RELEASE'] },
+    '/sevkiyat': { any: ['SHIPMENT_MANAGE', 'SHIPPING_READINESS_RECORD', 'COMMERCIAL_RELEASE', 'MANAGEMENT_RELEASE'] },
     '/depo': { any: ['WAREHOUSE_RECORD'] },
     '/satinalma': { any: ['PURCHASE_ORDER_MANAGE', 'PURCHASING_APPROVE', 'WAREHOUSE_RECORD'] },
 };
