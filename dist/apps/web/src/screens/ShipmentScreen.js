@@ -13,6 +13,7 @@ export async function renderShipmentScreen(container, stockLotId, deps, banner) 
     let loadError = null;
     let readiness = [];
     let confirmations = [];
+    let canReadiness = true;
     const val = (id, sel) => { const el = container.querySelector(`[data-ship-form="${id}"] ${sel}`); return el; };
     const readyOf = (id) => readiness.find((r) => r.shipmentId === id && r.status === 'READY' || r.shipment_id === id && r.status === 'READY');
     const confOf = (id) => confirmations.find((c) => (c.shipmentId ?? c.shipment_id) === id);
@@ -20,6 +21,7 @@ export async function renderShipmentScreen(container, stockLotId, deps, banner) 
         lotState = await deps.getStockLotState();
         shipments = await deps.api.listForStockLot(stockLotId);
         const ids = shipments.map((x) => x.id);
+        canReadiness = deps.api.canRecordReadiness ? await deps.api.canRecordReadiness() : true;
         readiness = deps.api.readinessForShipments ? await deps.api.readinessForShipments(ids) : [];
         confirmations = deps.api.deliveryConfirmations ? await deps.api.deliveryConfirmations(ids) : [];
     }
@@ -57,6 +59,14 @@ export async function renderShipmentScreen(container, stockLotId, deps, banner) 
     async function handleReadiness(shipmentId) {
         const g = (t) => val(shipmentId, `[data-testid="${t}"]`);
         const num = Number(String(g('ready-qty').value).replace(',', '.'));
+        // İstemci doğrulaması (kolaylık): sunucu yine de her kuralı denetler.
+        const bad = !(num > 0) ? 'Paketlenen adet 0\'dan büyük bir sayı olmalı.'
+            : String(g('ready-pack').value).trim().length < 3 ? 'Paket / palet referansı en az 3 karakter olmalı.'
+                : !(g('ready-product').checked && g('ready-qtyok').checked && g('ready-packok').checked && g('ready-docs').checked) ? 'Ürün, miktar, paketleme ve belge kontrollerinin hepsi işaretlenmeli.' : null;
+        if (bad) {
+            await renderShipmentScreen(container, stockLotId, deps, { kind: 'error', text: bad });
+            return;
+        }
         try {
             await deps.api.recordReadiness(shipmentId, { packedQty: num, packagingRef: g('ready-pack').value, productOk: g('ready-product').checked, qtyOk: g('ready-qtyok').checked, packagingOk: g('ready-packok').checked, docsOk: g('ready-docs').checked, note: g('ready-note').value });
             await renderShipmentScreen(container, stockLotId, deps, { kind: 'info', text: 'Sevkiyata hazırlık kararı kaydedildi. Stok hareketi OLUŞMADI; ürün henüz sevk edilmedi.' });
@@ -102,7 +112,7 @@ export async function renderShipmentScreen(container, stockLotId, deps, banner) 
                     h("td", { "data-testid": "shipment-status" }, shipment.status),
                     h("td", { "data-testid": "shipment-delivery-note" }, shipment.deliveryNoteNo ?? ''),
                     h("td", { "data-testid": "shipment-actions", "data-ship-form": shipment.id },
-                        shipment.status === 'DRAFT' ? (readyOf(shipment.id)
+                        shipment.status === 'DRAFT' ? (!canReadiness ? h('span', { 'data-testid': 'readiness-no-authority' }, 'Hazırlık kararını yalnız yetkili depo/sevkiyat personeli verir.') : readyOf(shipment.id)
                             ? h(Fragment, null,
                                 h('span', { 'data-testid': 'readiness-state' }, 'Sevkiyata hazır (depo kararı verildi)'),
                                 h('input', { type: 'text', 'data-testid': 'ready-revoke-reason', placeholder: 'İptal gerekçesi' }),

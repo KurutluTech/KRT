@@ -55,6 +55,23 @@ export const OPEN_RULES = {
     '/depo': { any: ['WAREHOUSE_RECORD'] },
     '/satinalma': { any: ['PURCHASE_ORDER_MANAGE', 'PURCHASING_APPROVE', 'WAREHOUSE_RECORD'] },
 };
+/**
+ * V3.6 — VISIBILITY ONLY. my_access() is role based; the server's real decision (access_decide: personal deny/allow, job profile, department, role)
+ * is available through my_access_matrix(). We keep it in SEPARATE fields (viewGranted / viewDenied) that only canOpen reads, so the action flags
+ * built from `actions` (who sees an approve/record button) are NOT widened: seeing a screen never grants an action — the server decides each call.
+ * Any malformed/missing answer returns the base unchanged (fail closed: nothing extra is shown).
+ */
+export function withServerDecisions(base, rows) {
+    if (!Array.isArray(rows) || rows.length === 0)
+        return base;
+    const granted = [], denied = [];
+    for (const r of rows) {
+        if (!r || typeof r.action_code !== 'string' || typeof r.allowed !== 'boolean')
+            return base;
+        (r.allowed ? granted : denied).push(r.action_code);
+    }
+    return { ...base, viewGranted: granted, viewDenied: denied, matrixLoaded: true };
+}
 export function canOpen(path, a) {
     const r = OPEN_RULES[path];
     if (!r)
@@ -65,7 +82,11 @@ export function canOpen(path, a) {
         return true;
     if ((r.roles ?? []).some((x) => a.roles.includes(x)))
         return true;
-    return (r.any ?? []).some((x) => a.actions.includes(x));
+    // ADMIN (Ender, Hakan) keeps full module access: a personal deny narrows the menu for everyone else, never for ADMIN.
+    const adminKeeps = a.roles.includes('ADMIN');
+    const denied = a.matrixLoaded && !adminKeeps ? new Set(a.viewDenied ?? []) : new Set();
+    const have = new Set([...(a.actions ?? []).filter((x) => !denied.has(x)), ...(a.viewGranted ?? [])]);
+    return (r.any ?? []).some((x) => have.has(x));
 }
 /** Role → the screens featured first on that role's home (directive §3 examples, mapped onto existing roles only). */
 export const ROLE_HOME = {

@@ -8,7 +8,7 @@ import { selReal, installPilotDecorator } from './pilotMark.js';
 import { h, mount } from '../../../packages/ui/src/h.js';
 import { createKmiNextClient } from '../../../packages/data-client/src/client.js';
 import { renderTerminalScreen, rememberedMachine, remember as rememberMachine } from './screens/TerminalScreen.js';
-import { canOpen, featuredPaths, landingPath, NO_ACCESS } from './access.js';
+import { canOpen, featuredPaths, landingPath, NO_ACCESS, withServerDecisions } from './access.js';
 import { renderCustomersScreen } from './screens/CustomersScreen.js';
 import { renderQuotesScreen } from './screens/QuotesScreen.js';
 import { createQuotesApi } from './quotesApi.js';
@@ -194,6 +194,7 @@ import { MACHINE_CARD_CSS } from './machineCard.js';
 import { loadExtras } from './homeData.js';
 import { homeCardsFor } from '../../../packages/domain/src/homeLayout.js';
 import { startIdleGuard } from './idleGuard.js';
+import { startVersionWatch } from './versionWatch.js';
 import { createUxTelemetry, errorClassOf, routeKey } from '../../../packages/domain/src/uxTelemetry.js';
 import { IDLE_LIMIT_MS, deviceProfile, idleGuardApplies, resolveDeviceMode } from '../../../packages/domain/src/idleSession.js';
 import { rememberProduct } from './lastProduct.js';
@@ -584,6 +585,12 @@ export async function startApp(root, opts = {}) {
         return false;
     } };
     let idleGuard = null;
+    // V3.6: new-version notice (never auto-refreshes; warns before discarding unsaved input). Static GET/HEAD only.
+    try {
+        if (typeof fetch === 'function' && !window.__kmiVersionWatch)
+            window.__kmiVersionWatch = startVersionWatch({ doc: document, win: window, fetchFn: (u, i) => fetch(u, i) });
+    }
+    catch { /* the notice is optional */ }
     let deviceReported = false;
     let deviceApply = null; // set by the shell render; ONE resize listener for the whole page (not one per render)
     window.addEventListener('resize', () => deviceApply?.(), { passive: true });
@@ -673,7 +680,13 @@ export async function startApp(root, opts = {}) {
             return accessCache;
         try {
             const value = await client.rpc('my_access', {}, session);
-            accessCache = { token, value: { ...NO_ACCESS, ...value }, failed: false };
+            let merged = { ...NO_ACCESS, ...value };
+            // V3.6: menu/route VISIBILITY follows the server's central decision (grant/deny, job profile, department). Failure = base access only.
+            try {
+                merged = withServerDecisions(merged, await client.rpc('my_access_matrix', {}, session));
+            }
+            catch { /* visibility falls back to my_access */ }
+            accessCache = { token, value: merged, failed: false };
         }
         catch {
             return { value: NO_ACCESS, failed: true };

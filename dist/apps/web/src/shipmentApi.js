@@ -11,6 +11,16 @@ export function createShipmentApi(client, session) {
         async create(stockLotId) {
             return client.rpc('create_shipment', { p_stock_lot_id: stockLotId }, session);
         },
+        async canRecordReadiness() {
+            // Yalnız GÖRÜNÜRLÜK: sunucu (SHIPPING_READINESS_RECORD, kişi bazlı) kararı verir. Okunamazsa form gizlenir (sunucu zaten reddeder).
+            try {
+                const a = await client.rpc('my_access', {}, session);
+                return (a.actions ?? []).includes('SHIPPING_READINESS_RECORD');
+            }
+            catch {
+                return false;
+            }
+        },
         async readinessForShipments(shipmentIds) {
             if (!shipmentIds.length) return [];
             return client.select('shipping_readiness', {
