@@ -424,6 +424,9 @@ export async function renderProductWorkspaceScreen(container, api, state = {}) {
                     ...skills.map((x) => h('option', { value: x.code, selected: x.code === curSkill }, `${x.name} (${x.code})`)))
                 : h('input', { 'data-testid': 'pw-op-skill', value: curSkill, placeholder: 'Yeterlilik kodu' });
             const level = h('select', { 'data-testid': 'pw-op-level' }, h('option', { value: '' }, '— seviye —'), ...[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((n) => h('option', { value: String(n), selected: op?.skillLevel === n }, `Seviye ${n}`)));
+            // m0221: form açıldığı andaki en yeni operasyon sürümü — kayıtta sunucu bununla karşılaştırır (eşzamanlı düzenlemede sessiz veri kaybı yok)
+            let seenVer = null;
+            if (op?.id && api.opHistory) void api.opHistory(op.id).then((rows) => { seenVer = rows.reduce((m, r) => Math.max(m, r.versionNo ?? 0), 0); }).catch(() => { seenVer = null; });
             const setup = h('input', { 'data-testid': 'pw-op-setup', inputmode: 'decimal', value: op?.setupMinutes != null ? String(op.setupMinutes) : '' });
             const cycle = h('input', { 'data-testid': 'pw-op-cycle', inputmode: 'decimal', value: op?.cycleSeconds != null ? String(op.cycleSeconds) : '' });
             const fp = h('input', { type: 'checkbox', 'data-testid': 'pw-op-fp', checked: op?.firstPieceRequired ?? true });
@@ -460,7 +463,7 @@ export async function renderProductWorkspaceScreen(container, api, state = {}) {
                 }
                 try {
                     const r = await api.saveOperation({ revisionId: rev.id, opNo: no, name: val(name).trim(), machineIds: ids, primaryId: prim, skillCode: val(skill).trim() || null, skillLevel: num(val(level)),
-                        camId: op?.camProgramId ?? null, setup: setupV, cycle: cycleV, firstPiece: isChecked(fp), qc: isChecked(qc), instructions: val(ins).trim() || null, reason: autoWhy(`OP${no} ${op ? 'güncellendi' : 'eklendi'}${diffs.length ? ' — ' + diffs.join('; ') : ''}`) });
+                        camId: op?.camProgramId ?? null, setup: setupV, cycle: cycleV, firstPiece: isChecked(fp), qc: isChecked(qc), instructions: val(ins).trim() || null, expectedVersion: seenVer, reason: autoWhy(`OP${no} ${op ? 'güncellendi' : 'eklendi'}${diffs.length ? ' — ' + diffs.join('; ') : ''}`) });
                     openOp = r.operationId;
                     const WARN_TR = { ALT_NOT_PRODUCTION_ELIGIBLE: 'alternatif makine şu an üretime uygun değil', ALT_MACHINE_CLASS_DIFFERS: 'alternatif makine sınıfı ana makineden farklı', ALT_SKILL_REQUIREMENTS_UNKNOWN: 'alternatif makinenin beceri şartı tanımsız', ALT_NO_CAM_FOR_MACHINE: 'alternatif makine için CAM/NC kaydı yok' };
                     const warn = alts.length ? await api.machineWarnings(r.operationId, prim, alts) : [];
@@ -582,7 +585,7 @@ export async function renderProductWorkspaceScreen(container, api, state = {}) {
                 const op = ws.routing.find((x) => x.id === openOp);
                 const host = opsHost.querySelector('[data-testid="pw-op-chain-host"]');
                 if (op && host)
-                    void drawChainPanel(host, api, ws, { act: !!(can.editRouting || can.manageDocuments) && editable }, (m) => reload(m), (e) => fail(e), undefined, op.opNo);
+                    void drawChainPanel(host, api, ws, { act: !!(can.editRouting || can.manageDocuments) && editable, files: !!can.manageDocuments }, (m) => reload(m), (e) => fail(e), undefined, op.opNo);
             });
             opsHost.replaceChildren(...(ws.routing.length ? [E('div', { class: 'oph' }, E('span', {}, 'OP'), E('span', {}, 'Operasyon'), E('span', {}, 'Makine'), E('span', {}, 'Hazırlık'), E('span', {}, 'Çevrim'), E('span', {}, 'Muayene'), E('span', {}, 'CAM'), E('span', { class: 'acts' }, 'İşlem')), ...ws.routing.map(opCard)]
                 : [emptyState(`${NA} — bu revizyonda operasyon yok`, can.editStructure ? '“+ Operasyon ekle” ile ilk operasyonu tanımlayın.' : 'Operasyon tanımı için taslak revizyon gerekir.', 'pw-route-empty')]), ...(can.editStructure && openOp === 'NEW' ? [E('div', { class: 'opc open', style: 'margin-top:8px' }, E('div', { class: 'opb' }, E('b', {}, insertAt === null ? 'Yeni operasyon (sona eklenir)' : `Yeni operasyon — kayıttan sonra ${insertAt === 0 ? 'CUT/PREP’in hemen ardına' : `${insertAt}. sıraya`} yerleşir`), E('div', { style: 'margin-top:10px' }, opEditor(null)), E('div', { class: 'row', style: 'margin-top:8px' }, btn('ghost sm', null, 'Vazgeç', () => { openOp = null; drawOps(); }))))] : []));
@@ -608,7 +611,7 @@ export async function renderProductWorkspaceScreen(container, api, state = {}) {
         if (rev && api.changeHistory && api.changeImpact) {
             routingCard.append(drawRouteChanges(h('div'), api, { revisionId: rev.id, status: rev.status })); // kendi açılır paneli var
         }
-        void drawChainPanel(chainHost, api, ws, { act: !!(can.editRouting || can.manageDocuments) && editable }, (m) => reload(m), (e) => fail(e), (c) => {
+        void drawChainPanel(chainHost, api, ws, { act: !!(can.editRouting || can.manageDocuments) && editable, files: !!can.manageDocuments }, (m) => reload(m), (e) => fail(e), (c) => {
             chainNow = c ? { ...c, operations: c.operations.map((x) => sanitizeChainOp(x, ws)) } : c;
             if (!opsHost.querySelector('input:focus, textarea:focus, select:focus'))
                 drawOps(); // never wipe a field the user is typing in
@@ -882,7 +885,7 @@ export async function renderProductWorkspaceScreen(container, api, state = {}) {
             const panel = E('div', { class: 'opb' }, chainH, o.active ? buildEngineeringPanel({ api, ws, rev, can, fail, reload, chainOf, canCreate: !!(can.manageDocuments && editable) }, o) : null, can.editRouting && editable && o.active ? buildOpWorkCard({ api, ws, rev, machines, skills, activeOps, can, canAct: !!(can.editRouting || can.manageDocuments) && editable, loadFresh: () => api.load(ws.product.id, rev.id), machineReqs, fail, reload, chainNow: () => chainNow }, o)
                     : E('div', { class: 'mut' }, o.active ? 'Bu revizyonu düzenleme yetkiniz yok ya da revizyon kapalı.' : 'Pasif operasyon düzenlenmez.'), E('div', { class: 'row', style: 'margin-top:10px' }, btn('ghost', 'pw-op-hist-btn', 'Operasyon geçmişi (önce → sonra)', () => void showHist(o))), E('div', { 'data-testid': 'pw-op-history', 'data-op-hist': o.id }));
             if (chainH === null && o.active)
-                void drawChainPanel(panel.querySelector('[data-testid="pw-op-chain-host"]'), api, ws, { act: !!(can.editRouting || can.manageDocuments) && editable }, (m) => reload(m), (e) => fail(e), undefined, o.opNo);
+                void drawChainPanel(panel.querySelector('[data-testid="pw-op-chain-host"]'), api, ws, { act: !!(can.editRouting || can.manageDocuments) && editable, files: !!can.manageDocuments }, (m) => reload(m), (e) => fail(e), undefined, o.opNo);
             return [panel];
         };
         const editors = (t, opCode) => {

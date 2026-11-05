@@ -2,6 +2,7 @@
 import { h } from '../../../../../packages/ui/src/h.js';
 import { classifyCycle, estimateView, EXCL_TR } from '../../../../../packages/domain/src/cycleAnalysis.js';
 import { isDenied } from './common.js';
+import { canonicalCycleBox } from './opTripleCard.js';
 const NUM = new Intl.NumberFormat('tr-TR', { maximumFractionDigits: 1 });
 const dtf = new Intl.DateTimeFormat('tr-TR', { timeZone: 'Europe/Istanbul', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
 const fmt = (iso) => (iso ? dtf.format(new Date(iso)) : '—');
@@ -45,6 +46,7 @@ export function cycleTopic(ctx, m) {
                     box.append(small(`Eşleme: CNC programı ${mp.cncProgram} · ${mp.nameMatch ? 'ad CAM kaydıyla aynı' : 'ad CAM kaydından FARKLI (yalnız kanıta dayalı)'} · içerik ${mp.contentVerified ? 'doğrulandı' : 'DOĞRULANAMADI'} · ${fmt(mp.provenAt)}`, 'cyc-map'));
                     try {
                         const est = await ctx.rpc('op_cycle_estimate', { p_op: o.id });
+                        try { box.append(canonicalCycleBox(await ctx.rpc('op_cycle_canonical', { p_op: o.id, p_wo_op: null }))); } catch { /* m0216 henüz uygulanmamış olabilir: eski tahmin görünümü aynen sürer */ }
                         const v = estimateView(est);
                         const col = TONE_CSS[v.tone] ?? '#94a3b8';
                         box.append(h('div', { 'data-testid': 'cyc-est', 'data-status': v.state, style: `border-left:3px solid ${col};padding:2px 10px;margin:6px 0` }, h('div', { style: `font-weight:800;color:${col}` }, v.headline), h('table', { style: 'font-size:13px;border-collapse:collapse' }, ...[

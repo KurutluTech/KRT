@@ -1,6 +1,8 @@
 // Paket C / 0136 — "Operasyon zinciri": for every operation ONE canonical answer (NC · CAM kaydı · takım listesi · makine) with five words only:
 // YOK · BELGE VAR · OPERASYONA BAĞLI DEĞİL · TEKNİK ONAY BEKLİYOR · YÜRÜRLÜKTE  (+ İŞ EMRİNE HAZIR for the whole operation).
 // The panel never decides anything: it shows what op_technical_chain says and offers the next real action (link, register CAM from the existing NC, release, attach). Titles / file names never count as a relation.
+import { drawOpFiles, drawRevisionDiffs } from './opRevisionPanel.js';
+import { renderOpMachineCompat } from '../machineTypeUi.js';
 import { h } from '../../../../packages/ui/src/h.js';
 import { guessMime } from './DocumentsScreen.js';
 import { toBase64 } from '../kx.js';
@@ -39,15 +41,22 @@ export function safeChain(chain, ws) {
     return chain ? { ...chain, operations: (chain.operations ?? []).map((x) => sanitizeChainOp(x, ws)) } : chain;
 }
 export const CHAIN_TONE = { 'YOK': 'bad', 'BELGE VAR': 'warn', 'OPERASYONA BAĞLI DEĞİL': 'warn', 'TEKNİK ONAY BEKLİYOR': 'warn', 'YÜRÜRLÜKTE': 'ok' };
-const word = (label, it, testid) => E('span', { class: `chip ${CHAIN_TONE[it.status] ?? 'warn'}`, 'data-testid': testid, 'data-status': it.status, title: it.detail ?? '' }, `${label}: ${it.status}${it.docNo ? ` · ${it.docNo}` : ''}${it.programNo && label === 'CAM' ? ` · ${it.programNo}` : ''}`);
+/** m0219: makine tipi (sunucu op_technical_chain.requirements) NC/CAM/takım listesi istemiyorsa (ör. şerit testere) 'GEREKMİYOR' yazılır; sunucu eski ise (requirements yok) SIKI kabul edilir. */
+export const chainReq = (op) => ({ nc: op?.requirements?.nc !== false, cam: op?.requirements?.cam !== false, toolList: op?.requirements?.toolList !== false, setupTime: op?.requirements?.setupTime !== false, cutTime: op?.requirements?.cutTime !== false, cuttingToolType: op?.requirements?.cuttingToolType ?? null, machineType: op?.machineType ?? null });
+const MT_TR = { BANDSAW: 'şerit testere', CNC_MACHINING: 'CNC işleme merkezi', CNC_TURNING: 'CNC torna' };
+const word = (label, it, testid, required = true, machineType = null) => !required
+    ? E('span', { class: 'chip', 'data-testid': testid, 'data-status': 'GEREKMİYOR', title: 'Makine tipine göre bu kayıt zorunlu değildir' }, `${label}: GEREKMİYOR${machineType ? ` (${MT_TR[machineType] ?? machineType})` : ''}`)
+    : E('span', { class: `chip ${CHAIN_TONE[it.status] ?? 'warn'}`, 'data-testid': testid, 'data-status': it.status, title: it.detail ?? '' }, `${label}: ${it.status}${it.docNo ? ` · ${it.docNo}` : ''}${it.programNo && label === 'CAM' ? ` · ${it.programNo}` : ''}`);
 /** Compact NC · CAM · takım listesi chips for one operation (same words as the chain panel, same source). Pure DOM, no decisions. */
 export function chainChips(op) {
-    return [word('NC', op.nc, 'pw-op-nc'), word('CAM', op.cam, 'pw-op-cam'), word('Takım listesi', op.toolList, 'pw-op-tl')];
+    const q = chainReq(op);
+    return [word('NC', op.nc, 'pw-op-nc', q.nc, q.machineType), word('CAM', op.cam, 'pw-op-cam', q.cam, q.machineType), word('Takım listesi', op.toolList, 'pw-op-tl', q.toolList, q.machineType)];
 }
 /** Plain-language reason for what is missing on ONE operation — the three records are different things: the NC DOCUMENT (a file under document control),
  *  the CAM RECORD (program record made from that NC) and the LINK of the CAM record to the operation. Pure — unit tested. Returns null when nothing is missing. */
 export function chainGapText(op, staleCam = false) {
-    const nc = op.nc.status, cam = op.cam.status, tl = op.toolList.status;
+    const q = chainReq(op);
+    const nc = q.nc ? op.nc.status : 'YÜRÜRLÜKTE', cam = q.cam ? op.cam.status : 'YÜRÜRLÜKTE', tl = q.toolList ? op.toolList.status : 'YÜRÜRLÜKTE'; /* m0219: gerekmeyen kayıt eksik sayılmaz */
     const doc = op.nc.docNo ?? 'NC belgesi';
     if (nc === 'YOK')
         return 'NC programı yok: bu operasyon için bir NC dosyası yüklenip yürürlüğe alınmalı.';
@@ -73,6 +82,9 @@ export function chainGapText(op, staleCam = false) {
 }
 /** The next real action for an operation, or null. Pure — unit tested. */
 export function nextChainAction(op, staleCam = false) {
+    const q = chainReq(op);
+    if (!q.nc && !q.cam && !q.toolList)
+        return null; /* m0219: şerit testere — NC/CAM/takım listesi eylemi önerilmez */
     if (op.nc.status === 'OPERASYONA BAĞLI DEĞİL' && op.nc.controlState === 'EFFECTIVE' && op.cam.status === 'YOK')
         return { kind: 'REGISTER_CAM', label: `CAM kaydını mevcut NC'den oluştur (${op.nc.docNo ?? 'NC'})` };
     if (op.nc.status === 'YÜRÜRLÜKTE' && op.cam.status === 'YOK')
@@ -175,9 +187,10 @@ export async function drawChainPanel(host, api, ws, can, reload, showErr, onChai
                 showErr(e);
             }
         };
-        const rowEl = E('div', { class: 'r', 'data-testid': 'pw-chain-op', 'data-op': String(op.opNo), 'data-ready': String(op.workOrderReady) }, E('div', { class: 'row', style: 'gap:6px;flex-wrap:wrap' }, E('b', {}, `OP${op.opNo}`), E('span', {}, op.name), word('NC', op.nc, 'pw-chain-nc'), word('CAM', op.cam, 'pw-chain-cam'), word('Takım listesi', op.toolList, 'pw-chain-tl'), E('span', { class: `chip ${op.workOrderReady ? 'ok' : 'warn'}`, 'data-testid': 'pw-chain-ready' }, op.workOrderReady ? 'İŞ EMRİNE HAZIR' : 'İŞ EMRİNE HAZIR DEĞİL')), gapText(op, isStale), act ? E('div', { class: 'row', style: 'margin-top:6px' }, E('button', { class: 'btn primary sm', type: 'button', 'data-testid': 'pw-chain-act', 'data-kind': act.kind, onClick: (ev) => void run(ev) }, act.label)) : null);
+        const rowEl = E('div', { class: 'r', 'data-testid': 'pw-chain-op', 'data-op': String(op.opNo), 'data-ready': String(op.workOrderReady) }, E('div', { class: 'row', style: 'gap:6px;flex-wrap:wrap' }, E('b', {}, `OP${op.opNo}`), E('span', {}, op.name), word('NC', op.nc, 'pw-chain-nc', chainReq(op).nc, op.machineType), word('CAM', op.cam, 'pw-chain-cam', chainReq(op).cam, op.machineType), word('Takım listesi', op.toolList, 'pw-chain-tl', chainReq(op).toolList, op.machineType), E('span', { class: `chip ${op.workOrderReady ? 'ok' : 'warn'}`, 'data-testid': 'pw-chain-ready' }, op.workOrderReady ? 'İŞ EMRİNE HAZIR' : 'İŞ EMRİNE HAZIR DEĞİL')), gapText(op, isStale), (op.machineType === 'BANDSAW' ? E('div', { class: 'mut', 'data-testid': 'pw-chain-bandsaw', role: 'note' }, `Şerit testere: NC / CAM / CNC takım listesi gerekmez. Bağlama ve kesme süresi, şerit bıçağı (${chainReq(op).cuttingToolType ?? 'BANDSAW_BLADE'}) ve kesim adedi/ölçüsü rota kaydından izlenir.`) : null), act ? E('div', { class: 'row', style: 'margin-top:6px' }, E('button', { class: 'btn primary sm', type: 'button', 'data-testid': 'pw-chain-act', 'data-kind': act.kind, onClick: (ev) => void run(ev) }, act.label)) : null);
         // Satır içi NC yükleme: NC yoksa dosya bu operasyon kartından yüklenir ve bu operasyona bağlanır. Yükleme TASLAK kalır; onay/yürürlük belge kontrolünde (görevler ayrılığı) yapılır.
-        if (can.act && op.nc.status === 'YOK' && api.upload && ws.revision) {
+        if (can.act && chainReq(op).nc && api.upload && ws.revision) {
+            const ncDocId = op.nc.status !== 'YOK' ? op.nc.documentId ?? null : null; // m0221-sprint: NC varsa da yüklenebilir → YENİ REVİZYON (eski sürüm korunur)
             const file = E('input', { type: 'file', accept: '.nc,.txt,.tap,.mpf,.h,.ptp,.cnc,text/plain', 'data-testid': 'pw-chain-nc-file', 'aria-label': `OP${op.opNo} NC dosyası` });
             let up = false;
             const toolsOut = E('div', { class: 'mut', 'data-testid': 'pw-chain-nc-tools', role: 'status' });
@@ -213,17 +226,27 @@ export async function drawChainPanel(host, api, ws, can, reload, showErr, onChai
                     ev.currentTarget.disabled = true;
                     try {
                         const bytes = new Uint8Array(await f.arrayBuffer());
-                        const r = await api.upload({ docType: 'NC_PROGRAM', entityType: 'PRODUCT_REVISION', entityId: ws.revision.id, title: `OP${op.opNo} NC · ${f.name}`.slice(0, 120), fileName: f.name, mimeType: guessMime(f.name, f.type), contentBase64: toBase64(bytes), validUntil: null, note: null, documentId: null });
-                        await api.linkDocumentToOp(r.documentId, op.opNo);
-                        await reload(`OP${op.opNo}: ${f.name} yüklendi ve bu operasyona bağlandı (TASLAK). Yürürlüğe alma/onay belge kontrolünden yapılır; sonra CAM kaydı bu NC'den oluşturulabilir.`);
+                        const r = await api.upload({ docType: 'NC_PROGRAM', entityType: 'PRODUCT_REVISION', entityId: ws.revision.id, title: ncDocId ? null : `OP${op.opNo} NC · ${f.name}`.slice(0, 120), fileName: f.name, mimeType: guessMime(f.name, f.type), contentBase64: toBase64(bytes), validUntil: null, note: null, documentId: ncDocId });
+                        if (!ncDocId)
+                            await api.linkDocumentToOp(r.documentId, op.opNo);
+                        await reload(`OP${op.opNo}: ${f.name} ${ncDocId ? 'YENİ NC REVİZYONU olarak eklendi (önceki sürüm korunur)' : 'yüklendi ve bu operasyona bağlandı'} (TASLAK). Yürürlüğe alma/onay belge kontrolünden yapılır; sonra CAM kaydı bu NC'den oluşturulabilir.`);
                     }
                     catch (e) {
                         up = false;
                         ev.currentTarget.disabled = false;
                         showErr(e);
                     }
-                } }, 'NC yükle ve bağla');
+                } }, ncDocId ? 'Yeni NC revizyonu yükle' : 'NC yükle ve bağla');
             rowEl.append(E('div', { class: 'row', style: 'gap:6px;margin-top:6px;flex-wrap:wrap', 'data-testid': 'pw-chain-nc-row' }, file, ncBtn), toolsOut);
+        }
+        if (onlyOpNo != null) { // operasyon sayfası: tam teknik pasaport (dosya revizyonları + REVİZYON FARKLARI)
+            const filesHost = E('div', { 'data-testid': 'opr-files-host' }), diffHost = E('div', { 'data-testid': 'opr-diffs-host' });
+            const compatHost = E('div', { 'data-testid': 'omc-host' });
+            rowEl.append(compatHost, filesHost, diffHost);
+            if (api.opMachineCompat && op.routingOperationId) void renderOpMachineCompat(compatHost, api.opMachineCompat, op.routingOperationId);
+            const fcan = { ...can, files: can.files ?? can.act };
+            void drawOpFiles(filesHost, api, ws, op, fcan, reload, showErr);
+            void drawRevisionDiffs(diffHost, api, ws, op, fcan, showErr);
         }
         return rowEl;
     });

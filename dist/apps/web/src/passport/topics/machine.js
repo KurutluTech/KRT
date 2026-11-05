@@ -5,6 +5,7 @@ import { pctOf } from './util.js';
 import { pilotText } from '../../pilotMark.js';
 import { cncTopics } from './cncTopics.js';
 import { h } from '../../../../../packages/ui/src/h.js';
+import { renderMachineTypePanel, renderMachineInfoPanel, renderCatalogPanel } from '../../machineTypeUi.js';
 import { camRevText } from '../../../../../packages/domain/src/camRevision.js';
 export const MACHINE_COLS = 'id,code,name,category,status,down_since,total_down_minutes,machine_class,updated_at';
 const ACTIVE = ['IN_PROGRESS', 'FIRST_PIECE_PENDING', 'FIRST_PIECE_APPROVED'];
@@ -23,6 +24,10 @@ export function machineTopics(ctx, m) {
     };
     return [
         A('teknik', 'Teknik kimlik', 'cnc', 'Kimlik', 'Üretici, model, seri no', ['MANUFACTURER', 'MODEL', 'SERIAL_NO', 'MODEL_YEAR']),
+        { ...T('tip', 'Makine tipi / sınıflandırma', 'cnc', 'Kimlik', { summary: 'Tip, alt tip, kabiliyet, bilgi, arşiv; operasyon gereksinimlerini belirler' }), render: async (host) => {
+            const io = { sel: ctx.sel, rpc: ctx.rpc }; const a = document.createElement('div'); const b = document.createElement('div'); const c = document.createElement('div'); host.replaceChildren(a, b, c);
+            await Promise.all([renderMachineTypePanel(a, io, m, ctx.access), renderMachineInfoPanel(b, io, m, ctx.access), renderCatalogPanel(c, io, ctx.access)]);
+        } },
         R('kapasite', 'Kapasite ve limitler', 'gauge', 'Kimlik', 'Strok, mil, magazin', async () => {
             const today = ctx.nowIso().slice(0, 10);
             const end = new Date(Date.parse(today) + 7 * 86400000).toISOString().slice(0, 10);

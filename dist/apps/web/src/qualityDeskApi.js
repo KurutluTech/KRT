@@ -14,7 +14,7 @@ export function createQualityDeskApi(c, s) {
     const routing = createRoutingApi(c, s), prod = createProductionApi(c, s), pur = createPurchasingApi(c, s), wos = createWorkOrdersApi(c, s), hub = createWorkOrderHubApi(c, s);
     return {
         async load() {
-            const [workOrders, ops, holds, ncrs, opTashih, receipts, machines, people] = await Promise.all([
+            const [workOrders, ops, holds, ncrs, opTashih, receipts, machines, people, recheck] = await Promise.all([
                 attempt(() => hub.list()),
                 attempt(() => c.select('work_order_operations', { columns: 'id,work_order_id,op_no,name,status,machine_id,operator_id,started_at,run_finished_at,qty_in,qty_good,qty_scrap', order: 'work_order_id.asc', limit: 5000 }, s)),
                 attempt(() => c.select('quality_holds', { columns: 'id,work_order_id,reason,status,opened_at,released_at,release_reason', order: 'opened_at.desc', limit: 400 }, s)),
@@ -27,6 +27,8 @@ export function createQualityDeskApi(c, s) {
                 attempt(async () => (await c.rpc('operation_tashih_queue', {}, s)) ?? []),
                 attempt(() => c.select('goods_receipts', { columns: 'id,stock_lot_id,qty_received,received_at,qc_decision', filters: { qc_decision: 'is.null' }, order: 'received_at.asc', limit: 300 }, s)),
                 attempt(() => hub.machines()), attempt(() => hub.operators()),
+                // m0220: yeni CAM revizyonu sonrası İLK PARÇA YENİDEN KONTROL bekleyenler. Kolon m0218 uygulanmadan yoktur → hata = null (ekran bozulmaz).
+                attempt(() => c.select('work_order_operations', { columns: 'id,work_order_id,op_no,name,status,machine_id,operator_id,started_at,fp_recheck_reason,fp_recheck_at', filters: { fp_recheck_required: 'eq.true' }, order: 'fp_recheck_at.asc', limit: 500 }, s)),
             ]);
             let incoming = null;
             if (receipts) {
@@ -36,7 +38,7 @@ export function createQualityDeskApi(c, s) {
             const woIds = [...(workOrders ?? []).map((w) => w.id), ...(ops ?? []).map((o) => o.workOrderId), ...(holds ?? []).map((x) => x.workOrderId), ...(ncrs ?? []).map((x) => x.workOrderId), ...(opTashih ?? []).map((r) => r.workOrderId)];
             const pf = await fetchPilotFlags(c, s, woIds);
             const pilot = new Set(woIds.filter((id) => pf.has(id)));
-            return { pilot, workOrders: workOrders, ops, holds, ncrs, incoming, machines: new Map((machines ?? []).map((m) => [m.id, m.code])), people: new Map((people ?? []).map((p) => [p.id, p.name])), opTashih };
+            return { pilot, workOrders: workOrders, ops, recheck, holds, ncrs, incoming, machines: new Map((machines ?? []).map((m) => [m.id, m.code])), people: new Map((people ?? []).map((p) => [p.id, p.name])), opTashih };
         },
         firstPiece: (op, ok, note) => routing.firstPiece(op, ok, note),
         qc: (op, r, note) => routing.qc(op, r, note),

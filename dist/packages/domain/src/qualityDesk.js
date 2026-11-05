@@ -31,6 +31,12 @@ export function buildQualityDesk(i) {
         counts.FIRST_PIECE = fp.length;
         for (const o of fp)
             items.push({ key: `FP:${o.id}`, kind: 'FIRST_PIECE', workOrderId: o.workOrderId, title: `${label(o.workOrderId)} · Op ${o.opNo}`, detail: `${o.name} · makine ${mName(o.machineId)} · operatör ${pName(o.operatorId)} — makine ilk parça onayını bekliyor`, since: o.startedAt, ageHours: hoursSince(o.startedAt, i.nowIso), tone: 'red', owner: o.operatorId ? pName(o.operatorId) : null, ref: { opId: o.id } });
+        // m0220: ilk parçası geçmiş ama yeni CAM revizyonu nedeniyle YENİDEN KONTROL bekleyen operasyonlar (yalnız FIRST_PIECE_APPROVE yetkisi karar verir; CAM personeli onaylayamaz)
+        const seen = new Set(fp.map((o) => o.id));
+        for (const o of (i.recheck ?? []).filter((x) => !seen.has(x.id))) {
+            counts.FIRST_PIECE = (counts.FIRST_PIECE ?? 0) + 1;
+            items.push({ key: `FPR:${o.id}`, kind: 'FIRST_PIECE', workOrderId: o.workOrderId, title: `${label(o.workOrderId)} · Op ${o.opNo} · YENİDEN KONTROL`, detail: `${o.name} · makine ${mName(o.machineId)} · operatör ${pName(o.operatorId)} — yeni CAM revizyonu için ilk parça yeniden kontrolü bekliyor${o.fpRecheckReason ? ` (${o.fpRecheckReason})` : ''}. Operasyon durumu, makine, operatör ve adetler değişmez.`, since: o.fpRecheckAt ?? o.startedAt, ageHours: hoursSince(o.fpRecheckAt ?? o.startedAt, i.nowIso), tone: 'red', owner: o.operatorId ? pName(o.operatorId) : null, ref: { opId: o.id, recheck: true } });
+        }
         const qc = i.ops.filter((o) => o.status === 'QC_PENDING');
         counts.QC = qc.length;
         for (const o of qc)

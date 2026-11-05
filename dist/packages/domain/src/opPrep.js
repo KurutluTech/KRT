@@ -23,7 +23,7 @@ export const FIELDS = [
 ];
 export const MISSING_TR = {
     op_name: 'operasyon adı', machine: 'makine', nc_cam: 'NC programı veya CAM kaydı', tool_list: 'takım listesi', fixture: 'fikstür/bağlama',
-    setup_minutes: 'hazırlık süresi', cycle_seconds: 'çevrim süresi', control_plan: 'kalite kontrol planı', first_piece: 'ilk parça kararı', skills: 'operatör yetkinliği',
+    setup_minutes: 'hazırlık/bağlama süresi', cycle_seconds: 'çevrim/kesme süresi', saw_blade: 'şerit testere bıçağı', cut_parameters: 'kesim adedi/ölçüsü', control_plan: 'kalite kontrol planı', first_piece: 'ilk parça kararı', skills: 'operatör yetkinliği',
 };
 export const missingText = (m) => (m ?? []).map((x) => MISSING_TR[x] ?? x);
 /** Ekran durumu. EKSİK sunucunun eksik listesinden türetilir; ONAYLI rota RELEASE / üretim GO değildir. */

@@ -286,19 +286,21 @@ export function matchKmiTools(draft, kmiTools = []) {
 }
 
 /** Operasyon için üretim hazırlığı eksik özeti (tek yerde). */
-export function engineeringGaps({ analysis, ncDoc, camLinked, toolListDoc, op }) {
+export function engineeringGaps({ analysis, ncDoc, camLinked, toolListDoc, op, req }) {
     const g = [];
-    if (!ncDoc) g.push({ k: 'NC', text: 'NC dosyası yok' }); else if (ncDoc.validity && ncDoc.validity !== 'EFFECTIVE') g.push({ k: 'NC_STATE', text: `NC ${ncDoc.validity === 'DRAFT' ? 'YÜKLENDİ (geçerli değil)' : ncDoc.validity}` });
-    if (analysis && !analysis.supported) g.push({ k: 'NC_FORMAT', text: analysis.unsupportedReason });
-    if (analysis?.supported) {
+    /* m0219: makine tipi (sunucu requirements) NC/CAM/takım listesi istemiyorsa (şerit testere) bu eksikler listelenmez; süre eksikleri kalır. req yoksa eski SIKI davranış. */
+    const needNc = req?.nc !== false, needCam = req?.cam !== false, needTl = req?.toolList !== false;
+    if (!needNc) { /* NC yok sayılır */ } else if (!ncDoc) g.push({ k: 'NC', text: 'NC dosyası yok' }); else if (ncDoc.validity && ncDoc.validity !== 'EFFECTIVE') g.push({ k: 'NC_STATE', text: `NC ${ncDoc.validity === 'DRAFT' ? 'YÜKLENDİ (geçerli değil)' : ncDoc.validity}` });
+    if (needNc && analysis && !analysis.supported) g.push({ k: 'NC_FORMAT', text: analysis.unsupportedReason });
+    if (needNc && analysis?.supported) {
         if (analysis.toolDraft.some((t) => t.missing.length)) g.push({ k: 'TOOL_FIELDS', text: `${analysis.toolDraft.filter((t) => t.missing.length).length} takımda eksik alan` });
         if (analysis.toolsCalledNotCommented.length) g.push({ k: 'TOOL_NO_COMMENT', text: `Takım yorumu olmayan T kodu: ${analysis.toolsCalledNotCommented.join(', ')}` });
         if (analysis.estimate.confidence !== 'KAPSAMLI_ARALIK') g.push({ k: 'ESTIMATE_PARTIAL', text: 'Süre tahmini kısmi (desteklenmeyen yapı var)' });
     }
-    if (!toolListDoc) g.push({ k: 'TOOL_LIST', text: 'Takım listesi belgesi yok (NC taslağından üretilebilir)' }); else if (toolListDoc.validity && toolListDoc.validity !== 'EFFECTIVE') g.push({ k: 'TOOL_LIST_STATE', text: 'Takım listesi geçerli değil' });
-    if (!camLinked) g.push({ k: 'CAM', text: 'CAM/setup kaydı yok' });
-    if (op && op.setupMinutes == null) g.push({ k: 'SETUP', text: 'Hazırlık süresi girilmemiş' });
-    if (op && op.cycleSeconds == null) g.push({ k: 'CYCLE', text: 'Çevrim süresi (operatör standardı) girilmemiş' });
+    if (!needTl) { /* takım listesi gerekmez */ } else if (!toolListDoc) g.push({ k: 'TOOL_LIST', text: 'Takım listesi belgesi yok (NC taslağından üretilebilir)' }); else if (toolListDoc.validity && toolListDoc.validity !== 'EFFECTIVE') g.push({ k: 'TOOL_LIST_STATE', text: 'Takım listesi geçerli değil' });
+    if (needCam && !camLinked) g.push({ k: 'CAM', text: 'CAM/setup kaydı yok' });
+    if (op && req?.setupTime !== false && op.setupMinutes == null) g.push({ k: 'SETUP', text: 'Hazırlık süresi girilmemiş' });
+    if (op && req?.cutTime !== false && op.cycleSeconds == null) g.push({ k: 'CYCLE', text: 'Çevrim süresi (operatör standardı) girilmemiş' });
     if (op && op.inspectionSeconds == null) g.push({ k: 'INSPECTION', text: 'Muayene süresi girilmemiş' });
     if (op && !op.skillCode) g.push({ k: 'SKILL', text: 'Yeterlilik tanımsız' });
     return g;

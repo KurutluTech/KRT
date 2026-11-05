@@ -46,6 +46,22 @@ export function holderSuggestion(desc) {
     let s = t.slice(m.index).trim().replace(/\s+BOY\s+\d+(?:[.,]\d+)?\s*$/i, '').trim();
     return s.length >= 3 ? s : '';
 }
+/** NC takım açıklamasından tutucu bilgisini AYRI parçalara böler (yalnız metinde yazan; yorum/çıkarım yok). */
+export function holderParts(desc) {
+    const t = String(desc ?? '').replace(/\s+/g, ' ').trim();
+    const taper = taperOf(t);
+    const er = /\bER\s?-?(\d{1,2})\b/i.exec(t);
+    const pens = /\bPENS\s+(.+?)(?=\s+BOY\b|$)/i.exec(t);
+    const cat = /\b([A-Z]\d[A-Z]\d-\d{4})\b/.exec(t);
+    const boy = /\bBOY\s+(\d+(?:[.,]\d+)?)/i.exec(t);
+    const o = {};
+    if (taper) o.taper = taper;
+    if (er) o.clamp = `ER${er[1]}`;
+    if (pens) o.collet = pens[1].trim();
+    if (cat) o.holderCode = cat[1];
+    if (boy) o.gaugeLen = boy[1];
+    return o;
+}
 /** Makine bağlantı standardı (açıklamadaki BT/CAT/SK/HSK + boyut). Yoksa null. */
 export function taperOf(text) {
     const m = /\b(CAT|BT|SK|HSK|ISO)\s?-?(\d{2,3})([A-Z])?\b/i.exec(String(text ?? ''));

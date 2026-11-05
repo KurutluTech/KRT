@@ -6,11 +6,12 @@ import { analyzeNc, toolDraftCsv, matchKmiTools, engineeringGaps, fmtDuration } 
 import { parseFusionExport, mapFusionToRoute, fusionTemplateCsv, qualityDraftCsv, FUSION_SOURCE_LABEL } from '../../../../packages/domain/src/fusionImport.js';
 import { errorText } from '../errorText.js';
 import { toBase64 } from '../kx.js';
-import { draftRows, rowsToCsv, normalizedContent, diffContent, rowsFromCsv, rowProblems, taperMix } from '../../../../packages/domain/src/toolListFromNc.js';
+import { draftRows, rowsToCsv, normalizedContent, diffContent, rowsFromCsv, rowProblems, taperMix , holderParts } from '../../../../packages/domain/src/toolListFromNc.js';
 import { opLabel } from './opBoxes.js';
 
 const E = (tag, props = null, ...kids) => h(tag, props, ...kids);
 const chip = (t, tone = '') => E('span', { class: `chip ${tone}` }, t);
+import { canonicalCycleBox, camImprovementBox } from '../passport/topics/opTripleCard.js';
 export const ENG_CSS = `.pw .eng{border:1px solid #1e293b;border-radius:12px;padding:10px 12px;margin:0 0 12px;min-width:0;background:rgba(148,163,184,.04)}
 .pw .eng h4{margin:0 0 6px;font-size:14px}.pw .eng .sub{color:#94a3b8;font-size:12px;overflow-wrap:anywhere}.pw .eng .gaps{display:flex;flex-wrap:wrap;gap:4px;margin:6px 0}
 .pw .eng .src{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:8px;margin:8px 0}.pw .eng .srcbox{border:1px solid #334155;border-radius:10px;padding:8px 10px;min-width:0}
@@ -40,10 +41,10 @@ export function buildEngineeringPanel(ctx, o) {
     host.append(head, body);
     const gapsHost = E('div', { class: 'gaps', 'data-testid': 'eng-gaps' });
     const camLinked = !!(o.camProgramId || (chain?.cam?.status && chain.cam.status !== 'YOK'));
-    let analysis = null; let fusion = null; let routeMap = null; let ncSrc = null; let kmiTools = ctx.kmiTools ?? []; let tlState = null; let plan = null; let busy = false;
+    let analysis = null; let fusion = null; let routeMap = null; let ncSrc = null; let kmiTools = ctx.kmiTools ?? []; let tlState = null; let plan = null; let busy = false; let canon = null; let camSt = null;
     const toolListDoc = tl ? { validity: tl.controlState === 'EFFECTIVE' ? 'EFFECTIVE' : (tl.controlState ?? 'DRAFT') } : null;
     const redrawGaps = () => {
-        const g = engineeringGaps({ analysis, ncDoc: nc ? { validity: nc.controlState === 'EFFECTIVE' ? 'EFFECTIVE' : (nc.controlState ?? 'DRAFT') } : null, camLinked, toolListDoc, op: o });
+        const g = engineeringGaps({ req: chain?.requirements, analysis, ncDoc: nc ? { validity: nc.controlState === 'EFFECTIVE' ? 'EFFECTIVE' : (nc.controlState ?? 'DRAFT') } : null, camLinked, toolListDoc, op: o });
         gapsHost.replaceChildren(E('div', { 'data-testid': 'eng-ready', class: 'sub', style: 'width:100%' }, g.length ? `Hazırlık: ${g.length} eksik/uyarı` : 'Hazırlık: eksik görünmüyor (START kapıları ayrıca değerlendirilir)'), ...g.map((x) => chip(x.text, x.k === 'NC' || x.k === 'NC_FORMAT' ? 'bad' : 'warn')));
     };
     const state = () => {
@@ -106,18 +107,21 @@ export function buildEngineeringPanel(ctx, o) {
             : t.state === 'EFFECTIVE' ? E('div', { class: 'sub', 'data-testid': 'eng-tl-next' }, 'Liste geçerli; kritik takım doğrulaması kayıtlı.')
                 : E('div', { class: 'sub', 'data-testid': 'eng-tl-next' }, `Teknik kontroller geçti. Kalan tek adım: kritik takım doğrulaması (yetkili kişi; Takım listesi kartı › Teknik doğrulama).${crit.length ? ' Sistemin doğrulayamadığı: ' + crit.map((x) => x.label).join(', ') + '.' : ''}`);
         return E('div', { class: 'banner', 'data-testid': 'eng-tl-status' }, E('b', {}, `Takım listesi: ${t.docNo ?? ''} v${t.versionNo}`), ` · ${stTr[t.state] ?? t.state}${t.state === 'EFFECTIVE' ? '' : ' (geçerli sayılmaz)'}`,
-            analysis?.supported ? E('div', { class: 'sub', 'data-testid': 'eng-tl-counts' }, `NC’den çıkarılan benzersiz takım: ${mt.length} · KMI takım kartı: ${kmiTools == null ? 'okunamadı' : `${matched} eşleşti / ${mt.length - matched} eşleşmedi`}`) : null,
+            analysis?.supported ? E('div', { class: 'sub', 'data-testid': 'eng-tl-counts' }, `NC’den çıkarılan benzersiz takım: ${mt.length} · KMI takım kartı: ${kmiTools == null ? 'okunamadı' : `${matched} eşleşti, ${mt.length - matched} tanımsız (teknik kontrolü engellemez)`}`) : null,
             next, todo.length && !fails.length ? null : null,
             foreignTl() ? E('div', { class: 'sub' }, 'Elle yüklenmiş liste: üzerine yazılmaz.') : null,
             canEdit && !plan ? E('div', { class: 'acts' }, E('button', { type: 'button', class: fails.length ? 'primary sm' : 'ghost sm', 'data-testid': 'eng-tl-complete', disabled: busy, onClick: () => void openComplete() }, fails.length ? 'Eksik takım bilgilerini tamamla' : 'Takım bilgilerini düzenle')) : null);
     }
-    function openCreate() { plan = { mode: 'create', rows: draftRows(analysis, kmiTools ?? []), baseVersionNo: tlState?.versionNo ?? null }; draw(); }
+    // NC'de yazan tutucu bilgisi tekrar istenmez: boş tutucu alanı NC önerisiyle dolar ve "doğrulanmadı" işaretlenir (kullanıcı değiştirebilir).
+    function prefill(rows) { for (const r of rows) { r.parts = holderParts(r.desc); if (!String(r.holder ?? '').trim() && r.holderSuggestion) { r.holder = r.holderSuggestion; r.holderFromNc = true; } } return rows; }
+    function openCreate() { plan = { mode: 'create', rows: prefill(draftRows(analysis, kmiTools ?? [])), baseVersionNo: tlState?.versionNo ?? null }; draw(); }
     async function openComplete() {
         try {
             if (!tlState?.csv) throw new Error('Mevcut liste içeriği okunamadı.');
             plan = { mode: 'complete', rows: rowsFromCsv(tlState.csv, kmiTools ?? []), baseVersionNo: tlState.versionNo };
             // NC'den tutucu önerisi: yalnız NC açıklamasında yazan; liste açıklaması boşsa NC taslağından T ile eşleşen satır
             if (analysis?.supported) { const nd = new Map(draftRows(analysis, kmiTools ?? []).map((r) => [r.t, r])); for (const r of plan.rows) { const n2 = nd.get(r.t); if (!r.holder && !r.holderSuggestion && n2?.holderSuggestion) r.holderSuggestion = n2.holderSuggestion; if (!r.desc && n2?.desc) r.desc = n2.desc; } }
+            prefill(plan.rows);
             draw();
         } catch (e) { fail(e); }
     }
@@ -132,8 +136,8 @@ export function buildEngineeringPanel(ctx, o) {
             confirm.disabled = busy || pr.length > 0;
         };
         const inp = (r, k, w, ph) => E('input', { value: r[k], placeholder: ph ?? '', 'data-testid': `eng-tl-${k}`, style: `width:${w}`, 'aria-label': `${r.t} ${k}`, onInput: (e) => { r[k] = e.target.value; r.edited = true; if (k === 'holder') r.holderFromNc = false; refresh(); } });
-        const nm = (r) => r.match === 'ESLESTI' ? chip('KMI kartı: ' + r.cardCode, 'ok') : chip(kmiTools == null ? 'kart eşleşmesi bilinmiyor' : 'KMI kartı yok (kart üretilmez)', 'warn');
-        const hold = (r) => { const el = inp(r, 'holder', '100%', r.holderSuggestion ? `öneri: ${r.holderSuggestion}` : 'tutucu'); const sg = r.holderSuggestion && !String(r.holder).trim() ? E('button', { type: 'button', class: 'ghost sm', 'data-testid': 'eng-tl-use-holder', onClick: () => { r.holder = r.holderSuggestion; r.holderFromNc = true; r.edited = true; draw(); } }, `NC önerisini kullan: ${r.holderSuggestion} (doğrulanmadı)`) : null; return E('span', { class: 'hc' }, el, sg, r.holderFromNc ? chip('NC’den önerildi — doğrulanmadı', 'warn') : null); };
+        const nm = (r) => r.match === 'ESLESTI' ? chip('KMI kartı: ' + r.cardCode, 'ok') : chip(kmiTools == null ? 'kart eşleşmesi bilinmiyor' : 'takım kartı tanımsız — listeyi engellemez', 'warn');
+        const hold = (r) => { const el = inp(r, 'holder', '100%', r.holderSuggestion ? `öneri: ${r.holderSuggestion}` : 'tutucu'); const sg = r.holderSuggestion && !String(r.holder).trim() ? E('button', { type: 'button', class: 'ghost sm', 'data-testid': 'eng-tl-use-holder', onClick: () => { r.holder = r.holderSuggestion; r.holderFromNc = true; r.edited = true; draw(); } }, `NC önerisini kullan: ${r.holderSuggestion} (doğrulanmadı)`) : null; const pc = r.parts ?? {}; const pt = [pc.taper, pc.clamp, pc.collet && `pens ${pc.collet}`, pc.holderCode, pc.gaugeLen && `boy ${pc.gaugeLen}`].filter(Boolean); return E('span', { class: 'hc' }, el, sg, pt.length ? E('span', { class: 'sub', 'data-testid': 'eng-tl-parts' }, pt.join(' · ')) : null, r.holderFromNc ? chip('NC’den önerildi — doğrulanmadı', 'warn') : null); };
         const df = pl.mode === 'create' && tlState?.csv ? diffContent(tlState.csv, rows) : null;
         if (df) box.append(E('div', { class: 'banner', 'data-testid': 'eng-tl-diff' }, `Mevcut listeye (v${tlState.versionNo}) göre fark — eklenen: ${df.added.join(', ') || '—'} · çıkan: ${df.removed.join(', ') || '—'} · değişen: ${df.changed.join(', ') || '—'}. Eski sürüm silinmez; aynı belgeye yeni sürüm eklenir.`));
         const uniq = new Set(rows.map((r) => r.t)).size; const sugCount = rows.filter((r) => r.holderSuggestion && !String(r.holder).trim()).length;
@@ -170,13 +174,13 @@ export function buildEngineeringPanel(ctx, o) {
             up = await api.upload({ docType: 'TOOL_LIST', entityType: 'PRODUCT_REVISION', entityId: ctx.rev.id, title: target ? null : title, fileName, mimeType: 'text/csv', contentBase64: toBase64(new TextEncoder().encode(rowsToCsv(rows))), validUntil: null, note: `${pl.mode === 'complete' ? 'Eksikler tamamlandı' : 'NC’den oluşturuldu'}: ${nc?.docNo ?? ''} ${ncSrc?.versionNo ? 'v' + ncSrc.versionNo : ''} sha256=${ncSrc?.sha256 ?? '?'}`, documentId: target?.documentId ?? null });
             if (!target) { step = 'operasyona bağlama'; await api.linkDocumentToOp(up.documentId, o.opNo); }
             step = 'içerik eşleme';
-            await api.toolistContentSave(up.versionId, content.csv, { ...content.mapping, source: pl.mode === 'complete' ? 'nc-analysis+completion' : 'nc-analysis', ncDocumentId: nc?.documentId ?? null, ncVersionId: ncSrc?.versionId ?? nc?.versionId ?? null, ncSha256: ncSrc?.sha256 ?? null, ncDocNo: nc?.docNo ?? null, ncVersionNo: ncSrc?.versionNo ?? null, operation: o.opCode, completion: { editedByUser: edited, inferredType: rows.filter((r) => r.inferredType).map((r) => r.t), holderSuggestedFromNc: rows.filter((r) => r.holderFromNc).map((r) => r.t) } });
+            await api.toolistContentSave(up.versionId, content.csv, { ...content.mapping, source: pl.mode === 'complete' ? 'nc-analysis+completion' : 'nc-analysis', ncDocumentId: nc?.documentId ?? null, ncVersionId: ncSrc?.versionId ?? nc?.versionId ?? null, ncSha256: ncSrc?.sha256 ?? null, ncDocNo: nc?.docNo ?? null, ncVersionNo: ncSrc?.versionNo ?? null, operation: o.opCode, completion: { editedByUser: edited, inferredType: rows.filter((r) => r.inferredType).map((r) => r.t), holderSuggestedFromNc: rows.filter((r) => r.holderFromNc).map((r) => r.t), holderParts: Object.fromEntries(rows.filter((r) => r.parts && Object.keys(r.parts).length).map((r) => [r.t, r.parts])), taperMismatch: taperMix(rows).mixed ? taperMix(rows).by : null } });
             step = 'sunucu kontrolü';
             const ck = await api.toolistChecks(up.versionId);
             busy = false; plan = null;
             const fails = (ck?.checks ?? []).filter((x) => x.status === 'FAIL');
             const mt = rows.filter((r) => r.match === 'ESLESTI').length;
-            const kc = `KMI kartı ${kmiTools == null ? 'okunamadı' : `${mt} eşleşti / ${rows.length - mt} eşleşmedi`}`;
+            const kc = `KMI kartı ${kmiTools == null ? 'okunamadı' : `${mt} eşleşti, ${rows.length - mt} tanımsız (engellemez)`}`;
             if (fails.length) await reload(`${up.versionNo ? 'v' + up.versionNo : 'Yeni sürüm'} kaydedildi ama teknik kontrol başarısız: ${fails.map((x) => (x.detail ? `${x.label} — ${x.detail}` : x.label)).join(' | ')}. Aynı belge (${tl?.docNo ?? 'liste'}) üzerinde düzeltmeye devam edin.`, 'error', { openOp: o.id });
             else await reload(`Takım listesi kaydedildi (${up.versionNo ? 'v' + up.versionNo : ''}), teknik kontrol GEÇTİ: ${rows.length} takım, ${kc}. Liste GEÇERLİ değil: kalan adım kritik takım doğrulaması (yetkili kişi).`, 'ok', { openOp: o.id });
         } catch (e) {
@@ -194,8 +198,9 @@ export function buildEngineeringPanel(ctx, o) {
             analysis?.unsupported?.length ? E('ul', { class: 'uns', 'data-testid': 'eng-unsupported-list' }, ...analysis.unsupported.map((u) => E('li', {}, `${u.text} (${u.count})`))) : null,
             e ? E('div', { class: 'sub' }, e.note) : null),
         box('Fusion CAM simülasyonu', 'eng-src-fusion', E('div', { class: 'v' }, routeMap?.matched?.simSeconds != null ? fmtDuration(routeMap.matched.simSeconds) : 'CAM simülasyonu yapılmadı'), E('div', { class: 'sub' }, routeMap?.matched?.simSeconds != null ? `${FUSION_SOURCE_LABEL}` : 'Fusion export/şablon yüklenmedi — NC tahmini yerine geçmez.')),
-        box('Operatör beyanı / standart', 'eng-src-std', E('div', { class: 'v' }, o.cycleSeconds != null ? fmtDuration(o.cycleSeconds) : 'girilmemiş'), E('div', { class: 'sub' }, 'Rotada kayıtlı çevrim standardı; ölçüm değildir.')),
-        box('Makine telemetrisi', 'eng-src-tele', E('div', { class: 'v' }, 'bu panelde okunmuyor'), E('div', { class: 'sub' }, 'Ölçülen çevrim süresi Çevrim analizi bölümündedir; burada tahmin yazılmaz.')));
+        box('Onaylı rota standardı', 'eng-src-std', E('div', { class: 'v' }, o.cycleSeconds != null ? fmtDuration(o.cycleSeconds) : 'girilmemiş'), E('div', { class: 'sub' }, 'Rotada kayıtlı onaylı standart; ölçüm veya operatör beyanı değildir.')),
+        box('Makine telemetrisi (MTConnect)', 'eng-src-tele', canon ? canonicalCycleBox(canon) : E('div', { class: 'v' }, 'okunamadı veya yetki yok'), E('div', { class: 'sub' }, 'Ölçüm standardı kendiliğinden değiştirmez; öneri yetkili onay bekler.')),
+        box('CAM teknik iyileştirme', 'eng-src-cam', camSt ? camImprovementBox(camSt, async (a) => { const r = await api.camApprove(o.id, a); void (async () => { try { camSt = await api.camState(o.id); canon = (await api.cycleCanonical?.(o.id)) ?? canon; } catch { /* eski görünüm kalır */ } draw(); })(); return r; }, async (reason) => { const r = await api.camApply(o.id, null, reason); void (async () => { try { camSt = await api.camState(o.id); } catch { /* eski görünüm kalır */ } draw(); })(); return r; }) : E('div', { class: 'v' }, 'okunamadı veya yetki yok'), E('div', { class: 'sub' }, 'CAM teknik onayı ilk parça kalite onayı, sevkiyat veya stok onayı yerine geçmez.')));
         return wrap;
     }
     function fusionView() {
@@ -223,6 +228,8 @@ export function buildEngineeringPanel(ctx, o) {
             E('div', { class: 'acts' }, E('button', { type: 'button', class: 'ghost sm', 'data-testid': 'eng-quality-csv', onClick: () => download(`kalite-plani-taslak-${o.opCode}.csv`, qualityDraftCsv({ opCode: o.opCode, drawingDocNo: drawing?.docNo ?? ws.cards?.drawing?.docNo ?? null, drawingFileName: drawing?.fileName ?? null, ncProgram: analysis?.programNumber ?? null, tools: analysis?.toolDraft ?? [] })) }, 'Kalite planı taslak şablonunu indir (TASLAK)'))));
     }
     draw();
+    void (async () => { try { canon = (await api.cycleCanonical?.(o.id)) ?? null; } catch { canon = null; } draw(); })();
+    void (async () => { try { camSt = (await api.camState?.(o.id)) ?? null; } catch { camSt = null; } draw(); })();
     if (nc) {
         void (async () => {
             try { ncSrc = await api.ncSource({ versionId: nc.versionId ?? null, documentId: nc.documentId }); analysis = analyzeNc(ncSrc.text, { machine: ctx.machineParams }); }

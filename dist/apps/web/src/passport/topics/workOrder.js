@@ -19,6 +19,7 @@ const STOP_TR = { SETUP: 'Ayar / kurulum', TOOL: 'Takım', MATERIAL_WAIT: 'Malze
 const STALE_REASON_TR = { NO_ACTIVITY: 'Oturum için hiç hareket kaydı yok', INACTIVITY: 'Eşik süreden uzun süredir hareket yok', SHIFT_HANDOVER: 'Vardiya devrinden sonra hareket yok' };
 const OP_TR = { PENDING: 'Bekliyor', FIRST_PIECE_PENDING: 'İlk parça onayı bekliyor', RUNNING: 'Üretimde', QC_PENDING: 'Kalite kontrol bekliyor', DONE: 'Bitti' };
 const dur = (m) => (m === null || m === undefined ? NA : m >= 60 ? `${Math.floor(m / 60)} sa ${Math.round(m % 60)} dk` : `${Math.round(m)} dk`);
+import { tripleCard } from './opTripleCard.js';
 export const loadWoPassport = (ctx) => ctx.rpc('work_order_passport', { p_work_order_id: ctx.id });
 const planner = (ctx) => ctx.access.owner || ctx.access.roles.some((r) => r === 'ADMIN' || r === 'MANAGEMENT') || ctx.access.actions.includes('WORK_ORDER_ASSIGN_MACHINE') || ctx.access.actions.includes('MANAGEMENT_RELEASE');
 export function workOrderTopics(ctx, w) {
@@ -230,6 +231,16 @@ export function workOrderTopics(ctx, w) {
             return [kv('Adet', [['Planlanan', nf(wo.qtyPlanned)], ['Gerçekleşen iyi', nf(wo.qtyProduced)], ['Tamamlanma', wo.qtyPlanned > 0 ? `% ${nf((wo.qtyProduced / wo.qtyPlanned) * 100)}` : NA]]),
                 kv('Süre (dakika)', [['Hedef (rota: çevrim × adet + hazırlık)', allTargets ? nf(planned) : NA], ['Gerçekleşen (başla→bitir)', doneAll ? nf(real) : NA]], 'Hedef yalnız TÜM operasyonların çevrim süresi tanımlıysa hesaplanır; gerçek süre yalnız tüm operasyonlar başlayıp bittiyse. Aksi halde BİLİNMİYOR.')];
         }),
+        { ...T('uclu', 'Üç Perspektif: Olması Gereken · Gerçekleşen · Beyan', 'chart', 'Üretim', { summary: 'Plan ↔ MTConnect ↔ operatör beyanı' }), render: async (host) => {
+                const o = await ops();
+                if (!o.length) { host.replaceChildren(h('section', { class: 'ps-panel', 'data-testid': 'tri-empty' }, h('div', { class: 'ps-ts' }, 'Bu iş emrinde operasyon yok.'))); return; }
+                const parts = [];
+                for (const x of o) {
+                    try { parts.push(tripleCard(await ctx.rpc('op_triple_canonical', { p_wo_op: x.id }), `OP${x.opNo} — ${x.name}`)); }
+                    catch (e) { parts.push(h('div', { 'data-testid': 'tri-err', class: 'ps-ts' }, `OP${x.opNo}: ${/FORBIDDEN/.test(String(e?.message ?? e)) ? 'Üretim doğruluğu verisini görme yetkiniz yok.' : 'Veri okunamadı.'}`)); }
+                }
+                host.replaceChildren(h('section', { class: 'ps-panel', 'data-testid': 'tri-panel' }, h('div', { class: 'ps-panel-h' }, h('h2', {}, 'Üç Perspektif')), ...parts));
+            } },
         tabTopic(ctx, T('olaylar', 'Olay ve değişiklik geçmişi', 'layers', 'Geçmiş', { summary: 'Zaman çizelgesi' }), 'zaman'),
     ];
 }

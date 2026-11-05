@@ -9,7 +9,13 @@ export function createProductWorkspaceApi(client, session) {
         createRevision: (id, rev) => rpc('revision_create', { p_product: id, p_revision: rev, p_copy_from: null }),
         load: (p, r) => rpc('product_workspace', { p_product: p, p_revision: r }),
         machines: () => selReal(client, 'machines', { columns: 'id,code,name', order: 'code.asc' }, session),
-        saveOperation: (i) => rpc('routing_op_save', { p_revision: i.revisionId, p_op_no: i.opNo, p_name: i.name, p_machine_ids: i.machineIds, p_primary: i.primaryId, p_skill_code: i.skillCode,
+        // m0221 uygulanmışsa iyimser sürüm kilidiyle (CONCURRENT_EDIT); uygulanmamışsa eski yol. Yetki/kapılar her iki yolda routing_op_save'dedir.
+        async saveOperation(i) {
+            const args = { p_revision: i.revisionId, p_op_no: i.opNo, p_name: i.name, p_machine_ids: i.machineIds, p_primary: i.primaryId, p_skill_code: i.skillCode, p_skill_level: i.skillLevel, p_cam: i.camId, p_setup: i.setup, p_cycle: i.cycle, p_first_piece: i.firstPiece, p_qc: i.qc, p_instructions: i.instructions, p_reason: i.reason };
+            if (i.expectedVersion != null) { try { return await rpc('routing_op_save_guarded', { ...args, p_expected_version: i.expectedVersion }); } catch (e) { if (!/PGRST202|routing_op_save_guarded|schema cache|404/i.test(String(e?.message ?? e))) throw e; } }
+            return rpc('routing_op_save', args);
+        },
+        _saveOperationLegacy: (i) => rpc('routing_op_save', { p_revision: i.revisionId, p_op_no: i.opNo, p_name: i.name, p_machine_ids: i.machineIds, p_primary: i.primaryId, p_skill_code: i.skillCode,
             p_skill_level: i.skillLevel, p_cam: i.camId, p_setup: i.setup, p_cycle: i.cycle, p_first_piece: i.firstPiece, p_qc: i.qc, p_instructions: i.instructions, p_reason: i.reason }),
         // m0210 (uygulanmışsa): ana/alternatif makine doğrulaması ve uyarılar; fonksiyon yoksa sessizce atlanır
         async machineWarnings(op, primaryId, alternateIds) {
@@ -41,6 +47,10 @@ export function createProductWorkspaceApi(client, session) {
         async toolistWorkDiscard(id, reason) { await rpc('toolist_work_discard', { p_work: id, p_reason: reason }); },
         async toolistRecheckDone(id, note) { await rpc('toolist_recheck_done', { p_recheck: id, p_note: note }); },
         techChain: (rev) => rpc('op_technical_chain', { p_rev: rev }),
+        cycleCanonical: (op) => rpc('op_cycle_canonical', { p_op: op, p_wo_op: null }),
+        camState: (op) => rpc('op_cam_improvement_state', { p_op: op }),
+        camApply: (op, wo, reason) => rpc('wo_op_cam_apply', { p_op: op, p_work_order: wo ?? null, p_reason: reason }),
+        camApprove: (op, a) => rpc('op_cam_technical_approve', { p_op: op, p_new_cam: a.cam, p_new_cycle: a.cycle, p_first_piece: null, p_reason: a.reason, p_expected_version: a.expectedVersion }),
         camFromNc: (op, nc, m) => rpc('cam_program_from_nc', { p_routing_operation: op, p_nc_version: nc, p_machine: m }),
         async releaseCam(id) { await rpc('release_cam_program', { p_program_id: id }); },
         async docSubmit(v, reason, label) { await dc.submit(v, reason, label); },
@@ -51,6 +61,14 @@ export function createProductWorkspaceApi(client, session) {
         async kmiTools() { try { return await client.select('tools', { columns: 'id,code,tool_type', order: 'code.asc', limit: 2000 }, session); } catch { return null; } },
         /** Belgenin en yeni sürümü (salt okunur). */
         async docLatest(documentId) { const lc = await dc.lifecycle(documentId); const v = [...lc.versions].sort((x, y) => y.versionNo - x.versionNo)[0]; return v ? { versionId: v.id, versionNo: v.versionNo, state: v.control?.state ?? null, fileName: v.fileName ?? null, sha256: v.sha256 ?? null } : null; },
+        /** m0221-öncesi gerekmez: belge sürümleri (salt okunur) — geçmiş + karşılaştırma. */
+        async docVersions(documentId) { const lc = await dc.lifecycle(documentId); return [...lc.versions].sort((x, y) => y.versionNo - x.versionNo).map((v) => ({ versionId: v.id, versionNo: v.versionNo, state: v.control?.state ?? null, fileName: v.fileName ?? null, sha256: v.sha256 ?? null, size: v.sizeBytes ?? v.size ?? null, uploadedAt: v.uploadedAt ?? v.createdAt ?? null, uploadedBy: v.uploadedBy ?? null, note: v.note ?? null })); },
+        /** Belge sürümü içeriği (bayt + metin çözümü varsa). Eski sürüm üzerine yazılmaz; her sürüm ayrı okunur. */
+        async docVersionFile(versionId) { const c = await dc.content(versionId); const bin = atob(c.contentBase64 ?? ''); const u8 = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i += 1) u8[i] = bin.charCodeAt(i); let text = null; try { text = new TextDecoder('utf-8', { fatal: true }).decode(u8); } catch { try { text = new TextDecoder('windows-1254').decode(u8); } catch { text = null; } } return { bytes: u8, text, fileName: c.fileName ?? null, mimeType: c.mimeType ?? null, sha256: c.sha256 ?? null }; },
+        /** CAM revizyonları (bu operasyona bağlı kayıtlar; RLS revision_visible). Okunamazsa null → KARŞILAŞTIRILAMIYOR. */
+        async camRevisions(opId) { try { return await client.select('cam_programs', { columns: 'id,program_no,revision,status,ideal_cycle_seconds,nc_sha256,nc_file_name,created_at,released_at', filters: { routing_operation_id: `eq.${opId}` }, order: 'created_at.desc', limit: 20 }, session); } catch { return null; } },
+        /** Bu operasyonu etkileyen açık iş emri işlemleri (salt okunur). Okunamazsa null. */
+        async opAffectedWos(opId) { try { return await client.select('work_order_operations', { columns: 'id,work_order_id,status,cam_program_id,fp_recheck_required', filters: { routing_operation_id: `eq.${opId}`, status: 'not.in.(DONE,CANCELLED)' }, limit: 200 }, session); } catch { return null; } },
         /** NC metni + kaynak kimliği (sürüm, SHA-256). */
         async ncSource(ref) {
             let vid = typeof ref === 'string' ? ref : ref?.versionId ?? null; let vno = null;
@@ -124,6 +142,7 @@ export function createProductWorkspaceApi(client, session) {
         async copyRouting(f, t, r) { await rpc('routing_copy', { p_from: f, p_to: t, p_reason: r }); },
         setParameter: (d, s, v, from, to, r) => rpc('param_set', { p_def: d, p_scope: s, p_value: v, p_valid_from: from, p_valid_to: to, p_reason: r }),
         parameterHistory: (d, s) => rpc('param_history', { p_def: d, p_scope: s }),
+        opMachineCompat: (o) => rpc('op_machine_compat', { p_op: o }),
         opHistory: async (o) => (await rpc('routing_op_history', { p_op: o })).versions,
         changeHistory: (rev) => rpc('routing_change_history', { p_revision: rev }),
         changeImpact: (rev) => rpc('routing_change_impact', { p_revision: rev }),

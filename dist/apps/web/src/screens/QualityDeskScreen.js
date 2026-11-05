@@ -57,9 +57,9 @@ export async function renderQualityDesk(container, api, o) {
         switch (it.kind) {
             case 'HOLD': return [note, btn('HOLD\'u serbest bırak', 'ok', 'HOLD', () => { if (!reasonOk(n()))
                     return refuse(`Serbest bırakma gerekçesi en az ${QD_MIN_REASON} karakter olmalı.`); void act(() => api.releaseHold(it.ref.holdId, n()), 'HOLD serbest bırakıldı (karar kaydedildi).'); }, 'qd-hold-release')];
-            case 'FIRST_PIECE': return [note, btn('İlk parça uygun', 'ok', 'FIRST_PIECE', () => void act(() => api.firstPiece(it.ref.opId, true, n()), 'İlk parça onaylandı — operasyon üretime geçti.'), 'qd-fp-approve'),
+            case 'FIRST_PIECE': return [note, btn('İlk parça uygun', 'ok', 'FIRST_PIECE', () => void act(() => api.firstPiece(it.ref.opId, true, n()), it.ref.recheck ? 'Yeniden kontrol onaylandı — operasyon mevcut durumunda devam eder (yeni CAM revizyonu için ilk parça geçti).' : 'İlk parça onaylandı — operasyon üretime geçti.'), 'qd-fp-approve'),
                 btn('Uygun değil', 'bad', 'FIRST_PIECE', () => { if (!reasonOk(n()))
-                    return refuse(`Red gerekçesi en az ${QD_MIN_REASON} karakter olmalı.`); void act(() => api.firstPiece(it.ref.opId, false, n()), 'İlk parça reddedildi.'); }, 'qd-fp-reject')];
+                    return refuse(`Red gerekçesi en az ${QD_MIN_REASON} karakter olmalı.`); void act(() => api.firstPiece(it.ref.opId, false, n()), it.ref.recheck ? 'Yeniden kontrol reddedildi — işaret kalır, operasyon kalite kararını bekler.' : 'İlk parça reddedildi.'); }, 'qd-fp-reject')];
             case 'QC': return [note, btn('Kalite uygun', 'ok', 'QC', () => void act(() => api.qc(it.ref.opId, 'PASS', n()), 'Kalite kontrol: uygun.'), 'qd-qc-pass'),
                 btn('Uygun değil (HOLD açılır)', 'bad', 'QC', () => { if (!reasonOk(n()))
                     return refuse(`Uygunsuzluk gerekçesi en az ${QD_MIN_REASON} karakter olmalı.`); void act(() => api.qc(it.ref.opId, 'FAIL', n()), 'Kalite kontrol: uygun değil — bekletme açıldı.'); }, 'qd-qc-fail')];
@@ -160,7 +160,7 @@ export async function renderQualityDesk(container, api, o) {
             host.replaceChildren(h('style', {}, CSS), h('div', { class: 'mu' }, 'Kalite kayıtları okunuyor…'));
             return;
         }
-        const desk = buildQualityDesk({ nowIso: now(), workOrders: data.workOrders, ops: data.ops, holds: data.holds, ncrs: data.ncrs, incoming: data.incoming,
+        const desk = buildQualityDesk({ nowIso: now(), workOrders: data.workOrders, ops: data.ops, recheck: data.recheck, holds: data.holds, ncrs: data.ncrs, incoming: data.incoming,
             names: { machine: (id) => (id ? data.machines.get(id) ?? id.slice(0, 8) : '—'), person: (id) => (id ? data.people.get(id) ?? id.slice(0, 8) : '—') } });
         const list = desk.items.filter((x) => (filter === 'ALL' || x.kind === filter) && (!q || `${x.title} ${x.detail}`.toLocaleLowerCase('tr-TR').includes(q)));
         const chip = (k, label, n) => h('button', { type: 'button', class: 'chip', 'aria-pressed': String(filter === k), 'data-testid': `qd-chip-${k}`, onClick: () => { filter = k; draw(); } }, label, n === null ? h('span', { class: 'u' }, 'veri yok') : h('b', {}, String(n)));
