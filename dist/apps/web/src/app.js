@@ -58,6 +58,10 @@ import { renderOeeScreen } from './screens/OeeScreen.js';
 import { createOeeApi } from './oeeApi.js';
 import { renderGeckoScreen } from './screens/GeckoScreen.js';
 import { createGeckoApi } from './geckoApi.js';
+import { renderHrHubScreen } from './screens/HrHubScreen.js';
+import { renderHrAdminScreen } from './screens/HrAdminScreen.js';
+import { createHrApi } from './hrApi.js';
+import { createCostPayApi } from './costPayApi.js';
 import { renderAcademyScreen } from './screens/AcademyScreen.js';
 import { createAcademyApi } from './academyApi.js';
 import { renderPassportScreen } from './screens/PassportScreen.js';
@@ -430,9 +434,11 @@ export const ROUTES = [
             }, { ...(q.get('k') ? { focus: q.get('k') } : {}), ...(view ? { view } : {}) });
         } },
     { path: '/yonetim', label: 'Yönetim Zekâsı (onaylar ve üst yönetim)', group: 'Yönetim', inMenu: true, render: (el, c, s, q, a) => renderManagementScreen(el, managementDeps(c, s, a), { tab: q.get('sekme') }) },
-    { path: '/maliyet', label: 'Maliyet Zekâsı (yalnız ekonomik erişim)', group: 'Yönetim', inMenu: true, render: (el, c, s, q, a) => renderCostIntelligenceScreen(el, q.get('sekme') ?? 'live', { api: createCostOpsApi(c, s), access: a, today: istanbulToday(), nowMs: Date.now(), openTab: (t) => { location.hash = `#/maliyet?sekme=${t}`; }, download: downloadText }) },
+    { path: '/maliyet', label: 'Maliyet Zekâsı (yalnız ekonomik erişim)', group: 'Yönetim', inMenu: true, render: (el, c, s, q, a) => renderCostIntelligenceScreen(el, q.get('sekme') ?? 'live', { api: createCostOpsApi(c, s), payApi: createCostPayApi(c, s), access: a, today: istanbulToday(), nowMs: Date.now(), openTab: (t) => { location.hash = `#/maliyet?sekme=${t}`; }, download: downloadText }) },
     { path: '/ekonomi', label: 'Ekonomi & Kararlar (yalnız sahip)', group: 'Yönetim', inMenu: true, render: (el, c, s) => renderEconomicsScreen(el, createEconomicsApi(c, s), { from: addDays(istanbulToday(), -89), to: istanbulToday(), today: istanbulToday() }) },
     { path: '/ekonomi-basvuru', label: 'Ekonomik sahiplik başvurusu', group: 'Yönetim', inMenu: true, render: (el, c, s) => renderOwnerApplicationScreen(el, createEconomicsApi(c, s)) },
+    { path: '/ik-merkezi', label: 'İK Merkezi (pasaport · puantaj · Academy · performans)', group: 'Saha', inMenu: true, render: (el, c, s, q) => renderHrHubScreen(el, createHrApi(c, s), { tab: q.get('sekme') || undefined, qr: q.get('qr') || undefined, mgmt: true }) },
+    { path: '/ik-yonetim', label: 'İK Yönetimi (katalog · puantaj · Academy · prim)', group: 'Yönetim', inMenu: true, render: (el, c, s, q) => renderHrAdminScreen(el, createHrApi(c, s), { panel: q.get('panel') || undefined }) },
     { path: '/giris-cikis', label: 'Giriş-Çıkış (GEÇKO)', group: 'Yönetim', inMenu: true, render: (el, c, s) => renderGeckoScreen(el, createGeckoApi(c, s)) },
     { path: '/yetkinlik-aktarim', label: 'Yetkinlik geçmişi aktarımı', group: 'Yönetim', inMenu: true, render: (el, c, s) => renderCompetencyImportScreen(el, createCompetencyImportApi(c, s)) },
     { path: '/akademi', label: 'Akademi & Yetkinlik', group: 'Yönetim', inMenu: true, render: (el, c, s) => renderAcademyScreen(el, createAcademyApi(c, s)) },

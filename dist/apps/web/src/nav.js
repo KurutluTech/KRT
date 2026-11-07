@@ -118,6 +118,8 @@ export const NAV_TREE = [
             { path: '/personel-makine', label: 'Personel – Makine Eşleştirme', icon: 'users' },
             { path: '/giris-cikis', label: 'Giriş-Çıkış (GEÇKO)', icon: 'clock' },
             { path: '/akademi', label: 'KMI Academy', icon: 'cap' },
+            { path: '/ik-yonetim', label: 'İK Yönetimi', icon: 'users' },
+            { path: '/ik-merkezi', label: 'İK Merkezi (benim)', icon: 'users', personal: true },
             { path: '/giris-cikislarim', label: 'Giriş-çıkışlarım', icon: 'clock', personal: true },
             { path: '/rozetlerim', label: 'Rozetler / Yetenekler', icon: 'badge', personal: true },
         ] },
@@ -150,7 +152,7 @@ export const WORKSPACE_OF_PATH = Object.fromEntries(NAV_TREE.flatMap((g) => g.it
 export function visibleNav(can) {
     return NAV_TREE.map((g) => ({ ...g, items: g.items.filter((i) => i.path === '/' || can(i.path)) })).filter((g) => g.items.length > 0);
 }
-export const GATE_ME_PATHS = ['/', '/bildirimler', '/operator', '/gorevler', '/onaylar', '/giris-cikislarim', '/rozetlerim'];
+export const GATE_ME_PATHS = ['/', '/bildirimler', '/operator', '/gorevler', '/onaylar', '/giris-cikislarim', '/rozetlerim', '/ik-merkezi'];
 export const GATES = [
     { id: 'me', title: 'BENİM KMI', short: 'Benim', icon: 'user', workspaces: [], personalPaths: [...GATE_ME_PATHS] },
     { id: 'perf', title: 'PERFORMANCE CENTER', short: 'Performans', icon: 'grid', workspaces: ['pc'] },

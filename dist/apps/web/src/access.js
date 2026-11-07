@@ -47,6 +47,8 @@ export const OPEN_RULES = {
     '/gecmis': { roles: ['ADMIN', 'MANAGEMENT'] },
     '/personel-aktarim': { any: ['PERSONNEL_MANAGE'] },
     '/yetkinlik-aktarim': { any: ['COMPETENCY_APPROVE'] },
+    // /ik-merkezi: her oturum açmış kullanıcıya açık (kendi verisi); sunucu RPC'leri yalnız SELF veri döndürür. /ik-yonetim: yalnız yönetim yetkileri; asıl sınır sunucudadır.
+    '/ik-yonetim': { any: ['PERSONNEL_MANAGE', 'PUANTAJ_MANAGE', 'PUANTAJ_APPROVE', 'PUANTAJ_BONUS_MANAGE', 'ACADEMY_MANAGE', 'COMPETENCY_APPROVE', 'GECKO_MAPPING_VERIFY', 'ACCOUNTING_MUTATION'] },
     '/giris-cikis': { any: ['GECKO_ATTENDANCE_VIEW', 'GECKO_SYNC_RUN', 'GECKO_VIEW_GRANT', 'GECKO_MAPPING_VERIFY'] },
     '/cihazlar': { any: ['DEVICE_MANAGE'] },
     '/tahsis': { any: ['QUALITY_REJECT', 'OPERATION_QC_RECORD', 'FIRST_PIECE_APPROVE', 'QUALITY_HOLD_RELEASE'] },

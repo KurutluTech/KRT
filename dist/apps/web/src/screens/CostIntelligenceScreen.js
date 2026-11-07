@@ -32,6 +32,7 @@ export const COST_TABS = [
     { id: 'models', n: 20, title: 'Maliyet Modelleri & Dağıtım Kuralları', state: 'DATA_REQUIRED', needs: 'Dağıtım sürücüleri (makine saati, alan, sayaç…) sahip politikası olmadan seçilmez; kurallar sürümlü ve tarihli olacak.' },
     { id: 'close', n: 21, title: 'Dönem Kapanışı & Denetim', state: 'PREVIEW', needs: 'close_cost_period ve ek/ters kayıt kuralı 0078 taslağında; uygulanmadı.' },
     { id: 'reports', n: 22, title: 'Yönetim Raporları', state: 'DATA_REQUIRED', needs: 'Rapor havuzu (Madde 28) mevcut; maliyet raporları gerçek gider verisi geldikten sonra eklenir.' },
+    { id: 'payroll', n: 23, title: 'Maaş ve Ücretler', state: 'DATA_REQUIRED', needs: 'Kanonik maaş/ücret kaynağı (m0249, uygulanmadı) ve ekonomik erişim. Excel yükle → kolon eşle → personel eşle → önizle → kaydet.' },
 ];
 const STATE_TR = { ENGINE: ['HESAP MOTORU HAZIR', 'ok'], PREVIEW: ['ÖNİZLEME / SİMÜLASYON', 'info'], DATA_REQUIRED: ['VERİ GEREKLİ', 'warn'] };
 export { figureText };
@@ -134,7 +135,8 @@ function importTab() {
 const TOOLS = { machine: machineCalc, tooling: () => h('div', {}, toolCalc(), EXT_EXTRA.toolHistory()), unit: unitCalc, energy: energyCalc, import: importTab, ...EXT_TOOLS,
     cash: () => h('div', {}, breakEvenCalc(), EXT_TOOLS.cash()), scenario: () => h('div', {}, energyCalc(), EXT_TOOLS.scenario()), maint: () => h('div', {}, EXT_TOOLS.maint(), EXT_EXTRA.lossRank()) };
 // Release 005: with `deps` (economic access) the record-backed tabs render LIVE panels; each panel itself says "Kurulum bekleniyor" when the DB package is not applied. Without deps the honest static state stays.
-const LIVE_PANELS = { live: renderLiveBoard, expense: (el, d) => renderExpensePanel(el, d), centers: (el, d) => renderCentersPanel(el, d), close: (el, d) => renderClosePanel(el, d) };
+import { renderCostPayScreen } from './HrAdminScreen.js';
+const LIVE_PANELS = { payroll: (el, d) => (d.payApi ? void renderCostPayScreen(el, d.payApi, {}) : el.appendChild(h('div', { class: 'card' }, 'Maaş ve Ücretler API bağlantısı yok.'))), live: renderLiveBoard, expense: (el, d) => renderExpensePanel(el, d), centers: (el, d) => renderCentersPanel(el, d), close: (el, d) => renderClosePanel(el, d) };
 export function renderCostIntelligenceScreen(container, initialTab = 'live', deps) {
     let active = COST_TABS.find((t) => t.id === initialTab)?.id ?? 'live';
     const draw = () => {
