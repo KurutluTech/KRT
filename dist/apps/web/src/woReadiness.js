@@ -69,7 +69,7 @@ export function checklistBlockers(rows, ctx = {}) {
         // teknik kod yerine açıklama; operatör sabit değil: yönetici ya operatörü değiştirir ya eşleştirmeye gider
         const human = notPaired ? 'Bu iş emrinin atanmış operatörü, ilgili makineyle eşleştirilmemiş.' : noEligible ? 'Bu operasyonun makinesiyle eşleştirilmiş uygun personel yok.' : null;
         return { code: r.code + (r.opLabel ? `@${r.opLabel}` : ''), title: `${r.area}${r.opLabel ? ` · ${r.opLabel}` : ''}`, detail: human ?? r.detail ?? null,
-            fix2: (notPaired || noEligible) ? { type: 'focus', id: 'operator', label: 'Operatörü Değiştir' } : null,
+            fix2: (notPaired || noEligible) ? { type: 'focus', id: 'operator', label: 'Operatörü Değiştir' } : (r.code === 'RESPONSIBLE_NOT_ASSIGNED' ? { type: 'focus', id: 'responsible', label: 'Sorumlu ata' } : null),
             fix: r.code === 'WO_OP_ROUTE_OUT_OF_SYNC' ? { type: 'resync' } : (FIX[r.code] ?? (l ? { type: 'link', href: l.href } : null)), fixLabel: (notPaired || noEligible) ? 'Personel–Makine Eşleştirmesine Git' : (r.code === 'WO_OP_ROUTE_OUT_OF_SYNC' ? 'Rotayı iş emriyle eşitle' : (FIXL[r.code] ?? l?.label ?? null)), screen: r.resolveScreen, who: r.who, kind: KIND_TR[r.gapKind] ?? r.gapKind, pass: r.passCheck };
     });
 }

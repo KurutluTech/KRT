@@ -21,6 +21,18 @@ export function createWorkOrdersApi(client, session) {
         async assignMachine(workOrderId, machineId) {
             return client.rpc('assign_work_order_machine', { p_work_order_id: workOrderId, p_machine_id: machineId }, session);
         },
+        /** m0257: iş emri sorumlusu (CAM/üretim). Sütun yoksa (migration öncesi) null döner → ekran kutuyu göstermez. */
+        async responsible(workOrderId) {
+            try {
+                const r = await client.select('work_orders', { columns: 'id,responsible_personnel_id', filters: { id: `eq.${workOrderId}` } }, session);
+                const x = Array.isArray(r) ? r[0] : r;
+                return x ? { ok: true, personId: x.responsible_personnel_id ?? x.responsiblePersonnelId ?? null } : null;
+            }
+            catch { return null; }
+        },
+        async assignResponsible(workOrderId, personId) {
+            return client.rpc('work_order_responsible_set', { p_work_order_id: workOrderId, p_person_id: personId, p_reason: null }, session);
+        },
         async assignOperator(workOrderId, personId) {
             return client.rpc('assign_work_order_operator', { p_work_order_id: workOrderId, p_person_id: personId }, session);
         },
