@@ -7,7 +7,7 @@ export const reqCell = (s) => s.machineType === 'BANDSAW' ? 'Gerekmiyor (şerit 
 export const timeCell = (s) => (s.setupMinutes != null || s.cycleSeconds != null) ? `${s.setupMinutes ?? '—'} dk / ${s.cycleSeconds ?? '—'} sn` : 'Süre girilmemiş';
 const RS = { IN_ROUTE_ACTIVE: 'Rotada (aktif)', NOT_DEFINED: 'Rotada TANIMSIZ' };
 const routeText = (s) => (s.routeStatus ?? '').startsWith('DRAFT_UNLINKED') ? 'Rotada değil — bağsız taslak (bilgi)' : (s.routeStatus ?? '').startsWith('DRAFT_OP_INACTIVE') ? 'Operasyon pasif — taslak (bilgi)' : (RS[s.routeStatus] ?? s.routeStatus ?? '—');
-export function renderOpPlanPanel(root, wo, matrix, machineName) {
+export function renderOpPlanPanel(root, wo, matrix, machineName, onTransfer) {
     const slots = matrix?.slots ?? [];
     const rows = slots.map((s) => {
         const defined = s.routeStatus === 'IN_ROUTE_ACTIVE';
@@ -30,6 +30,7 @@ export function renderOpPlanPanel(root, wo, matrix, machineName) {
     root.replaceChildren(h('section', { 'data-testid': 'opplan', class: 'woc-panel' },
         h('h3', {}, 'Rota ve operasyon makineleri'),
         h('div', { class: 'woc-meta', 'data-testid': 'opplan-note' }, `İş emri kartındaki makine (${machineName ?? '—'}) yalnızca ana atamadır; her operasyonun makinesi ayrıdır.`),
+        typeof onTransfer === 'function' ? h('div', { class: 'woc-row', style: 'margin:6px 0' }, h('button', { type: 'button', 'data-testid': 'opplan-transfer', onClick: onTransfer }, 'Rota makinelerini ve ayarlarını iş emrine aktar (tüm operasyonlar, sırayla)'), h('span', { class: 'woc-meta' }, 'Rotadaki makine, CAM, süre ve yeterlilik bilgileri iş emrindeki operasyonlara tek seferde kopyalanır. Başlamış operasyonlara dokunulmaz.')) : null,
         (matrix?.staleWorkOrderOps ?? []).length ? h('div', { class: 'woc-meta', 'data-testid': 'opplan-stale', style: 'color:#b00020' }, `Uyarı: iş emrinde güncel rotada karşılığı olmayan operasyon var (${matrix.staleWorkOrderOps.map((o) => `OP${o.opNo ?? o.op_no}`).join(', ')}) — rota değişti, iş emri operasyonları yeniden uygulanmalı.`) : null,
         h('div', { style: 'overflow-x:auto' }, h('table', { class: 'woc-meta', style: 'width:100%;border-collapse:collapse' },
             h('thead', {}, h('tr', {}, ...['Operasyon', 'Rota', 'Makine', 'CAM', 'Bağlama / kesme', 'Şerit bıçağı', 'Uygun operatör', 'Hazırlık'].map((t) => h('th', { style: 'text-align:left;padding:4px 8px' }, t)))),

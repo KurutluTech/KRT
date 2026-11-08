@@ -181,7 +181,7 @@ export async function renderWorkOrderHubScreen(container, deps, view = {}) {
                 const opSlot = h('div', { 'data-testid': 'opplan-slot' });
                 const anchor2 = container.querySelector('[data-testid="hub-readiness"]');
                 if (anchor2?.parentNode) anchor2.parentNode.insertBefore(opSlot, anchor2.nextSibling);
-                renderOpPlanPanel(opSlot, w, mx, mName?.code ?? mName?.name);
+                renderOpPlanPanel(opSlot, w, mx, mName?.code ?? mName?.name, deps.hub.resync ? () => void act(() => deps.hub.resync(w.id, 'Rota operasyon makineleri ve ayarları iş emrine toplu aktarıldı'), 'Rota, operasyon sırasıyla iş emrine aktarıldı.') : undefined);
             } catch { /* panel optional */ }
         }
         await renderProductionScreen(prod, w.id, { api: deps.production, getWorkOrder: () => deps.hub.snapshot(w.id) });
