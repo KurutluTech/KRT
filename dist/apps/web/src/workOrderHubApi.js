@@ -40,6 +40,8 @@ export function createWorkOrderHubApi(client, session) {
         },
         /** m0196 canonical START checklist (all gates; read-only) */
         async checklist(id) { return client.rpc('work_order_start_checklist', { p_work_order_id: id }, session); },
+        /** m0196: rotayı iş emriyle eşitle (WORK_ORDER_ASSIGN_MACHINE; gerekçe >= 10 karakter; iş emri durumu ve HOLD değişmez) */
+        async resync(id, reason) { return client.rpc('work_order_routing_resync', { p_work_order_id: id, p_reason: reason }, session); },
         async opMatrix(id, revId) { return client.rpc('op_prep_matrix', { p_revision: revId, p_work_order: id }, session); },
         async readinessRows(id) { return client.rpc('work_order_readiness', { p_work_order_id: id }, session); },
         async setRevision(id, rev) { await client.rpc('set_work_order_revision', { p_work_order_id: id, p_revision_id: rev }, session); },

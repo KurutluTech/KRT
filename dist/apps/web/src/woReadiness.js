@@ -51,7 +51,7 @@ const KIND_TR = { SOFTWARE: 'yazılım eksik', DATA: 'veri girişi', PHYSICAL: '
 const FIX = { REVISION_NOT_LINKED: { type: 'focus', id: 'revision' }, MACHINE_NOT_PRODUCTION_ELIGIBLE: { type: 'focus', id: 'machine' }, OPERATOR_NOT_ASSIGNED: { type: 'focus', id: 'operator' }, CAM_NOT_LINKED: { type: 'focus', id: 'cam' }, DATE_NOT_PLANNED: { type: 'link', href: '#/planlama' }, SHIFT_NOT_PLANNED: { type: 'link', href: '#/planlama' } };
 const FIXL = { REVISION_NOT_LINKED: 'Revizyonu bağla', MACHINE_NOT_PRODUCTION_ELIGIBLE: 'Makine ata', OPERATOR_NOT_ASSIGNED: 'Operatör ata', CAM_NOT_LINKED: 'Programı bağla', DATE_NOT_PLANNED: 'Planlamaya git', SHIFT_NOT_PLANNED: 'Planlamaya git' };
 // Eksik → gerçek giriş ekranı (aynı bilgi tek yerde girilir): rota/CUT-PREP/kesim/operasyon → Rota hazırlık; operatör eşleşmesi → Personel–Makine eşleştirme
-const ROUTE_CODES = /^(ROUTE_|ROUTING_|CUT_PREP|CUT_SPEC|OP_NOT_DEFINED|OP_SETUP|OP_MACHINE|OP_TOOL|CAM_NOT_LINKED|CONTROL_PLAN)/;
+const ROUTE_CODES = /^(ROUTE_|ROUTING_|CUT_PREP|CUT_SPEC|OP_NOT_DEFINED|OP_SETUP|OP_MACHINE|OP_TOOL|OP_FIXTURE|OP_SAW|OP_CUT_PARAMS|CAM_NOT_LINKED|CONTROL_PLAN)/;
 const PAIR_CODES = /^(OPERATOR_NOT_PAIRED|NO_ELIGIBLE_OPERATOR|OPERATOR_)/;
 function entryLink(code, ctx) {
     if (code === 'OPERATOR_NOT_ASSIGNED') return null;
@@ -70,6 +70,6 @@ export function checklistBlockers(rows, ctx = {}) {
         const human = notPaired ? 'Bu iş emrinin atanmış operatörü, ilgili makineyle eşleştirilmemiş.' : noEligible ? 'Bu operasyonun makinesiyle eşleştirilmiş uygun personel yok.' : null;
         return { code: r.code + (r.opLabel ? `@${r.opLabel}` : ''), title: `${r.area}${r.opLabel ? ` · ${r.opLabel}` : ''}`, detail: human ?? r.detail ?? null,
             fix2: (notPaired || noEligible) ? { type: 'focus', id: 'operator', label: 'Operatörü Değiştir' } : null,
-            fix: FIX[r.code] ?? (l ? { type: 'link', href: l.href } : null), fixLabel: (notPaired || noEligible) ? 'Personel–Makine Eşleştirmesine Git' : (FIXL[r.code] ?? l?.label ?? null), screen: r.resolveScreen, who: r.who, kind: KIND_TR[r.gapKind] ?? r.gapKind, pass: r.passCheck };
+            fix: r.code === 'WO_OP_ROUTE_OUT_OF_SYNC' ? { type: 'resync' } : (FIX[r.code] ?? (l ? { type: 'link', href: l.href } : null)), fixLabel: (notPaired || noEligible) ? 'Personel–Makine Eşleştirmesine Git' : (r.code === 'WO_OP_ROUTE_OUT_OF_SYNC' ? 'Rotayı iş emriyle eşitle' : (FIXL[r.code] ?? l?.label ?? null)), screen: r.resolveScreen, who: r.who, kind: KIND_TR[r.gapKind] ?? r.gapKind, pass: r.passCheck };
     });
 }

@@ -127,7 +127,9 @@ export async function renderWorkOrderHubScreen(container, deps, view = {}) {
         const seenFix = new Set(); const seenFix2 = new Set();   // aynı işlem bağlantısı/düğmesi her satırda tekrarlanmaz: ilk satırda bir kez
         const once = (set, key, make) => { if (set.has(key)) return null; set.add(key); return make(); };
         const fix2Btn = (b) => !b.fix2 ? null : h('button', { type: 'button', 'data-testid': 'hub-fix2', 'data-focus': b.fix2.id, onClick: () => { const el = focusMap[b.fix2.id]; el?.scrollIntoView({ block: 'center' }); el?.focus(); } }, b.fix2.label);
-        const fixBtn = (b) => !b.fix ? null : b.fix.type === 'link'
+        const resyncBox = (b) => { const why = h('input', { type: 'text', placeholder: 'Gerekçe (en az 10 karakter)', 'data-testid': 'hub-resync-reason', 'aria-label': 'Rota eşitleme gerekçesi' });
+            return h('span', { class: 'woc-row', 'data-testid': 'hub-resync' }, why, h('button', { type: 'button', 'data-testid': 'hub-fix', onClick: () => { const r = why.value.trim(); if (r.length < 10) return redo({ wo: w.id, message: { kind: 'error', text: 'Rota eşitleme için en az 10 karakterlik gerekçe yazın.' } }); void act(() => deps.hub.resync(w.id, r), 'Rota iş emriyle eşitlendi.'); } }, b.fixLabel)); };
+        const fixBtn = (b) => !b.fix ? null : b.fix.type === 'resync' ? resyncBox(b) : b.fix.type === 'link'
             ? h('a', { href: b.fix.href, class: 'woc-link', 'data-testid': 'hub-fix' }, `${b.fixLabel} →`)
             : h('button', { type: 'button', 'data-testid': 'hub-fix', 'data-focus': b.fix.id, onClick: () => { const el = focusMap[b.fix.id]; el?.scrollIntoView({ block: 'center' }); el?.focus(); } }, `${b.fixLabel}`);
         const head = blockers ? readinessHeadline(blockers.length) : readinessHeadline(null);
