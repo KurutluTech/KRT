@@ -305,16 +305,21 @@ export function buildOpWorkCard(ctx, o) {
     const defHost = E('div', { 'data-testid': 'owc-machine-defaults' });
     const defBlade = h('input', { 'data-testid': 'owc-def-blade', placeholder: 'ör. Simonds 27×0,9 Z-5/8 3660' });
     const defFixture = h('input', { 'data-testid': 'owc-def-fixture', placeholder: 'ör. Makine mengenesi' });
-    const defState = { id: curPrimary || null, blade: null, fixture: null, loaded: false };
+    const defState = { id: curPrimary || null, blade: null, fixture: null, robot: null, loaded: false };
+    const defRobot = h('select', { 'data-testid': 'owc-def-robot' }, h('option', { value: '' }, '— robot yok —'), ...(ctx.robots ?? []).map((r) => h('option', { value: r.code }, r.name ? `${r.code} · ${r.name}` : r.code)));
     const drawDefaults = () => {
         if (!defState.id || !api.machineDefaults) { defHost.replaceChildren(); return; }
         const m = machines.find((x) => x.id === defState.id);
         const useFx = h('button', { type: 'button', class: 'ghost sm', 'data-testid': 'owc-use-default-fixture', disabled: !defState.fixture, onClick: () => { const code = defState.fixture; if (code && !pend.res.some((p) => p.on && p.kind === 'FIXTURE' && p.code === code)) { pend.res.push({ kind: 'FIXTURE', code, label: 'Makine varsayılanı', qty: null, note: null, on: true }); drawAll(); } } }, 'Varsayılan aparatı bu operasyona yaz');
         const saveDef = h('button', { type: 'button', class: 'ghost', 'data-testid': 'owc-def-save', onClick: async () => { try { await api.setMachineDefaults(defState.id, val(defBlade).trim() || null, val(defFixture).trim() || null); defState.blade = val(defBlade).trim() || null; defState.fixture = val(defFixture).trim() || null; drawDefaults(); statusHost.replaceChildren(E('div', { class: 'banner ok' }, `Makine ${m?.code ?? ''} varsayılanı kaydedildi.`)); } catch (e) { fail(e); } } }, 'Makineye kaydet');
+        const saveRobot = h('button', { type: 'button', class: 'ghost', 'data-testid': 'owc-def-robot-save', onClick: async () => { try { const code = val(defRobot) || null; await api.setMachineRobot(defState.id, code); defState.robot = code; drawDefaults(); statusHost.replaceChildren(E('div', { class: 'banner ok' }, code ? `Makine ${m?.code ?? ''} ← robot ${code} bağlandı.` : `Makine ${m?.code ?? ''} robot bağlantısı kaldırıldı.`)); } catch (e) { fail(e); } } }, 'Robotu makineye kaydet');
+        defRobot.value = defState.robot ?? '';
         defBlade.value = defState.blade ?? ''; defFixture.value = defState.fixture ?? '';
         defHost.replaceChildren(E('div', { class: 'owc-leg' }, L(`Makine ${m?.code ?? ''} varsayılanları — bir kez girilir, her üründe geçerlidir`, 'info')),
             E('div', { class: 'fgrid' }, field('Varsayılan testere bıçağı', defBlade), field('Varsayılan aparat / bağlama', defFixture)),
-            E('div', { class: 'row', style: 'gap:8px' }, saveDef, useFx), E('div', { class: 'mut' }, defState.blade ? `Bu makinede bıçak: ${defState.blade} (operasyona ayrıca yazmaya gerek yok)` : ''));
+            E('div', { class: 'row', style: 'gap:8px' }, saveDef, useFx),
+            (ctx.robots ?? []).length && api.setMachineRobot ? E('div', { 'data-testid': 'owc-def-robot-box' }, E('div', { class: 'fgrid' }, field('Makineye bağlı robot (sabit)', defRobot)), E('div', { class: 'row', style: 'gap:8px' }, saveRobot), E('div', { class: 'mut' }, defState.robot ? `Bu makinede robot: ${(ctx.robots ?? []).find((r) => r.code === defState.robot)?.name ?? defState.robot} — operasyona ayrıca eklemek gerekmez. Robotla çalışan operatör için Robot operatörü yetkinliği, Akademi & Yetkinlik → Makine yetkinlik şartları ekranından şart olarak tanımlanabilir.` : 'Robot sabit duruyorsa (ör. torna yükleme) bir kez bağlayın; operasyonlarda otomatik görünür.')) : null,
+            E('div', { class: 'mut' }, defState.blade ? `Bu makinede bıçak: ${defState.blade} (operasyona ayrıca yazmaya gerek yok)` : ''));
     };
     const cutMat = h('input', { 'data-testid': 'owc-cut-mat', placeholder: 'Malzeme (ör. 4140 Ø37)', list: 'owc-mat-list' });
     const cutSpeed = h('input', { 'data-testid': 'owc-cut-speed', inputmode: 'decimal', placeholder: 'Hız' });
@@ -386,6 +391,7 @@ export function buildOpWorkCard(ctx, o) {
     const fxCode = h('input', { 'data-testid': 'pw-res-code-extra', placeholder: 'Kod / ad' });
     queueMicrotask(() => { if (api.opPrepMatrix && rev?.id) api.opPrepMatrix(rev.id).then((m) => { const slots = m?.slots ?? []; slotRef.v = slots.find((x) => (g(x, 'routingOperationId', 'routing_operation_id')) === o.id) ?? null; applyVisibility(); }).catch(() => { slotRef.v = null; applyVisibility(); }); else drawStrip();
         if (api.machineDefaults && curPrimary) api.machineDefaults(curPrimary).then((r) => { const x = Array.isArray(r) ? r[0] : r; defState.blade = g(x, 'defaultBlade', 'default_blade') ?? null; defState.fixture = g(x, 'defaultFixture', 'default_fixture') ?? null; drawDefaults(); }).catch(() => { drawDefaults(); });
+        if (api.machineRobot && curPrimary) api.machineRobot(curPrimary).then((r) => { const x = Array.isArray(r) ? r[0] : r; defState.robot = g(x, 'defaultRobot', 'default_robot') ?? null; drawDefaults(); }).catch(() => { });
         if (api.resourceParams) api.resourceParams(o.id).then((r) => { cutRows.v = r ?? []; drawCutExisting(); }).catch(() => { }); });
     drawStrip(); drawCutExisting(); drawDefaults();
     const gapMachines = !base.skill && ctx.machineReqs ? o.machines.filter((m) => !ctx.machineReqs.some((r) => r.machineId === m.id)).map((m) => m.code) : [];

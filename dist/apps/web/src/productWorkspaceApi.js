@@ -31,6 +31,9 @@ export function createProductWorkspaceApi(client, session) {
         // m0254 (uygulanmamışsa çağıran yakalar): hazırlık matrisi (uyarı/engel), kesme parametreleri, makine varsayılanları
         opPrepMatrix: (rev) => rpc('op_prep_matrix', { p_revision: rev, p_work_order: null }),
         machineDefaults: (id) => client.select('machines', { columns: 'id,default_blade,default_fixture', filters: { id: `eq.${id}` } }, session),
+        // m0256: makineye bağlı kalıcı robot (yoksa/migration yoksa çağıran yakalar).
+        machineRobot: (id) => client.select('machines', { columns: 'id,default_robot', filters: { id: `eq.${id}` } }, session),
+        async setMachineRobot(id, robotCode) { await rpc('machine_robot_set', { p_machine: id, p_robot: robotCode, p_reason: null }); },
         async setMachineDefaults(id, blade, fixture) { await rpc('machine_defaults_set', { p_machine: id, p_blade: blade, p_fixture: fixture, p_reason: null }); },
         resourceParams: (op) => client.select('routing_op_resources', { columns: 'code,params', filters: { routing_operation_id: `eq.${op}`, active: 'eq.true', kind: 'eq.RESOURCE' } }, session),
         async setCutParams(op, material, speed, speedUnit, feed, feedUnit, coolant, r) { await rpc('routing_op_cut_params_set', { p_op: op, p_material: material, p_speed: speed, p_speed_unit: speedUnit, p_feed: feed, p_feed_unit: feedUnit, p_coolant: coolant, p_reason: r }); },
