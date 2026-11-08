@@ -10,6 +10,8 @@ export function createProductWorkspaceApi(client, session) {
         load: (p, r) => rpc('product_workspace', { p_product: p, p_revision: r }),
         machines: () => selReal(client, 'machines', { columns: 'id,code,name', order: 'code.asc' }, session),
         // m0253: kayıtlı robotlar (machine_type=ROBOT; arşivliler de gelir, ekran ayıklar). Tür/sütun yoksa çağıran yakalar.
+        // Malzeme taşıma sınıfı (forklift, robot…): üretim makinesi değil; ana/alternatif makine listesinde görünmez.
+        handling: () => client.select('machines', { columns: 'id', filters: { machine_class: 'eq.MATERIAL_HANDLING' } }, session),
         robots: () => client.select('machines', { columns: 'id,code,name,archived_at', filters: { machine_type: 'eq.ROBOT' }, order: 'code.asc' }, session),
         // m0221 uygulanmışsa iyimser sürüm kilidiyle (CONCURRENT_EDIT); uygulanmamışsa eski yol. Yetki/kapılar her iki yolda routing_op_save'dedir.
         async saveOperation(i) {

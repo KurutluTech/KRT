@@ -131,6 +131,13 @@ export async function renderProductWorkspaceScreen(container, api, state = {}) {
         catch {
             machines = [];
         }
+        // Malzeme taşıma sınıfı (forklift vb.) üretim makinesi değildir; ana/alternatif makine listesinde görünmez. Okunamazsa liste eskisi gibi kalır.
+        try {
+            const handling = new Set(((await api.handling?.()) ?? []).map((r) => r.id));
+            if (handling.size)
+                machines = machines.filter((m) => !handling.has(m.id));
+        }
+        catch { /* sınıf okunamazsa filtre uygulanmaz */ }
         // m0253: robotlar işleme makinesi (ana/alternatif) listesinde GÖRÜNMEZ; yalnız operasyon kaynağı olarak seçilir. Tip okunamazsa (migration yok) robots=[] ve liste eskisi gibi kalır.
         try {
             const allRobots = (await api.robots?.()) ?? [];
