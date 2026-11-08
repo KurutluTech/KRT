@@ -55,7 +55,7 @@ const STATE_TONE = { MISSING: 'bad', DRAFT: 'info', APPROVED: 'ok', INVALID: 'wa
 const REV_TR = { DRAFT: 'Taslak', RELEASED: 'Yürürlükte', OBSOLETE: 'Eski' };
 const CALC_TR = { CURRENT: 'Güncel', STALE: 'Eskimiş', SUPERSEDED: 'Yenilendi' };
 const CALC_TONE = { CURRENT: 'ok', STALE: 'warn', SUPERSEDED: 'off' };
-const KIND_TR = { FIXTURE: 'Fikstür', TOOL: 'Takım', GAUGE: 'Mastar/Ölçü', RESOURCE: 'Kaynak', FIRST_PIECE: 'İlk parça', IN_PROCESS: 'Proses içi', FINAL: 'Son kontrol' };
+const KIND_TR = { FIXTURE: 'Fikstür', TOOL: 'Takım', GAUGE: 'Mastar/Ölçü', RESOURCE: 'Kaynak', ROBOT: 'Robot', FIRST_PIECE: 'İlk parça', IN_PROCESS: 'Proses içi', FINAL: 'Son kontrol' };
 const DOC_TR = { DRAWING: 'Teknik resim', CAD_MODEL: 'CAD/STEP', NC_PROGRAM: 'NC programı', CAM_SETUP_SHEET: 'CAM setup', TOOL_LIST: 'Takım listesi', CONTROL_PLAN: 'Kontrol planı', WORK_INSTRUCTION: 'İş talimatı' };
 const CTL_TR = { DRAFT: 'Taslak', IN_REVIEW: 'İncelemede', APPROVED: 'Onaylandı', EFFECTIVE: 'Yürürlükte', SUPERSEDED: 'Geçersiz', REJECTED: 'Reddedildi' };
 const ctlLabel = (state, docType) => (isSimpleDocType(docType) ? ({ DRAFT: 'Yüklendi (geçerli değil)', EFFECTIVE: 'Geçerli', SUPERSEDED: 'Eski sürüm', REJECTED: 'İptal' }[state ?? ''] ?? '—') : (CTL_TR[state ?? ''] ?? '—'));
@@ -117,6 +117,7 @@ export async function renderProductWorkspaceScreen(container, api, state = {}) {
     async function renderWorkspace(productId) {
         let ws;
         let machines = [];
+        let robots = [];
         let skills = [];
         try {
             ws = await api.load(productId, state.rev ?? null);
@@ -129,6 +130,17 @@ export async function renderProductWorkspaceScreen(container, api, state = {}) {
         }
         catch {
             machines = [];
+        }
+        // m0253: robotlar işleme makinesi (ana/alternatif) listesinde GÖRÜNMEZ; yalnız operasyon kaynağı olarak seçilir. Tip okunamazsa (migration yok) robots=[] ve liste eskisi gibi kalır.
+        try {
+            const allRobots = (await api.robots?.()) ?? [];
+            const robotIds = new Set(allRobots.map((r) => r.id));
+            if (robotIds.size)
+                machines = machines.filter((m) => !robotIds.has(m.id));
+            robots = allRobots.filter((r) => !r.archived_at && !r.archivedAt);
+        }
+        catch {
+            robots = [];
         }
         try {
             skills = (await api.skills()).filter((x) => x.active !== false);
@@ -559,7 +571,7 @@ export async function renderProductWorkspaceScreen(container, api, state = {}) {
             }
             catch (e) {
                 fail(e);
-            } })(); }))) : null)), E('div', { class: 'opx' }, E('div', { class: 'row', style: 'gap:6px;flex-wrap:wrap' }, E('span', { class: 'mut' }, `v${o.versionNo ?? '—'}${o.usedInWorkOrders ? ` · ${o.usedInWorkOrders} iş emrinde` : ''}`), o.firstPieceRequired ? chip('İlk parça', 'warn') : null, o.qcRequired ? chip('Kalite', 'warn') : null, ...(chainOf(o) && o.active ? [...chainChips(chainOf(o)), btn('ghost sm', `pw-op-chain-open-${o.opCode}`, open ? 'Teknik zinciri gizle' : 'Teknik zincir ▸', () => toggleOp(o.id))] : [])), chainOf(o) && o.active && chainGapText(chainOf(o)) ? E('div', { class: 'mut', 'data-testid': 'pw-op-gap' }, chainGapText(chainOf(o))) : null, resLine || preLine || qcLine || docLine ? E('div', { class: 'l' }, ...[resLine, preLine, qcLine, docLine].filter(Boolean).map((t) => E('span', {}, t))) : null), open ? E('div', { class: 'opb' }, o.active ? buildEngineeringPanel({ api, ws, rev, can, fail, reload, chainOf, canCreate: !!(can.manageDocuments && editable) }, o) : null, editOk && o.active ? buildOpWorkCard({ api, ws, rev, machines, skills, activeOps, can, canAct: !!(can.editRouting || can.manageDocuments) && editable, loadFresh: () => api.load(ws.product.id, rev.id), machineReqs, fail, reload, chainNow: () => chainNow }, o)
+            } })(); }))) : null)), E('div', { class: 'opx' }, E('div', { class: 'row', style: 'gap:6px;flex-wrap:wrap' }, E('span', { class: 'mut' }, `v${o.versionNo ?? '—'}${o.usedInWorkOrders ? ` · ${o.usedInWorkOrders} iş emrinde` : ''}`), o.firstPieceRequired ? chip('İlk parça', 'warn') : null, o.qcRequired ? chip('Kalite', 'warn') : null, ...(chainOf(o) && o.active ? [...chainChips(chainOf(o)), btn('ghost sm', `pw-op-chain-open-${o.opCode}`, open ? 'Teknik zinciri gizle' : 'Teknik zincir ▸', () => toggleOp(o.id))] : [])), chainOf(o) && o.active && chainGapText(chainOf(o)) ? E('div', { class: 'mut', 'data-testid': 'pw-op-gap' }, chainGapText(chainOf(o))) : null, resLine || preLine || qcLine || docLine ? E('div', { class: 'l' }, ...[resLine, preLine, qcLine, docLine].filter(Boolean).map((t) => E('span', {}, t))) : null), open ? E('div', { class: 'opb' }, o.active ? buildEngineeringPanel({ api, ws, rev, can, fail, reload, chainOf, canCreate: !!(can.manageDocuments && editable) }, o) : null, editOk && o.active ? buildOpWorkCard({ api, ws, rev, machines, robots, skills, activeOps, can, canAct: !!(can.editRouting || can.manageDocuments) && editable, loadFresh: () => api.load(ws.product.id, rev.id), machineReqs, fail, reload, chainNow: () => chainNow }, o)
                 : E('div', { class: 'mut' }, o.active ? 'Bu revizyonu düzenleme yetkiniz yok ya da revizyon kapalı.' : 'Pasif operasyon düzenlenmez.'), E('div', { class: 'row', style: 'margin-top:10px' }, btn('ghost', 'pw-op-hist-btn', 'Operasyon geçmişi (önce → sonra)', () => void showHist(o))), E('div', { 'data-testid': 'pw-op-history', 'data-op-hist': o.id })) : null);
         };
         const showHist = async (o) => {
@@ -882,7 +894,7 @@ export async function renderProductWorkspaceScreen(container, api, state = {}) {
             if (!o)
                 return can.editStructure ? [E('div', { class: 'opb', 'data-testid': 'pw-op-new' }, E('b', {}, 'Yeni operasyon'), E('div', { style: 'margin-top:10px' }, opEditor(null)))] : [E('div', { class: 'mut' }, 'Operasyon ekleme yetkiniz yok.')];
             const chainH = can.editRouting && editable && o.active ? null : E('div', { 'data-testid': 'pw-op-chain-host', 'data-op-chain': String(o.opNo), style: 'margin-bottom:12px' });
-            const panel = E('div', { class: 'opb' }, chainH, o.active ? buildEngineeringPanel({ api, ws, rev, can, fail, reload, chainOf, canCreate: !!(can.manageDocuments && editable) }, o) : null, can.editRouting && editable && o.active ? buildOpWorkCard({ api, ws, rev, machines, skills, activeOps, can, canAct: !!(can.editRouting || can.manageDocuments) && editable, loadFresh: () => api.load(ws.product.id, rev.id), machineReqs, fail, reload, chainNow: () => chainNow }, o)
+            const panel = E('div', { class: 'opb' }, chainH, o.active ? buildEngineeringPanel({ api, ws, rev, can, fail, reload, chainOf, canCreate: !!(can.manageDocuments && editable) }, o) : null, can.editRouting && editable && o.active ? buildOpWorkCard({ api, ws, rev, machines, robots, skills, activeOps, can, canAct: !!(can.editRouting || can.manageDocuments) && editable, loadFresh: () => api.load(ws.product.id, rev.id), machineReqs, fail, reload, chainNow: () => chainNow }, o)
                     : E('div', { class: 'mut' }, o.active ? 'Bu revizyonu düzenleme yetkiniz yok ya da revizyon kapalı.' : 'Pasif operasyon düzenlenmez.'), E('div', { class: 'row', style: 'margin-top:10px' }, btn('ghost', 'pw-op-hist-btn', 'Operasyon geçmişi (önce → sonra)', () => void showHist(o))), E('div', { 'data-testid': 'pw-op-history', 'data-op-hist': o.id }));
             if (chainH === null && o.active)
                 void drawChainPanel(panel.querySelector('[data-testid="pw-op-chain-host"]'), api, ws, { act: !!(can.editRouting || can.manageDocuments) && editable, files: !!can.manageDocuments }, (m) => reload(m), (e) => fail(e), undefined, o.opNo);

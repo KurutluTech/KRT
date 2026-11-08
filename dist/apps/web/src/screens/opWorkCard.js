@@ -13,7 +13,7 @@ const num = (s) => { const t = String(s).trim().replace(',', '.'); if (t === '')
 /** İşlemin gerçek tanımıyla otomatik audit notu — her zaman ≥10 karakter, boş/uydurma gerekçe değil. */
 export const autoWhy = (what) => `Otomatik: ${String(what || 'rota düzenleme')}`.slice(0, 400);
 const WARN_TR = { ALT_NOT_PRODUCTION_ELIGIBLE: 'alternatif makine şu an üretime uygun değil', ALT_MACHINE_CLASS_DIFFERS: 'alternatif makine sınıfı ana makineden farklı', ALT_SKILL_REQUIREMENTS_UNKNOWN: 'alternatif makinenin beceri şartı tanımsız', ALT_NO_CAM_FOR_MACHINE: 'alternatif makine için CAM/NC kaydı yok' };
-const KIND_TR = { FIXTURE: 'Fikstür', TOOL: 'Takım', GAUGE: 'Mastar/Ölçü', RESOURCE: 'Kaynak', FIRST_PIECE: 'İlk parça', IN_PROCESS: 'Proses içi', FINAL: 'Son kontrol' };
+const KIND_TR = { FIXTURE: 'Fikstür', TOOL: 'Takım', GAUGE: 'Mastar/Ölçü', RESOURCE: 'Kaynak', ROBOT: 'Robot', FIRST_PIECE: 'İlk parça', IN_PROCESS: 'Proses içi', FINAL: 'Son kontrol' };
 const section = (id, title, open, ...kids) => h('details', { class: 'fsec owc-sec', 'data-testid': `owc-${id}`, open }, h('summary', {}, title), E('div', { class: 'owc-body' }, ...kids));
 /** Başka operasyona bağlı belge adayı: bu operasyonla BAĞLANAMAZ. Mevcut backend, ortak kullanım için yetkili doğrulaması / uygunluk kanıtı / özel audit sağlamıyor (document_link_operation yalnız bağlar);
  *  bu korumalar ekranda taklit edilmez → istisna bağlantısı KAPALI. Salt okunur bilgi: hangi operasyona/makineye ait olduğu gösterilir. */
@@ -24,6 +24,7 @@ export function docVerdict(candidate, op, machineCodesOfOp) {
 /** ctx: { api, ws, rev, machines, skills, activeOps, can, fail, reload, chainNow(), mkChainHost? } */
 export function buildOpWorkCard(ctx, o) {
     const { api, ws, rev, machines, skills, activeOps, fail, reload } = ctx;
+    const robots = ctx.robots ?? [];
     const curPrimary = o.machines.find((x) => x.primary)?.id ?? (o.machines.length === 1 ? o.machines[0].id : '');
     const baseAlts = o.machines.filter((x) => x.id !== curPrimary).map((x) => x.id);
     const base = { name: o.name ?? '', primary: curPrimary, alts: new Set(baseAlts), skill: o.skillCode ?? '', level: o.skillLevel != null ? String(o.skillLevel) : '',
@@ -56,8 +57,12 @@ export function buildOpWorkCard(ctx, o) {
     // ---- bekleyen (henüz kaydedilmemiş) listeler: kaynak, kalite noktası, ön koşul
     const pend = { res: [], qc: [], dep: [] };
     const pendHost = E('div', { class: 'owc-pend', 'data-testid': 'owc-pending' });
-    const resKind = h('select', { 'data-testid': 'pw-res-kind' }, ...['FIXTURE', 'TOOL', 'GAUGE', 'RESOURCE'].map((k) => h('option', { value: k }, KIND_TR[k])));
+    const resKind = h('select', { 'data-testid': 'pw-res-kind' }, ...['FIXTURE', 'TOOL', 'GAUGE', 'RESOURCE', 'ROBOT'].map((k) => h('option', { value: k }, KIND_TR[k])));
     const resCode = h('input', { 'data-testid': 'pw-res-code', placeholder: 'Kod (ör. T12, FX-01)' });
+    // ROBOT seçilince kod alanı yerine KAYITLI, arşivsiz robotların listesi (Yeni makine ekle → Robot / Otomasyon). Robot yetkinlik/başlatma kapısı değildir; yalnız operasyonda kullanılan kaynağı kaydeder.
+    const resRobot = h('select', { 'data-testid': 'pw-res-robot', hidden: true }, h('option', { value: '' }, robots.length ? '— robot seçin —' : '— kayıtlı robot yok (Yeni makine ekle → Robot / Otomasyon) —'), ...robots.map((r) => h('option', { value: r.code }, r.name ? `${r.code} · ${r.name}` : r.code)));
+    const syncResKind = () => { const isRobot = val(resKind) === 'ROBOT'; resRobot.hidden = !isRobot; resCode.hidden = isRobot; };
+    resKind.addEventListener('change', syncResKind);
     const qcNo = h('input', { 'data-testid': 'pw-qc-no', type: 'number', min: 1, placeholder: 'No' });
     const qcLabel = h('input', { 'data-testid': 'pw-qc-label', placeholder: 'Kontrol (ör. Çap Ø20 H7)' });
     const plans = ws.quality.filter((q) => q.operationNo === null || q.operationNo === o.opNo);
@@ -101,10 +106,12 @@ export function buildOpWorkCard(ctx, o) {
     const oldDraw = drawPend;
     const drawAll = () => { oldDraw(); refreshBtn(); };
     // eklemeler (yerel; kayıt tek düğmeyle)
-    const addRes = () => { const code = val(resCode).trim(); if (!code) {
-        invalid(resCode, true);
+    const addRes = () => { const isRobot = val(resKind) === 'ROBOT'; const code = (isRobot ? val(resRobot) : val(resCode)).trim(); const box = isRobot ? resRobot : resCode; if (!code) {
+        invalid(box, true);
         return;
-    } invalid(resCode, false); pend.res.push({ kind: val(resKind), code, label: null, qty: null, note: null, on: true }); resCode.value = ''; drawAll(); };
+    } if (pend.res.some((p) => p.on && p.kind === val(resKind) && p.code === code)) {
+        return;
+    } invalid(box, false); const rb = isRobot ? robots.find((r) => r.code === code) : null; pend.res.push({ kind: val(resKind), code, label: rb?.name ?? null, qty: null, note: null, on: true }); resCode.value = ''; resRobot.value = ''; drawAll(); };
     const addQc = () => { const no = Number(val(qcNo)); const label = val(qcLabel).trim(); if (!(no >= 1) || !label) {
         invalid(!(no >= 1) ? qcNo : qcLabel, true);
         return;
@@ -274,7 +281,7 @@ export function buildOpWorkCard(ctx, o) {
             E('div', { class: 'row', style: 'gap:4px 20px' }, h('label', { class: 'chk' }, fp, 'İlk parça kontrolü şart'), h('label', { class: 'chk' }, qc, 'Kalite kontrolü şart')), field('Operatör talimatı', ins),
             E('div', { class: 'row', style: 'align-items:flex-end' }, field('Ön koşul operasyon', depSel), addBtn('Listeye ekle', 'pw-dep-add', addDep)), existingDep),
         section('C', 'C — Teknik kaynaklar (NC · CAM · takım listesi · fikstür)', true, chainHost, candHost,
-            E('div', { class: 'row', style: 'align-items:flex-end;gap:8px;flex-wrap:wrap' }, field('Fikstür / takım / mastar', resKind), field('Kod', resCode), addBtn('Listeye ekle', 'pw-res-add', addRes)), existingRes,
+            E('div', { class: 'row', style: 'align-items:flex-end;gap:8px;flex-wrap:wrap' }, field('Fikstür / takım / mastar / robot', resKind), field('Kod / robot', E('span', {}, resCode, resRobot)), addBtn('Listeye ekle', 'pw-res-add', addRes)), existingRes,
             E('div', { class: 'mut' }, 'CAD ve teknik resim ürün düzeyinde ortak kütüphanededir (Dosyalar bölümü); burada tekrar yüklenmez.')),
         section('D', 'D — Kalite', true, E('div', { class: 'fgrid' }, field('No', qcNo), field('Kontrol', qcLabel), field('Tür', qcKind), field('Kontrol planı', qcPlan)), addBtn('Listeye ekle', 'pw-qc-add', addQc), exQc,
             E('div', { class: 'mut' }, 'Kalite planı onayı ayrı kalite kapısıdır; bu kart planı onaylamaz.')),

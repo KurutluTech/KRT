@@ -9,6 +9,8 @@ export function createProductWorkspaceApi(client, session) {
         createRevision: (id, rev) => rpc('revision_create', { p_product: id, p_revision: rev, p_copy_from: null }),
         load: (p, r) => rpc('product_workspace', { p_product: p, p_revision: r }),
         machines: () => selReal(client, 'machines', { columns: 'id,code,name', order: 'code.asc' }, session),
+        // m0253: kayıtlı robotlar (machine_type=ROBOT; arşivliler de gelir, ekran ayıklar). Tür/sütun yoksa çağıran yakalar.
+        robots: () => client.select('machines', { columns: 'id,code,name,archived_at', filters: { machine_type: 'eq.ROBOT' }, order: 'code.asc' }, session),
         // m0221 uygulanmışsa iyimser sürüm kilidiyle (CONCURRENT_EDIT); uygulanmamışsa eski yol. Yetki/kapılar her iki yolda routing_op_save'dedir.
         async saveOperation(i) {
             const args = { p_revision: i.revisionId, p_op_no: i.opNo, p_name: i.name, p_machine_ids: i.machineIds, p_primary: i.primaryId, p_skill_code: i.skillCode, p_skill_level: i.skillLevel, p_cam: i.camId, p_setup: i.setup, p_cycle: i.cycle, p_first_piece: i.firstPiece, p_qc: i.qc, p_instructions: i.instructions, p_reason: i.reason };
