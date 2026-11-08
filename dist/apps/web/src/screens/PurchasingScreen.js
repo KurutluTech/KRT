@@ -79,18 +79,24 @@ export async function renderPurchasingScreen(container, deps, banner) {
     function customerMaterialBox() {
         if (!custList) return null;
         const mk = (tid, ph, rows) => h('select', { 'data-testid': tid }, h('option', { value: '' }, ph), ...rows.map((r) => h('option', { value: r.value }, r.label)));
-        const wo = mk('cm-wo', '— iş emri / sipariş seçin —', woList.map((w) => ({ value: w.id, label: w.label })));
-        const cust = mk('cm-customer', '— müşteri seçin —', custList.map((c) => ({ value: c.id, label: c.name })));
-        const mat = mk('cm-material', '— malzeme seçin —', matList.map((m) => ({ value: m, label: m })));
+        const cust = mk('cm-customer', '— 1) müşteri seçin —', custList.map((c) => ({ value: c.id, label: c.name })));
+        const wo = mk('cm-wo', '— 2) iş emri / sipariş seçin —', []);
+        const mat = mk('cm-material', '— 3) malzeme —', matList.map((m) => ({ value: m, label: m })));
         const bars = h('input', { type: 'number', min: '1', step: '1', placeholder: 'Çubuk adedi', 'data-testid': 'cm-bars' });
         const ref = h('input', { type: 'text', placeholder: 'Müşteri irsaliye / teslim no', 'data-testid': 'cm-ref' });
         const msg = h('div', { class: 'mut', 'data-testid': 'cm-msg' });
         const setMats = (codes, pick) => { mat.replaceChildren(h('option', { value: '' }, '— malzeme seçin —'), ...codes.map((m) => h('option', { value: m }, m))); if (pick) mat.value = pick; };
+        cust.addEventListener('change', () => {
+            msg.textContent = '';
+            const mine = woList.filter((w) => w.customerId === cust.value);
+            wo.replaceChildren(h('option', { value: '' }, mine.length ? '— 2) iş emri / sipariş seçin —' : '— bu müşterinin açık iş emri yok —'), ...mine.map((w) => h('option', { value: w.id }, w.label)));
+            setMats(matList, null); bars.value = '';
+            if (mine.length === 1) { wo.value = mine[0].id; wo.dispatchEvent(new Event('change')); }
+        });
         wo.addEventListener('change', async () => {
             msg.textContent = '';
             const w = woList.find((x) => x.id === wo.value);
             if (!w) return;
-            if (w.customerId && custList.some((c) => c.id === w.customerId)) cust.value = w.customerId;
             try {
                 const ms = await deps.api.woMaterials(w.id);
                 const need = ms.filter((m) => m.shortage > 0);
@@ -117,7 +123,7 @@ export async function renderPurchasingScreen(container, deps, banner) {
             }
             catch (err) { msg.textContent = errorText(err); }
         } }, 'Müşteri malzemesini kabul et');
-        return h('div', { class: 'panel', 'data-testid': 'cm-box' }, h('h2', null, 'Müşteri malzemesi kabul (siparişsiz)'), h('div', { class: 'mut' }, 'Önce iş emrini seçin: müşteri, malzeme ve eksik çubuk adedi otomatik gelir. Fiyatsız kayıt olur; kabulden sonra lot HOLD kalır, giriş kalite kontrolü gerekir.'), h('div', { style: 'display:flex;gap:8px;flex-wrap:wrap;margin-top:8px' }, wo, cust, mat, bars, ref, btn), msg);
+        return h('div', { class: 'panel', 'data-testid': 'cm-box' }, h('h2', null, 'Müşteri malzemesi kabul (siparişsiz)'), h('div', { class: 'mut' }, 'Önce müşteriyi, sonra iş emrini seçin: malzeme ve eksik çubuk adedi otomatik gelir. Fiyatsız kayıt olur; kabulden sonra lot HOLD kalır, giriş kalite kontrolü gerekir.'), h('div', { style: 'display:flex;gap:8px;flex-wrap:wrap;margin-top:8px' }, cust, wo, mat, bars, ref, btn), msg);
     }
     const screen = (h("div", { class: "purchasing-screen kd" },
         h("style", null, DS_CSS + '.kd table{border-collapse:collapse;width:100%;font-size:14px}.kd td{padding:8px;border-top:1px solid #1e293b;vertical-align:middle}.kd td:last-child{display:flex;gap:8px;flex-wrap:wrap;align-items:center}'),
