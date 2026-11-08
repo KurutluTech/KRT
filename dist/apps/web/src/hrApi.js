@@ -1,6 +1,13 @@
 // KMI NEXT — İK entegre departmanı (m0232–m0237) RPC sarmalayıcısı. Yalnız bu dosyadaki RPC'ler çağrılır; tablolara doğrudan erişim YOKTUR.
+// client.rpc() sonuçları camelCase'e çevirir (camelizeKeys); bu ekranlar RPC sözleşmesindeki snake_case'i okur. Yalnız küçük-harf-camelCase anahtarlar geri çevrilir (SALARY_NET, uuid vb. dokunulmaz).
+const _SNAKE_KEY = /^[a-z][a-z0-9]*(?:[A-Z][a-z0-9]*)+$/;
+export function snakeKeys(v) {
+    if (Array.isArray(v)) return v.map(snakeKeys);
+    if (v !== null && typeof v === 'object') { const o = {}; for (const [k, x] of Object.entries(v)) o[_SNAKE_KEY.test(k) ? k.replace(/[A-Z]/g, (c) => '_' + c.toLowerCase()) : k] = snakeKeys(x); return o; }
+    return v;
+}
 export function createHrApi(client, session) {
-    const r = (name, args = {}) => client.rpc(name, args, session);
+    const r = async (name, args = {}) => snakeKeys(await client.rpc(name, args, session));
     return {
         myPersonnelId: () => r('actor_personnel_id'),
         payAccess: () => r('cost_pay_access', {}),
