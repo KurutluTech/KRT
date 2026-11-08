@@ -96,6 +96,7 @@ export const NAV_TREE = [
         ] },
     { id: 'maint', short: 'Bakım', title: 'BAKIM', icon: 'gauge', items: [
             { path: '/makineler', label: 'Makineler', icon: 'factory' },
+            { path: '/makine-ekle', label: 'Yeni makine ekle', icon: 'plus' },
             { path: '/bakim', label: 'Bakım', icon: 'wrench' },
         ] },
     { id: 'wh', short: 'Depo', title: 'DEPO & STOK', icon: 'box', items: [

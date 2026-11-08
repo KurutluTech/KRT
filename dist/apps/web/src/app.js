@@ -142,6 +142,7 @@ import { createMasterImportApi, createCatalogApi } from './masterImportApi.js';
 import { renderMasterImportScreen } from './screens/MasterImportScreen.js';
 import { createAssetApi } from './assetApi.js';
 import { renderMachineCreateScreen } from './screens/MachineCreateScreen.js';
+import { canCreateMachine } from './machineTypeUi.js';
 import { makeIo as makeMachineIo } from './passport/topics/common.js';
 import { renderAssetCenterScreen } from './screens/AssetCenterScreen.js';
 import { createPlanCockpitApi } from './planCockpitApi.js';
@@ -446,7 +447,7 @@ export const ROUTES = [
     { path: '/teklifler', label: 'Teklifler (talep · fizibilite · teklif · onay)', group: 'Yönetim', inMenu: true, render: (el, c, s) => renderQuotesScreen(el, createQuotesApi(c, s)) },
     { path: '/musteriler', label: 'Müşteriler (kartlar)', group: 'Yönetim', inMenu: true, render: (el, c, s) => renderEntityGalleryScreen(el, galleryDeps(c, s), { kind: 'CUSTOMER', listHref: '#/musteriler-liste', listLabel: 'Kişiler · şartlar · teslimat (liste)' }) },
     { path: '/musteriler-liste', label: 'Müşteriler (kişiler · şartlar · teslimat)', group: 'Yönetim', inMenu: false, render: (el, c, s) => renderCustomersScreen(el, createCustomersApi(c, s)) },
-    { path: '/makineler', label: 'Makineler (kartlar)', group: 'Saha', inMenu: true, render: (el, c, s) => renderEntityGalleryScreen(el, galleryDeps(c, s, true), { kind: 'MACHINE' }) },
+    { path: '/makineler', label: 'Makineler (kartlar)', group: 'Saha', inMenu: true, render: (el, c, s, q, a) => renderEntityGalleryScreen(el, galleryDeps(c, s, true), { kind: 'MACHINE', ...(canCreateMachine(a) ? { listHref: '#/makine-ekle', listLabel: '＋ Yeni makine ekle' } : {}) }) },
     { path: '/makine-ekle', label: 'Yeni makine ekle (tip · alt tip · kabiliyet)', group: 'Saha', inMenu: true, render: (el, c, s, q, a) => renderMachineCreateScreen(el, { io: makeMachineIo(c, s), access: a }) },
     { path: '/tedarikciler', label: 'Tedarikçiler (kartlar)', group: 'Yönetim', inMenu: true, render: (el, c, s) => renderEntityGalleryScreen(el, galleryDeps(c, s), { kind: 'SUPPLIER', listHref: '#/katalog?k=tedarikci', listLabel: 'Katalog Merkezi' }) },
     { path: '/takim-kartlari', label: 'Takım kartları', group: 'Saha', inMenu: true, render: (el, c, s) => renderEntityGalleryScreen(el, galleryDeps(c, s), { kind: 'TOOL', listHref: '#/takimhane', listLabel: 'Takım Odası (işlemler)' }) },

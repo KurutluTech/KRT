@@ -36,6 +36,8 @@ export const OPEN_RULES = {
     '/vardiya-planlayici': { any: ['WORK_ORDER_ASSIGN_MACHINE'], roles: ['ADMIN', 'MANAGEMENT'] },
     '/sevkiyat-belgeleri': { any: ['SHIPMENT_MANAGE', 'ACCOUNTING_MUTATION'], roles: ['ADMIN', 'MANAGEMENT', 'ACCOUNTING', 'SHIPPING'] },
     '/sevkiyat-iade': { any: ['SHIPMENT_MANAGE', 'WAREHOUSE_RECORD', 'QUALITY_HOLD_RELEASE', 'QUALITY_HOLD_OPEN', 'QUALITY_REJECT', 'ACCOUNTING_MUTATION'], roles: ['ADMIN', 'MANAGEMENT', 'QUALITY', 'SHIPPING', 'WAREHOUSE', 'ACCOUNTING'] },
+    // Yeni makine ekle: menüde yalnız ekranın kendi kuralıyla (machineTypeUi.canCreateMachine: owner / ADMIN / MACHINE_CREATE) aynı kişilere görünür. Yalnız gezinme; yetkiyi sunucu (machine_create) belirler.
+    '/makine-ekle': { owner: true, roles: ['ADMIN'], any: ['MACHINE_CREATE'] },
     '/personel-makine': { any: ['MACHINE_SKILL_VERIFY', 'WORK_ORDER_ASSIGN_MACHINE'], roles: ['ADMIN', 'MANAGEMENT'] },
     '/rota-hazirlik': { any: ['ROUTING_MANAGE', 'BOM_RELEASE'], roles: ['ADMIN', 'MANAGEMENT', 'CAM'] },
     '/personel-yetki': { any: ['PERSONNEL_LOGIN_LINK', 'WORK_ORDER_ASSIGN_MACHINE', 'WORK_ORDER_MULTI_MACHINE_ASSIGN'] },
