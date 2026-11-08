@@ -30,7 +30,7 @@ export async function renderAcademyScreen(container, api, state = {}) {
     catch (err) {
         loadError = errText(err);
     }
-    const rerender = (banner) => void renderAcademyScreen(container, api, { ...state, banner });
+    const rerender = (banner, person) => void renderAcademyScreen(container, api, { ...state, banner, person: person ?? (lvPerson.value || state.person) });
     const run = async (fn, okText) => {
         try {
             await fn();
@@ -55,26 +55,97 @@ export async function renderAcademyScreen(container, api, state = {}) {
         span.appendChild(document.createTextNode(`${r.skillName} · ${masteryLabel(r.level)}${STATE_TR[r.state] ? ` (${STATE_TR[r.state]})` : ''}`));
         return span;
     };
-    // ---- level form ----
-    const lvPerson = sel('ac-level-person', activePeople.map((p) => [p.id, p.name]), '— personel —');
-    const lvSkill = sel('ac-level-skill', skills.filter((s) => s.active).map((s) => [s.code, s.name]), '— yetkinlik —');
-    const lvLevel = sel('ac-level-level', [...[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((n) => [String(n), `${n} · ${masteryLabel(n)}`]), ['REVOKE', 'Kaldır']]);
+    // ---- toplu yetkinlik girişi: kişi seç → tüm yetkinlikler tikli liste → tek seferde kaydet ----
+    const CAT_TR = { MACHINE: 'Makine', MEASUREMENT: 'Ölçüm', PROCESS: 'Süreç', SOFTWARE: 'Yazılım', MAINTENANCE: 'Bakım', OTHER: 'Diğer' };
+    const activeSkills = skills.filter((s) => s.active);
+    const lvPerson = sel('ac-level-person', activePeople.map((p) => [p.id, p.name]), '— personel seç —');
+    if (state.person && activePeople.some((p) => p.id === state.person))
+        lvPerson.value = state.person;
     const lvUntil = input('ac-level-until', { type: 'date' });
-    const lvReason = input('ac-level-reason', { placeholder: 'Gerekçe (en az 10 karakter)' });
-    const saveLevel = () => {
+    const lvReason = input('ac-level-reason', { placeholder: 'Gerekçe (en az 10 karakter)', value: 'Yönetici toplu yetkinlik girişi', style: 'min-width:260px' });
+    const bulkRows = new Map(); // skillCode -> { chk, lvl }
+    const bulkBody = h('div', { 'data-testid': 'ac-bulk-body' });
+    const personCard = h('div', { 'data-testid': 'ac-person-card', style: 'margin:8px 0' });
+    const levelOptions = () => [1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((n) => [String(n), `${n} · ${masteryLabel(n)}`]);
+    const drawBulk = () => {
+        bulkRows.clear();
+        bulkBody.replaceChildren();
+        personCard.replaceChildren();
         const pid = lvPerson.value;
-        const cur = matrix.find((r) => r.personnelId === pid && r.skillCode === lvSkill.value);
-        const level = lvLevel.value === 'REVOKE' ? null : Number(lvLevel.value);
+        if (!pid)
+            return;
+        const mine = matrix.filter((r) => r.personnelId === pid);
+        personCard.appendChild(h('div', { style: 'font-weight:600;margin-bottom:4px' }, `${personName(pid)} — mevcut rozetler`));
+        if (mine.length)
+            personCard.appendChild(h('div', { style: 'display:flex;flex-wrap:wrap' }, ...mine.map(badge)));
+        else
+            personCard.appendChild(h('div', { style: 'color:#64748b' }, 'Yetkinlik kaydı yok.'));
+        const cats = [...new Set(activeSkills.map((s) => s.category ?? 'OTHER'))];
+        for (const cat of cats) {
+            bulkBody.appendChild(h('div', { style: 'font-weight:600;margin:10px 0 4px;color:#94a3b8' }, CAT_TR[cat] ?? cat));
+            for (const sk of activeSkills.filter((x) => (x.category ?? 'OTHER') === cat)) {
+                const cur = mine.find((r) => r.skillCode === sk.code);
+                const chk = h('input', { type: 'checkbox', 'data-testid': 'ac-bulk-chk', 'data-skill': sk.code });
+                chk.checked = !!cur;
+                const lvl = sel('ac-bulk-lvl', levelOptions());
+                lvl.value = String(cur?.level ?? 3);
+                lvl.setAttribute('data-skill', sk.code);
+                const curTxt = cur ? `şu an: ${masteryLabel(cur.level)}${cur.validUntil ? ` · ${cur.validUntil}` : ' · süresiz'}${STATE_TR[cur.state] ? ` (${STATE_TR[cur.state]})` : ''}` : 'kayıt yok';
+                bulkRows.set(sk.code, { chk, lvl, cur });
+                bulkBody.appendChild(h('label', { style: 'display:flex;align-items:center;gap:10px;padding:4px 0;cursor:pointer' }, chk, h('span', { style: 'min-width:240px' }, sk.name), lvl, h('span', { style: 'color:#64748b;font-size:12px' }, curTxt)));
+            }
+        }
+    };
+    lvPerson.addEventListener('change', drawBulk);
+    const bulkMsg = h('div', { 'data-testid': 'ac-bulk-msg', style: 'color:#b91c1c;margin:6px 0' });
+    const bulkRefuse = (t) => { bulkMsg.textContent = t; };
+    const saveBulk = async () => {
+        bulkMsg.textContent = '';
+        const pid = lvPerson.value;
+        if (!pid)
+            return bulkRefuse('Önce personel seçin.');
+        if (lvReason.value.trim().length < 10)
+            return bulkRefuse('Gerekçe en az 10 karakter olmalı.');
         const until = lvUntil.value || null;
-        const pre = canChangeSkillLevel({
-            actorIsApprover: true, actorPersonnelId: null,
-            person: pid ? { id: pid, active: people.find((p) => p.id === pid)?.active ?? false } : null,
-            skill: lvSkill.value ? { code: lvSkill.value, active: true } : null,
-            currentLevel: cur?.level ?? null, currentValidUntil: cur?.validUntil ?? null, newLevel: level, validUntil: until, reason: lvReason.value, today,
-        });
-        if (!pre.ok)
-            return refuse(pre.reason);
-        void run(() => api.setLevel(pid, lvSkill.value, level, until, lvReason.value.trim()), `${personName(pid)}: ${skillName(lvSkill.value)} → ${level === null ? 'kaldırıldı' : MASTERY_TR[level]}`);
+        if (until && until < today)
+            return bulkRefuse('Geçerlilik sonu geçmişte olamaz.');
+        const jobs = [];
+        for (const [code, r] of bulkRows) {
+            const want = r.chk.checked ? Number(r.lvl.value) : null;
+            if (want === null) {
+                if (r.cur)
+                    jobs.push({ code, level: null });
+            }
+            else if (!r.cur || r.cur.level !== want)
+                jobs.push({ code, level: want });
+        }
+        if (!jobs.length)
+            return bulkRefuse('Değişiklik yok — tik veya seviye değiştirmediniz.');
+        const done = [];
+        try {
+            for (const j of jobs) {
+                await api.setLevel(pid, j.code, j.level, j.level === null ? null : until, lvReason.value.trim());
+                done.push(j);
+            }
+        }
+        catch (err) {
+            const failed = jobs[done.length];
+            return rerender({ kind: 'error', text: `${done.length} kayıt yapıldı; ${skillName(failed.code)} kaydedilemedi: ${errText(err)}` }, pid);
+        }
+        rerender({ kind: 'ok', text: `${personName(pid)}: ${done.filter((j) => j.level !== null).length} yetkinlik kaydedildi${done.some((j) => j.level === null) ? `, ${done.filter((j) => j.level === null).length} kaldırıldı` : ''}.` }, pid);
+    };
+    // ---- yeni yetkinlik (listede yoksa) ----
+    const nsName = input('ac-newskill-name', { placeholder: 'Yeni yetkinlik adı' });
+    const nsCat = sel('ac-newskill-cat', Object.entries(CAT_TR));
+    const skillCodeOf = (name) => name.trim().replace(/İ/g, 'I').replace(/ı/g, 'I').replace(/[çÇ]/g, 'C').replace(/[şŞ]/g, 'S').replace(/[ğĞ]/g, 'G').replace(/[öÖ]/g, 'O').replace(/[üÜ]/g, 'U').toUpperCase().replace(/[^A-Z0-9]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 40);
+    const saveNewSkill = () => {
+        const name = nsName.value.trim();
+        const code = skillCodeOf(name);
+        if (code.length < 2)
+            return refuse('Yetkinlik adı gerekli.');
+        if (skills.some((s) => s.code === code || s.name.toLowerCase() === name.toLowerCase()))
+            return refuse('Bu yetkinlik listede zaten var.');
+        void run(() => api.upsertSkill(code, name, nsCat.value), `Yeni yetkinlik eklendi: ${name}`);
     };
     // ---- requirement form ----
     const rqMachine = sel('ac-req-machine', machines.map((m) => [m.id, `${m.code} ${m.name}`]), '— makine —');
@@ -137,9 +208,10 @@ export async function renderAcademyScreen(container, api, state = {}) {
     };
     const box = (title, ...children) => h('section', { style: 'border:1px solid #e2e8f0;border-radius:12px;padding:12px;margin:12px 0' }, h('h2', { style: 'margin-top:0;font-size:18px' }, title), ...children);
     const formRow = (...children) => h('div', { style: 'display:flex;flex-wrap:wrap;gap:6px;align-items:center' }, ...children);
-    const screen = h('div', { class: 'academy-screen', style: 'padding:0 16px;box-sizing:border-box;max-width:100%' }, h('h1', { 'data-testid': 'ac-heading' }, 'Akademi & Yetkinlik'), state.banner ? h('div', { 'data-testid': 'ac-banner', 'data-kind': state.banner.kind, style: `padding:10px;border-radius:8px;background:${state.banner.kind === 'ok' ? '#dcfce7' : '#fee2e2'}` }, state.banner.text) : null, loadError ? h('div', { 'data-testid': 'ac-load-error' }, `Yüklenemedi: ${loadError}`) : null, loadError ? null : box('Rozet merdiveni', h('p', { style: 'font-size:12px;color:#555' }, 'ÖĞRENCİ → GÖZETİMLİ → BAĞIMSIZ → USTA. Süresi dolan yetkinlik çalışmaya izin vermez. "Onaylı" sayısı bilgi amaçlıdır, puantaja bağlı değildir.'), activePeople.length === 0 ? h('div', { 'data-testid': 'ac-no-people' }, 'KMI personel listesi boş — önce personel kaydı gerekir.') : null, ...activePeople.map((p) => {
+    const screen = h('div', { class: 'academy-screen', style: 'padding:0 16px;box-sizing:border-box;max-width:100%' }, h('h1', { 'data-testid': 'ac-heading' }, 'Akademi & Yetkinlik'), state.banner ? h('div', { 'data-testid': 'ac-banner', 'data-kind': state.banner.kind, style: `padding:10px;border-radius:8px;background:${state.banner.kind === 'ok' ? '#dcfce7' : '#fee2e2'}` }, state.banner.text) : null, loadError ? h('div', { 'data-testid': 'ac-load-error' }, `Yüklenemedi: ${loadError}`) : null, loadError ? null : box('Yetkinlik girişi (toplu)', h('p', { style: 'font-size:12px;color:#555' }, 'Personeli seçin; yetkinlikleri tikleyip seviyesini seçin, tek seferde Kaydet. Tiki kaldırırsanız mevcut yetkinlik kaldırılır. Geçerlilik sonu yalnız yeni ya da seviyesi değişen yetkinliğe uygulanır; boşsa süresizdir.'), formRow(lvPerson), personCard, bulkBody, bulkMsg, formRow(h('label', {}, 'Geçerlilik sonu: ', lvUntil), lvReason, h('button', { type: 'button', 'data-testid': 'ac-level-save', onClick: () => void saveBulk() }, 'Kaydet')), h('h3', {}, 'Listede yoksa yeni yetkinlik ekle'), formRow(nsName, nsCat, h('button', { type: 'button', 'data-testid': 'ac-newskill-save', onClick: saveNewSkill }, 'Ekle'))), loadError ? null : box('Rozet merdiveni', h('p', { style: 'font-size:12px;color:#555' }, 'ÖĞRENCİ → GÖZETİMLİ → BAĞIMSIZ → USTA. Süresi dolan yetkinlik çalışmaya izin vermez. "Onaylı" sayısı bilgi amaçlıdır, puantaja bağlı değildir.'), activePeople.length === 0 ? h('div', { 'data-testid': 'ac-no-people' }, 'KMI personel listesi boş — önce personel kaydı gerekir.') : null, ...activePeople.map((p) => {
         const rows = matrix.filter((r) => r.personnelId === p.id);
         return h('div', { 'data-testid': 'ac-person', 'data-person': p.id, style: 'border-top:1px solid #f1f5f9;padding:8px 0' }, h('div', {}, h('b', {}, p.name), ' · ', h('span', { 'data-testid': 'ac-approved', 'data-count': String(approvedSkillCount(rows.map((r) => ({ skillCode: r.skillCode, level: r.level, validUntil: r.validUntil })), today)) }, `Onaylı yetkinlik: ${approvedSkillCount(rows.map((r) => ({ skillCode: r.skillCode, level: r.level, validUntil: r.validUntil })), today)}`)), rows.length ? h('div', { style: 'display:flex;flex-wrap:wrap' }, ...rows.map(badge)) : h('div', { style: 'color:#64748b' }, 'Yetkinlik kaydı yok.'));
-    }), h('h3', {}, 'Seviye değiştir (yetkili onay)'), formRow(lvPerson, lvSkill, lvLevel, h('label', {}, 'Geçerlilik sonu: ', lvUntil), lvReason, h('button', { type: 'button', 'data-testid': 'ac-level-save', onClick: saveLevel }, 'Kaydet'))), loadError ? null : box('Akademi', h('div', {}, ...modules.map((m) => h('div', { 'data-testid': 'ac-module', 'data-code': m.code }, `${m.code} — ${m.title} · ${skillName(m.skillCode)} → ${MASTERY_TR[m.targetLevel]}${m.validityMonths ? ` · ${m.validityMonths} ay geçerli` : ' · süresiz'}${m.passMark !== null ? ` · geçme notu ${m.passMark}` : ''}`))), modules.length === 0 ? h('div', { 'data-testid': 'ac-no-modules', style: 'color:#64748b' }, 'Henüz modül yok.') : null, h('h3', {}, 'Yeni modül'), formRow(mdCode, mdTitle, mdSkill, mdTarget, mdValidity, mdPass), mdContent, h('button', { type: 'button', 'data-testid': 'ac-mod-save', onClick: saveModule }, 'Modül oluştur'), h('h3', {}, 'Kayıt'), formRow(enModule, enPerson, enTrainer, h('button', { type: 'button', 'data-testid': 'ac-enroll-save', onClick: saveEnroll }, 'Kaydet')), ...enrollments.map(enrollmentRow)), loadError ? null : box('Makine yetkinlik şartları', h('p', { style: 'font-size:12px;color:#555' }, 'Şartı tanımlı makinede, şartı karşılamayan operatöre iş atanamaz ve iş başlatılamaz (Akıllı Atama ile birlikte devreye girer).'), ...reqs.map((r) => h('div', { 'data-testid': 'ac-req', 'data-machine': r.machineId, 'data-skill': r.skillCode }, `${machines.find((m) => m.id === r.machineId)?.code ?? '?'}: ${skillName(r.skillCode)} en az ${MASTERY_TR[r.minLevel]} — ${r.reason}`)), formRow(rqMachine, rqSkill, rqLevel, rqReason, h('button', { type: 'button', 'data-testid': 'ac-req-save', onClick: saveReq }, 'Kaydet'))));
+    })), loadError ? null : box('Akademi', h('div', {}, ...modules.map((m) => h('div', { 'data-testid': 'ac-module', 'data-code': m.code }, `${m.code} — ${m.title} · ${skillName(m.skillCode)} → ${MASTERY_TR[m.targetLevel]}${m.validityMonths ? ` · ${m.validityMonths} ay geçerli` : ' · süresiz'}${m.passMark !== null ? ` · geçme notu ${m.passMark}` : ''}`))), modules.length === 0 ? h('div', { 'data-testid': 'ac-no-modules', style: 'color:#64748b' }, 'Henüz modül yok.') : null, h('h3', {}, 'Yeni modül'), formRow(mdCode, mdTitle, mdSkill, mdTarget, mdValidity, mdPass), mdContent, h('button', { type: 'button', 'data-testid': 'ac-mod-save', onClick: saveModule }, 'Modül oluştur'), h('h3', {}, 'Kayıt'), formRow(enModule, enPerson, enTrainer, h('button', { type: 'button', 'data-testid': 'ac-enroll-save', onClick: saveEnroll }, 'Kaydet')), ...enrollments.map(enrollmentRow)), loadError ? null : box('Makine yetkinlik şartları', h('p', { style: 'font-size:12px;color:#555' }, 'Şartı tanımlı makinede, şartı karşılamayan operatöre iş atanamaz ve iş başlatılamaz (Akıllı Atama ile birlikte devreye girer).'), ...reqs.map((r) => h('div', { 'data-testid': 'ac-req', 'data-machine': r.machineId, 'data-skill': r.skillCode }, `${machines.find((m) => m.id === r.machineId)?.code ?? '?'}: ${skillName(r.skillCode)} en az ${MASTERY_TR[r.minLevel]} — ${r.reason}`)), formRow(rqMachine, rqSkill, rqLevel, rqReason, h('button', { type: 'button', 'data-testid': 'ac-req-save', onClick: saveReq }, 'Kaydet'))));
+    drawBulk();
     mount(container, screen);
 }

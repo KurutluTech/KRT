@@ -12,6 +12,9 @@ export function createAcademyApi(client, session) {
         async setLevel(personnelId, skillCode, level, validUntil, reason) {
             await client.rpc('set_personnel_skill_level', { p_personnel_id: personnelId, p_skill_code: skillCode, p_level: level, p_valid_until: validUntil, p_reason: reason }, session);
         },
+        async upsertSkill(code, name, category) {
+            await client.rpc('upsert_skill', { p_code: code, p_name: name, p_category: category, p_active: true }, session);
+        },
         async setRequirement(machineId, skillCode, minLevel, reason) {
             await client.rpc('set_machine_skill_requirement', { p_machine_id: machineId, p_skill_code: skillCode, p_min_level: minLevel, p_reason: reason }, session);
         },
