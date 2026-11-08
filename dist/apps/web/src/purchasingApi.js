@@ -22,6 +22,16 @@ export function createPurchasingApi(client, session) {
         async recordGoodsReceipt(purchaseOrderLineId, qty) {
             return client.rpc('record_goods_receipt', { p_purchase_order_line_id: purchaseOrderLineId, p_qty: qty }, session);
         },
+        async customers() {
+            return client.select('customers', { columns: 'id,code,name,active', filters: { active: 'eq.true' }, order: 'name.asc' }, session);
+        },
+        async materialCodes() {
+            const r = await client.select('bom_lines', { columns: 'material_code', order: 'material_code.asc' }, session);
+            return [...new Set(r.map((x) => x.material_code).filter(Boolean))];
+        },
+        async receiveCustomerMaterial(customerId, materialCode, bars, reference) {
+            return client.rpc('record_customer_material_receipt', { p_customer_id: customerId, p_material_code: materialCode, p_bars: bars, p_reference: reference }, session);
+        },
         async recordIncomingQualityDecision(stockLotId, decision, reason) {
             return client.rpc('record_incoming_quality_decision', { p_stock_lot_id: stockLotId, p_decision: decision, p_reason: reason ?? null }, session);
         },

@@ -19,6 +19,15 @@ export async function renderPurchasingScreen(container, deps, banner) {
     catch (err) {
         loadError = errorText(err);
     }
+    let custList = null;
+    let matList = [];
+    if (deps.api.receiveCustomerMaterial && deps.api.customers) {
+        try {
+            custList = await deps.api.customers();
+            matList = deps.api.materialCodes ? await deps.api.materialCodes().catch(() => []) : [];
+        }
+        catch { custList = null; }
+    }
     const receiveInputs = new Map();
     function receiveInputFor(lineId) {
         let input = receiveInputs.get(lineId);
@@ -65,10 +74,33 @@ export async function renderPurchasingScreen(container, deps, banner) {
             await renderPurchasingScreen(container, deps, { kind: 'error', text: errorText(err) });
         }
     }
+    function customerMaterialBox() {
+        if (!custList) return null;
+        const optSel = (tid, ph, rows) => h('select', { 'data-testid': tid }, h('option', { value: '' }, ph), ...rows.map((r) => h('option', { value: r.value }, r.label)));
+        const cust = optSel('cm-customer', '— müşteri seçin —', custList.map((c) => ({ value: c.id, label: c.name })));
+        const mat = optSel('cm-material', '— malzeme seçin —', matList.map((m) => ({ value: m, label: m })));
+        const bars = h('input', { type: 'number', min: '1', step: '1', placeholder: 'Çubuk adedi', 'data-testid': 'cm-bars' });
+        const ref = h('input', { type: 'text', placeholder: 'Müşteri irsaliye / teslim no', 'data-testid': 'cm-ref' });
+        const msg = h('div', { class: 'mut', 'data-testid': 'cm-msg' });
+        const btn = h('button', { type: 'button', class: 'okb', 'data-testid': 'cm-save', onClick: async () => {
+            const n = Number(bars.value);
+            if (!cust.value) { msg.textContent = 'Müşteriyi seçin.'; return; }
+            if (!mat.value) { msg.textContent = 'Malzemeyi seçin.'; return; }
+            if (!Number.isInteger(n) || n <= 0) { msg.textContent = 'Çubuk adedi tam sayı olmalı.'; return; }
+            if (ref.value.trim().length < 3) { msg.textContent = 'Müşteri irsaliye / teslim numarasını yazın.'; return; }
+            try {
+                await deps.api.receiveCustomerMaterial(cust.value, mat.value, n, ref.value.trim());
+                await renderPurchasingScreen(container, deps, { kind: 'info', text: 'Müşteri malzemesi kabul edildi; lot HOLD. Sıradaki adım: Kalite → Giriş kalite kontrolü (sahiplik: Müşteri).' });
+            }
+            catch (err) { msg.textContent = errorText(err); }
+        } }, 'Müşteri malzemesini kabul et');
+        return h('div', { class: 'panel', 'data-testid': 'cm-box' }, h('h2', null, 'Müşteri malzemesi kabul (siparişsiz)'), h('div', { class: 'mut' }, 'Müşterinin getirdiği çubuk. Fiyatsız kayıt olur; satınalma/fatura akışına girmez. Kabulden sonra lot HOLD kalır, giriş kalite kontrolü gerekir.'), h('div', { style: 'display:flex;gap:8px;flex-wrap:wrap;margin-top:8px' }, cust, mat, bars, ref, btn), msg);
+    }
     const screen = (h("div", { class: "purchasing-screen kd" },
         h("style", null, DS_CSS + '.kd table{border-collapse:collapse;width:100%;font-size:14px}.kd td{padding:8px;border-top:1px solid #1e293b;vertical-align:middle}.kd td:last-child{display:flex;gap:8px;flex-wrap:wrap;align-items:center}'),
         h("h1", { "data-testid": "purchasing-heading" }, "Sat\u0131nalma / Depo"),
         banner ? (h("div", { class: `banner ${banner.kind}`, "data-testid": "purchasing-banner", "data-kind": banner.kind }, banner.text)) : null,
+        customerMaterialBox(),
         loadError ? (h("div", { class: "banner error", "data-testid": "purchasing-load-error" },
             "Y\u00FCklenemedi: ",
             loadError)) : (h(Fragment, null,
