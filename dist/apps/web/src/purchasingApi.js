@@ -25,6 +25,23 @@ export function createPurchasingApi(client, session) {
         async customers() {
             return client.select('customers', { columns: 'id,code,name,active', filters: { active: 'eq.true' }, order: 'name.asc' }, session);
         },
+        async openWorkOrders() {
+            const [wos, items, orders] = await Promise.all([
+                client.select('work_orders', { columns: 'id,order_item_id,status,qty_planned', order: 'created_at.desc', limit: 200 }, session),
+                client.select('order_items', { columns: 'id,order_id', limit: 2000 }, session),
+                client.select('orders', { columns: 'id,customer_po,customer_id', limit: 2000 }, session),
+            ]);
+            const itemOrder = new Map(items.map((i) => [i.id, i.order_id]));
+            const ord = new Map(orders.map((o) => [o.id, o]));
+            return wos.filter((w) => !['COMPLETED', 'CANCELLED'].includes(w.status)).map((w) => {
+                const o = ord.get(itemOrder.get(w.order_item_id));
+                return { id: w.id, label: `${o?.customer_po ?? 'Sipariş?'} · ${w.qty_planned} adet · ${w.status}`, customerId: o?.customer_id ?? null };
+            });
+        },
+        async woMaterials(workOrderId) {
+            const rows = await client.rpc('work_order_material_status', { p_work_order_id: workOrderId }, session);
+            return rows.map((r) => ({ materialCode: String(r.material_code ?? r.materialCode), shortage: Number(r.shortage) }));
+        },
         async materialCodes() {
             const r = await client.select('bom_lines', { columns: 'material_code', order: 'material_code.asc' }, session);
             return [...new Set(r.map((x) => x.material_code).filter(Boolean))];
