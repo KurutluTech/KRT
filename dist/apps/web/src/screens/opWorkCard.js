@@ -314,7 +314,7 @@ export function buildOpWorkCard(ctx, o) {
         defBlade.value = defState.blade ?? ''; defFixture.value = defState.fixture ?? '';
         defHost.replaceChildren(E('div', { class: 'owc-leg' }, L(`Makine ${m?.code ?? ''} varsayılanları — bir kez girilir, her üründe geçerlidir`, 'info')),
             E('div', { class: 'fgrid' }, field('Varsayılan testere bıçağı', defBlade), field('Varsayılan aparat / bağlama', defFixture)),
-            E('div', { class: 'row', style: 'gap:8px' }, saveDef, useFx), defState.blade ? E('div', { class: 'mut' }, `Bu makinede bıçak: ${defState.blade} (operasyona ayrıca yazmaya gerek yok)`) : null);
+            E('div', { class: 'row', style: 'gap:8px' }, saveDef, useFx), E('div', { class: 'mut' }, defState.blade ? `Bu makinede bıçak: ${defState.blade} (operasyona ayrıca yazmaya gerek yok)` : ''));
     };
     const cutMat = h('input', { 'data-testid': 'owc-cut-mat', placeholder: 'Malzeme (ör. 4140 Ø37)', list: 'owc-mat-list' });
     const cutSpeed = h('input', { 'data-testid': 'owc-cut-speed', inputmode: 'decimal', placeholder: 'Hız' });
@@ -349,8 +349,8 @@ export function buildOpWorkCard(ctx, o) {
     const needsFiles = () => { const sl = slotRef.v; if (!sl) return true; const r = g(sl, 'requirements') ?? {}; return !!(r.nc || r.cam || r.tool_list || r.toolList); };
     let filesMounted = false;
     const mountFiles = () => {
-        if (!needsFiles()) { filesNote.textContent = 'Bu makine tipinde NC / CAM / CNC takım listesi gerekmiyor. Gerekli ise makine tipi “Makine tipi ve uyumluluk” bölümünden değişir.'; chainHost.hidden = true; candHost.hidden = true; engHost.replaceChildren(); return; }
-        filesNote.textContent = ''; chainHost.hidden = false; candHost.hidden = false;
+        if (!needsFiles()) { filesNote.textContent = 'Bu makine tipinde NC / CAM / CNC takım listesi gerekmiyor. Gerekli ise makine tipi “Makine tipi ve uyumluluk” bölümünden değişir.'; chainHost.hidden = true; candHost.hidden = true; filesLeg.hidden = true; engHost.replaceChildren(); return; }
+        filesNote.textContent = ''; filesLeg.hidden = false; chainHost.hidden = false; candHost.hidden = false;
         if (filesMounted) return; filesMounted = true;
         if (ctx.buildEngineering) engHost.replaceChildren(ctx.buildEngineering());
         drawCandidates();
@@ -406,7 +406,8 @@ export function buildOpWorkCard(ctx, o) {
     panes.kalite = E('div', { class: 'owc-pane', hidden: true, 'data-testid': 'owc-pane-kalite' },
         E('div', { class: 'owc-leg' }, L('Kontrol planı onayı Kalite kapısıdır', 'gate'), ' — bu kart planı onaylamaz; seçili plana bağlar.'),
         E('div', { class: 'fgrid' }, field(L('Kontrol planı', 'gate'), qcPlan), field(L('No', 'info'), qcNo), field(L('Kontrol', 'info'), qcLabel), field(L('Tür', 'info'), qcKind)), addBtn('Listeye ekle', 'pw-qc-add', addQc), exQc);
-    panes.dosya = E('div', { class: 'owc-pane', hidden: true, 'data-testid': 'owc-pane-dosya' }, filesNote, E('div', { class: 'owc-leg' }, L('NC / CAM / takım listesi', 'gate'), ' — yalnız gerektiren makine tipinde görünür'), engHost, chainHost, candHost,
+    const filesLeg = E('div', { class: 'owc-leg' }, L('NC / CAM / takım listesi', 'gate'), ' — yalnız gerektiren makine tipinde görünür');
+    panes.dosya = E('div', { class: 'owc-pane', hidden: true, 'data-testid': 'owc-pane-dosya' }, filesNote, filesLeg, engHost, chainHost, candHost,
         E('div', { class: 'mut' }, 'CAD ve teknik resim ürün düzeyinde ortak kütüphanededir (Dosyalar bölümü); burada tekrar yüklenmez.'));
     const tabBar = E('div', { class: 'owc-tabs', role: 'tablist' }, ...tabs.map(([k, t]) => { const b = h('button', { type: 'button', class: 'ghost', role: 'tab', 'data-testid': `owc-tab-${k}`, 'aria-selected': String(k === 'genel'), onClick: () => showTab(k) }, t); tabBtns[k] = b; return b; }));
     return E('div', { class: 'owc', 'data-testid': 'pw-op-edit' }, h('style', {}, OWC_CSS), stripHost, tabBar, ...tabs.map(([k]) => panes[k]), pendHost, statusHost, E('div', { class: 'row owc-bar' }, saveBtn));
