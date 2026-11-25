@@ -33,6 +33,7 @@ export const OPEN_RULES = {
     '/pdf-siparis': { any: ['ORDER_CREATE'] },
     // KMI-012: planner screens. Navigation only — plan_blocks / plan_slot_capacity / plan_operator_load / scenarios gate on the server (operator-only users get their own work orders only, no customer, no other operator names).
     '/planlama-kokpit': { any: ['WORK_ORDER_ASSIGN_MACHINE'], roles: ['ADMIN', 'MANAGEMENT'] },
+    '/cutprep-hazirlik': { any: ['WORK_ORDER_ASSIGN_MACHINE', 'ROUTING_MANAGE', 'FIRST_PIECE_APPROVE'], roles: ['ADMIN', 'MANAGEMENT', 'CAM', 'QUALITY'] },
     '/vardiya-planlayici': { any: ['WORK_ORDER_ASSIGN_MACHINE'], roles: ['ADMIN', 'MANAGEMENT'] },
     '/sevkiyat-belgeleri': { any: ['SHIPMENT_MANAGE', 'ACCOUNTING_MUTATION'], roles: ['ADMIN', 'MANAGEMENT', 'ACCOUNTING', 'SHIPPING'] },
     '/sevkiyat-iade': { any: ['SHIPMENT_MANAGE', 'WAREHOUSE_RECORD', 'QUALITY_HOLD_RELEASE', 'QUALITY_HOLD_OPEN', 'QUALITY_REJECT', 'ACCOUNTING_MUTATION'], roles: ['ADMIN', 'MANAGEMENT', 'QUALITY', 'SHIPPING', 'WAREHOUSE', 'ACCOUNTING'] },

@@ -3,6 +3,7 @@ import { isSetupPending } from './errorText.js';
 export function createTaskFloorApi(client, session) {
     let historyMissing = false;
     let evidenceMissing = false;
+    let reqMissing = false;
     let qrMissing = false; // schema capability, detected once per page load (not user data)
     return {
         async history(id) {
@@ -19,6 +20,28 @@ export function createTaskFloorApi(client, session) {
                 }
                 throw e;
             }
+        },
+        // Smart Task Engine (r19): görev <-> kanonik gereksinim görünümü. Sunucu işlevi yoksa sessizce 'yok' (görev ekranı eskisi gibi çalışır).
+        async requirementOverview() {
+            if (reqMissing)
+                return [];
+            try {
+                const r = await client.rpc('task_requirement_overview', {}, session);
+                return Array.isArray(r) ? r : [];
+            }
+            catch (e) {
+                if (isSetupPending(e)) {
+                    reqMissing = true;
+                    return [];
+                }
+                throw e;
+            }
+        },
+        async requirementInfo(id) {
+            if (reqMissing)
+                return [];
+            const r = await client.rpc('task_requirement_info', { p_task_id: id }, session);
+            return Array.isArray(r) ? r : [];
         },
         async evidence(id) {
             if (evidenceMissing)

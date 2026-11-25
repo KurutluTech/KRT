@@ -158,6 +158,8 @@ import { createSearchApi } from './searchApi.js';
 import { renderSearchScreen } from './screens/SearchScreen.js';
 import { createTaskFloorApi } from './taskFloorApi.js';
 import { renderTaskFloorScreen } from './screens/TaskFloorScreen.js';
+import { createCutPrepPanelApi } from './cutprepPanelApi.js';
+import { renderCutPrepPanelScreen } from './screens/CutPrepPanelScreen.js';
 import { renderApprovalsScreen } from './screens/ApprovalsScreen.js';
 import { countGates, sourcesFor } from '../../../packages/domain/src/approvalWorkspace.js';
 import { renderWorkOrderHubScreen } from './screens/WorkOrderHubScreen.js';
@@ -458,6 +460,7 @@ export const ROUTES = [
     { path: '/pdf-siparis', label: 'PDF’ten Sipariş', group: 'Yönetim', inMenu: true, render: (el, c, s, q) => renderOrderImportScreen(el, createOrderImportApi(c, s), { id: q.get('id') }) },
     { path: '/yetki-yonetimi', label: 'Yetki Yönetimi (sahipler · izinler)', group: 'Yönetim', inMenu: true, render: (el, c, s) => renderPermissionAdminScreen(el, createPermissionAdminApi(c, s)) },
     { path: '/pasaport-calisma', label: 'Pasaport çalışma alanı', group: 'Yönetim', inMenu: false, needs: ['tur', 'id'], render: (el, c, s, q) => renderPassportWorkspaceScreen(el, createPassportCardsApi(c, s), { type: q.get('tur'), id: q.get('id') }) },
+    { path: '/cutprep-hazirlik', label: 'CUT/PREP başlangıç hazırlığı', group: 'Saha', inMenu: false, render: (el, c, s, q) => renderCutPrepPanelScreen(el, createCutPrepPanelApi(c, s), { wo: q.get('wo') }) },
     { path: '/urun-calisma', label: 'Ürün Çalışma Alanı (rota & operasyon)', group: 'Yönetim', inMenu: true, render: (el, c, s, q, a) => renderProductWorkspaceScreen(el, createProductWorkspaceApi(c, s), { product: q.get('urun'), rev: q.get('rev'), openOpNo: q.get('opno'), canOpenOrders: canOpen('/siparis-komuta', a) }) },
     { path: '/urun-master', label: 'Ürün Master / Digital DNA', group: 'Yönetim', inMenu: true, render: (el, c, s, q) => (q.get('urun') ? renderProductMasterScreen(el, createProductMasterApi(c, s), { product: q.get('urun'), tab: q.get('sekme') ?? undefined, embedBom: (host, productId, revisionId) => renderProductWorkspaceScreen(host, createProductWorkspaceApi(c, s), { product: productId, rev: revisionId, only: ['bom'] }) })
             : renderEntityGalleryScreen(el, galleryDeps(c, s), { kind: 'PRODUCT', listHref: '#/urun-liste', listLabel: 'Ürün Master listesi (tablo)' })) },
@@ -841,6 +844,11 @@ export async function startApp(root, opts = {}) {
         const collBtn = sideEl.querySelector('[data-testid="app-side-collapse"]');
         // collapsed rail: a gate click opens the page list as a flyout (peek); it closes on outside click, Escape or after choosing a page
         const closePeek = () => { sidePeek = false; sideEl.classList.remove('peek'); };
+        // r19: sayfa adresi (hash) başka yoldan değişse bile (ör. "İlgili ekrana git" bağlantısı, geri tuşu) açık çekmece/yan menü kapanır; oturum ve veri etkilenmez.
+        const shellHashClose = () => { closeDrawer(); closePeek(); };
+        window.__kmiShellHashClose && window.removeEventListener('hashchange', window.__kmiShellHashClose);
+        window.__kmiShellHashClose = shellHashClose;
+        window.addEventListener('hashchange', shellHashClose);
         document.addEventListener('click', (e) => { const t = e.target; if (!sideEl.classList.contains('peek'))
             return; if (!e.composedPath().includes(sideEl) || t?.closest('.kmi-panel a'))
             closePeek(); });

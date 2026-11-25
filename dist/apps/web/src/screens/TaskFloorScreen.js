@@ -18,7 +18,7 @@ const REFUSAL_TR = {
     NOT_ASSIGNEE: 'Bu görev size atanmamış — yalnız atanan kişi başlatır/tamamlar.', SELF_APPROVAL_FORBIDDEN: 'Tamamlayan kişi kendi işini onaylayamaz — başka bir yetkili onaylamalı.',
     EVIDENCE_REQUIRED: 'Bu görev için kanıt zorunlu (fotoğraf/dosya adı, ölçüm no vb. en az 5 karakter).', NOTE_REQUIRED: 'Not yazın (en az 5 karakter).', REASON_REQUIRED: 'Neden yazın (en az 5 karakter).',
     ASSIGNEE_REQUIRED: 'Bir kişi veya rol seçin.', TITLE_REQUIRED: 'Görev başlığı yazın.', SOURCE_RECORD_NOT_FOUND: 'İlgili kayıt bulunamadı.', DUE_BEFORE_START: 'Bitiş başlangıçtan önce olamaz.',
-    TASK_NOT_FOUND: 'Bu görev bulunamadı ya da size açık değil.', ...EVIDENCE_REFUSAL_TR, ILLEGAL_TASK_TRANSITION: 'Görevin durumu bu arada değişti — listeyi yenileyip tekrar deneyin.',
+    TASK_NOT_FOUND: 'Bu görev bulunamadı ya da size açık değil.', ...EVIDENCE_REFUSAL_TR, TASK_REQUIREMENTS_NOT_MET: 'Bu görev otomatik izlenen koşullara bağlı; koşullar ilgili ekranda tamamlanınca kendiliğinden kapanır, elle tamamlanamaz.', ILLEGAL_TASK_TRANSITION: 'Görevin durumu bu arada değişti — listeyi yenileyip tekrar deneyin.',
 };
 const errText = (e) => { const m = e instanceof Error ? e.message : String(e); const k = Object.keys(REFUSAL_TR).find((x) => m.includes(x)); return k ? REFUSAL_TR[k] : errorText(e); };
 const fmt = (iso) => (iso ? new Date(iso).toLocaleString('tr-TR', { timeZone: 'Europe/Istanbul', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : '—');
@@ -27,6 +27,9 @@ const newReq = () => `task-${Date.now()}-${Math.random().toString(36).slice(2, 1
 const GLY = { 1: '✕', 2: '◆', 3: '!', 4: '◷', 5: '▶', 6: '·' };
 const PAGE = 40;
 const TF_CSS = DS_CSS + `
+.tf-auto{font-size:11px;font-weight:700;letter-spacing:.03em;padding:1px 6px;border-radius:999px;border:1px solid #38bdf8;color:#38bdf8;margin-left:6px;white-space:nowrap}
+.tf-req{list-style:none;margin:0;padding:0;display:grid;gap:6px}.tf-req .ok{color:#22c55e}.tf-req .no{color:#f87171}
+
 .kd.tf-screen{max-width:1440px;margin:0 auto;gap:8px}.kd.tf-screen [hidden]{display:none}
 .kd .tf-top{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:2px}.kd .tf-top>div:first-child{flex:1 1 auto;min-width:0}.kd .tf-top .hd{display:flex;align-items:baseline;gap:6px 14px;flex-wrap:wrap}.kd .tf-top h1{margin:0;font-size:22px}.kd .tf-top .sub{font-size:13px;color:#94a3b8}
 .kd .tf-fresh{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:800;letter-spacing:.06em;border-radius:999px;padding:5px 10px;border:1px solid #14532d;background:rgba(34,197,94,.1);color:#86efac}
@@ -98,6 +101,8 @@ export async function renderTaskFloorScreen(container, api, state = {}) {
     let savedScroll = 0;
     const hist = new Map();
     const evm = new Map();
+    const reqMap = new Map(); // taskId -> { total, satisfied } (otomatik gereksinim görevleri)
+    const reqInfo = new Map(); // item id -> 'LOADING' | 'ERROR' | rows
     let items = [];
     const nowMs = () => Date.now();
     const inst = Math.random().toString(36).slice(2);
@@ -127,7 +132,21 @@ export async function renderTaskFloorScreen(container, api, state = {}) {
             }
             if (my !== generation)
                 return;
+            reqMap.clear();
+            try {
+                for (const r of (await api.requirementOverview?.()) ?? [])
+                    reqMap.set(r.taskId ?? r.task_id, r);
+            }
+            catch { /* görünüm yardımcıdır: okunamazsa görevler yine eskisi gibi listelenir */ }
+            if (my !== generation)
+                return;
             items = buildWorkItems({ manual: d.manual, derived: d.derived, nowMs: loadedAt, scope }, d.canManage);
+            for (const it of items) {
+                it.auto = it.taskId && reqMap.has(it.taskId) ? reqMap.get(it.taskId) : null;
+                // Otomatik izlenen görev: koşullar karşılanmadan elle tamamlanamaz (sunucu da reddeder); koşul tamamlanınca görev kendiliğinden kapanır.
+                if (it.auto && (it.auto.satisfied ?? 0) < (it.auto.total ?? 0) && it.can && it.can.complete)
+                    it.can = { ...it.can, complete: false };
+            }
             if (state.focus && !ui.focusDone) {
                 const want = `task:${state.focus}`;
                 if (!items.some((x) => x.id === want) && d.canManage && scope === 'MINE') {
@@ -242,6 +261,39 @@ export async function renderTaskFloorScreen(container, api, state = {}) {
     } };
     mq?.addEventListener('change', onMq);
     // ---------------- detail ----------------
+    const KIND_TR = { CAM_PROGRAM_READY: 'CAM programı yayında (RELEASED)', TOOL_LIST_READY: 'Takım listesi yürürlükte ve operasyona bağlı', CONTROL_PLAN_LINKED: 'Kontrol planı yayında ve operasyona bağlı', OPERATION_TIMES_READY: 'Kurulum ve çevrim süreleri girilmiş', CUT_TOLERANCE_DEFINED: 'Kesim toleransı (+/-) girilmiş', OPERATOR_ASSIGNMENT_READY: 'Operasyona operatör atanmış', SHIFT_PLAN_READY: 'Operatörün vardiyası tanımlı' };
+    const ACT_TR = { CAM_PROGRAM_READY: 'CAM programını yayınlayıp (RELEASED) bu operasyona bağlayın.', TOOL_LIST_READY: 'Takım listesini bu revizyona/operasyona bağlayıp doküman kontrolünde onaylayarak yürürlüğe alın.', CONTROL_PLAN_LINKED: 'Bu operasyon için ölçüm noktalı kontrol planını yayınlayıp onaylatın.', OPERATION_TIMES_READY: 'Operasyonun kurulum (dk) ve çevrim (sn) sürelerini girin.', CUT_TOLERANCE_DEFINED: 'Kesim toleransını (+/−) mühendislik girsin; değer tahmin edilmez.', OPERATOR_ASSIGNMENT_READY: 'İş emri operasyonuna aktif bir operatör seçin.', SHIFT_PLAN_READY: 'Seçilen operatörün vardiyasını tanımlayın.' };
+    const reqRoute = (r) => {
+        const g = (a, b) => r[a] ?? r[b];
+        const kind = r.kind;
+        if (kind === 'OPERATOR_ASSIGNMENT_READY')
+            return g('workOrderId', 'work_order_id') ? `#/is-emirleri?wo=${encodeURIComponent(g('workOrderId', 'work_order_id'))}` : null;
+        if (kind === 'SHIFT_PLAN_READY')
+            return g('workOrderId', 'work_order_id') ? `#/vardiya-planlayici?wo=${encodeURIComponent(g('workOrderId', 'work_order_id'))}` : null;
+        const prod = g('productId', 'product_id');
+        const rev = g('revisionId', 'revision_id');
+        const op = g('opNo', 'op_no');
+        return prod ? `#/urun-calisma?urun=${encodeURIComponent(prod)}${rev ? `&rev=${encodeURIComponent(rev)}` : ''}${op ? `&opno=${op}` : ''}` : null;
+    };
+    const autoTag = (x) => x.auto ? h('span', { class: 'tf-auto', 'data-testid': 'tf-auto-tag', title: 'Bu görev sistemin izlediği kayıt koşullarına bağlıdır; koşul tamamlanınca kendiliğinden kapanır.' }, `OTOMATİK ${x.auto.satisfied ?? 0}/${x.auto.total ?? 0}`) : null;
+    const reqBlock = (x) => {
+        if (!x.auto || !x.taskId)
+            return null;
+        const st = reqInfo.get(x.id);
+        if (st === undefined) {
+            reqInfo.set(x.id, 'LOADING');
+            void api.requirementInfo(x.taskId).then((r) => { reqInfo.set(x.id, r); repaintIfSelected(x.id); }, () => { reqInfo.set(x.id, 'ERROR'); repaintIfSelected(x.id); });
+        }
+        const body = st === undefined || st === 'LOADING' ? h('div', { class: 'mut' }, 'Koşullar yükleniyor…')
+            : st === 'ERROR' ? h('div', { class: 'banner error' }, 'Koşullar okunamadı — daha sonra tekrar deneyin.')
+                : h('ul', { class: 'tf-req', 'data-testid': 'tf-req-list' }, ...st.map((r) => {
+                    const ok = r.state === 'SATISFIED' || r.state === 'NOT_REQUIRED';
+                    const code = r.opCode ?? r.op_code;
+                    const go = ok ? null : reqRoute(r);
+                    return h('li', { 'data-state': r.state }, h('span', { class: ok ? 'ok' : 'no', 'aria-hidden': 'true' }, ok ? '✔' : '✖'), ' ', h('b', {}, KIND_TR[r.kind] ?? r.kind), code ? ` · ${code}` : '', r.state === 'NOT_REQUIRED' ? ' · bu operasyon için gerekli değil' : '', !ok && ACT_TR[r.kind] ? h('div', { class: 'mut', style: 'font-size:12px' }, 'Yapılacak: ' + ACT_TR[r.kind]) : null, go ? h('a', { href: go, class: 'btn ghost', 'data-testid': 'tf-req-go', style: 'margin-left:8px' }, 'İlgili ekrana git →') : null);
+                }));
+        return h('div', { class: 'tf-sec', 'data-testid': 'tf-req-section' }, h('h3', {}, 'Neden açık? (otomatik izlenen koşullar)'), body, (Array.isArray(st) && st.some((r) => (r.workOrderId ?? r.work_order_id) && (r.opNo ?? r.op_no) === 1)) ? h('a', { href: `#/cutprep-hazirlik?wo=${encodeURIComponent((st.find((r) => (r.workOrderId ?? r.work_order_id))).workOrderId ?? (st.find((r) => (r.workOrderId ?? r.work_order_id))).work_order_id)}`, class: 'btn ghost', 'data-testid': 'tf-cutprep-panel' }, 'CUT/PREP başlangıç paneli →') : null, h('div', { class: 'mut', style: 'font-size:12px;margin-top:4px' }, 'Aynı işi burada ayrıca beyan etmeniz gerekmez: koşullar ilgili ekranda tamamlanınca görev kendiliğinden kapanır, bozulursa aynı görev yeniden açılır. Kalite onayı veya üretim serbest bırakma anlamına gelmez.'));
+    };
     const loadDetailData = (x) => {
         if (!x.taskId)
             return;
@@ -303,7 +355,7 @@ export async function renderTaskFloorScreen(container, api, state = {}) {
             }
             if (!hs.length)
                 return h('div', { class: 'mut' }, 'Geçmiş kaydı yok.');
-            return h('ol', { class: 'tf-hist', 'data-testid': 'tf-hist' }, ...hs.map((e) => h('li', { 'data-event': e.event }, h('b', {}, fmt(e.at)), ' · ', EVENT_TR[e.event] ?? e.event, ' · ', e.actorLabel, e.note ? h('div', { class: 'mut' }, e.note) : null)));
+            return h('ol', { class: 'tf-hist', 'data-testid': 'tf-hist' }, ...hs.map((e) => h('li', { 'data-event': e.event }, h('b', {}, fmt(e.at)), ' · ', EVENT_TR[e.event] ?? e.event, ' · ', e.actorLabel, e.note ? h('div', { class: 'mut' }, /^AUTO\[(USER|SYSTEM)\]:/.test(e.note) ? `Otomatik (${/^AUTO\[SYSTEM\]/.test(e.note) ? 'sistem taraması' : 'kullanıcının kaydı sonrası'}): ${e.note.replace(/^AUTO\[(USER|SYSTEM)\]:\s*/, '')}` : e.note) : null)));
         };
         const evidence = () => {
             if (!x.taskId)
@@ -325,7 +377,7 @@ export async function renderTaskFloorScreen(container, api, state = {}) {
             return h('div', { class: 'tf-sec', 'data-testid': 'tf-evidence-section' }, h('h3', {}, x.requiresEvidence ? 'Kanıt (zorunlu)' : 'Kanıt'), text, files, !text && !files ? h('div', { class: 'mut' }, 'Kanıt zorunlu: dosya, ölçüm no veya açıklama (en az 5 karakter).') : null);
         };
         const esc = x.sla.escalation;
-        return h('div', { class: 'tf-detail', 'data-testid': 'tf-detail' }, h('div', { class: 'tf-grid' }, h('dl', {}, h('dt', {}, 'Kim sorumlu?'), h('dd', {}, `${x.assigneeLabel}${x.department ? ` · ${x.department}` : ''}`, x.nextOwner && x.nextOwner !== x.assigneeLabel ? h('div', { class: 'mut' }, `Sonraki sorumlu: ${x.nextOwner}`) : null)), h('dl', {}, h('dt', {}, 'Ne zamana kadar?'), h('dd', {}, x.dueIso ? fmt(x.dueIso) : 'Termin tanımlı değil', ' · ', SLA_TR[x.sla.state], x.sla.used !== null && x.state !== 'DONE' ? h('div', { class: 'tf-sla', 'data-state': x.sla.state, 'aria-hidden': 'true' }, h('i', { style: `width:${Math.min(100, Math.round(x.sla.used * 100))}%` })) : null, x.sla.state === 'OVERDUE' && x.state !== 'DONE' && x.state !== 'CANCELLED' ? h('div', { class: 'tf-late', 'data-testid': 'tf-d-late' }, `GECİKTİ${x.sla.overdueMin !== null ? ` — ${durationTr(x.sla.overdueMin)}` : ''}`) : null, esc.level > 0 ? h('div', { class: 'tf-esc', 'data-testid': 'tf-escalation', 'data-level': String(esc.level) }, `Önerilen eskalasyon (${esc.level}/3): ${esc.text} — otomatik gönderilmez`) : null)), h('dl', {}, h('dt', {}, 'Ne yapılacak?'), h('dd', { 'data-testid': 'tf-d-what' }, x.description ? x.description : 'Başlıkta belirtilen iş (ek açıklama yok).')), h('dl', {}, h('dt', {}, 'Neden gerekli?'), h('dd', {}, x.origin === 'RECORD' ? `${x.source?.label ?? 'Kayıt'} üzerinde açık iş: ${x.stateLabel}.` : x.source ? `${x.source.label} ile ilgili görev${x.ownerLabel ? ` — atayan: ${x.ownerLabel}` : ''}.` : `Yönetimin atadığı görev${x.ownerLabel ? ` — atayan: ${x.ownerLabel}` : ''}.`, x.blockedReason ? h('div', { class: 'tf-late' }, x.blockedReason) : null)), h('dl', {}, h('dt', {}, 'Hangi kayıtla ilişkili?'), h('dd', {}, x.source ? h('a', { href: x.sourceRoute ?? x.href, 'data-testid': 'tf-d-source' }, `${x.source.label} →`) : 'Bağımsız görev')), h('dl', {}, h('dt', {}, 'Tamamlamak için ne gerekli?'), h('dd', { 'data-testid': 'tf-d-how' }, x.nextStep, x.requiresEvidence ? h('div', { class: 'mut' }, 'Kanıt zorunlu: fotoğraf / dosya, ölçüm no veya açıklama.') : null))), evidence(), x.taskId ? h('div', { class: 'tf-sec' }, h('a', { class: 'btn ghost', href: `#/kart?t=TASK&id=${encodeURIComponent(x.taskId)}`, 'data-testid': 'tf-passport' }, 'Görev pasaportunu aç →')) : null, h('div', { class: 'tf-sec' }, h('h3', {}, 'Geçmiş'), timeline()), x.qr ? h('div', { class: 'tf-sec' }, h('h3', {}, 'Görev QR kodu'), h('div', { class: 'tf-qr', 'data-testid': 'tf-qr' }, h('span', { class: 'tf-qrph', role: 'img', 'aria-label': 'Görev QR kodu' }), h('div', {}, h('code', {}, x.qr), h('div', { class: 'mut', style: 'font-size:12px' }, 'Telefonla okutulunca bu görev açılır (yalnız görmeye yetkili kişiye). Okutmak görevi tamamlamaz.')))) : null);
+        return h('div', { class: 'tf-detail', 'data-testid': 'tf-detail' }, h('div', { class: 'tf-grid' }, h('dl', {}, h('dt', {}, 'Kim sorumlu?'), h('dd', {}, `${x.assigneeLabel}${x.department ? ` · ${x.department}` : ''}`, x.nextOwner && x.nextOwner !== x.assigneeLabel ? h('div', { class: 'mut' }, `Sonraki sorumlu: ${x.nextOwner}`) : null)), h('dl', {}, h('dt', {}, 'Ne zamana kadar?'), h('dd', {}, x.dueIso ? fmt(x.dueIso) : 'Termin tanımlı değil', ' · ', SLA_TR[x.sla.state], x.sla.used !== null && x.state !== 'DONE' ? h('div', { class: 'tf-sla', 'data-state': x.sla.state, 'aria-hidden': 'true' }, h('i', { style: `width:${Math.min(100, Math.round(x.sla.used * 100))}%` })) : null, x.sla.state === 'OVERDUE' && x.state !== 'DONE' && x.state !== 'CANCELLED' ? h('div', { class: 'tf-late', 'data-testid': 'tf-d-late' }, `GECİKTİ${x.sla.overdueMin !== null ? ` — ${durationTr(x.sla.overdueMin)}` : ''}`) : null, esc.level > 0 ? h('div', { class: 'tf-esc', 'data-testid': 'tf-escalation', 'data-level': String(esc.level) }, `Önerilen eskalasyon (${esc.level}/3): ${esc.text} — otomatik gönderilmez`) : null)), h('dl', {}, h('dt', {}, 'Ne yapılacak?'), h('dd', { 'data-testid': 'tf-d-what' }, x.description ? x.description : 'Başlıkta belirtilen iş (ek açıklama yok).')), h('dl', {}, h('dt', {}, 'Neden gerekli?'), h('dd', {}, x.origin === 'RECORD' ? `${x.source?.label ?? 'Kayıt'} üzerinde açık iş: ${x.stateLabel}.` : x.source ? `${x.source.label} ile ilgili görev${x.ownerLabel ? ` — atayan: ${x.ownerLabel}` : ''}.` : `Yönetimin atadığı görev${x.ownerLabel ? ` — atayan: ${x.ownerLabel}` : ''}.`, x.blockedReason ? h('div', { class: 'tf-late' }, x.blockedReason) : null)), h('dl', {}, h('dt', {}, 'Hangi kayıtla ilişkili?'), h('dd', {}, x.source ? h('a', { href: x.sourceRoute ?? x.href, 'data-testid': 'tf-d-source' }, `${x.source.label} →`) : 'Bağımsız görev')), h('dl', {}, h('dt', {}, 'Tamamlamak için ne gerekli?'), h('dd', { 'data-testid': 'tf-d-how' }, x.nextStep, x.requiresEvidence ? h('div', { class: 'mut' }, 'Kanıt zorunlu: fotoğraf / dosya, ölçüm no veya açıklama.') : null))), reqBlock(x), evidence(), x.taskId ? h('div', { class: 'tf-sec' }, h('a', { class: 'btn ghost', href: `#/kart?t=TASK&id=${encodeURIComponent(x.taskId)}`, 'data-testid': 'tf-passport' }, 'Görev pasaportunu aç →')) : null, h('div', { class: 'tf-sec' }, h('h3', {}, 'Geçmiş'), timeline()), x.qr ? h('div', { class: 'tf-sec' }, h('h3', {}, 'Görev QR kodu'), h('div', { class: 'tf-qr', 'data-testid': 'tf-qr' }, h('span', { class: 'tf-qrph', role: 'img', 'aria-label': 'Görev QR kodu' }), h('div', {}, h('code', {}, x.qr), h('div', { class: 'mut', style: 'font-size:12px' }, 'Telefonla okutulunca bu görev açılır (yalnız görmeye yetkili kişiye). Okutmak görevi tamamlamaz.')))) : null);
     };
     const actionBlock = (x) => {
         const mode = ui.open && x.taskId && ui.open.endsWith(`:${x.taskId}`) ? ui.open.split(':')[0] : null;
@@ -403,7 +455,7 @@ export async function renderTaskFloorScreen(container, api, state = {}) {
     const row = (x) => {
         const sel = ui.sel === x.id && (isWide() || ui.mobileDetail);
         const t = x.taskId ? data.manual.find((m) => m.id === x.taskId) : null;
-        const pick = h('button', { type: 'button', class: 'tf-pick', 'data-testid': 'tf-pick', 'aria-current': sel ? 'true' : 'false', onClick: () => select(x.id) }, h('span', { class: 'tf-l1' }, h('span', { class: 'k' }, h('span', { class: `tf-tier t${x.tier}` }, `${GLY[x.tier] ?? ''} ${x.tierLabel.toLocaleUpperCase('tr-TR')}`), h('span', { class: 'mut', style: 'font-size:12px' }, x.origin === 'MANUAL' ? x.typeLabel : `${x.typeLabel} · ${x.source?.label ?? ''}`)), ...(['DONE', 'CANCELLED', 'AWAITING_APPROVAL', 'BLOCKED'].includes(x.state) ? [pillFor(x)] : [])), h('span', { class: 'tf-title' }, x.title), h('span', { class: 'tf-meta' }, h('span', { class: 'who' }, h('span', { class: 'avatar', 'aria-hidden': 'true' }, initials(x.assigneeLabel)), h('b', {}, x.assigneeLabel)), x.department ? h('span', {}, x.department) : null, metaLate(x)));
+        const pick = h('button', { type: 'button', class: 'tf-pick', 'data-testid': 'tf-pick', 'aria-current': sel ? 'true' : 'false', onClick: () => select(x.id) }, h('span', { class: 'tf-l1' }, h('span', { class: 'k' }, h('span', { class: `tf-tier t${x.tier}` }, `${GLY[x.tier] ?? ''} ${x.tierLabel.toLocaleUpperCase('tr-TR')}`), h('span', { class: 'mut', style: 'font-size:12px' }, x.origin === 'MANUAL' ? x.typeLabel : `${x.typeLabel} · ${x.source?.label ?? ''}`), autoTag(x)), ...(['DONE', 'CANCELLED', 'AWAITING_APPROVAL', 'BLOCKED'].includes(x.state) ? [pillFor(x)] : [])), h('span', { class: 'tf-title' }, x.title), h('span', { class: 'tf-meta' }, h('span', { class: 'who' }, h('span', { class: 'avatar', 'aria-hidden': 'true' }, initials(x.assigneeLabel)), h('b', {}, x.assigneeLabel)), x.department ? h('span', {}, x.department) : null, metaLate(x)));
         // phone: the one next action sits on the card in a big touch target; everything else is in the detail screen
         const quick = !isWide() && t ? (x.can.start ? h('button', { type: 'button', class: 'okb tf-quick', 'data-testid': 'tf-start', onClick: () => void act(() => api.start(t.id), 'Görev başladı.') }, 'Başla')
             : x.can.complete ? h('button', { type: 'button', class: 'primary tf-quick', 'data-testid': 'tf-complete-open', onClick: () => select(x.id, `complete:${t.id}`) }, 'Tamamla') : null) : null;
@@ -423,7 +475,7 @@ export async function renderTaskFloorScreen(container, api, state = {}) {
     } };
     function paintList() {
         const at = loadedAt || nowMs();
-        const list = applyFilters(items, ui.filters, at);
+        const list = applyFilters(items, ui.filters, at).filter((x) => !ui.kind || (ui.kind === 'AUTO' ? !!x.auto : x.origin === 'MANUAL' && !x.auto));
         const pg = pageOf(list, ui.shown);
         for (const c of chips)
             c.btn.setAttribute('aria-pressed', String(ui.filters.view === c.id));
@@ -479,6 +531,7 @@ export async function renderTaskFloorScreen(container, api, state = {}) {
         search.addEventListener('input', () => { ui.filters = { ...ui.filters, q: search.value }; ui.shown = PAGE; paintList(); paintDetail(); });
         const sel = (testid, label, opts, cur, on) => opts.length ? h('select', { 'data-testid': testid, 'aria-label': label, onChange: (e) => { const v = e.target.value; on(v || null); ui.shown = PAGE; paintList(); paintDetail(); } }, h('option', { value: '' }, label), ...opts.map((o) => h('option', { value: o.id, ...(cur === o.id ? { selected: true } : {}) }, o.label))) : null;
         const deptSel = sel('tf-dept', 'Tüm departmanlar', fc.departments.map((x) => ({ id: x, label: x })), ui.filters.dept, (v) => { ui.filters = { ...ui.filters, dept: v }; });
+        const kindSel = h('select', { 'data-testid': 'tf-kind', 'aria-label': 'Görev kaynağı', onChange: (e) => { ui.kind = e.target.value || null; ui.shown = PAGE; paintList(); paintDetail(); } }, h('option', { value: '' }, 'Otomatik + manuel'), h('option', { value: 'AUTO', ...(ui.kind === 'AUTO' ? { selected: true } : {}) }, 'Yalnız otomatik gereksinim görevleri'), h('option', { value: 'MANUAL', ...(ui.kind === 'MANUAL' ? { selected: true } : {}) }, 'Yalnız elle atanan görevler'));
         const typeSel = sel('tf-type', 'Tüm iş türleri', [{ id: 'MANUAL', label: 'Atanan görevler' }, { id: 'RECORD', label: 'Kayıttan gelenler' }, ...fc.types], ui.filters.type, (v) => { ui.filters = { ...ui.filters, type: v }; });
         const scopeBtns = d.canManage ? [h('button', { type: 'button', 'data-testid': 'tf-scope-mine', class: 'tf-chip', 'aria-pressed': String(scope === 'MINE'), disabled: scope === 'MINE', onClick: () => { scope = 'MINE'; void reload(); } }, 'Benim'),
             h('button', { type: 'button', 'data-testid': 'tf-scope-all', class: 'tf-chip', 'aria-pressed': String(scope === 'ALL'), disabled: scope === 'ALL', onClick: () => { scope = 'ALL'; void reload(); } }, 'Tüm atanan görevler')] : [];
@@ -497,9 +550,9 @@ export async function renderTaskFloorScreen(container, api, state = {}) {
                 dueAt: tDue.value ? new Date(tDue.value).toISOString() : null, sourceType: pre?.sourceType ?? 'NONE', sourceId: pre?.sourceId ?? null, requiresEvidence: tEv.checked, clientRequestId: newReq() }), 'Görev atandı.');
         };
         const newForm = d.canManage ? h('details', { 'data-testid': 'tf-new', class: 'newtask', ...(pre ? { open: true } : {}) }, h('summary', {}, '＋ Yeni görev ata'), pre ? h('div', { 'data-testid': 'tf-prefill', style: 'font-size:13px;color:#94a3b8' }, `İlgili kayıt: ${pre.sourceType}`) : null, h('div', { style: 'display:flex;gap:6px;flex-wrap:wrap;margin-top:6px;align-items:center' }, tTitle, tDesc, tWho, tDue, h('label', { style: 'font-size:13px' }, tEv, ' kanıt zorunlu'), h('button', { type: 'button', 'data-testid': 'tf-new-create', class: 'primary', onClick: create }, 'Görevi ata'))) : null;
-        const activeFilters = (ui.filters.dept ? 1 : 0) + (ui.filters.type ? 1 : 0) + (scope === 'ALL' ? 1 : 0);
-        const bar = wide ? h('div', { class: 'tf-bar' }, viewBar, search, deptSel, typeSel, ...scopeBtns, newForm)
-            : h('div', { class: 'tf-bar' }, search, viewBar, h('details', { class: 'tf-filter', 'data-testid': 'tf-filter-menu', ...(activeFilters ? { open: true } : {}) }, h('summary', {}, activeFilters ? `Filtre (${activeFilters})` : 'Filtre'), h('div', { class: 'fb' }, deptSel, typeSel, ...(scopeBtns.length ? [h('div', { style: 'display:flex;gap:6px;flex-wrap:wrap' }, ...scopeBtns)] : []))), newForm);
+        const activeFilters = (ui.filters.dept ? 1 : 0) + (ui.kind ? 1 : 0) + (ui.filters.type ? 1 : 0) + (scope === 'ALL' ? 1 : 0);
+        const bar = wide ? h('div', { class: 'tf-bar' }, viewBar, search, deptSel, typeSel, kindSel, ...scopeBtns, newForm)
+            : h('div', { class: 'tf-bar' }, search, viewBar, h('details', { class: 'tf-filter', 'data-testid': 'tf-filter-menu', ...(activeFilters ? { open: true } : {}) }, h('summary', {}, activeFilters ? `Filtre (${activeFilters})` : 'Filtre'), h('div', { class: 'fb' }, deptSel, typeSel, kindSel, ...(scopeBtns.length ? [h('div', { style: 'display:flex;gap:6px;flex-wrap:wrap' }, ...scopeBtns)] : []))), newForm);
         const countLine = h('div', { 'data-testid': 'tf-count', style: 'font-size:13px;color:#94a3b8' }, `${sum.actionable} iş şu an sizi bekliyor · ${sum.active} aktif`);
         const detailMode = !wide && ui.mobileDetail;
         const body = detailMode ? [detailHost]

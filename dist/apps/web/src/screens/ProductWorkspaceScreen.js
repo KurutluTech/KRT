@@ -846,18 +846,28 @@ export async function renderProductWorkspaceScreen(container, api, state = {}) {
                 const missing = rows.length ? rows.some((x) => x.cut_tol_plus_mm == null || x.cut_tol_minus_mm == null) : true;
                 if (!missing) { host.replaceChildren(E('b', {}, 'Kesim toleransı (mühendislik)'), E('div', { class: 'mut', 'data-testid': 'pw-tol-complete-done' }, `Tanımlı: +${rows[0].cut_tol_plus_mm} / −${rows[0].cut_tol_minus_mm} mm · kaynak: ${rows[0].cut_tol_source ?? '—'} · yürürlükteki revizyonda değiştirilemez (yeni revizyon gerekir).`)); return; }
                 const code = h('select', { 'data-testid': 'pw-tol-complete-code', 'aria-label': 'Malzeme' }, ...cand.map((b) => h('option', { value: b.materialCode }, `${b.materialCode} · kesim ${fmtMm(specOf(b.materialCode).cutLengthMm)} mm`)));
-                const tp = h('input', { 'data-testid': 'pw-tol-complete-plus', inputmode: 'decimal', placeholder: 'Üst tolerans + mm' });
-                const tm = h('input', { 'data-testid': 'pw-tol-complete-minus', inputmode: 'decimal', placeholder: 'Alt tolerans − mm' });
-                const ts = h('input', { 'data-testid': 'pw-tol-complete-src', placeholder: 'Teknik resim no / revizyon (zorunlu)' });
+                const TOL_OPTS = ['0.05', '0.1', '0.2', '0.5', '1', 'custom'];
+                const tolSel = (testid, label) => h('select', { 'data-testid': testid, 'aria-label': label }, ...TOL_OPTS.map((o) => h('option', { value: o, ...(o === '0.1' ? { selected: true } : {}) }, o === 'custom' ? 'Özel değer' : `${o.replace('.', ',')} mm`)));
+                const tpSel = tolSel('pw-tol-complete-plus-sel', 'Üst tolerans'); const tmSel = tolSel('pw-tol-complete-minus-sel', 'Alt tolerans');
+                const tpCus = h('input', { 'data-testid': 'pw-tol-complete-plus', inputmode: 'decimal', placeholder: 'Özel üst (mm)', style: 'display:none' });
+                const tmCus = h('input', { 'data-testid': 'pw-tol-complete-minus', inputmode: 'decimal', placeholder: 'Özel alt (mm)', style: 'display:none' });
+                const rangeEl = h('div', { class: 'mut', 'data-testid': 'pw-tol-complete-range' }, '');
+                const tolVal = (sel, cus) => (sel.value === 'custom' ? num(cus.value) : Number(sel.value));
+                const cutOf = () => { const b = cand.find((x) => x.materialCode === code.value) ?? cand[0]; return Number(specOf(b.materialCode).cutLengthMm); };
+                const drawRange = () => { const a = tolVal(tpSel, tpCus), b2 = tolVal(tmSel, tmCus), n = cutOf(); rangeEl.textContent = (a === null || b2 === null || !Number.isFinite(n) || a < 0 || b2 < 0) ? 'Kabul aralığı: değer girin' : `Kabul aralığı: ${(n - b2).toFixed(2).replace('.', ',')} – ${(n + a).toFixed(2).replace('.', ',')} mm (nominal ${n} mm, +${a} / −${b2})`; };
+                for (const [sel, cus] of [[tpSel, tpCus], [tmSel, tmCus]]) sel.addEventListener('change', () => { cus.style.display = sel.value === 'custom' ? '' : 'none'; drawRange(); });
+                for (const el of [tpCus, tmCus, code]) { el.addEventListener('input', drawRange); el.addEventListener('change', drawRange); }
+                queueMicrotask(drawRange);
+                const ts = h('input', { 'data-testid': 'pw-tol-complete-src', placeholder: 'Karar / kaynak (zorunlu, en az 3 karakter)' });
                 const why = reasonBox('pw-tol-complete-reason', 'Gerekçe (en az 5 karakter)');
                 const save = async () => {
-                    const a = num(val(tp)), b2 = num(val(tm));
-                    if (a === null || b2 === null || val(ts).trim().length < 3 || val(why).trim().length < 5) { fail(new Error('Üst ve alt tolerans, teknik resim no/revizyonu ve gerekçe zorunlu. Değeri mühendislik belirler.')); return; }
+                    const a = tolVal(tpSel, tpCus), b2 = tolVal(tmSel, tmCus);
+                    if (a === null || b2 === null || a < 0 || b2 < 0 || val(ts).trim().length < 3 || val(why).trim().length < 5) { fail(new Error('Üst ve alt tolerans, karar/kaynak ve gerekçe zorunlu.')); return; }
                     try { await api.cutToleranceComplete(rev.id, val(code), a, b2, val(ts).trim(), val(why).trim()); await reload('Kesim toleransı kaydedildi. Rev A aynı kaldı; kesim boyu, BOM ve rota değişmedi.'); }
                     catch (e) { fail(e); }
                 };
                 host.replaceChildren(E('b', {}, 'Kesim toleransı eksik — mühendislik tamamlar'), E('div', { class: 'mut' }, 'Rev A yürürlükte kalır; yalnız boş tolerans alanı doldurulur. Değer mühendislikten gelir, tolerans yokken kalite PASS verilmez.'),
-                    E('div', { class: 'fgrid' }, field('Malzeme', code), field('Üst tolerans + (mm)', tp), field('Alt tolerans − (mm)', tm), field('Teknik resim / revizyon', ts), field('Gerekçe', why)), btn('primary sm', 'pw-tol-complete-save', 'Toleransı kaydet', save));
+                    E('div', { class: 'fgrid' }, field('Malzeme', code), field('Üst tolerans + (mm)', E('div', {}, tpSel, tpCus), 'Varsayılan öneri ±0,10 mm'), field('Alt tolerans − (mm)', E('div', {}, tmSel, tmCus), 'Üst ve alt ayrı seçilir'), rangeEl, field('Karar / kaynak', ts, 'Örn. yönetim kararı + tarih; teknik resim varsa numarası'), field('Gerekçe', why)), btn('primary sm', 'pw-tol-complete-save', 'Toleransı kaydet', save));
             }).catch(() => host.replaceChildren());
             return host;
         }
