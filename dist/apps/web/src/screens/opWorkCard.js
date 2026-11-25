@@ -175,7 +175,7 @@ export function buildOpWorkCard(ctx, o) {
                     if (want.primary !== base.primary || !eqSet(want.alts, base.alts))
                         diffs.push('makine tanımı');
                     await api.saveOperation({ revisionId: rev.id, opNo: o.opNo, name: want.name, machineIds: [want.primary, ...want.alts], primaryId: want.primary, skillCode: want.skill || null, skillLevel: num(want.level),
-                        camId: o.camProgramId ?? null, setup: num(want.setup), cycle: num(want.cycle), firstPiece: want.fp, qc: want.qc, instructions: want.ins || null, reason: autoWhy(`${o.opCode} ${diffs.length ? diffs.join('; ') : 'düzenleme'}`) });
+                        camId: o.camProgramId ?? null, setup: num(want.setup), cycle: num(want.cycle), firstPiece: want.fp, qc: want.qc, instructions: want.ins || null, reason: autoWhy(`${opLabel(o)} ${diffs.length ? diffs.join('; ') : 'düzenleme'}`) });
                 }, verify: (f) => {
                     const prim = f.machines.find((x) => x.primary)?.id ?? (f.machines.length === 1 ? f.machines[0].id : '');
                     const alts = new Set(f.machines.filter((x) => x.id !== prim).map((x) => x.id));
@@ -197,20 +197,20 @@ export function buildOpWorkCard(ctx, o) {
                 invalid(insp, true);
                 return fail(new Error('VALUE_OUT_OF_RANGE'));
             }
-            steps.push({ id: 'insp', label: 'Muayene süresi', run: async () => { await api.setParameter('OP_INSPECTION_SEC', o.id, v, new Date().toLocaleDateString('sv-SE', { timeZone: 'Europe/Istanbul' }), null, autoWhy(`${o.opCode} muayene süresi ${changeText(num(base.insp), v, 'sn')}`)); },
+            steps.push({ id: 'insp', label: 'Muayene süresi', run: async () => { await api.setParameter('OP_INSPECTION_SEC', o.id, v, new Date().toLocaleDateString('sv-SE', { timeZone: 'Europe/Istanbul' }), null, autoWhy(`${opLabel(o)} muayene süresi ${changeText(num(base.insp), v, 'sn')}`)); },
                 verify: (f) => Number(f.inspectionSeconds) === v, commit: () => { base.insp = cc0.insp; } });
         }
         for (const p of [...pend.res])
-            steps.push({ id: `res:${p.code}`, label: `${p.on ? 'Kaynak ekle' : 'Kaynak kaldır'}: ${p.code}`, run: async () => { await api.setResource(o.id, p.kind, p.code, p.label, p.qty, p.note, p.on, autoWhy(`${o.opCode} ${p.on ? 'kaynak eklendi' : 'kaynak kaldırıldı'} ${p.code}`)); },
+            steps.push({ id: `res:${p.code}`, label: `${p.on ? 'Kaynak ekle' : 'Kaynak kaldır'}: ${p.code}`, run: async () => { await api.setResource(o.id, p.kind, p.code, p.label, p.qty, p.note, p.on, autoWhy(`${opLabel(o)} ${p.on ? 'kaynak eklendi' : 'kaynak kaldırıldı'} ${p.code}`)); },
                 verify: (f) => f.resources.some((r) => r.code === p.code && r.kind === p.kind) === p.on, commit: () => { const i = pend.res.indexOf(p); if (i >= 0) pend.res.splice(i, 1); } });
         for (const p of [...pend.cut])
-            steps.push({ id: `cut:${p.material}`, label: `Kesme parametresi: ${p.material}`, run: async () => { await api.setCutParams(o.id, p.material, p.speed, p.speedUnit, p.feed, p.feedUnit, p.coolant, autoWhy(`${o.opCode} kesme parametresi ${p.material}`)); },
+            steps.push({ id: `cut:${p.material}`, label: `Kesme parametresi: ${p.material}`, run: async () => { await api.setCutParams(o.id, p.material, p.speed, p.speedUnit, p.feed, p.feedUnit, p.coolant, autoWhy(`${opLabel(o)} kesme parametresi ${p.material}`)); },
                 verify: (f) => f.resources.some((r) => r.kind === 'RESOURCE' && String(r.code).startsWith('CUT-') && r.label === p.material), commit: () => { const i = pend.cut.indexOf(p); if (i >= 0) pend.cut.splice(i, 1); } });
         for (const p of [...pend.qc])
-            steps.push({ id: `qc:${p.no}`, label: `Kalite noktası: KN${p.no}`, run: async () => { await api.setQcPoint(o.id, p.no, p.label, p.kind, p.plan, null, true, autoWhy(`${o.opCode} kalite noktası KN${p.no}`)); },
+            steps.push({ id: `qc:${p.no}`, label: `Kalite noktası: KN${p.no}`, run: async () => { await api.setQcPoint(o.id, p.no, p.label, p.kind, p.plan, null, true, autoWhy(`${opLabel(o)} kalite noktası KN${p.no}`)); },
                 verify: (f) => f.qcPoints.some((q) => Number(q.pointNo) === p.no && same(q.label, p.label)), commit: () => { const i = pend.qc.indexOf(p); if (i >= 0) pend.qc.splice(i, 1); } });
         for (const p of [...pend.dep])
-            steps.push({ id: `dep:${p.id}`, label: `Ön koşul: ${p.code}`, run: async () => { await api.setDependency(o.id, p.id, p.on, autoWhy(`${o.opCode} ön koşul ${p.on ? 'eklendi' : 'kaldırıldı'} ${p.code}`)); },
+            steps.push({ id: `dep:${p.id}`, label: `Ön koşul: ${p.code}`, run: async () => { await api.setDependency(o.id, p.id, p.on, autoWhy(`${opLabel(o)} ön koşul ${p.on ? 'eklendi' : 'kaldırıldı'} ${p.code}`)); },
                 verify: (f) => f.dependsOn.some((d) => d.operationId === p.id) === p.on, commit: () => { const i = pend.dep.indexOf(p); if (i >= 0) pend.dep.splice(i, 1); } });
         // 1) sırayla gönder; bağımlı adımın öncülü başarısızsa GÖNDERME (atlanır)
         const outcome = new Map();
@@ -253,13 +253,13 @@ export function buildOpWorkCard(ctx, o) {
         drawAll();
         if (!anyBad) {
             const w = steps.warnings?.length ? ` Uyarı: ${steps.warnings.join('; ')}.` : '';
-            await reload(`${o.opCode}: ${saved.length} değişiklik kaydedildi.${w}`, 'ok', { openOp: o.id });
+            await reload(`${opLabel(o)}: ${saved.length} değişiklik kaydedildi.${w}`, 'ok', { openOp: o.id });
             return;
         }
         if (!fresh)
             notSaved.push({ label: 'Sunucu durumu', text: 'kayıtlar yeniden okunamadı; kaydedildi sayılmadı — sayfayı yenileyip kontrol edin' });
         if (!notSaved.length) {
-            await reload(`${o.opCode}: ${saved.length} değişiklik sunucuda doğrulandı.`, 'ok', { openOp: o.id });
+            await reload(`${opLabel(o)}: ${saved.length} değişiklik sunucuda doğrulandı.`, 'ok', { openOp: o.id });
             return;
         }
         statusHost.replaceChildren(E('div', { class: 'banner bad', 'data-testid': 'owc-partial' }, E('b', {}, `${fresh ? 'Sunucuda doğrulanan' : 'Sunucu yanıtıyla kaydedilen (yeniden okunamadı)'}: ${saved.length} adım. KAYDEDİLEMEYEN: ${notSaved.length} adım — formda duruyor, tekrar deneyebilirsiniz.`),
@@ -367,7 +367,7 @@ export function buildOpWorkCard(ctx, o) {
         const rows = [];
         for (const x of ws.routing) {
             if (x.opNo === o.opNo || x.active === false) continue;
-            const from = { fromOpNo: x.opNo, fromOpCode: x.opCode ?? `OP${x.opNo}`, fromMachines: (x.machines ?? []).map((m) => m.code) };
+            const from = { fromOpNo: x.opNo, fromOpCode: opLabel(x), fromMachines: (x.machines ?? []).map((m) => m.code) };
             for (const d of x.documents ?? []) if (d.docNo && !own.has(d.docNo)) rows.push({ d, from, verdict: docVerdict(from, o, myMachines) });
         }
         candHost.replaceChildren(rows.length ? h('details', { class: 'owc-alt' }, h('summary', {}, `Diğer operasyonlara ait belgeler (${rows.length}) — sadece bilgi, işlem gerekmez`),
@@ -397,7 +397,7 @@ export function buildOpWorkCard(ctx, o) {
     const gapMachines = !base.skill && ctx.machineReqs ? o.machines.filter((m) => !ctx.machineReqs.some((r) => r.machineId === m.id)).map((m) => m.code) : [];
     const undefinedSkillNote = !base.skill ? E('div', { class: 'banner warn', 'data-testid': 'owc-skill-note' }, `Yeterlilik şartı TANIMSIZ${gapMachines.length ? ` (makine ${gapMachines.join(', ')})` : ''} — “gerekmiyor” anlamına gelmez; şart sahip kararıyla tanımlanır.`) : null;
     panes.genel = E('div', { class: 'owc-pane', 'data-testid': 'owc-pane-genel' },
-        E('div', { class: 'fgrid' }, field(L('Operasyon'), h('input', { value: `${o.opCode}`, disabled: true, 'aria-label': 'Operasyon numarası otomatik' })), field(L('Ad', 'info'), name), field(L('Ana makine', 'calc', 'gate'), primary)),
+        E('div', { class: 'fgrid' }, field(L('Operasyon'), h('input', { value: `${opLabel(o)}`, disabled: true, 'aria-label': 'Operasyon numarası otomatik' })), field(L('Ad', 'info'), name), field(L('Ana makine', 'calc', 'gate'), primary)),
         h('details', { class: 'owc-alt', 'data-testid': 'pw-op-alt', open: alt.some((x) => isChecked(x.box)) }, h('summary', {}, 'Alternatif makine ekle (isteğe bağlı)'), E('div', { class: 'row', style: 'gap:4px 16px;margin-top:6px' }, ...alt.map((x) => h('label', { class: 'chk' }, x.box, x.m.code))), E('div', { class: 'mut' }, 'Alternatif makine iş başlatma izni vermez; yeterlilik ve kapılar o makine için ayrıca doğrulanır.')),
         E('div', { class: 'fgrid' }, field(L('Yeterlilik', 'gate'), skill), field(L('Seviye (1-10)', 'gate'), level)), undefinedSkillNote,
         E('div', { class: 'row', style: 'gap:4px 20px' }, h('label', { class: 'chk' }, fp, 'İlk parça kontrolü şart', tag('gate')), h('label', { class: 'chk' }, qc, 'Kalite kontrolü şart', tag('gate'))),

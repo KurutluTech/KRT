@@ -51,6 +51,8 @@ export function createProductWorkspaceApi(client, session) {
         barNeed: (rev, q) => rpc('bar_material_need', { p_revision: rev, p_qty: q }),
         // K02 (1010): tol = { plus, minus, source } yalniz 3'u de doluysa gonderilir; bos birakilirsa parametreler HIC gonderilmez (sunucu mevcut toleransi korur, kesim boyu degistiyse sifirlar). Deger uydurulmaz.
         async barSpecSave(rev, m, d, b, c, k, kr, den, r, tol) { await rpc('bom_bar_spec_save', { p_revision: rev, p_material_code: m, p_dia: d, p_bar_length: b, p_cut_length: c, p_kerf: k, p_kerf_reason: kr, p_density: den, p_reason: r, ...(tol ? { p_tol_plus: tol.plus, p_tol_minus: tol.minus, p_tol_source: tol.source } : {}) }); },
+        // K03: yururlukteki (RELEASED) revizyonda yalniz BOS toleransi tamamlar; baska hicbir alana dokunmaz (sunucu zorlar)
+        async cutToleranceComplete(rev, m, plus, minus, source, reason) { await rpc('bom_cut_tolerance_complete', { p_revision: rev, p_material_code: m, p_tol_plus: plus, p_tol_minus: minus, p_tol_source: source, p_reason: reason }); },
         barTolerances: async (rev) => { try { return (await rpc('bom_bar_specs_read', { p_revision: rev })) ?? []; } catch { return []; } },
         toolistFile: (v) => dc.content(v),
         async toolistContentGet(v) { const r = await rpc('toolist_content_get', { p_version: v }); return { saved: r.saved === true, csv: r.csv }; },

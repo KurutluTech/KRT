@@ -23,6 +23,8 @@
     <script src="./config.js"></script>
     <script type="module">
       import { startApp } from './dist/apps/web/src/app.js';
+      import { installOpCodeGuard } from './dist/apps/web/src/opCodeGuard.js';
+      installOpCodeGuard();
       startApp(document.getElementById('app'));
     </script>
   </body>

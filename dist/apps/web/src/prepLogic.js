@@ -246,7 +246,11 @@ export function remainingActions(i, steps, perm, toolDocNo) {
         rows.push(row('quality', `Kalite planı${opn}`, st, why, ready ? 'Kalite planını onayla ve OP30’a bağla' : 'Kalite planını aç', 'quality', perm.quality, 'Kalite planı düzenleme yetkiniz yok'));
     }
     const r6 = by('ready');
-    if (r6.status !== 'DONE') {
+    if (r6.status !== 'DONE' && i.ws.revision?.status === 'RELEASED') {
+        // Yürürlükteki revizyon tekrar yayın beklemez: kalan iş "üretim hazırlığı"dır (eksikler yukarıdaki satırlarda).
+        rows.push({ key: 'release', title: `Rev ${rev} üretim hazırlığı`, status: 'Üretim hazırlığı', why: r6.line, action: null, target: null, noPerm: null });
+    }
+    else if (r6.status !== 'DONE') {
         const prior = steps.slice(0, 5).filter((s) => !(s.key === 'bom' && s.status === 'WAIT'));
         const blocked = prior.some((s) => s.status !== 'DONE');
         if (blocked)

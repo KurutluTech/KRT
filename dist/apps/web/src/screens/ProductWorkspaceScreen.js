@@ -400,15 +400,15 @@ export async function renderProductWorkspaceScreen(container, api, state = {}) {
                 if (code === 'OP_INSPECTION_SEC') {
                     const ph = await api.parameterHistory(code, o.id);
                     if (!ph.versions.length)
-                        paramHistHost.append(emptyState(`${NA} — ${o.opCode} muayene süresi için hiç değer girilmemiş`));
+                        paramHistHost.append(emptyState(`${NA} — ${opLabel(o)} muayene süresi için hiç değer girilmemiş`));
                     else
-                        paramHistHost.append(E('div', { class: 'kx-sub' }, E('b', {}, `${o.opCode} · ${ph.def.name} geçmişi`), E('div', { class: 'rows' }, ...ph.versions.map((v) => E('div', { class: 'r prevg', 'data-testid': 'pw-param-row' }, E('b', {}, `v${v.versionNo}`), E('span', {}, changeText(v.prevValue, v.value, ph.def.unit)), E('span', { class: 'mut' }, `${v.validFrom}${v.validTo ? ' → ' + v.validTo : ' →'}`), E('span', { class: 'mut' }, `${v.setBy ?? '—'} · ${v.reason}`), v.inForce ? chip('Yürürlükte', 'ok') : E('span', {}))))));
+                        paramHistHost.append(E('div', { class: 'kx-sub' }, E('b', {}, `${opLabel(o)} · ${ph.def.name} geçmişi`), E('div', { class: 'rows' }, ...ph.versions.map((v) => E('div', { class: 'r prevg', 'data-testid': 'pw-param-row' }, E('b', {}, `v${v.versionNo}`), E('span', {}, changeText(v.prevValue, v.value, ph.def.unit)), E('span', { class: 'mut' }, `${v.validFrom}${v.validTo ? ' → ' + v.validTo : ' →'}`), E('span', { class: 'mut' }, `${v.setBy ?? '—'} · ${v.reason}`), v.inForce ? chip('Yürürlükte', 'ok') : E('span', {}))))));
                 }
                 else {
                     const rows = await api.opHistory(o.id);
                     const setup = code === 'OP_SETUP_MIN';
                     const unit = setup ? 'dk' : 'sn';
-                    paramHistHost.append(E('div', { class: 'kx-sub' }, E('b', {}, `${o.opCode} · ${setup ? 'Hazırlık' : 'Çevrim'} süresi geçmişi`), E('div', { class: 'rows' }, ...rows.map((r, i) => {
+                    paramHistHost.append(E('div', { class: 'kx-sub' }, E('b', {}, `${opLabel(o)} · ${setup ? 'Hazırlık' : 'Çevrim'} süresi geçmişi`), E('div', { class: 'rows' }, ...rows.map((r, i) => {
                         const prev = rows[i + 1];
                         const cur = setup ? r.setupMinutes : r.cycleSeconds;
                         const was = prev ? (setup ? prev.setupMinutes : prev.cycleSeconds) : undefined;
@@ -505,7 +505,7 @@ export async function renderProductWorkspaceScreen(container, api, state = {}) {
                 const srcOps = (ws.routing ?? []).filter((x) => x.active !== false);
                 if (!srcOps.length)
                     return null;
-                const sel = h('select', { 'data-testid': 'pw-op-copy', 'aria-label': 'Öncekinden kopyala' }, h('option', { value: '' }, '— boş başla —'), ...srcOps.map((x) => h('option', { value: x.id }, `${x.opCode ?? 'OP' + x.opNo} · ${x.name ?? ''}`.slice(0, 60))));
+                const sel = h('select', { 'data-testid': 'pw-op-copy', 'aria-label': 'Öncekinden kopyala' }, h('option', { value: '' }, '— boş başla —'), ...srcOps.map((x) => h('option', { value: x.id }, `${opLabel(x)} · ${x.name ?? ''}`.slice(0, 60))));
                 sel.addEventListener('change', () => {
                     const src = srcOps.find((x) => x.id === sel.value);
                     if (!src)
@@ -549,7 +549,7 @@ export async function renderProductWorkspaceScreen(container, api, state = {}) {
             if (j < 0 || j >= ids.length)
                 return;
             [ids[i], ids[j]] = [ids[j], ids[i]];
-            const why = prompt0(`${o.opCode} sırası değiştirildi`);
+            const why = prompt0(`${opLabel(o)} sırası değiştirildi`);
             if (why === null)
                 return;
             try {
@@ -571,10 +571,10 @@ export async function renderProductWorkspaceScreen(container, api, state = {}) {
             const preLine = o.dependsOn.length ? `Ön koşul: ${o.dependsOn.map((d) => opLabel(activeOps.find((a) => a.id === d.operationId) ?? d)).join(', ')}` : null;
             const qcLine = o.qcPoints.length ? `Kalite noktaları: ${o.qcPoints.map((q) => `KN${q.pointNo} ${q.label}${q.controlPlan ? ` [plan ${q.controlPlan}]` : ''}`).join('; ')}` : null;
             const docLine = o.documents.length ? `Belgeler: ${o.documents.map((d) => d.docNo).join(', ')}` : null;
-            return E('div', { class: `opc ${open ? 'open' : ''} ${o.active ? '' : 'off'}`, 'data-testid': 'pw-op', 'data-op': o.opCode, 'data-op-id': o.id, 'data-active': String(o.active), 'data-state': st }, E('div', { class: 'opr' }, E('span', { class: 'code' }, opLabel(o)), E('div', { class: 'nm' }, o.name, ' ', stateChip(st), o.active ? null : [' ', chip('Pasif', 'bad')]), E('div', { class: 'c-machine' }, lbl('Makine', ''), o.machines.length ? o.machines.map((m) => (m.primary ? `★${m.code}` : m.code)).join(', ') : NA), E('div', { class: 'num' }, lbl('Hazırlık', ''), `${fmt(o.setupMinutes)} `, o.setupMinutes != null ? E('span', { class: 'u' }, 'dk') : null), E('div', { class: 'num' }, lbl('Çevrim', ''), `${fmt(o.cycleSeconds)} `, o.cycleSeconds != null ? E('span', { class: 'u' }, 'sn') : null), E('div', { class: 'num' }, lbl('Muayene', ''), `${fmt(o.inspectionSeconds)} `, o.inspectionSeconds != null ? E('span', { class: 'u' }, 'sn') : null), E('div', { class: 'c-cam' }, lbl('CAM', ''), o.camProgram ?? E('span', { class: 'mut' }, 'yok')), E('div', { class: 'acts' }, btn('ghost sm', `pw-op-toggle-${o.opCode}`, open ? 'Kapat' : (editOk && o.active ? 'Düzenle' : 'Aç'), () => toggleOp(o.id)), can.editStructure && o.active ? btn('ghost sm icon', `pw-op-up-${o.opCode}`, '↑', () => void move(o, -1), { 'aria-label': `${o.opCode} yukarı taşı`, ...(idx === 0 ? {} : {}) }) : null, can.editStructure && o.active ? btn('ghost sm icon', `pw-op-down-${o.opCode}`, '↓', () => void move(o, 1), { 'aria-label': `${o.opCode} aşağı taşı` }) : null, can.editStructure ? E('details', { class: 'more', 'data-testid': `pw-op-more-${o.opCode}` }, E('summary', { class: 'ghost sm', 'aria-label': `${opLabel(o)} diğer işlemler` }, '⋯'), E('div', { class: 'moremenu' }, btn(o.active ? 'danger sm' : 'ghost sm', `pw-op-active-${o.opCode}`, o.active ? 'Pasife al' : 'Etkinleştir', () => { const why = prompt0(); if (why === null)
+            return E('div', { class: `opc ${open ? 'open' : ''} ${o.active ? '' : 'off'}`, 'data-testid': 'pw-op', 'data-op': o.opCode, 'data-op-id': o.id, 'data-active': String(o.active), 'data-state': st }, E('div', { class: 'opr' }, E('span', { class: 'code' }, opLabel(o)), E('div', { class: 'nm' }, o.name, ' ', stateChip(st), o.active ? null : [' ', chip('Pasif', 'bad')]), E('div', { class: 'c-machine' }, lbl('Makine', ''), o.machines.length ? o.machines.map((m) => (m.primary ? `★${m.code}` : m.code)).join(', ') : NA), E('div', { class: 'num' }, lbl('Hazırlık', ''), `${fmt(o.setupMinutes)} `, o.setupMinutes != null ? E('span', { class: 'u' }, 'dk') : null), E('div', { class: 'num' }, lbl('Çevrim', ''), `${fmt(o.cycleSeconds)} `, o.cycleSeconds != null ? E('span', { class: 'u' }, 'sn') : null), E('div', { class: 'num' }, lbl('Muayene', ''), `${fmt(o.inspectionSeconds)} `, o.inspectionSeconds != null ? E('span', { class: 'u' }, 'sn') : null), E('div', { class: 'c-cam' }, lbl('CAM', ''), o.camProgram ?? E('span', { class: 'mut' }, 'yok')), E('div', { class: 'acts' }, btn('ghost sm', `pw-op-toggle-${o.opCode}`, open ? 'Kapat' : (editOk && o.active ? 'Düzenle' : 'Aç'), () => toggleOp(o.id)), can.editStructure && o.active ? btn('ghost sm icon', `pw-op-up-${o.opCode}`, '↑', () => void move(o, -1), { 'aria-label': `${opLabel(o)} yukarı taşı`, ...(idx === 0 ? {} : {}) }) : null, can.editStructure && o.active ? btn('ghost sm icon', `pw-op-down-${o.opCode}`, '↓', () => void move(o, 1), { 'aria-label': `${opLabel(o)} aşağı taşı` }) : null, can.editStructure ? E('details', { class: 'more', 'data-testid': `pw-op-more-${o.opCode}` }, E('summary', { class: 'ghost sm', 'aria-label': `${opLabel(o)} diğer işlemler` }, '⋯'), E('div', { class: 'moremenu' }, btn(o.active ? 'danger sm' : 'ghost sm', `pw-op-active-${o.opCode}`, o.active ? 'Pasife al' : 'Etkinleştir', () => { const why = prompt0(); if (why === null)
                 return; void (async () => { try {
                 await api.setActive(o.id, !o.active, why);
-                await reload(o.active ? `${o.opCode} pasife alındı (silinmez, geçmişi korunur).` : `${o.opCode} etkinleştirildi.`, 'ok', { openOp: o.id });
+                await reload(o.active ? `${opLabel(o)} pasife alındı (silinmez, geçmişi korunur).` : `${opLabel(o)} etkinleştirildi.`, 'ok', { openOp: o.id });
             }
             catch (e) {
                 fail(e);
@@ -661,10 +661,10 @@ export async function renderProductWorkspaceScreen(container, api, state = {}) {
                     const cMin = x.cycleSec != null ? (q * x.cycleSec) / 60 : null;
                     const iMin = x.inspectionSec != null ? (q * x.inspectionSec) / 60 : null;
                     const slow = x.inspectionSec != null && x.cycleSec != null && x.inspectionSec > x.cycleSec;
-                    return E('div', { class: 'r calcg', 'data-testid': 'pw-calc-op', 'data-state': miss ? 'MISSING' : 'OK' }, E('div', {}, E('b', {}, x.opCode ?? `OP${x.opNo}`), ' ', x.name ?? ''), E('div', { class: 'num' }, lbl('Hazırlık (parti başına)', ''), sMin === null ? NA : `${fmt(sMin)} dk`), E('div', { class: 'num' }, lbl('CNC çevrimi', ''), cMin === null ? NA : `${fmt(cMin, 2)} dk`), E('div', { class: 'num', 'data-testid': 'pw-calc-quality' }, lbl('Kalite muayenesi (paralel)', ''), iMin === null ? NA : `${fmt(iMin, 2)} dk`, slow ? E('span', { class: 'mut' }, ' ⚠ çevrimden uzun') : null), miss ? chip('EKSİK STANDART', 'bad') : E('b', { class: 'num', 'data-testid': 'pw-calc-machine' }, `${fmt(x.minutes, 2)} dk`), E('div', { class: 'mut' }, pin ? ['OP_SETUP_MIN', 'OP_CYCLE_SEC', 'OP_INSPECTION_SEC'].map((k, i) => `${['Hazırlık', 'Çevrim', 'Muayene'][i]} ${pin.params[k]?.versionNo ? `v${pin.params[k].versionNo}` : NA}`).join(' · ') : ''));
+                    return E('div', { class: 'r calcg', 'data-testid': 'pw-calc-op', 'data-state': miss ? 'MISSING' : 'OK' }, E('div', {}, E('b', {}, opLabel(x)), ' ', x.name ?? ''), E('div', { class: 'num' }, lbl('Hazırlık (parti başına)', ''), sMin === null ? NA : `${fmt(sMin)} dk`), E('div', { class: 'num' }, lbl('CNC çevrimi', ''), cMin === null ? NA : `${fmt(cMin, 2)} dk`), E('div', { class: 'num', 'data-testid': 'pw-calc-quality' }, lbl('Kalite muayenesi (paralel)', ''), iMin === null ? NA : `${fmt(iMin, 2)} dk`, slow ? E('span', { class: 'mut' }, ' ⚠ çevrimden uzun') : null), miss ? chip('EKSİK STANDART', 'bad') : E('b', { class: 'num', 'data-testid': 'pw-calc-machine' }, `${fmt(x.minutes, 2)} dk`), E('div', { class: 'mut' }, pin ? ['OP_SETUP_MIN', 'OP_CYCLE_SEC', 'OP_INSPECTION_SEC'].map((k, i) => `${['Hazırlık', 'Çevrim', 'Muayene'][i]} ${pin.params[k]?.versionNo ? `v${pin.params[k].versionNo}` : NA}`).join(' · ') : ''));
                 };
                 out.replaceChildren(...[E('div', { class: 'row', style: 'gap:8px' }, chip(e.complete ? `Makine süresi ${fmt(e.totalMinutes)} dk` : `EKSİK VERİ — kısmi ${fmt(e.partialMinutes)} dk (toplam hesaplanamadı)`, e.complete ? 'ok' : 'warn', { 'data-testid': 'pw-calc-total', 'data-complete': String(e.complete) }), ...(e.totalQualityMinutes != null ? [chip(`Kalite muayene yükü ${fmt(e.totalQualityMinutes)} dk · CNC ile paralel`, 'info', { 'data-testid': 'pw-calc-quality-total' })] : []), E('span', { class: 'mut' }, `${q} adet · henüz kaydedilmedi`)),
-                    missing.length ? E('div', { class: 'banner bad', style: 'margin-top:8px' }, `Hesaplanamayan operasyon: ${missing.map((m) => m.opCode ?? `OP${m.opNo}`).join(', ')} — hazırlık veya çevrim standardı girilmemiş. Sonuç 0 kabul edilmedi.`) : null,
+                    missing.length ? E('div', { class: 'banner bad', style: 'margin-top:8px' }, `Hesaplanamayan operasyon: ${missing.map((m) => opLabel(m)).join(', ')} — hazırlık veya çevrim standardı girilmemiş. Sonuç 0 kabul edilmedi.`) : null,
                     E('div', { class: 'rows', style: 'margin-top:8px' }, E('div', { class: 'r hd calcg' }, E('span', {}, 'Operasyon'), E('span', {}, 'Hazırlık'), E('span', {}, 'CNC çevrimi'), E('span', {}, 'Kalite (paralel)'), E('span', {}, 'Makine süresi'), E('span', {}, 'Kullanılan parametre sürümü')), ...ops.map(row)),
                     E('div', { class: 'mut', style: 'margin-top:6px' }, String(e.formula ?? ''))].filter(Boolean));
             }
@@ -836,13 +836,40 @@ export async function renderProductWorkspaceScreen(container, api, state = {}) {
             queueMicrotask(refresh);
             return E('div', { class: 'formbox', 'data-testid': 'pw-bom-form' }, E('b', {}, m.kind === 'add' ? 'Yeni BOM satırı' : m.kind === 'edit' ? `Satırı düzenle: ${m.code}` : `Satırı kaldır: ${m.code}`), E('div', { class: 'mut', 'data-testid': 'pw-bom-ctx' }, `${ws.product.code} · ${rev ? `Rev ${rev.revision} · ${REV_TR[rev.status]}` : ''}${ws.product.material ? ` · ürün kartı malzemesi: ${ws.product.material}` : ''}. Stok eşleşmesi bu ekranda doğrulanmaz; stok ayrılmaz.`), m.kind === 'remove' ? E('div', { class: 'mut' }, 'Satır taslak revizyondan kaldırılır; değişiklik geçmişte kalır.') : E('div', {}, dl, E('div', { class: 'fgrid' }, field('Malzeme', code, mats.length ? 'Ürün kartındaki malzeme önerilir; başka malzeme de yazılabilir.' : undefined), field('Hammadde tipi', type), field('Fire % (isteğe bağlı)', sc)), qFld, barBox), field('Değişiklik notu', reason, 'Kayıt ürün geçmişine yazılır; hazır bir not önerilir, isterseniz değiştirin.'), E('div', { class: 'row' }, btn(m.kind === 'remove' ? 'danger' : 'primary', m.kind === 'add' ? 'pw-bom-add' : m.kind === 'edit' ? 'pw-bom-row-save' : 'pw-bom-row-del', m.kind === 'remove' ? 'Kaldır' : 'BOM taslağını kaydet', () => void submit()), btn('ghost', null, 'Vazgeç', () => { bomMode = null; drawBom(); })));
         };
+        // K03: yururlukteki revizyonda eksik kesim toleransini yetkili kisi tamamlar (Rev B acilmaz; yalniz bos tolerans, kesim boyu/BOM/rota degismez)
+        function drawTolComplete() {
+            if (!rev || rev.status !== 'RELEASED' || !can.manageBom || bomEditable) return null;
+            const cand = ws.bom.filter((b) => specOf(b.materialCode));
+            if (!cand.length) return null;
+            const host = E('div', { 'data-testid': 'pw-tol-complete', class: 'formbox', style: 'margin-top:10px' }, E('span', { class: 'mut' }, 'Kesim toleransı okunuyor…'));
+            void (api.barTolerances ? api.barTolerances(rev.id) : Promise.resolve([])).then((rows) => {
+                const missing = rows.length ? rows.some((x) => x.cut_tol_plus_mm == null || x.cut_tol_minus_mm == null) : true;
+                if (!missing) { host.replaceChildren(E('b', {}, 'Kesim toleransı (mühendislik)'), E('div', { class: 'mut', 'data-testid': 'pw-tol-complete-done' }, `Tanımlı: +${rows[0].cut_tol_plus_mm} / −${rows[0].cut_tol_minus_mm} mm · kaynak: ${rows[0].cut_tol_source ?? '—'} · yürürlükteki revizyonda değiştirilemez (yeni revizyon gerekir).`)); return; }
+                const code = h('select', { 'data-testid': 'pw-tol-complete-code', 'aria-label': 'Malzeme' }, ...cand.map((b) => h('option', { value: b.materialCode }, `${b.materialCode} · kesim ${fmtMm(specOf(b.materialCode).cutLengthMm)} mm`)));
+                const tp = h('input', { 'data-testid': 'pw-tol-complete-plus', inputmode: 'decimal', placeholder: 'Üst tolerans + mm' });
+                const tm = h('input', { 'data-testid': 'pw-tol-complete-minus', inputmode: 'decimal', placeholder: 'Alt tolerans − mm' });
+                const ts = h('input', { 'data-testid': 'pw-tol-complete-src', placeholder: 'Teknik resim no / revizyon (zorunlu)' });
+                const why = reasonBox('pw-tol-complete-reason', 'Gerekçe (en az 5 karakter)');
+                const save = async () => {
+                    const a = num(val(tp)), b2 = num(val(tm));
+                    if (a === null || b2 === null || val(ts).trim().length < 3 || val(why).trim().length < 5) { fail(new Error('Üst ve alt tolerans, teknik resim no/revizyonu ve gerekçe zorunlu. Değeri mühendislik belirler.')); return; }
+                    try { await api.cutToleranceComplete(rev.id, val(code), a, b2, val(ts).trim(), val(why).trim()); await reload('Kesim toleransı kaydedildi. Rev A aynı kaldı; kesim boyu, BOM ve rota değişmedi.'); }
+                    catch (e) { fail(e); }
+                };
+                host.replaceChildren(E('b', {}, 'Kesim toleransı eksik — mühendislik tamamlar'), E('div', { class: 'mut' }, 'Rev A yürürlükte kalır; yalnız boş tolerans alanı doldurulur. Değer mühendislikten gelir, tolerans yokken kalite PASS verilmez.'),
+                    E('div', { class: 'fgrid' }, field('Malzeme', code), field('Üst tolerans + (mm)', tp), field('Alt tolerans − (mm)', tm), field('Teknik resim / revizyon', ts), field('Gerekçe', why)), btn('primary sm', 'pw-tol-complete-save', 'Toleransı kaydet', save));
+            }).catch(() => host.replaceChildren());
+            return host;
+        }
         function drawBom() {
             const revTone = (rev ? { DRAFT: 'info', RELEASED: 'ok', OBSOLETE: 'off' }[rev.status] : '') ?? '';
+            const tolDone = drawTolComplete();
             bomHost.replaceChildren(...[
                 ws.bom.length ? E('div', { class: 'row', style: 'margin-bottom:6px', 'data-testid': 'pw-bom-saved-badge' }, chip('KAYITLI BOM', 'ok'), E('span', { class: 'mut' }, 'Aşağıdaki satırlar kaydedilmiştir. Forma girilenler “BOM taslağını kaydet” denmeden kayıt olmaz.')) : null,
                 ws.bom.length ? E('div', { class: 'rows' }, E('div', { class: 'r hd bomg' }, E('span', {}, 'Malzeme kodu'), E('span', {}, 'Miktar / ürün'), E('span', {}, 'Fire %'), E('span', {}, 'Durum'), E('span', { class: 'acts' }, bomEditable ? 'İşlem' : '')), ...ws.bom.map((b) => E('div', { class: 'r bomg', 'data-testid': 'pw-bom-row', 'data-code': b.materialCode }, E('b', {}, b.materialCode), E('span', { class: 'num' }, lbl('Miktar', ''), specOf(b.materialCode) ? `Ø${fmtMm(specOf(b.materialCode).diaMm)} çubuk · ${specOf(b.materialCode).plan.piecesPerBar} parça/çubuk` : `${fmt(b.qtyPerUnit)} adet/ürün`), E('span', { class: 'num' }, lbl('Fire', ''), b.scrapAllowancePct != null ? `%${fmt(b.scrapAllowancePct)}` : NA), E('span', {}, chip(rev ? REV_TR[rev.status] ?? rev.status : '—', revTone)), E('div', { class: 'acts' }, bomEditable ? [btn('ghost sm', 'pw-bom-row-edit', 'Düzenle', () => { bomMode = { kind: 'edit', code: b.materialCode }; drawBom(); }), btn('danger sm', 'pw-bom-row-remove', 'Kaldır', () => { bomMode = { kind: 'remove', code: b.materialCode }; drawBom(); })] : null))))
                     : emptyState(`${NA} — bu revizyonda BOM yok`, bomEditable ? '“+ Satır ekle” ile ilk malzemeyi tanımlayın. Eksik kalırsa ürün hazırlığı tamamlanmış sayılmaz.' : 'BOM, taslak revizyonda tanımlanır.'),
                 bomPanel(), bomEditable ? null : E('div', { class: 'mut', 'data-testid': 'pw-bom-note', style: 'margin-top:10px' }, !can.manageBom ? 'BOM düzenleme yetkiniz yok.' : rev?.status === 'RELEASED' ? 'Yürürlükteki revizyonun BOM’u teknik veridir: değişiklik için yeni (taslak) revizyon açın — kaynak aynı BOM’dur, ikinci reçete oluşmaz.' : '')
+                , tolDone
             ].filter(Boolean));
         }
         const bomCard = card({ title: 'BOM', testid: 'pw-card-bom', span: 12, id: 'card-bom', chip: stateChip(ws.bom.length ? (rev?.state ?? 'MISSING') : 'MISSING'), actions: [bomEditable && !bomMode ? btn('primary sm', 'pw-bom-open-add', '+ Satır ekle', () => { bomMode = { kind: 'add' }; drawBom(); }) : null] }, bomHost, barHost, E('div', { class: 'kx-foot' }, h('a', { href: `#/urun-master?urun=${ws.product.id}` }, 'Yeni revizyon / BOM taslağı / yayın: Ürün Master')));
@@ -859,7 +886,7 @@ export async function renderProductWorkspaceScreen(container, api, state = {}) {
         if (rev)
             void drawControlPlan(cpHost, api, { revisionId: rev.id, opNos: ws.routing.filter((x) => x.active).map((x) => x.opNo), showErr: fail, onChanged: (m) => reload(m) });
         const qualityCard = card({ title: 'Kalite planı', testid: 'pw-card-quality', span: 5, id: 'card-quality', chip: stateChip(ws.quality.length ? (rev?.state ?? 'MISSING') : 'MISSING') }, ws.quality.length ? E('div', { class: 'rows' }, ...ws.quality.map((q) => {
-            const linked = ws.routing.flatMap((o) => o.qcPoints.filter((p) => p.controlPlanId === q.id).map((p) => `${o.opCode} KN${p.pointNo}`));
+            const linked = ws.routing.flatMap((o) => o.qcPoints.filter((p) => p.controlPlanId === q.id).map((p) => `${opLabel(o)} KN${p.pointNo}`));
             return E('div', { class: 'r', style: 'grid-template-columns:minmax(0,1fr) auto', 'data-testid': 'pw-plan', 'data-linked': String(linked.length) }, E('div', {}, E('b', {}, q.operationNo != null ? `OP${q.operationNo}` : 'Genel'), ` · v${q.version} · ${q.status}`, E('div', { class: 'mut' }, `${q.characteristics} karakteristik`)), chip(linked.length ? `Bağlı: ${linked.join(', ')}` : 'Operasyona bağlı değil', linked.length ? 'ok' : 'warn'));
         })) : emptyState(`${NA} — kontrol planı yok`, 'Kontrol planı Kalite’de hazırlanır.'), (() => { const miss = ws.routing.filter((o) => o.qcPoints.length === 0).map((o) => o.opCode); return miss.length ? E('div', { class: 'banner', 'data-testid': 'pw-quality-missing' }, `Kalite noktası eksik: ${miss.join(', ')} — operasyonu açıp mevcut kontrol planından bir nokta bağlayın.`) : E('div', { class: 'mut', 'data-testid': 'pw-quality-missing' }, 'Tüm operasyonların kalite noktası bağlı.'); })(), cpHost, E('div', { class: 'mut', style: 'margin-top:10px' }, 'Onaylanan kontrol planı yürürlüğe girer ve operasyonun kalite noktasına otomatik bağlanır (revizyon taslakken). Eksik ölçü varsa onay verilmez.'), E('div', { class: 'kx-foot' }, h('a', { href: '#/kalite' }, 'Kontrol planı düzenleme: Kalite')));
         // ---------------------------------------------------------------------------------------- parametreler
@@ -943,8 +970,8 @@ export async function renderProductWorkspaceScreen(container, api, state = {}) {
                 return;
             }
             try {
-                await api.setActive(o.id, active, `Taslak düzenleme: ${o.opCode} ${active ? 'etkinleştirildi' : 'pasife alındı'}`);
-                await reload(active ? `${o.opCode} etkinleştirildi.` : `${o.opCode} pasife alındı (silinmez, geçmişi korunur).`);
+                await api.setActive(o.id, active, `Taslak düzenleme: ${opLabel(o)} ${active ? 'etkinleştirildi' : 'pasife alındı'}`);
+                await reload(active ? `${opLabel(o)} etkinleştirildi.` : `${opLabel(o)} pasife alındı (silinmez, geçmişi korunur).`);
             }
             catch (e) {
                 fail(e);
