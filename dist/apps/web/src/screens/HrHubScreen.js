@@ -1,11 +1,12 @@
 // KMI NEXT — İK Merkezi (çalışan görünümü + yönetim görünümü). Veri yalnız hrApi RPC'lerinden gelir; hata metni sunucudan aynen (errorText) gösterilir.
 // Çalışan sekmeleri: Pasaportum, Puantajım, Performansım & Prim, Zirvedekiler. Yönetim sekmeleri yalnız yetkiliye görünür (sunucu yine kontrol eder).
+import { humanError } from '../errorText.js';
 import { h, mount } from '../../../../packages/ui/src/h.js';
 import { learnBody } from './HrLearnScreen.js';
 const CSS = `.hrh{padding:0 16px;box-sizing:border-box;max-width:100%;color:#e2e8f0}.hrh h1{color:#fff;font-size:20px}.hrh .tabs{display:flex;gap:6px;flex-wrap:wrap;margin:8px 0}.hrh button{min-height:44px;border-radius:10px;border:0;background:#1e293b;color:#e2e8f0;font-weight:700;padding:0 14px}.hrh button.on{background:#1d4ed8;color:#fff}.hrh .card{border:1px solid #1e293b;border-radius:14px;padding:12px 14px;margin:10px 0;background:#0f172a;overflow-wrap:anywhere}.hrh table{width:100%;border-collapse:collapse;font-size:13px}.hrh td,.hrh th{padding:6px 4px;border-bottom:1px solid #1e293b;text-align:left}.hrh .err{color:#fca5a5;font-weight:700}.hrh .mut{color:#94a3b8;font-size:12px}.hrh input,.hrh select{min-height:44px;border-radius:8px;border:1px solid #334155;background:#0b1220;color:#e2e8f0;padding:0 8px;max-width:100%;box-sizing:border-box}.hrh .pod{display:flex;gap:8px;align-items:flex-end;justify-content:center;margin:10px 0}.hrh .pod>div{flex:1 1 0;min-width:0;text-align:center;border-radius:10px 10px 0 0;padding:8px 4px;background:#1e293b}.hrh .pod .p1{background:linear-gradient(180deg,#facc15,#a16207);color:#111;min-height:90px}.hrh .pod .p2{background:linear-gradient(180deg,#cbd5e1,#64748b);color:#111;min-height:70px}.hrh .pod .p3{background:linear-gradient(180deg,#d97706,#78350f);min-height:56px}`;
 const monthNow = () => new Date().toISOString().slice(0, 7);
 const prevMonth = () => { const d = new Date(); d.setMonth(d.getMonth() - 1); return d.toISOString().slice(0, 7); };
-const errText = (e) => (e && (e.message || e.error || String(e))) || 'Hata';
+const errText = (e) => (e ? humanError(String(e.message || e.error || e), e.code) : 'Hata');
 const fmtMin = (m) => `${Math.floor((m || 0) / 60)} sa ${(m || 0) % 60} dk`;
 export async function renderHrHubScreen(container, api, state = {}) {
     const tab = state.tab || 'pasaport';

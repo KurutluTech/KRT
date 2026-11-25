@@ -76,7 +76,7 @@ export async function renderEconomicsScreen(container, api, state) {
         [ov, board] = await Promise.all([api.overview(state.from, state.to), api.board()]);
     }
     catch (err) {
-        loadError = errText(err);
+        loadError = refusalText(errText(err));
     }
     const go = (patch) => void renderEconomicsScreen(container, api, { ...state, error: null, notice: null, unbindOpen: false, ...patch });
     const shell = (...children) => mount(container, h('div', { class: 'economics-screen', style: 'padding:0 16px;box-sizing:border-box;max-width:100%' }, h('h1', { 'data-testid': 'eco-heading' }, 'Ekonomi & Yönetim Kararları'), ...children));

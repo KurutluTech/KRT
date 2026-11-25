@@ -1,9 +1,10 @@
 // KMI NEXT — Ücret Yönetimi: Maaş Excel Yükle sihirbazı. Excel TARAYICIDA okunur; dosya sunucuya gönderilmez.
 // Sunucuya yalnız KULLANICININ EŞLEDİĞİ sütunlar gider (TC no, IBAN, adres vb. okunmaz). Yetki/RLS sunucuda; arayüz gizlemesi ek önlemdir.
+import { humanError } from '../errorText.js';
 import { h } from '../../../../packages/ui/src/h.js';
 import { openXlsx, sha256Hex } from '../xlsxReader.js';
 import { IDENT, COMPONENTS, detectHeaderRow, periodFromSheetName, suggestMapping, buildRows, errorReportCsv } from '../costPayLib.js';
-const errText = (e) => (e && (e.message || e.error || String(e))) || 'Hata';
+const errText = (e) => (e ? humanError(String(e.message || e.error || e), e.code) : 'Hata');
 const STATUS_TR = { MATCHED: 'Eşleşti', MANUAL: 'Elle onaylandı', NEEDS_REVIEW: 'Onay bekliyor', AMBIGUOUS: 'Birden fazla kişiye uyuyor', UNMATCHED: 'Eşleşmedi', SKIPPED: 'Atlandı' };
 const ISSUE_TR = { EMPNO_NOT_FOUND: 'Sicil no sistemde yok', EMPNO_NAME_MISMATCH: 'Sicil no ile ad uyuşmuyor', EMPNO_NOT_UNIQUE: 'Sicil no birden çok kişide', NAME_ONLY_NEEDS_CONFIRM: 'Yalnız ad eşleşti: onay gerekli', NAME_NOT_UNIQUE: 'Aynı isimde birden çok personel', NO_MATCH: 'Ad hiçbir personelle eşleşmedi', NO_IDENTITY: 'Sicil ve ad yok', DUPLICATE_IN_FILE: 'Aynı kişi dosyada birden çok satırda', NEGATIVE_AMOUNT: 'Negatif tutar', INVALID_AMOUNT: 'Tutar okunamadı', AMOUNT_IMPLAUSIBLE: 'Tutar makul aralığın dışında', NO_PAY_AMOUNT: 'Net/brüt/işveren maliyeti yok', UNKNOWN_COMPONENT: 'Bilinmeyen alan', MISSING_AMOUNT: 'Boş tutar', MANUAL_CONFIRMED: 'Elle onaylandı' };
 const money = (v) => (v === null || v === undefined || v === '' ? '' : Number(v).toLocaleString('tr-TR', { maximumFractionDigits: 2 }));

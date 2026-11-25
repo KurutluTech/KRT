@@ -91,9 +91,9 @@ a{color:var(--kmi-cyan2)}
 .kmi-nav a[aria-current=page] .ic{color:var(--kmi-gold2)}
 .kmi-side.collapsed{width:84px}
 .kmi-side.collapsed .kmi-panel{display:none}.kmi-side.collapsed.peek{width:340px;z-index:55;box-shadow:12px 0 40px rgba(0,0,0,.5)}.kmi-side.collapsed.peek .kmi-panel{display:block}
-.kmi-side.collapsed .t,.kmi-side.collapsed .lbl,.kmi-side.collapsed .nl{display:none}
+.kmi-side.collapsed:not(.peek) .t,.kmi-side.collapsed:not(.peek) .lbl,.kmi-side.collapsed:not(.peek) .nl{display:none}
 .kmi-side.collapsed .kmi-side-head{flex-direction:column;padding:10px 6px}
-.kmi-side.collapsed .kmi-nav a{justify-content:center;padding:6px}
+.kmi-side.collapsed:not(.peek) .kmi-nav a{justify-content:center;padding:6px}
 .kmi-main{min-height:100vh}
 .kmi-content{padding:16px;max-width:1500px;margin:0 auto}
 .kmi-content>*{max-width:100%}

@@ -1,3 +1,4 @@
+import { humanError } from './errorText.js';
 import { createTerminalApi } from './terminalApi.js';
 const wo = (w) => ({ workOrderId: w.workOrderId, status: w.status, productCode: w.productCode, qtyPlanned: w.qtyPlanned, qtyProduced: w.qtyProduced, qtyScrap: w.qtyScrap ?? 0, operatorName: w.operatorName ?? null, plannedDate: w.plannedDate ?? null, openQualityHold: !!w.openQualityHold, startRefusal: w.startRefusal ?? null, ...(w.isPilot ? { isPilot: true } : {}) });
 const op = (o) => ({ operationId: o.operationId, workOrderId: o.workOrderId, opNo: o.opNo, name: o.name, productCode: o.productCode, status: o.status ?? null, qtyIn: o.qtyIn, qtyGood: o.qtyGood ?? 0, qtyScrap: o.qtyScrap ?? 0, qtyTashih: o.qtyTashih ?? null, operatorName: o.operatorName ?? null, startedAt: o.startedAt ?? null, stale: !!o.staleReason });
@@ -69,7 +70,7 @@ export function createProductionDeskApi(c, s) {
                     return { machineId: m.machineId, code: sn.machine.code, name: sn.machine.name, label: sn.machine.label, eligible: sn.machine.eligible, returnPath: sn.machine.returnPath, reason: sn.machine.reason, status: sn.machine.status ?? mr?.status ?? null, machineClass: mr?.machineClass ?? null, cnc: row, cncDenied: denied, stateSince, shift, routed: (sn.routedActive ?? []).map(op), active: sn.active ? wo(sn.active) : null, queue: sn.queue.map(wo), error: null };
                 }
                 catch (e) {
-                    return { machineId: m.machineId, code: m.code, name: m.name, label: null, eligible: false, returnPath: null, reason: null, status: mr?.status ?? null, machineClass: mr?.machineClass ?? null, cnc: cnc.get(m.code) ?? null, cncDenied: denied, active: null, queue: [], error: e instanceof Error ? e.message : 'okunamadı' };
+                    return { machineId: m.machineId, code: m.code, name: m.name, label: null, eligible: false, returnPath: null, reason: null, status: mr?.status ?? null, machineClass: mr?.machineClass ?? null, cnc: cnc.get(m.code) ?? null, cncDenied: denied, active: null, queue: [], error: e instanceof Error ? humanError(e.message, e.code) : 'okunamadı' };
                 }
             }));
         },

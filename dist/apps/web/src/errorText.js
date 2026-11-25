@@ -200,6 +200,17 @@ const BUSINESS_TR = [
     [/^PRODUCT_REQUIRED/, 'Siparişe dönüştürmeden önce her kalem bir ürüne bağlanmalıdır.'],
     [/^QUOTE_EXPIRED/, 'Teklifin geçerlilik süresi dolmuş. Yeni revizyonla süreyi güncelleyin.'],
     [/^DUPLICATE_CUSTOMER_PO/, 'Bu müşteri için aynı sipariş numarası (PO) zaten kullanılmış.'],
+    // --- S (G 830/850 yeni iş kodları; hata sözleşmesi: SQLSTATE + "^İŞ_KODU[: ayrıntı]") ---
+    [/^DUPLICATE_CUSTOMER_CODE/, 'Bu müşteri kodu zaten kayıtlı. Mevcut müşteriyi açın; aynı kodla ikinci müşteri açılmaz.'],
+    [/^DUPLICATE_CAM_PROGRAM/, 'Bu revizyon için aynı program numarası ve revizyon zaten kayıtlı. Mevcut programı açın.'],
+    [/^CAM_PROGRAM_TOOL_DUPLICATE/, 'Bu CAM programına aynı takım tipi zaten eklenmiş. Mevcut satırın adedini düzenleyin.'],
+    [/^DUPLICATE_TOOL_CODE/, 'Bu takım kodu zaten kayıtlı. Aynı fiziksel takım ikinci kez kaydedilemez; mevcut takımı açın.'],
+    [/^PROGRAM_NO_REQUIRED/, 'Program numarası zorunludur.'],
+    [/^REVISION_REQUIRED\s*$/, 'Revizyon bilgisi zorunludur.'],
+    [/^REVISION_NOT_FOUND/, 'Revizyon bulunamadı (silinmiş olabilir). Sayfayı yenileyin.'],
+    [/^TOOL_CODE_REQUIRED/, 'Takım kodu zorunludur.'],
+    [/^TOOL_TYPE_REQUIRED/, 'Takım tipi zorunludur.'],
+    [/^TOOL_LIFE_RATED_INVALID/, 'Nominal ömür 0 ile 1.000.000 dakika arasında olmalıdır.'],
     [/^CUSTOMER_PO_REQUIRED/, 'Müşteri sipariş numarası (PO) zorunludur.'],
     [/^PRICE_MISSING/, 'Her miktar kademesi için fiyat girilmelidir. Fiyat bilinmiyorsa teklif gönderilemez.'],
     [/^COST_UNKNOWN/, 'Maliyet henüz hesaplanamadı (eksik veri var). Önce eksikleri tamamlayıp maliyeti hesaplayın.'],
@@ -214,9 +225,10 @@ const BUSINESS_TR = [
     [/^TITLE_REQUIRED/, 'Talep başlığı zorunludur.'],
     [/^PART_NAME_REQUIRED/, 'Her kalem için parça adı zorunludur.'],
     [/^QTY_TIERS_INVALID|^QTY_NOT_A_QUOTED_TIER/, 'Miktarlar sıfırdan büyük sayılar olmalı ve teklifteki kademelerden biri olmalıdır (örn. 10, 100, 500).'],
-    [/^CUSTOMER_NOT_FOUND/, 'Müşteri seçilmelidir.'],
+    [/^CUSTOMER_NOT_FOUND/, 'Müşteri seçilmemiş veya bulunamadı (silinmiş / pasif olabilir). Listeden bir müşteri seçin; gerekirse sayfayı yenileyin.'],
     [/^(?:RECEIVED_ON_REQUIRED|RESPOND_BY_BEFORE_RECEIVED)/, 'Alındığı tarih zorunludur; cevap tarihi alındığı tarihten önce olamaz.'],
-    [/^(?:PRODUCT_NOT_FOUND|REVISION_PRODUCT_MISMATCH|PRODUCT_ALREADY_LINKED)/, 'Ürün seçimi geçersiz veya kalem zaten bir ürüne bağlı.'],
+    [/^PRODUCT_NOT_FOUND/, 'Ürün seçilmemiş veya bulunamadı (silinmiş olabilir). Listeden bir ürün seçin; gerekirse sayfayı yenileyin.'],
+    [/^(?:REVISION_PRODUCT_MISMATCH|PRODUCT_ALREADY_LINKED)/, 'Ürün seçimi geçersiz veya kalem zaten bir ürüne bağlı.'],
     [/^(?:UNIT_PRICE_REQUIRED|MARGIN_INVALID|BASIS_INVALID)/, 'Fiyat için birim fiyat (elle) veya marj yüzdesi (maliyet+marj) geçerli sayı olmalıdır.'],
     [/^(?:LINES_REQUIRED|NO_LINES)/, 'Önce en az bir kalem ekleyin.'],
     [/^(?:DESCRIPTION_REQUIRED)/, 'Kalem açıklaması zorunludur.'],
@@ -331,7 +343,32 @@ const BUSINESS_TR = [
     [/Invalid schema|PGRST106|schema must be one of/i, 'Sunucu ayarı eksik: veri şeması (kmi_next) Supabase API ayarında açık değil. Sistem yöneticisine bildirin; bu bir kullanıcı hatası değildir.'],
 ];
 export const SETUP_PENDING_TR = 'Kurulum bekleniyor: bu bölümün veritabanı kurulumu henüz yapılmadı. Mevcut kayıtlarınız etkilenmedi; kurulum tamamlanınca bu bölüm açılır.';
-export function humanError(raw) {
+export const PERMISSION_DENIED_TR = 'Bu işlem veya bu veri için erişim yetkiniz yok. Gerekiyorsa yöneticinize başvurun. [YETKİ_YOK]';
+export const GENERIC_SAFE_TR = 'İşlem tamamlanamadı (sunucu hatası). Tekrar deneyin; sürerse yöneticinize bildirin.';
+export const KIOSK_UNAVAILABLE_TR = 'Bu ekran şu an açılamıyor. Ekran anahtarını veya erişim ayarını yöneticinizle kontrol edin.';
+export const OFFLINE_TR = 'Sunucuya ulaşılamadı. Bağlantıyı kontrol edip tekrar deneyin.';
+// SQLSTATE -> güvenli Türkçe metin (ham PostgreSQL / PostgREST / RLS metni ASLA kullanıcıya gösterilmez).
+const SQLSTATE_TR = [
+    [/^42501$/, PERMISSION_DENIED_TR],
+    [/^23505$/, 'Bu kayıt zaten var (aynı değerle ikinci kayıt açılamaz). Mevcut kaydı açın. [HATA 23505]'],
+    [/^23503$/, 'Bu kayıt başka kayıtlarla ilişkili olduğu için işlem yapılamadı. [HATA 23503]'],
+    [/^23502$/, 'Zorunlu bir alan boş bırakılmış. Alanları kontrol edin. [HATA 23502]'],
+    [/^23514$/, 'Girilen değer izin verilen sınırların dışında. Alanları kontrol edin. [HATA 23514]'],
+    [/^22\w{3}$/, 'Girilen değer geçersiz biçimde. Alanları kontrol edin. [HATA 22]'],
+    [/^(?:40001|40P01)$/, 'Aynı anda başka bir işlem aynı kaydı değiştirdi. Sayfayı yenileyip tekrar deneyin. [HATA 40]'],
+    [/^57014$/, 'İşlem çok uzun sürdü ve durduruldu. Tekrar deneyin. [HATA 57014]'],
+];
+// Ham veritabanı / PostgREST metni belirtileri: bunlar kullanıcıya gösterilmez.
+const RAW_DB_TEXT = /permission denied|violates (?:row-level security|foreign key|unique|check|not-null)|row-level security|duplicate key value|null value in column|invalid input (?:syntax|value)|(?:relation|column|function|schema|table|type|role|policy|constraint|trigger|operator) ["']?[\w.]+["']?[^.]{0,40}(?:does not exist|already exists)|does not exist|syntax error|could not serialize|deadlock detected|canceling statement|value too long|out of range|division by zero|current transaction is aborted|JWT|PGRST\d{3}|SQLSTATE|\bkmi_next\b|\bpublic\.[a-z_]+|\bpg_[a-z_]+|violates\b|ERROR:\s|\bDETAIL:|\bCONTEXT:|\bHINT:/i;
+/** Ham veritabanı metni mi? (iş kodu `^[A-Z][A-Z0-9_]+` ve düz Türkçe uygulama metinleri ham sayılmaz.) */
+export function looksLikeRawDbText(raw) {
+    const r = String(raw ?? '').trim();
+    if (/^[A-Z][A-Z0-9_]{2,}(?::|\s|$)/.test(r) && !/^(?:ERROR|DETAIL|HINT|CONTEXT|PGRST\d|JWT)/.test(r))
+        return false; // iş kodu sözleşmesi (örn. SELF_APPROVAL_NOT_ALLOWED)
+    return RAW_DB_TEXT.test(r);
+}
+export function humanError(raw, code) {
+    raw = String(raw ?? '');
     if (/Could not find the function|PGRST202|PGRST205|schema cache|unknown rpc/i.test(raw))
         return SETUP_PENDING_TR;
     if (/^REFRESH_UNAVAILABLE$/.test(raw.trim()))
@@ -347,12 +384,26 @@ export function humanError(raw) {
     }
     if (raw === 'UNAUTHENTICATED')
         return 'Oturumunuz kapanmış. Lütfen yeniden giriş yapın. [UNAUTHENTICATED]';
+    // S-FE (NEW-W-01): PostgreSQL / RLS yetki hataları ham SQL metni olarak gösterilmez.
+    if (/^FORBIDDEN\b/.test(raw.trim()))
+        return `Bu işlem için yetkiniz yok. Yetki için yöneticinize başvurun. [${raw.trim().slice(0, 80)}]`;
+    if (/permission denied|violates row-level security policy|row-level security|^42501$/i.test(raw.trim()) || (code === '42501' && !/^[A-Z][A-Z0-9_]{3,}/.test(raw.trim())))
+        return PERMISSION_DENIED_TR;
     if (/Failed to fetch|NetworkError|Load failed|network/i.test(raw))
-        return 'Sunucuya ulaşılamadı. Bağlantıyı kontrol edip tekrar deneyin.';
+        return OFFLINE_TR;
+    if (/\bJWT\b|PGRST30[0-3]/.test(raw))
+        return 'Oturumunuz kapanmış veya süresi dolmuş. Lütfen yeniden giriş yapın. [OTURUM]';
+    // S-FE: eşlenmemiş ham veritabanı metni -> güvenli genel mesaj (SQLSTATE biliniyorsa sınıfına özgü metin)
+    const sc = typeof code === 'string' ? code.trim() : '';
+    if (looksLikeRawDbText(raw)) {
+        const hit = SQLSTATE_TR.find(([re]) => re.test(sc));
+        return hit ? hit[1] : `${GENERIC_SAFE_TR}${sc ? ` [HATA ${sc}]` : ''}`;
+    }
     return raw;
 }
 export function errorText(err) {
-    return humanError(err instanceof Error ? err.message : String(err));
+    const code = err && typeof err === 'object' && typeof err.code === 'string' ? err.code : undefined;
+    return humanError(err instanceof Error ? err.message : String(err), code);
 }
 /** True when the backend piece a screen needs is not installed yet (RPC/table/column missing), as opposed to a real failure.
  *  The screen then shows "Kurulum bekleniyor" instead of a broken page. Duck-typed on PostgrestError (status/code/message). */

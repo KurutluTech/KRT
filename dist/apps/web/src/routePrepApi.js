@@ -1,6 +1,6 @@
 // Rota hazırlık: CUT/PREP · operasyon makine/süre · uç payı · rotayı iş emrine uygula. Yetki/audit/revizyon kuralları sunucuda.
 import { auditedRpc } from './auditedRpc.js';
-import { isSetupPending } from './errorText.js';
+import { isSetupPending, humanError } from './errorText.js';
 export function createRoutePrepApi(client, session) {
     const call = (fn, args) => auditedRpc(client, fn, args, session);
     return {
@@ -16,7 +16,7 @@ export function createRoutePrepApi(client, session) {
             catch (e) {
                 if (isSetupPending(e)) return { state: 'setup_pending', rows: [] };
                 if (e?.status === 403 || e?.code === '42501' || /FORBIDDEN|permission denied/i.test(String(e?.message ?? ''))) return { state: 'denied', rows: [] };
-                return { state: 'error', rows: [], message: String(e?.message ?? e) };
+                return { state: 'error', rows: [], message: humanError(String(e?.message ?? e), e?.code) };
             }
         },
         workOrders: () => client.select('work_orders', { columns: 'id,status,product_revision_id,qty_planned', filters: { status: 'in.(PLANNED,MACHINE_ASSIGNED,ON_HOLD)' } }, session),

@@ -3,7 +3,7 @@
 import { h, mount } from '../../../../packages/ui/src/h.js';
 import { encodeQr, qrToSvg } from '../../../../packages/ui/src/qr.js';
 import { dateTr } from '../cardKit.js';
-import { errorText } from '../errorText.js';
+import { errorText, looksLikeRawDbText } from '../errorText.js';
 import { transferResultText, ASSET_FROM_KEY } from './AssetCenterScreen.js';
 import { CLASS_TR, DEPARTMENTS, EVENT_TR, KIND_TR, LIFECYCLE_TR, OPS_TR, TRANSFER_STATUS_TR, deptTr } from '../assetApi.js';
 const CSS = `
@@ -167,7 +167,7 @@ export async function renderAssetPassportScreen(container, id, deps) {
         say('ok', ok);
     }
     catch (e) {
-        say('error', e.message && !/[A-Z_]{6,}/.test(e.message) ? e.message : errorText(e));
+        say('error', e.message && !/[A-Z_]{6,}/.test(e.message) && !looksLikeRawDbText(e.message) ? e.message : errorText(e));
     } await load(); }
     async function runT(fn) { try {
         const r = transferResultText(await fn());

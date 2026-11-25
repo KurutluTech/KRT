@@ -1,9 +1,10 @@
 // KMI NEXT — İK Yönetimi: tüm yönetim işlemleri GERÇEK RPC'lerle (hrApi.call). Biçimler bildirimsel (PANELS); yetki kontrolü SUNUCUDA (FORBIDDEN aynen gösterilir),
 // arayüz ayrıca state.can (kullanıcının yetki kodları) verilirse yetkisiz panelleri gizler. Hiçbir tabloya doğrudan erişim yoktur.
+import { humanError } from '../errorText.js';
 import { h, mount } from '../../../../packages/ui/src/h.js';
 import { renderPayWizard } from './CostPayWizard.js';
 import qrcode from '../vendor/qrcode-generator.js';
-const errText = (e) => (e && (e.message || e.error || String(e))) || 'Hata';
+const errText = (e) => (e ? humanError(String(e.message || e.error || e), e.code) : 'Hata');
 const CSS = `.hra{padding:0 16px;box-sizing:border-box;max-width:100%;color:#e2e8f0}.hra h1{color:#fff;font-size:20px}.hra .tabs{display:flex;gap:6px;flex-wrap:wrap;margin:8px 0}.hra button,.hra select,.hra input,.hra textarea{min-height:44px;border-radius:10px;border:1px solid #334155;background:#1e293b;color:#e2e8f0;font-size:15px;padding:0 10px;box-sizing:border-box;max-width:100%}.hra textarea{padding:8px;min-height:80px;width:100%}.hra button{font-weight:700;border:0}.hra .on{background:#2563eb}.hra .card{background:#0f172a;border:1px solid #1e293b;border-radius:12px;padding:12px;margin:8px 0}.hra .mut{color:#94a3b8;font-size:13px;overflow-wrap:anywhere}.hra .card{overflow-wrap:anywhere}.hra .err{color:#fecaca;background:#7f1d1d;padding:10px;border-radius:10px;margin:8px 0}.hra .ok{color:#bbf7d0;background:#14532d;padding:10px;border-radius:10px;margin:8px 0}.hra .row{display:flex;flex-direction:column;gap:2px;margin:6px 0}.hra .tw{overflow-x:auto}.hra table{border-collapse:collapse;font-size:13px}.hra td,.hra th{border-bottom:1px solid #1e293b;padding:4px 8px;text-align:left;white-space:nowrap}.hra pre{white-space:pre-wrap;word-break:break-word;font-size:12px}`;
 const P = (name, label, extra = {}) => ({ name, label, type: 'text', ...extra });
 const REASON = P('reason', 'Gerekçe (en az 5 harf)', { required: true });

@@ -1,4 +1,5 @@
 // Makine pasaportu → "MTConnect Çevrim Analizi". Sunucu (op_cycle_estimate, m0182) karar verir; bu ekran yalnız gösterir ve eşleme kaydını yetkili kullanıcıya sunar.
+import { humanError, looksLikeRawDbText } from '../../errorText.js';
 import { h } from '../../../../../packages/ui/src/h.js';
 import { classifyCycle, estimateView, EXCL_TR } from '../../../../../packages/domain/src/cycleAnalysis.js';
 import { isDenied } from './common.js';
@@ -9,7 +10,7 @@ const fmt = (iso) => (iso ? dtf.format(new Date(iso)) : '—');
 const TONE_CSS = { ok: '#34d399', warn: '#fbbf24', bad: '#f87171' };
 const panel = (title, testid, ...kids) => h('section', { class: 'ps-panel', 'data-testid': testid }, h('div', { class: 'ps-panel-h' }, h('h2', {}, title)), ...kids.filter(Boolean));
 const small = (t, testid, extra = '') => h('div', { class: 'ps-ts', style: `margin:4px 0;${extra}`, ...(testid ? { 'data-testid': testid } : {}) }, t);
-const errMsg = (e) => String(e?.message ?? e).replace(/^[\s\S]*?(FORBIDDEN|EVIDENCE_REQUIRED|MACHINE_NOT_IN_OPERATION|CAM_PROGRAM_REQUIRED|CNC_DEVICE_NOT_BOUND|REASON_REQUIRED)/, '$1').slice(0, 220);
+const errMsg = (e) => (looksLikeRawDbText(String(e?.message ?? e)) ? humanError(String(e?.message ?? e), e?.code) : String(e?.message ?? e)).replace(/^[\s\S]*?(FORBIDDEN|EVIDENCE_REQUIRED|MACHINE_NOT_IN_OPERATION|CAM_PROGRAM_REQUIRED|CNC_DEVICE_NOT_BOUND|REASON_REQUIRED)/, '$1').slice(0, 220);
 export function cycleTopic(ctx, m) {
     return {
         id: 'cnc-cevrim', title: 'MTConnect Çevrim Analizi', icon: 'chart', group: 'CNC', summary: 'Medyan tahmin · örnek · güven · eşleme',

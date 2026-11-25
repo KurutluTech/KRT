@@ -1,8 +1,9 @@
 // KMI NEXT — Çalışan Academy görünümü: planlarım, dersler (PDF/video/metin), çoktan seçmeli sınav, beceri haritası, sertifikalar, rozetler.
 // Doğru cevap hiçbir zaman istemciye gelmez (sunucu hr_exam_attempt_view yalnız soru+seçenek etiketi döndürür). Sınav sayacı/süre sunucudadır.
+import { humanError } from '../errorText.js';
 import { h } from '../../../../packages/ui/src/h.js';
 import { renderBadgesScreen } from './BadgesScreen.js';
-const errText = (e) => (e && (e.message || e.error || String(e))) || 'Hata';
+const errText = (e) => (e ? humanError(String(e.message || e.error || e), e.code) : 'Hata');
 const KIND_TR = { PDF: 'PDF', VIDEO: 'Video', TEXT: 'Metin' };
 export async function learnBody(api, tab, state, go) {
     if (tab === 'akademi') {

@@ -1,3 +1,4 @@
+import { humanError } from './errorText.js';
 import { auditedRpc } from './auditedRpc.js';
 // KMI-MANAGEMENT-001 Onaylar adapter. NO new data source and NO new writer: it READS the canonical tables (commercial_approvals, purchase_requests,
 // purchase_orders, tasks) under their existing RLS and CALLS the existing canonical RPCs (grant_management_release / decide_commercial_approval /
@@ -38,7 +39,7 @@ export async function loadMaintenanceTests(client, session) {
         return { ...t, machineCode: mById.get(t.machineId)?.code ?? null, machineStatus: mById.get(t.machineId)?.status ?? null, lastResult: last ? last.result : null };
     });
 }
-const msg = (e) => (e instanceof Error ? e.message : String(e));
+const msg = (e) => humanError(e instanceof Error ? e.message : String(e), e?.code);
 export function createApprovalsInboxApi(client, session, opts = {}) {
     const on = { commercial: opts.sources?.commercial ?? true, requests: opts.sources?.requests ?? true, orders: opts.sources?.orders ?? true, maintenance: opts.sources?.maintenance ?? true, hist: !opts.light };
     const now = opts.now ?? (() => Date.now());

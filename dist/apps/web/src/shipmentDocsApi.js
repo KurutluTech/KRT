@@ -14,6 +14,5 @@ export function createShipmentDocsApi(client, session) {
         removeLot: (ship, lot) => rpc('shipment_remove_lot', { p_ship: ship, p_lot: lot }),
         saveDoc: (ship, type, no, qty) => rpc('shipment_doc_save', { p_ship: ship, p_type: type, p_doc_no: no, p_qty: qty }),
         decideDoc: (id, approve, reason) => rpc('shipment_doc_decide', { p_id: id, p_approve: approve, p_reason: reason }),
-        me: async () => (await client.rpc('current_user_id', {}, session).catch(() => null)),
     };
 }

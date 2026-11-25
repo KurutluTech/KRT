@@ -1,5 +1,6 @@
 // İş Emri Aç (/is-emri-ac?item=<sipariş kalemi>) — ön kontrol + AYRI kapılar: (1) yeni ana iş emri  (2) mevcut iş emrine rota uygula  (3) START (burada YOK).
 // Mevcut iş emri varsa "Mevcut iş emrine devam et" sunulur; ikinci ana iş emri açılmaz. Operatör ataması operasyon düzeyindedir ve yetkili yöneticinin açık onayını ister.
+import { humanError } from '../../errorText.js';
 import { h, mount } from '../../../../../packages/ui/src/h.js';
 import { DS_CSS, pill, stateBox } from '../../ds.js';
 import { buildPrecheck, operatorCandidates, opLabel, ACTIVE_WO, STATUS_LABEL } from './precheckModel.js';
@@ -7,7 +8,7 @@ import { buildPrecheck, operatorCandidates, opLabel, ACTIVE_WO, STATUS_LABEL } f
 const KIND = { OK: 'ok', MISSING: 'warn', WARN: 'warn', BLOCKED: 'bad', UNKNOWN: 'unknown' };
 const WO_TR = { PLANNED: 'Planlandı', MACHINE_ASSIGNED: 'Makine atandı', ON_HOLD: 'BEKLETMEDE', IN_PROGRESS: 'Üretimde', FIRST_PIECE_PENDING: 'İlk parça bekliyor', FIRST_PIECE_APPROVED: 'İlk parça onaylı', PRODUCTION_DONE: 'Üretim bitti', COMPLETED: 'Tamamlandı', CANCELLED: 'İptal' };
 const CSS = `.woa .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:12px}.woa table{width:100%;border-collapse:collapse}.woa td,.woa th{padding:6px 8px;border-bottom:1px solid #243049;text-align:left;vertical-align:top;font-size:13px}.woa .own{color:#94a3b8;font-size:12px}.woa .btn{min-height:44px;padding:8px 14px;border-radius:8px;border:1px solid #3b82f6;background:#1d4ed8;color:#fff;cursor:pointer}.woa .btn[disabled]{opacity:.45;cursor:not-allowed;background:#334155;border-color:#475569}.woa .gate{border:1px solid #243049;border-radius:10px;padding:12px;display:flex;flex-direction:column;gap:8px}.woa input,.woa select{min-height:40px;background:#0f172a;color:#e2e8f0;border:1px solid #334155;border-radius:6px;padding:4px 8px}`;
-const errText = (e) => { const m = `${e?.message ?? e ?? ''}`; const map = [[/EXCEEDS_OPEN_PRODUCTION_NEED/, 'Açık üretim ihtiyacını aşıyor — ikinci/ek iş emri açılamaz.'], [/FORBIDDEN/, 'Bu işlem için yetkiniz yok.'], [/ROUTING_INCOMPLETE[^]*OP(\d+)_beklenen_OP10/, 'Rota geçersiz: ilk operasyon OP10 olmalı (CUT/PREP varsa ondan sonra).'], [/ROUTING_DIVERGED/, 'İş emrindeki operasyonlar güncel rotadan farklı; otomatik değiştirilmedi.'], [/REVISION_NOT_RELEASED/, 'Revizyon yayınlanmış değil.'], [/WORK_ORDER_NOT_ELIGIBLE_FOR_ROUTING/, 'İş emri bu durumda rota almaz.'], [/REASON_REQUIRED/, 'Gerekçe (en az 3 karakter) zorunlu.']]; for (const [re, t] of map) if (re.test(m)) return t; return `İşlem başarısız: ${m.slice(0, 160)}`; };
+const errText = (e) => { const m = `${e?.message ?? e ?? ''}`; const map = [[/EXCEEDS_OPEN_PRODUCTION_NEED/, 'Açık üretim ihtiyacını aşıyor — ikinci/ek iş emri açılamaz.'], [/FORBIDDEN/, 'Bu işlem için yetkiniz yok.'], [/ROUTING_INCOMPLETE[^]*OP(\d+)_beklenen_OP10/, 'Rota geçersiz: ilk operasyon OP10 olmalı (CUT/PREP varsa ondan sonra).'], [/ROUTING_DIVERGED/, 'İş emrindeki operasyonlar güncel rotadan farklı; otomatik değiştirilmedi.'], [/REVISION_NOT_RELEASED/, 'Revizyon yayınlanmış değil.'], [/WORK_ORDER_NOT_ELIGIBLE_FOR_ROUTING/, 'İş emri bu durumda rota almaz.'], [/REASON_REQUIRED/, 'Gerekçe (en az 3 karakter) zorunlu.']]; for (const [re, t] of map) if (re.test(m)) return t; const hm = humanError(m, e?.code); return hm !== m ? hm : `İşlem başarısız: ${m.slice(0, 160)}`; };
 
 export async function renderWorkOrderOpen(el, deps) {
   const { client, session } = deps; const q = deps.query ?? new URLSearchParams(); const itemId = q.get('item');
@@ -58,7 +59,7 @@ export async function renderWorkOrderOpen(el, deps) {
   function paint() {
     const kids = [h('style', {}, DS_CSS + CSS), h('h1', { 'data-testid': 'woa-title' }, 'İş Emri Aç')];
     if (st.banner) kids.push(stateBox(st.banner.kind === 'ok' ? 'ok' : 'error', st.banner.text, '', 'woa-banner'));
-    if (st.error) { kids.push(stateBox('error', 'Veri okunamadı', String(st.error.message ?? st.error), 'woa-error')); root.replaceChildren(...kids); return; }
+    if (st.error) { kids.push(stateBox('error', 'Veri okunamadı', humanError(String(st.error.message ?? st.error), st.error?.code), 'woa-error')); root.replaceChildren(...kids); return; }
     if (!st.data) { kids.push(stateBox('loading', 'Yükleniyor…', '', 'woa-loading')); root.replaceChildren(...kids); return; }
     if (st.data.list) {
       kids.push(h('div', { class: 'own' }, 'Onaylı/üretimdeki siparişlerin kalemleri. Açık iş emri olan kalemde yeni ana iş emri açılmaz; mevcut iş emrine devam edilir.'),

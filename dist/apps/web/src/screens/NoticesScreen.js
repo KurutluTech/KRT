@@ -1,5 +1,6 @@
 // KMI-001 §001.5 — Bildirimler: one communication surface over the CANONICAL sources (PULSE alerts, approvals inbox, task floor). Read-only: every notice opens the real work screen /
 // object passport; decisions are made there (the server re-checks). A source that cannot be read is reported — never shown as "0 bildirim".
+import { humanError } from '../errorText.js';
 import { h, mount } from '../../../../packages/ui/src/h.js';
 import { NOTICE_KIND_TR, mergeNotices, noticeCounts, noticesFromAlerts, noticesFromApprovals, noticesFromTasks, waitingText } from '../../../../packages/domain/src/notices.js';
 import { passportHref } from '../passport/registry.js';
@@ -41,7 +42,7 @@ export async function renderNoticesScreen(container, deps, state = {}) {
         return await p();
     }
     catch (e) {
-        failed.push({ src, why: e instanceof Error ? e.message : String(e) });
+        failed.push({ src, why: humanError(e instanceof Error ? e.message : String(e), e?.code) });
         return [];
     } };
     const [alerts, approvals, tasks] = await Promise.all([safe('PULSE', deps.sources.alerts), safe('APPROVAL', deps.sources.approvals), safe('TASK', deps.sources.tasks)]);

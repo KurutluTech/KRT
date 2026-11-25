@@ -14,6 +14,7 @@ import { sumPeriods, distinctActiveWorkOrders, rankMachines, deadlineRisk, scrap
 import { passportHref } from '../passport/registry.js';
 import { initials } from '../ds.js';
 import { errorText as sharedErrorText } from '../errorText.js';
+import { classifyKioskError, KIOSK_TEXT_TR, publicSafeBoard } from '../liveApi.js';
 import { distributionBar, CHART_CSS } from '../charts.js';
 import { MACHINE_NAME_CSS } from '../machineCard.js';
 import { watchCncExpiry } from '../cncLive.js';
@@ -78,6 +79,9 @@ const fmt = (iso) => (iso ? new Intl.DateTimeFormat('tr-TR', { timeZone: 'Europe
 const ORDER_TR = { LATE: 'GECİKMİŞ', DUE_SOON: 'YAKLAŞIYOR', ON_TRACK: 'ZAMANINDA' };
 const errText = (e) => sharedErrorText(e);
 const renderSeq = new WeakMap();
+// KIOSK (oturumsuz TV): son BAŞARILI pano. Bağlantı kısa süre kesilirse boş/hata ekranı yerine son pano, "bağlantı yok" işaretiyle gösterilir; en çok 5 dk.
+const LAST_GOOD_MAX_MS = 5 * 60 * 1000;
+const lastGood = new WeakMap();
 export async function renderLiveScreen(container, api, state) {
     // A newer render of the same container (auto-refresh vs. a button press) supersedes this one: the older result must never overwrite the newer screen.
     const seq = (renderSeq.get(container) ?? 0) + 1;
@@ -86,11 +90,31 @@ export async function renderLiveScreen(container, api, state) {
     let board = null;
     let loadError = null;
     let displays = null;
+    let staleSince = null;
+    let loadKind = null;
     try {
         board = await api.board(profile);
+        // derinlemesine savunma: ekran (PUBLIC) görünümü sunucu yanlışlıkla müşteri alanı döndürse bile hiçbirini göstermez (NEW-W-03)
+        if (profile === 'PUBLIC')
+            board = publicSafeBoard(board);
+        if (state.mode === 'KIOSK' && board)
+            lastGood.set(container, { board, at: Date.now() });
+        state.failures = 0;
     }
     catch (e) {
-        loadError = errText(e);
+        state.failures = (state.failures ?? 0) + 1;
+        if (state.mode === 'KIOSK') {
+            // kiosk: ham hata metni ASLA gösterilmez; yalnız sınıflandırılmış güvenli mesaj (NEW-W-02)
+            loadKind = classifyKioskError(e);
+            loadError = KIOSK_TEXT_TR[loadKind];
+            const lg = lastGood.get(container);
+            if ((loadKind === 'KIOSK_OFFLINE' || loadKind === 'KIOSK_ERROR') && lg && Date.now() - lg.at <= LAST_GOOD_MAX_MS) {
+                board = lg.board;
+                staleSince = lg.at;
+            }
+        }
+        else
+            loadError = errText(e);
     }
     if (state.mode === 'APP') {
         try {
@@ -251,13 +275,15 @@ export async function renderLiveScreen(container, api, state) {
         return row;
     };
     const b = board;
-    mount(container, h('div', { class: `live${state.mode === 'KIOSK' ? ' kiosk' : ''}`, 'data-testid': 'live', 'data-profile': profile }, h('style', {}, CSS), h('div', { class: 'bar' }, h('h1', { style: 'margin:6px 0', 'data-testid': 'live-heading' }, b?.display ? `KURUTLU LIVE — ${b.display}` : 'KURUTLU LIVE — Fabrika Performansı · Canlı Operasyon'), b ? h('span', { class: 'chip', 'data-testid': 'live-shift' }, b.shift ? `Vardiya ${b.shift}` : 'Üretim vardiyası dışında') : null, state.mode === 'APP' ? h('button', { type: 'button', 'data-testid': 'live-profile-toggle', onClick: () => go({ profile: profile === 'OFFICE' ? 'PUBLIC' : 'OFFICE' }) }, profile === 'OFFICE' ? 'Ekran görünümü (atölye)' : 'Ofis görünümü') : null), loadError ? h('div', { 'data-testid': 'live-error', style: 'padding:10px;border-radius:8px;background:#7f1d1d;color:#fecaca' }, loadError === 'DISPLAY_TOKEN_INVALID' ? 'Ekran anahtarı geçersiz veya iptal edilmiş.' : `Yüklenemedi: ${loadError}`) : null, state.error ? h('div', { 'data-testid': 'live-action-error', style: 'padding:8px;border-radius:8px;background:#7f1d1d;color:#fecaca' }, state.error) : null, state.message ? h('div', { 'data-testid': 'live-message', style: 'padding:8px;border-radius:8px;background:#14532d;color:#bbf7d0' }, state.message) : null, state.newToken ? h('div', { 'data-testid': 'live-new-link', style: 'padding:8px;border-radius:8px;background:#422006;color:#fde68a;font-size:12px;overflow-wrap:anywhere' }, 'Bu bağlantı yalnız şimdi gösterilir, saklanmaz: ', h('code', {}, state.newToken)) : null, b ? h('div', { 'data-testid': 'live-honesty', style: 'padding:8px 12px;border-radius:10px;background:#2a1c05;border:1px solid #78350f;color:#fde68a;font-size:12px' }, `Telemetri bağlı değil: ${b.sourceNote} · ${PHYSICAL_TR} · ${FRESHNESS_TR[b.productionFreshness]} · Son üretim kaydı: ${fmt(b.lastProductionEventAt)} · Güncellendi: ${fmt(b.generatedAt)}`) : null, b ? kpi8(b) : null, b ? opsPanels(b) : null, b ? kpiStrip(b) : null, b ? h('section', { class: 'panel' }, h('h2', {}, 'Makine durumu'), liveDist(b), tabsRow(b), h('div', { class: 'grid', 'data-testid': 'live-grid' }, ...b.machines.map(machineTile))) : null, b ? h('section', { class: 'panel' }, h('h2', {}, 'Sipariş ilerlemesi (en yakın termin)'), b.orders.length ? h('div', { style: 'overflow-x:auto' }, h('table', { 'data-testid': 'live-orders' }, h('tbody', {}, ...b.orders.map((o) => h('tr', { 'data-testid': 'live-order', 'data-state': o.state }, h('td', {}, o.productCode ?? '—'), o.customerPo !== undefined ? h('td', {}, o.customerPo ?? '—') : null, h('td', {}, o.dueDate), h('td', {}, `${NUM.format(o.produced)}/${NUM.format(o.qty)} üretim · ${NUM.format(o.shipped)} sevk`), h('td', { style: 'font-weight:800' }, ORDER_TR[o.state] ?? o.state))))))
+    mount(container, h('div', { class: `live${state.mode === 'KIOSK' ? ' kiosk' : ''}`, 'data-testid': 'live', 'data-profile': profile }, h('style', {}, CSS), h('div', { class: 'bar' }, h('h1', { style: 'margin:6px 0', 'data-testid': 'live-heading' }, b?.display ? `KURUTLU LIVE — ${b.display}` : 'KURUTLU LIVE — Fabrika Performansı · Canlı Operasyon'), b ? h('span', { class: 'chip', 'data-testid': 'live-shift' }, b.shift ? `Vardiya ${b.shift}` : 'Üretim vardiyası dışında') : null, state.mode === 'APP' ? h('button', { type: 'button', 'data-testid': 'live-profile-toggle', onClick: () => go({ profile: profile === 'OFFICE' ? 'PUBLIC' : 'OFFICE' }) }, profile === 'OFFICE' ? 'Ekran görünümü (atölye)' : 'Ofis görünümü') : null), loadError ? h('div', { 'data-testid': 'live-error', 'data-kind': loadKind ?? 'APP', role: 'alert', style: 'padding:10px;border-radius:8px;background:#7f1d1d;color:#fecaca' }, state.mode === 'KIOSK' ? (staleSince ? `${loadError} Gösterilen veri ${new Date(staleSince).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })} tarihlidir; yeniden deneniyor.` : loadError) : `Yüklenemedi: ${loadError}`) : null, state.error ? h('div', { 'data-testid': 'live-action-error', style: 'padding:8px;border-radius:8px;background:#7f1d1d;color:#fecaca' }, state.error) : null, state.message ? h('div', { 'data-testid': 'live-message', style: 'padding:8px;border-radius:8px;background:#14532d;color:#bbf7d0' }, state.message) : null, state.newToken ? h('div', { 'data-testid': 'live-new-link', style: 'padding:8px;border-radius:8px;background:#422006;color:#fde68a;font-size:12px;overflow-wrap:anywhere' }, 'Bu bağlantı yalnız şimdi gösterilir, saklanmaz: ', h('code', {}, state.newToken)) : null, b ? h('div', { 'data-testid': 'live-honesty', style: 'padding:8px 12px;border-radius:10px;background:#2a1c05;border:1px solid #78350f;color:#fde68a;font-size:12px' }, `Telemetri bağlı değil: ${b.sourceNote} · ${PHYSICAL_TR} · ${FRESHNESS_TR[b.productionFreshness]} · Son üretim kaydı: ${fmt(b.lastProductionEventAt)} · Güncellendi: ${fmt(b.generatedAt)}`) : null, b ? kpi8(b) : null, b ? opsPanels(b) : null, b ? kpiStrip(b) : null, b ? h('section', { class: 'panel' }, h('h2', {}, 'Makine durumu'), liveDist(b), tabsRow(b), h('div', { class: 'grid', 'data-testid': 'live-grid' }, ...b.machines.map(machineTile))) : null, b ? h('section', { class: 'panel' }, h('h2', {}, 'Sipariş ilerlemesi (en yakın termin)'), b.orders.length ? h('div', { style: 'overflow-x:auto' }, h('table', { 'data-testid': 'live-orders' }, h('tbody', {}, ...b.orders.map((o) => h('tr', { 'data-testid': 'live-order', 'data-state': o.state }, h('td', {}, o.productCode ?? '—'), o.customerPo !== undefined && profile !== 'PUBLIC' && state.mode !== 'KIOSK' ? h('td', {}, o.customerPo ?? '—') : null, h('td', {}, o.dueDate), h('td', {}, `${NUM.format(o.produced)}/${NUM.format(o.qty)} üretim · ${NUM.format(o.shipped)} sevk`), h('td', { style: 'font-weight:800' }, ORDER_TR[o.state] ?? o.state))))))
         : h('div', { class: 'small' }, 'Açık sipariş satırı yok.')) : null, b ? h('section', { class: 'panel' }, h('h2', {}, 'Vardiya karşılaştırması (dün / bugün)'), b.shiftCompare.length ? h('table', { 'data-testid': 'live-compare' }, h('tbody', {}, ...b.shiftCompare.map((x) => h('tr', {}, h('td', {}, x.day), h('td', {}, x.shift === 'OUT_OF_SHIFT' ? 'vardiya dışı' : x.shift), h('td', {}, `${NUM.format(x.good)} sağlam`), h('td', {}, `${NUM.format(x.scrap)} fire`)))))
         : h('div', { class: 'small', 'data-testid': 'live-compare-empty' }, 'Dün ve bugün üretim kaydı yok (VERİ YOK — "sıfır üretim" anlamına gelmez).')) : null, displays ? displaysPanel(displays) : null));
     const sel = GROUPS.find((g) => g[0] === state.group);
     if (sel && sel[2])
         container.querySelectorAll('[data-testid="live-machine"]').forEach((el) => { el.hidden = !sel[2].includes(el.dataset.headline ?? ''); });
-    const ms = state.refreshMs ?? 30000;
+    // bağlantı/okuma hatasında kiosk daha sık dener (5 sn, 10, 20 … en çok normal yenileme aralığı); başarıda normal aralığa döner
+    const baseMs = state.refreshMs ?? 30000;
+    const ms = loadError && state.mode === 'KIOSK' && baseMs > 0 && loadKind !== 'DISPLAY_TOKEN_INVALID' ? Math.min(baseMs, 5000 * 2 ** Math.min(state.failures ?? 1, 6) / 2) : baseMs;
     // Auto-refresh re-renders the whole screen; never do that while the person is working in the screen-management panel
     // (it would collapse the panel and wipe what they are typing) — try again on the next tick instead.
     const tick = () => {

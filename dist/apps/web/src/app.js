@@ -193,6 +193,7 @@ import { OBJECT_CARD_CSS } from './objectCard.js';
 import { renderHomeShow, showsFleet, HOME_SHOW_CSS } from './homeShow.js';
 import { createHomeLoader } from './homeLoader.js';
 import { createHomePrefsApi } from './homePrefsApi.js';
+import { humanError } from './errorText.js';
 import { applyOrder, moveSection, orderStorageKey } from '../../../packages/domain/src/smartHome.js';
 import { SPINDLE_CSS } from './spindle.js';
 import { MACHINE_CARD_CSS } from './machineCard.js';
@@ -615,10 +616,14 @@ export async function startApp(root, opts = {}) {
         loginNotice = undefined;
         expiredHandled = true;
         if (ending) {
-            try {
-                await withTimeout(client.rpc('log_session_event', { p_kind: reason === 'IDLE' ? 'IDLE_SIGNOUT' : 'REMOTE_SIGNOUT', p_reason: reason }, ending), 2500);
+            // S-FE: log_session_event yerel/kanonik zincirde YOK (karar K-2, opsiyonel 871). Özellik bayrağı kapalıyken (varsayılan) hiç çağrılmaz;
+            // yalnız sunucuda fonksiyon kurulduktan sonra config.js `features: { sessionEvent: true }` ile açılır.
+            if (window.KMI_NEXT_CONFIG?.features?.sessionEvent === true) {
+                try {
+                    await withTimeout(client.rpc('log_session_event', { p_kind: reason === 'IDLE' ? 'IDLE_SIGNOUT' : 'REMOTE_SIGNOUT', p_reason: reason }, ending), 2500);
+                }
+                catch { /* audit function not deployed / unreachable: the screen is closed anyway */ }
             }
-            catch { /* audit function not deployed / unreachable: the screen is closed anyway */ }
             try {
                 await withTimeout(client.auth.signOut(ending), 3000);
             }
@@ -750,7 +755,7 @@ export async function startApp(root, opts = {}) {
                     await route();
             }
             catch (err) {
-                renderLogin(err instanceof Error ? `Giriş başarısız: ${err.message}` : 'Giriş başarısız', mode, 'error');
+                renderLogin(err instanceof Error ? `Giriş başarısız: ${humanError(err.message, err.code)}` : 'Giriş başarısız', mode, 'error');
             }
         };
         const dbText = h('span', {}, 'Veritabanı bağlantısı kontrol ediliyor…');

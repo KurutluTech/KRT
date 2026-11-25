@@ -1,4 +1,5 @@
 // Üçlü perspektif kartı (iş emri operasyonu) + kanonik çevrim özeti (rota/makine). Yalnız gösterir; sunucu hesabını yeniden hesaplamaz.
+import { humanError } from '../../errorText.js';
 import { h } from '../../../../../packages/ui/src/h.js';
 import { tripleView, canonicalCycleView, camStateView } from '../../../../../packages/domain/src/opTriple.js';
 const TONE = { ok: '#34d399', warn: '#fbbf24', bad: '#f87171' };
@@ -45,13 +46,13 @@ export function camImprovementBox(raw, onApprove, onApply) {
         msg.textContent = ''; btn.disabled = true;
         try { const r = await onApprove({ cam: sel.value || null, cycle: cyc.value === '' ? null : Number(cyc.value), reason: why.value, expectedVersion: v.expectedVersion });
             msg.textContent = r?.alreadyApplied ? 'Zaten uygulanmış — değişiklik yapılmadı.' : `CAM teknik onayı kaydedildi (rota sürümü ${r?.versionNo}). İlk parça kalite onayı ayrıdır; CAM onayı yerine geçmez.`; }
-        catch (e) { msg.textContent = `Kaydedilemedi: ${e?.message ?? e}`; } finally { btn.disabled = false; } } }, 'CAM teknik onayı ver');
+        catch (e) { msg.textContent = `Kaydedilemedi: ${humanError(String(e?.message ?? e), e?.code)}`; } finally { btn.disabled = false; } } }, 'CAM teknik onayı ver');
     const waiting = v.wo.filter((w) => w.stage === 'RESYNC_BEKLIYOR').length;
     const applyMsg = h('div', { 'data-testid': 'cam-apply-msg', class: 'ps-ts' });
     const applyBtn = (onApply && waiting > 0) ? h('button', { type: 'button', 'data-testid': 'cam-apply', onClick: async () => {
         applyMsg.textContent = ''; applyBtn.disabled = true;
         try { const r = await onApply(why.value); applyMsg.textContent = r?.alreadyApplied ? 'Uygulanacak değişiklik yok.' : `${r?.applied ?? 0} iş emri operasyonu yeni CAM revizyonuna alındı; başlamış ${r?.frozenStarted ?? 0} operasyon donuk kaldı. Makine, operatör, kalite ve HOLD değişmedi.`; }
-        catch (e) { applyMsg.textContent = `Uygulanamadı: ${e?.message ?? e}`; } finally { applyBtn.disabled = false; } } }, `Onaylı CAM'i başlamamış ${waiting} iş emri operasyonuna uygula`) : null;
+        catch (e) { applyMsg.textContent = `Uygulanamadı: ${humanError(String(e?.message ?? e), e?.code)}`; } finally { applyBtn.disabled = false; } } }, `Onaylı CAM'i başlamamış ${waiting} iş emri operasyonuna uygula`) : null;
     return h('div', { 'data-testid': 'cam-box' },
         h('div', {}, h('span', { style: 'color:#94a3b8' }, 'Mevcut onaylı standart: '), `${v.standard.seconds == null ? 'girilmemiş' : `${v.standard.seconds} sn`} (${v.standard.source})`),
         v.currentCam ? h('div', {}, h('span', { style: 'color:#94a3b8' }, 'Bağlı CAM: '), `${v.currentCam.text}${v.currentCam.technicalCycle != null ? ` · teknik hedef ${v.currentCam.technicalCycle} sn (onaylı standart değildir)` : ''}`) : null,

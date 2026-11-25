@@ -1,3 +1,4 @@
+import { humanError } from '../../errorText.js';
 // Planlama Merkezi — metinler ve tarih yardımcıları (saf, DOM yok).
 export const SHIFT_TR = { TeamK1: '1. Vardiya (08–16)', TeamK2: '2. Vardiya (16–24)', TeamOfis: 'Ofis' };
 export const SHIFT_SHORT = { TeamK1: 'V1', TeamK2: 'V2' };
@@ -35,7 +36,7 @@ const ERR = [
   [/ORDER_MUST_CONTAIN_ALL_PLANNED_SLICES_ONCE/, () => 'Sıralama listesi güncel değil; yenileyin.'], [/duplicate key|one_started/, () => 'Bu operasyonda zaten başlamış bir dilim var.'],
   [/SLICE_ALREADY_STARTED_OR_CLOSED/, () => 'Dilim zaten başlatılmış veya kapanmış.'], [/UNAUTHENTICATED|JWT/, () => 'Oturum süresi dolmuş; yeniden giriş yapın.'],
 ];
-export function errText(e) { const msg = `${e?.code ?? ''} ${e?.message ?? e ?? ''}`.trim(); for (const [re, f] of ERR) { const m = re.exec(msg); if (m) return f(m); } return msg ? `İşlem başarısız: ${msg.slice(0, 160)}` : 'İşlem başarısız.'; }
+export function errText(e) { const msg = `${e?.code ?? ''} ${e?.message ?? e ?? ''}`.trim(); for (const [re, f] of ERR) { const m = re.exec(msg); if (m) return f(m); } if (!msg) return 'İşlem başarısız.'; const raw = String(e?.message ?? e ?? ''); const hm = humanError(raw, e?.code); return hm !== raw ? hm : `İşlem başarısız: ${msg.slice(0, 160)}`; }
 export const isBackendMissing = (e) => /PGRST202|Could not find the function|schema cache|42883|42703|42P01|does not exist|PLAN_BACKEND_MISSING/.test(`${e?.code ?? ''} ${e?.message ?? e ?? ''}`);
 export const isConflict = (e) => /VERSION_CONFLICT/.test(String(e?.message ?? ''));
 // ---- tarih (yerel saat dilimi bağımsız; 'YYYY-MM-DD' metni üzerinde) ----

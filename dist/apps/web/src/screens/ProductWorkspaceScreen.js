@@ -724,6 +724,11 @@ export async function renderProductWorkspaceScreen(container, api, state = {}) {
             const kerf = h('input', { 'data-testid': 'pw-bom-kerf', inputmode: 'decimal', placeholder: '0,9 (KMI varsayılanı)', value: sp && sp.kerfSource === 'EXCEPTION' ? fmtIn(sp.kerfMm) : '' });
             const kerfWhy = h('input', { 'data-testid': 'pw-bom-kerf-reason', placeholder: 'Varsayılandan farklıysa neden?', value: sp?.kerfReason ?? '' });
             const den = h('input', { 'data-testid': 'pw-bom-den', inputmode: 'decimal', placeholder: '7,85 (çelik varsayılanı)', value: sp && sp.densitySource === 'SPEC' ? fmtIn(sp.densityGCm3) : '' });
+            const tolP = h('input', { 'data-testid': 'pw-bom-tol-plus', inputmode: 'decimal', placeholder: 'Üst tolerans + mm' });
+            const tolM = h('input', { 'data-testid': 'pw-bom-tol-minus', inputmode: 'decimal', placeholder: 'Alt tolerans − mm' });
+            const tolS = h('input', { 'data-testid': 'pw-bom-tol-src', placeholder: 'Teknik resim no / revizyon (zorunlu)' });
+            const tolNow = h('div', { class: 'mut', 'data-testid': 'pw-bom-tol-now' }, 'Kayıtlı tolerans: okunuyor…');
+            if (api.barTolerances) void api.barTolerances(rev.id).then((rows) => { const t = rows.find((x) => x.cut_tol_plus_mm !== null && x.cut_tol_plus_mm !== undefined); tolNow.textContent = t ? `Kayıtlı tolerans: +${t.cut_tol_plus_mm} / −${t.cut_tol_minus_mm} mm · kaynak: ${t.cut_tol_source ?? '—'}` : 'Kayıtlı tolerans YOK — mühendislik kararı gelene kadar boş kalır; boşken CUT/PREP kalite onayı verilemez.'; });
             const pq = h('input', { 'data-testid': 'pw-bom-prevqty', inputmode: 'numeric', value: '37', 'aria-label': 'Önizleme adedi' });
             const prev = E('div', { 'data-testid': 'pw-bom-preview', class: 'kx-sub mut' });
             const setReasonDefault = () => { if (!val(reason).trim() || reason.dataset['auto'] === '1') {
@@ -752,6 +757,8 @@ export async function renderProductWorkspaceScreen(container, api, state = {}) {
                 el.addEventListener('input', refresh);
                 el.addEventListener('change', refresh);
             }
+            const tolBox = E('div', { 'data-testid': 'pw-bom-tol' }, E('b', {}, 'Kesim toleransı (mühendislik)'), tolNow, E('div', { class: 'fgrid' }, field('Üst tolerans + (mm)', tolP, 'Boş = mevcut korunur'), field('Alt tolerans − (mm)', tolM, 'Üst ve alt birlikte girilir'), field('Teknik resim / revizyon', tolS, 'Toleransın kaynağı')));
+            barBox.append(tolBox);
             barBox.append(E('div', { class: 'fgrid' }, field('Çap (mm)', dia), field('Standart çubuk boyu (mm)', bar), field('Kesim / ham parça boyu (mm)', cut)), ...(pilot && !sp && m.kind === 'add' ? [E('div', { class: 'row', 'data-testid': 'pw-bom-pilot' }, E('span', { class: 'mut' }, `Pilot referansı (henüz kayıtlı değil): ${pilot.material} · Ø${pilot.dia} · ${pilot.bar} mm çubuk · ${pilot.cut} mm kesim.`), btn('ghost sm', 'pw-bom-pilot-fill', 'Forma al', () => { code.value = code.value || pilot.material; dia.value = String(pilot.dia); bar.value = String(pilot.bar); cut.value = String(pilot.cut); refresh(); }))] : []), E('div', { class: 'row', style: 'align-items:flex-end' }, field('Önizleme adedi', pq)), prev, fold('İleri düzey: testere payı, yoğunluk', [E('div', { class: 'fgrid' }, field('Testere payı (mm)', kerf, 'Boş = KMI varsayılanı 0,9 mm'), field('Farklıysa neden', kerfWhy), field('Yoğunluk (g/cm³)', den, 'Boş = çelik varsayılanı (ölçülmüş değer değildir)'))]));
             const submit = async () => {
                 const qv = num(val(q));
@@ -811,7 +818,11 @@ export async function renderProductWorkspaceScreen(container, api, state = {}) {
                     }
                     if (bar1) {
                         const k = num(val(kerf)), de = num(val(den));
-                        await api.barSpecSave(rev.id, c, num(val(dia)), num(val(bar)), num(val(cut)), k, k === null ? null : val(kerfWhy).trim() || null, de, val(reason).trim());
+                        const tp = num(val(tolP)), tm = num(val(tolM)), ts = val(tolS).trim();
+                        const tolGiven = tp !== null || tm !== null || ts.length > 0;
+                        if (tolGiven && (tp === null || tm === null || Number.isNaN(tp) || Number.isNaN(tm) || tp < 0 || tm < 0 || ts.length < 3))
+                            throw new Error('Tolerans için üst ve alt değer (≥ 0) ile teknik resim/revizyon birlikte girilmeli.');
+                        await api.barSpecSave(rev.id, c, num(val(dia)), num(val(bar)), num(val(cut)), k, k === null ? null : val(kerfWhy).trim() || null, de, val(reason).trim(), tolGiven ? { plus: tp, minus: tm, source: ts } : undefined);
                     }
                     await reload(bar1 ? `BOM taslağı kaydedildi: ${c} · çubuk tanımı güncel. Stok ayrılmadı.` : created ? `BOM satırı eklendi: ${c} ${fmt(qv)} /adet.` : `BOM satırı güncellendi: ${c} — adet ${changeText(cur?.qtyPerUnit, qv)}, fire % ${changeText(cur?.scrapAllowancePct, sv)}.`);
                 }
