@@ -21,7 +21,7 @@ import { drawBarStock, fmtMm } from './barStockPanel.js';
 import { drawRouteChanges } from './routeChangePanel.js';
 import { drawOpPrep } from './opPrepPanel.js';
 import { drawCutMethod } from './cutMethodPanel.js';
-import { drawOpBoxes, isCutPrep, movableOps, opLabel, fixCutPrepText } from './opBoxes.js';
+import { drawOpBoxes, isCutPrep, movableOps, opLabel, fixCutPrepText, listMoveOrder } from './opBoxes.js';
 import { barPlanPreview, DEFAULT_KERF_MM, DEFAULT_STEEL_DENSITY } from '../../../../packages/domain/src/barStock.js';
 import { KX_CSS, NA, card, chip, emptyState, field, fmt, fold, fromBase64, invalid, isChecked, kvItem, showFile, toBase64, val, when } from '../kx.js';
 const PW_CSS = ENG_CSS + `
@@ -543,12 +543,9 @@ export async function renderProductWorkspaceScreen(container, api, state = {}) {
                 onSave: async (ids, why) => { try { await api.reorder(rev.id, ids, why); pendingOrder = null; await reload('Operasyon sırası kaydedildi; OP numaraları yeniden hesaplandı (kimlikler, NC/CAM/takım ve kalite bağları korundu).'); } catch (e) { pendingOrder = null; drawBoxes(); fail(e); } } });
         };
         const move = async (o, dir) => {
-            const ids = activeOps.map((x) => x.id);
-            const i = ids.indexOf(o.id);
-            const j = i + dir;
-            if (j < 0 || j >= ids.length)
+            const ids = listMoveOrder(ws.routing, o, dir); // 011.02: CUT/PREP sıralamaya girmez (kutu görünümüyle aynı kural)
+            if (!ids)
                 return;
-            [ids[i], ids[j]] = [ids[j], ids[i]];
             const why = prompt0(`${opLabel(o)} sırası değiştirildi`);
             if (why === null)
                 return;
@@ -571,7 +568,7 @@ export async function renderProductWorkspaceScreen(container, api, state = {}) {
             const preLine = o.dependsOn.length ? `Ön koşul: ${o.dependsOn.map((d) => opLabel(activeOps.find((a) => a.id === d.operationId) ?? d)).join(', ')}` : null;
             const qcLine = o.qcPoints.length ? `Kalite noktaları: ${o.qcPoints.map((q) => `KN${q.pointNo} ${q.label}${q.controlPlan ? ` [plan ${q.controlPlan}]` : ''}`).join('; ')}` : null;
             const docLine = o.documents.length ? `Belgeler: ${o.documents.map((d) => d.docNo).join(', ')}` : null;
-            return E('div', { class: `opc ${open ? 'open' : ''} ${o.active ? '' : 'off'}`, 'data-testid': 'pw-op', 'data-op': o.opCode, 'data-op-id': o.id, 'data-active': String(o.active), 'data-state': st }, E('div', { class: 'opr' }, E('span', { class: 'code' }, opLabel(o)), E('div', { class: 'nm' }, o.name, ' ', stateChip(st), o.active ? null : [' ', chip('Pasif', 'bad')]), E('div', { class: 'c-machine' }, lbl('Makine', ''), o.machines.length ? o.machines.map((m) => (m.primary ? `★${m.code}` : m.code)).join(', ') : NA), E('div', { class: 'num' }, lbl('Hazırlık', ''), `${fmt(o.setupMinutes)} `, o.setupMinutes != null ? E('span', { class: 'u' }, 'dk') : null), E('div', { class: 'num' }, lbl('Çevrim', ''), `${fmt(o.cycleSeconds)} `, o.cycleSeconds != null ? E('span', { class: 'u' }, 'sn') : null), E('div', { class: 'num' }, lbl('Muayene', ''), `${fmt(o.inspectionSeconds)} `, o.inspectionSeconds != null ? E('span', { class: 'u' }, 'sn') : null), E('div', { class: 'c-cam' }, lbl('CAM', ''), o.camProgram ?? E('span', { class: 'mut' }, 'yok')), E('div', { class: 'acts' }, btn('ghost sm', `pw-op-toggle-${o.opCode}`, open ? 'Kapat' : (editOk && o.active ? 'Düzenle' : 'Aç'), () => toggleOp(o.id)), can.editStructure && o.active ? btn('ghost sm icon', `pw-op-up-${o.opCode}`, '↑', () => void move(o, -1), { 'aria-label': `${opLabel(o)} yukarı taşı`, ...(idx === 0 ? {} : {}) }) : null, can.editStructure && o.active ? btn('ghost sm icon', `pw-op-down-${o.opCode}`, '↓', () => void move(o, 1), { 'aria-label': `${opLabel(o)} aşağı taşı` }) : null, can.editStructure ? E('details', { class: 'more', 'data-testid': `pw-op-more-${o.opCode}` }, E('summary', { class: 'ghost sm', 'aria-label': `${opLabel(o)} diğer işlemler` }, '⋯'), E('div', { class: 'moremenu' }, btn(o.active ? 'danger sm' : 'ghost sm', `pw-op-active-${o.opCode}`, o.active ? 'Pasife al' : 'Etkinleştir', () => { const why = prompt0(); if (why === null)
+            return E('div', { class: `opc ${open ? 'open' : ''} ${o.active ? '' : 'off'}`, 'data-testid': 'pw-op', 'data-op': o.opCode, 'data-op-id': o.id, 'data-active': String(o.active), 'data-state': st }, E('div', { class: 'opr' }, E('span', { class: 'code' }, opLabel(o)), E('div', { class: 'nm' }, o.name, ' ', stateChip(st), o.active ? null : [' ', chip('Pasif', 'bad')]), E('div', { class: 'c-machine' }, lbl('Makine', ''), o.machines.length ? o.machines.map((m) => (m.primary ? `★${m.code}` : m.code)).join(', ') : NA), E('div', { class: 'num' }, lbl('Hazırlık', ''), `${fmt(o.setupMinutes)} `, o.setupMinutes != null ? E('span', { class: 'u' }, 'dk') : null), E('div', { class: 'num' }, lbl('Çevrim', ''), `${fmt(o.cycleSeconds)} `, o.cycleSeconds != null ? E('span', { class: 'u' }, 'sn') : null), E('div', { class: 'num' }, lbl('Muayene', ''), `${fmt(o.inspectionSeconds)} `, o.inspectionSeconds != null ? E('span', { class: 'u' }, 'sn') : null), E('div', { class: 'c-cam' }, lbl('CAM', ''), o.camProgram ?? E('span', { class: 'mut' }, 'yok')), E('div', { class: 'acts' }, btn('ghost sm', `pw-op-toggle-${o.opCode}`, open ? 'Kapat' : (editOk && o.active ? 'Düzenle' : 'Aç'), () => toggleOp(o.id)), can.editStructure && o.active && !isCutPrep(o) ? btn('ghost sm icon', `pw-op-up-${o.opCode}`, '↑', () => void move(o, -1), { 'aria-label': `${opLabel(o)} yukarı taşı`, ...(idx === 0 ? {} : {}) }) : null, can.editStructure && o.active && !isCutPrep(o) ? btn('ghost sm icon', `pw-op-down-${o.opCode}`, '↓', () => void move(o, 1), { 'aria-label': `${opLabel(o)} aşağı taşı` }) : null, can.editStructure ? E('details', { class: 'more', 'data-testid': `pw-op-more-${o.opCode}` }, E('summary', { class: 'ghost sm', 'aria-label': `${opLabel(o)} diğer işlemler` }, '⋯'), E('div', { class: 'moremenu' }, btn(o.active ? 'danger sm' : 'ghost sm', `pw-op-active-${o.opCode}`, o.active ? 'Pasife al' : 'Etkinleştir', () => { const why = prompt0(); if (why === null)
                 return; void (async () => { try {
                 await api.setActive(o.id, !o.active, why);
                 await reload(o.active ? `${opLabel(o)} pasife alındı (silinmez, geçmişi korunur).` : `${opLabel(o)} etkinleştirildi.`, 'ok', { openOp: o.id });

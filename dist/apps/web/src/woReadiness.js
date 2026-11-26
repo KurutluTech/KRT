@@ -20,6 +20,11 @@ const RULES = [
     [/^OPERATOR_NOT_QUALIFIED/, () => ({ title: 'Seçili operatörün bu makine için yetkinliği yok', detail: null, fix: { type: 'focus', id: 'operator' }, fixLabel: 'Operatörü değiştir' })],
     [/^OPERATOR_QUALIFICATION_EXPIRED/, () => ({ title: 'Operatörün yetkinlik süresi dolmuş', detail: null, fix: { type: 'focus', id: 'operator' }, fixLabel: 'Operatörü değiştir' })],
     [/MULTI_MACHINE|HARD_CAP/, () => ({ title: 'Operatörün çok-makine yetkisi yetersiz', detail: 'Operatör aynı anda bu kadar makinede çalışamaz.', fix: { type: 'focus', id: 'operator' }, fixLabel: 'Operatörü değiştir' })],
+    // 010.08: eksik / geçersiz teknik doküman üretim hazırlığını engeller (karar sunucuda; burada yalnız okunur metin + Doküman Kontrol bağlantısı)
+    [/^DOCUMENT_NOT_EFFECTIVE/, (c) => ({ title: 'Teknik doküman eksik veya yürürlükte değil', detail: tail(c) ? `Doküman türü: ${tail(c)} — onaylı ve GEÇERLİ sürüm olmadan üretim başlatılamaz.` : 'Onaylı ve GEÇERLİ sürüm olmadan üretim başlatılamaz.', fix: { type: 'link', href: '#/dokuman-kontrol' }, fixLabel: 'Doküman Kontrol\'e git' })],
+    [/^DOCUMENT_CHANGE_UNACKNOWLEDGED/, (c) => ({ title: 'Doküman sürümü değişti — dağıtım kararı bekliyor', detail: `${tail(c) ? `Doküman türü: ${tail(c)} — ` : ''}İş açıkken yeni sürüm yürürlüğe girdi; Doküman Kontrol > Dağıtım bölümünde "yeni sürüme geç" ya da gerekçeli istisna kararı verilmeden iş başlatılamaz.`, fix: { type: 'link', href: '#/dokuman-kontrol' }, fixLabel: 'Doküman Kontrol\'e git' })],
+    [/^DOCUMENT_REVISION_MISMATCH/, () => ({ title: 'Doküman revizyonu ürün revizyonuyla uyuşmuyor', detail: 'Belgede yazan revizyon ile ürün revizyonu farklı; doğru revizyonlu sürüm yürürlüğe alınmalı.', fix: { type: 'link', href: '#/dokuman-kontrol' }, fixLabel: 'Doküman Kontrol\'e git' })],
+    [/^DOCUMENT_(WITHDRAWN|INVALID|EXPIRED|FILE_MISSING)/, () => ({ title: 'Teknik doküman geçersiz (geri çekilmiş / süresi dolmuş / dosya eksik)', detail: 'Geçersiz doküman GEÇERLİ sayılmaz; yeni sürüm yüklenip yürürlüğe alınmalı.', fix: { type: 'link', href: '#/dokuman-kontrol' }, fixLabel: 'Doküman Kontrol\'e git' })],
 ];
 export function describeBlocker(code, woId) {
     const hit = RULES.find(([re]) => re.test(code));
@@ -57,6 +62,7 @@ function entryLink(code, ctx) {
     if (code === 'OPERATOR_NOT_ASSIGNED') return null;
     if (PAIR_CODES.test(code)) return { href: '#/personel-makine', label: 'Eşleştirmeye git' };
     if (code === 'CAM_NOT_LINKED') return null;   // WO üzerindeki “Programı bağla” (odak) yeterli
+    if (/^DOCUMENT_/.test(code)) return { href: '#/dokuman-kontrol', label: 'Doküman Kontrol\'e git' };   // 010.08
     if (ROUTE_CODES.test(code) && ctx?.revisionId) return { href: `#/rota-hazirlik?rev=${ctx.revisionId}`, label: 'Rota hazırlığa git' };
     return null;
 }

@@ -16,6 +16,16 @@ export function moveInOrder(order, from, to) {
     if (from === to || from < 0 || to < 0 || from >= order.length || to >= order.length) return order.slice();
     const a = order.slice(); const [x] = a.splice(from, 1); a.splice(to, 0, x); return a;
 }
+/** 011.02 liste görünümü ↑/↓: tek adım taşıma sonrası routing_reorder'a gidecek kimlik sırası (CUT/PREP hiç girmez).
+ *  CUT/PREP, pasif veya sınır dışı taşımada null döner → çağrı yapılmaz. */
+export function listMoveOrder(ops, op, dir) {
+    if (!op || isCutPrep(op) || !op.active) return null;
+    const ids = movableOps(ops).map((o) => o.id);
+    const i = ids.indexOf(op.id); const j = i + dir;
+    if (i < 0 || j < 0 || j >= ids.length) return null;
+    [ids[i], ids[j]] = [ids[j], ids[i]];
+    return ids;
+}
 /** Sıralamanın sunucuda alacağı kodlar: sıra*10 → OP10, OP20 … (sunucudaki routing_reorder ile aynı kural). */
 export const previewCode = (index) => `OP${(index + 1) * 10}`;
 export const sameOrder = (a, b) => a.length === b.length && a.every((x, i) => x === b[i]);

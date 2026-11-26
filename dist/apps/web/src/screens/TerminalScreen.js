@@ -86,6 +86,9 @@ const REFUSAL_TR = [
     [/^NO_INPUT_QUANTITY/, 'Operasyona girecek adet yok'],
     [/^MACHINE_SKILL_REQUIREMENTS_UNKNOWN/, 'Makinenin beceri gereksinimi tanımlı değil'],
     [/^DOCUMENT_NOT_EFFECTIVE/, 'Çizim / doküman yürürlükte değil'],
+    [/^DOCUMENT_CHANGE_UNACKNOWLEDGED/, 'Doküman sürümü değişti — sorumlunun kararı bekleniyor'],   // 010.08
+    [/^DOCUMENT_REVISION_MISMATCH/, 'Doküman revizyonu ürün revizyonuyla uyuşmuyor'],
+    [/^DOCUMENT_(WITHDRAWN|INVALID|EXPIRED|FILE_MISSING)/, 'Doküman geçersiz (geri çekilmiş / süresi dolmuş)'],
     [/^TOOL_LIST_REQUIRED/, 'Takım listesi yürürlükte değil'],
     [/^TOOLIST_RECHECK_PENDING/, 'Takım listesi değişti — yeniden kontrol bekliyor'],
     [/^OPERATION_NOT_PENDING/, 'Operasyon zaten başlamış'],

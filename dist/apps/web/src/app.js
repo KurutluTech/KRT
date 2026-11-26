@@ -157,6 +157,7 @@ import { renderCatalogCenterScreen } from './screens/CatalogCenterScreen.js';
 import { createSearchApi } from './searchApi.js';
 import { renderSearchScreen } from './screens/SearchScreen.js';
 import { createTaskFloorApi } from './taskFloorApi.js';
+import { renderPriorityCard } from './homePriorityCard.js';
 import { renderTaskFloorScreen } from './screens/TaskFloorScreen.js';
 import { createCutPrepPanelApi } from './cutprepPanelApi.js';
 import { renderCutPrepPanelScreen } from './screens/CutPrepPanelScreen.js';
@@ -1065,7 +1066,10 @@ export async function startApp(root, opts = {}) {
                 const catHost = h('div', { 'data-testid': 'cockpit-catalog-host' });
                 const hasCatalog = homeCardsFor(homeAccess).length > 0;
                 const catalog = hasCatalog ? h('details', { class: 'hs-catalog cp-block', 'data-testid': 'home-catalog' }, h('summary', {}, 'Ayrıntılı gösterge kataloğu'), catHost) : null;
-                host.replaceChildren(showHost, ...(catalog ? [catalog] : []));
+                const priHost = h('div', { 'data-testid': 'home-priority-host' });
+                let priReqs = null; // otomatik görev gereksinim ilerlemesi (STE): bir kez okunur, yoksa kart onsuz çalışır
+                void createTaskFloorApi(client, session).requirementOverview().then((rows) => { priReqs = new Map(rows.map((r) => [r.taskId ?? r.task_id, { done: Number(r.satisfied ?? 0), total: Number(r.total ?? 0) }])); if (last) draw(); }).catch(() => { });
+                host.replaceChildren(priHost, showHost, ...(catalog ? [catalog] : []));
                 host.hidden = false;
                 let last = null;
                 let catLoaded = false;
@@ -1074,6 +1078,7 @@ export async function startApp(root, opts = {}) {
                     if (!last)
                         return;
                     const nowMs = Date.now();
+                    try { renderPriorityCard(priHost, last.tasks, nowMs, { reqs: priReqs, approvalsPending: last.approvalsPending, loadedAt: last.loadedAt, sources: last.sources, onRefresh: () => loader.refresh() }); } catch { /* kart başarısız olsa da ana sayfa çizilir */ }
                     const recent = navState.recent;
                     const order = applyOrder(present(), savedOrder);
                     renderHomeShow(showHost, { snapshot: last.snapshot, board: last.board, info: new Map(last.info.map((m) => [m.code, m])), approvalsInQueue: last.approvalsPending, approvalsPending: last.approvalsPending === null ? null : last.approvalsPending + countGates((last.tasks?.derived ?? []).map((d) => ({ sourceType: d.sourceType, sourceId: d.sourceId, title: d.title, status: d.status, due: d.due ?? null, route: d.route ?? null })), new Set(access.actions)), access: homeAccess, nowMs, canOpen: (p) => canOpen(p, access),
